@@ -33,10 +33,10 @@ const FRESH_ARRIVALS = [
 ];
 
 const NEARBY = [
-    { id: '1', name: 'Men', image: 'https://images.unsplash.com/photo-1488161628813-99c974fc5bce?auto=format&fit=crop&w=200&q=80' },
-    { id: '2', name: 'Women', image: 'https://images.unsplash.com/photo-1616847250630-f7e793977508?auto=format&fit=crop&w=200&q=80' },
+    { id: '1', name: 'Men', image: require('../../assets/images/men_icon.jpg') },
+    { id: '2', name: 'Women', image: require('../../assets/images/women_icon.jpg') },
     { id: '3', name: 'Kids', image: 'https://images.unsplash.com/photo-1519457431-44ccd64a579b?auto=format&fit=crop&w=200&q=80' },
-    { id: '4', name: 'Makeup', image: 'https://images.unsplash.com/photo-1522335789203-abd6523f433e?auto=format&fit=crop&w=200&q=80' },
+    { id: '4', name: 'Makeup', image: require('../../assets/images/makeup_icon.jpg') },
 ];
 
 const BIG_DISCOUNTS = [
@@ -127,7 +127,6 @@ export default function HomeScreen() {
                 {/* Recommended Section */}
                 <View style={styles.sectionHeader}>
                     <Text style={styles.sectionTitle}>Recommended</Text>
-                    <TouchableOpacity onPress={() => router.push('/product-listing')}><Text style={styles.viewAllText}>View All</Text></TouchableOpacity>
                 </View>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
                     {RECOMMENDED.map((item) => (
@@ -171,7 +170,10 @@ export default function HomeScreen() {
                     {NEARBY.map((item) => (
                         <View key={item.id} style={styles.nearbyItem}>
                             <View style={styles.nearbyImageContainer}>
-                                <Image source={{ uri: item.image }} style={styles.nearbyImage} />
+                                <Image
+                                    source={typeof item.image === 'string' ? { uri: item.image } : item.image}
+                                    style={styles.nearbyImage}
+                                />
                             </View>
                             <Text style={styles.nearbyName}>{item.name}</Text>
                         </View>

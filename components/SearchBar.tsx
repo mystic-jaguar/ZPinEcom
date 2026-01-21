@@ -17,7 +17,7 @@ export default function SearchBar({ placeholder = "Search fashion, trends, style
                     placeholderTextColor="#999"
                 />
                 {/* Microphone icon - could be interactive */}
-                <Feather name="mic" size={20} color="#FBBF24" />
+                {/* <Feather name="mic" size={20} color="#FBBF24" /> */}
             </View>
         </View>
     );

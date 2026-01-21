@@ -8,10 +8,10 @@ import SearchBar from '../../components/SearchBar';
 const { width } = Dimensions.get('window');
 
 const CATEGORIES_GRID = [
-    { id: '1', name: 'Men', image: 'https://images.unsplash.com/photo-1488161628813-99c974fc5bce?auto=format&fit=crop&w=300&q=80' },
-    { id: '2', name: 'Women', image: 'https://images.unsplash.com/photo-1616847250630-f7e793977508?auto=format&fit=crop&w=300&q=80' },
+    { id: '1', name: 'Men', image: require('../../assets/images/men_icon.jpg') },
+    { id: '2', name: 'Women', image: require('../../assets/images/women_icon.jpg') },
     { id: '3', name: 'Kids', image: 'https://images.unsplash.com/photo-1519457431-44ccd64a579b?auto=format&fit=crop&w=300&q=80' },
-    { id: '4', name: 'Makeup', image: 'https://images.unsplash.com/photo-1522335789203-abd6523f433e?auto=format&fit=crop&w=300&q=80' },
+    { id: '4', name: 'Makeup', image: require('../../assets/images/makeup_icon.jpg') },
     { id: '5', name: 'Home', image: 'https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=300&q=80' },
     { id: '6', name: 'Electronics', image: 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=300&q=80' },
     { id: '7', name: 'Gen-Z', image: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=300&q=80' },
@@ -36,7 +36,7 @@ export default function CategoriesScreen() {
                     {CATEGORIES_GRID.map((item) => (
                         <View key={item.id} style={styles.gridItem}>
                             <View style={styles.imageContainer}>
-                                <Image source={{ uri: item.image }} style={styles.gridImage} resizeMode="cover" />
+                                <Image source={typeof item.image === 'string' ? { uri: item.image } : item.image} style={styles.gridImage} resizeMode="cover" />
                             </View>
                             <Text style={styles.gridLabel}>{item.name}</Text>
                         </View>
