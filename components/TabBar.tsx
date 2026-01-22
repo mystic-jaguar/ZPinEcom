@@ -1,14 +1,17 @@
-import { Feather, FontAwesome5, MaterialIcons } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import React from 'react';
 import { Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
 
 // Interactive Tab Bar implementing the design from Home Screen
 export default function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
+    const insets = useSafeAreaInsets();
+
     return (
-        <View style={styles.bottomNav}>
+        <View style={[styles.bottomNav, { paddingBottom: 2 + insets.bottom, height: 70 + insets.bottom }]}>
             {state.routes.map((route, index) => {
                 const { options } = descriptors[route.key];
                 const isFocused = state.index === index;
@@ -33,19 +36,15 @@ export default function TabBar({ state, descriptors, navigation }: BottomTabBarP
                 if (route.name === 'index') {
                     label = "Home";
                     iconName = "home";
-                    IconComponent = Feather;
                 } else if (route.name === 'categories') {
                     label = "Categories";
-                    iconName = "grid-view";
-                    IconComponent = MaterialIcons;
-                } else if (route.name === 'hot') {
-                    label = "Hot";
-                    iconName = "fire";
-                    IconComponent = FontAwesome5;
+                    iconName = "grid";
+                } else if (route.name === 'cart') {
+                    label = "Cart";
+                    iconName = "shopping-cart";
                 } else if (route.name === 'profile') {
                     label = "Profile";
                     iconName = "user";
-                    IconComponent = Feather;
                 }
 
                 const color = isFocused ? '#FBBF24' : '#999';
@@ -59,7 +58,7 @@ export default function TabBar({ state, descriptors, navigation }: BottomTabBarP
                         onPress={onPress}
                         style={styles.navItem}
                     >
-                        <IconComponent name={iconName} size={24} color={color} />
+                        <Feather name={iconName} size={24} color={color} />
                         <Text style={[styles.navText, { color }]}>
                             {label}
                         </Text>
@@ -79,7 +78,6 @@ const styles = StyleSheet.create({
         borderTopColor: '#f0f0f0',
         justifyContent: 'space-around',
         alignItems: 'center',
-        paddingBottom: 10,
         elevation: 10,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: -2 },

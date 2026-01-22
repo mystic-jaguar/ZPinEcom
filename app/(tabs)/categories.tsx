@@ -1,69 +1,417 @@
 import { Feather } from '@expo/vector-icons';
-import React from 'react';
-import { Dimensions, Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import { Dimensions, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Header from '../../components/Header';
 import SearchBar from '../../components/SearchBar';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
-const CATEGORIES_GRID = [
-    { id: '1', name: 'Men', image: require('../../assets/images/men_icon.jpg') },
-    { id: '2', name: 'Women', image: require('../../assets/images/women_icon.jpg') },
-    { id: '3', name: 'Kids', image: 'https://images.unsplash.com/photo-1519457431-44ccd64a579b?auto=format&fit=crop&w=300&q=80' },
-    { id: '4', name: 'Makeup', image: require('../../assets/images/makeup_icon.jpg') },
-    { id: '5', name: 'Home', image: 'https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=300&q=80' },
-    { id: '6', name: 'Electronics', image: 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=300&q=80' },
-    { id: '7', name: 'Gen-Z', image: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=300&q=80' },
-    { id: '8', name: 'Footwear', image: 'https://images.unsplash.com/photo-1549298916-b41d501d3772?auto=format&fit=crop&w=300&q=80' },
+// Data parsed from Categories.txt with Image support
+// Items are now objects: { name: string, image: any | null }
+const CATEGORY_DATA = [
+    {
+        id: 'accessories',
+        name: 'Accessories',
+        icon: 'briefcase', // Feather icon name
+        sections: [
+            {
+                title: 'Bags & Backpacks',
+                data: [
+                    { name: 'Handbags', image: require('../../assets/images/handbags.jpg') },
+                    { name: 'Backpacks', image: require('../../assets/images/backpacks.jpg') },
+                    { name: 'Laptop Bags', image: require('../../assets/images/laptopbags.jpg') },
+                    { name: 'School bags', image: require('../../assets/images/schoolbags.jpg') },
+                    { name: 'Travel/Gym Bags', image: require('../../assets/images/travelbags.jpg') },
+                    { name: 'Sling & Clutch Bags', image: require('../../assets/images/slingbags.jpg') }
+                ]
+            },
+            {
+                title: 'Wallets & Belts',
+                data: [
+                    { name: 'Wallets', image: require('../../assets/images/wallets.jpg') },
+                    { name: 'Belts', image: require('../../assets/images/belts.jpg') },
+                    { name: 'Card Holders', image: require('../../assets/images/cardholders.jpg') },
+                    { name: 'Coin Pouches', image: require('../../assets/images/coinpouches.jpg') }
+                ]
+            },
+            {
+                title: 'Watches',
+                data: [
+                    { name: 'Analog', image: require('../../assets/images/analog.jpg') },
+                    { name: 'Digital', image: require('../../assets/images/digital.jpg') },
+                    { name: 'Smart Watches', image: require('../../assets/images/smartwatches.jpg') },
+                    { name: 'Sports Watches', image: require('../../assets/images/sportswatches.jpg') }
+                ]
+            },
+            {
+                title: 'Sunglasses & Eyewear',
+                data: [
+                    { name: 'Sunglasses', image: null },
+                    { name: 'Blue Light Glasses', image: null },
+                    { name: 'Reading Glasses', image: null },
+                    { name: 'Frames', image: null }
+                ]
+            },
+            {
+                title: 'Jewellery',
+                data: [
+                    { name: 'Earrings', image: null },
+                    { name: 'Necklaces', image: null },
+                    { name: 'Bangles & Bracelets', image: null },
+                    { name: 'Rings', image: null },
+                    { name: 'Jewellery Sets', image: null }
+                ]
+            },
+            {
+                title: 'Hair Accessories',
+                data: [
+                    { name: 'Clips & Pins', image: null },
+                    { name: 'Hair Bands & Scrunchies', image: null },
+                    { name: 'Headbands', image: null },
+                    { name: 'Bridal Accessories', image: null }
+                ]
+            },
+            {
+                title: 'Caps & Hats',
+                data: [
+                    { name: 'Caps', image: null },
+                    { name: 'Hats', image: null },
+                    { name: 'Winter Caps', image: null }
+                ]
+            },
+            {
+                title: 'Scarves & Stoles',
+                data: [
+                    { name: 'Scarves', image: null },
+                    { name: 'Stoles', image: null },
+                    { name: 'Winter Wear', image: null }
+                ]
+            }
+        ]
+    },
+    {
+        id: 'beauty',
+        name: 'Beauty',
+        icon: 'smile',
+        sections: [
+            {
+                title: 'Skincare',
+                data: [
+                    { name: 'Face Wash & Cleanser', image: null },
+                    { name: 'Moisturizers & Creams', image: null },
+                    { name: 'Sunscreen', image: null },
+                    { name: 'Serums & Masks', image: null }
+                ]
+            },
+            {
+                title: 'Haircare',
+                data: [
+                    { name: 'Shampoo & Conditioner', image: null },
+                    { name: 'Hair Oil & Serum', image: null },
+                    { name: 'Hair Color', image: null },
+                    { name: 'Styling Products', image: null }
+                ]
+            },
+            {
+                title: 'Makeup',
+                data: [
+                    { name: 'Face Makeup', image: null },
+                    { name: 'Eye Makeup', image: null },
+                    { name: 'Lip Makeup', image: null },
+                    { name: 'Makeup Kits', image: null }
+                ]
+            },
+            {
+                title: 'Personal Care',
+                data: [
+                    { name: 'Soaps & Body Wash', image: null },
+                    { name: 'Deodorants', image: null },
+                    { name: 'Oral Care', image: null },
+                    { name: 'Feminine Hygiene', image: null }
+                ]
+            },
+            {
+                title: 'Grooming',
+                data: [
+                    { name: 'Shaving & Trimming', image: null },
+                    { name: 'Hair Removal', image: null },
+                    { name: 'Grooming Kits', image: null },
+                    { name: 'Beard & Styling Products', image: null }
+                ]
+            },
+            {
+                title: 'Fragrances & Deodorants',
+                data: [
+                    { name: 'Perfumes', image: null },
+                    { name: 'Body Sprays', image: null },
+                    { name: 'Roll-Ons', image: null },
+                    { name: 'Gift Sets', image: null }
+                ]
+            },
+            {
+                title: 'Beauty Tools',
+                data: [
+                    { name: 'Hair Dryers', image: null },
+                    { name: 'Straighteners & Curlers', image: null },
+                    { name: 'Trimmers & Shavers', image: null },
+                    { name: 'Face & Skin Tools', image: null }
+                ]
+            }
+        ]
+    },
+    {
+        id: 'home',
+        name: 'Home & Living',
+        icon: 'home',
+        sections: [
+            {
+                title: 'Kitchenware',
+                data: [
+                    { name: 'Cookware', image: null },
+                    { name: 'Utensils', image: null },
+                    { name: 'Storage Containers', image: null },
+                    { name: 'Kitchen Tools', image: null }
+                ]
+            },
+            {
+                title: 'Dining Essentials',
+                data: [
+                    { name: 'Dinner Sets', image: null },
+                    { name: 'Plates & Bowls', image: null },
+                    { name: 'Glasses & Mugs', image: null },
+                    { name: 'Serving Items', image: null }
+                ]
+            },
+            {
+                title: 'Storage & Organizers',
+                data: [
+                    { name: 'Storage Boxes', image: null },
+                    { name: 'Wardrobe Organizers', image: null },
+                    { name: 'Kitchen Organizers', image: null },
+                    { name: 'Multipurpose Racks', image: null }
+                ]
+            },
+            {
+                title: 'Cleaning & Utility',
+                data: [
+                    { name: 'Cleaning Tools', image: null },
+                    { name: 'Cleaning Supplies', image: null },
+                    { name: 'Laundry Items', image: null },
+                    { name: 'Utility Accessories', image: null }
+                ]
+            },
+            {
+                title: 'Bedding & Linen',
+                data: [
+                    { name: 'Bedsheets', image: null },
+                    { name: 'Blankets & Quilts', image: null },
+                    { name: 'Pillow Covers', image: null },
+                    { name: 'Towels', image: null }
+                ]
+            },
+            {
+                title: 'Bathroom Accessories',
+                data: [
+                    { name: 'Soap Dispensers & Holders', image: null },
+                    { name: 'Bathroom Racks', image: null },
+                    { name: 'Mirrors', image: null },
+                    { name: 'Bath Essentials', image: null }
+                ]
+            },
+            {
+                title: 'Home Improvement',
+                data: [
+                    { name: 'Tools & Hardware', image: null },
+                    { name: 'Electrical Fittings', image: null },
+                    { name: 'Plumbing Essentials', image: null },
+                    { name: 'Repair & Maintenance', image: null }
+                ]
+            }
+        ]
+    },
+    {
+        id: 'gadgets',
+        name: 'Gadgets',
+        icon: 'smartphone',
+        sections: [
+            {
+                title: 'Mobile Accessories',
+                data: [
+                    { name: 'Mobile Covers', image: null },
+                    { name: 'Screen Guards', image: null },
+                    { name: 'Mobile Holders', image: null },
+                    { name: 'Cables', image: null }
+                ]
+            },
+            {
+                title: 'Audio Devices',
+                data: [
+                    { name: 'Earphones', image: null },
+                    { name: 'Headphones', image: null },
+                    { name: 'Bluetooth Speakers', image: null }
+                ]
+            },
+            {
+                title: 'Smart Devices',
+                data: [
+                    { name: 'Smart Watches', image: null },
+                    { name: 'Fitness Bands', image: null },
+                    { name: 'Smart Accessories', image: null }
+                ]
+            },
+            {
+                title: 'Computer Accessories',
+                data: [
+                    { name: 'Keyboards & Mouse', image: null },
+                    { name: 'Laptop Bags', image: null },
+                    { name: 'Webcam & Mic', image: null },
+                    { name: 'USB & Storage Devices', image: null }
+                ]
+            },
+            {
+                title: 'Gaming Accessories',
+                data: [
+                    { name: 'Controllers', image: null },
+                    { name: 'Gaming Mouse & Keyboard', image: null },
+                    { name: 'Headsets', image: null },
+                    { name: 'Gaming Chairs', image: null }
+                ]
+            },
+            {
+                title: 'Chargers & Power Banks',
+                data: [
+                    { name: 'Mobile Chargers', image: null },
+                    { name: 'Fast Chargers', image: null },
+                    { name: 'Power Banks', image: null },
+                    { name: 'Multi-port Chargers', image: null }
+                ]
+            }
+        ]
+    },
+    {
+        id: 'appliances',
+        name: 'Electrical Appliances',
+        icon: 'zap',
+        sections: [
+            {
+                title: 'Large Appliances',
+                data: [
+                    { name: 'Refrigerator', image: null },
+                    { name: 'Washing Machine', image: null },
+                    { name: 'Air Conditioner', image: null },
+                    { name: 'Television', image: null }
+                ]
+            },
+            {
+                title: 'Small Appliances',
+                data: [
+                    { name: 'Mixer Grinder', image: null },
+                    { name: 'Toaster', image: null },
+                    { name: 'Electric Kettle', image: null },
+                    { name: 'Juicer', image: null }
+                ]
+            },
+            {
+                title: 'Kitchen Appliances',
+                data: [
+                    { name: 'Microwave Oven', image: null },
+                    { name: 'Induction Cooktop', image: null },
+                    { name: 'Gas Stove', image: null },
+                    { name: 'Rice Cooker', image: null }
+                ]
+            },
+            {
+                title: 'Heating & Cooling',
+                data: [
+                    { name: 'Room Heater', image: null },
+                    { name: 'Geyser', image: null },
+                    { name: 'Fans', image: null },
+                    { name: 'Air Coolers', image: null }
+                ]
+            },
+            {
+                title: 'Personal Appliances',
+                data: [
+                    { name: 'Iron', image: null },
+                    { name: 'Trimmer & Shaver', image: null },
+                    { name: 'Hair Dryer', image: null },
+                    { name: 'Straightener', image: null }
+                ]
+            }
+        ]
+    }
 ];
 
 export default function CategoriesScreen() {
+    const [selectedCategoryId, setSelectedCategoryId] = useState(CATEGORY_DATA[0].id);
+
+    const selectedCategory = CATEGORY_DATA.find(c => c.id === selectedCategoryId) || CATEGORY_DATA[0];
+
     return (
         <SafeAreaView style={styles.container}>
-            {/* Explicit Header reuse */}
             <Header />
+            <View style={styles.searchContainer}>
+                <SearchBar placeholder="Search categories..." />
+            </View>
 
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-                <SearchBar placeholder="Search brands, trends, styles..." />
-
-                <View style={styles.titleContainer}>
-                    <Text style={styles.pageTitle}>Shop Categories</Text>
-                    <Text style={styles.pageSubtitle}>Explore the latest collections near you</Text>
+            <View style={styles.contentContainer}>
+                {/* Sidebar */}
+                <View style={styles.sidebar}>
+                    <ScrollView showsVerticalScrollIndicator={false}>
+                        {CATEGORY_DATA.map((cat) => {
+                            const isSelected = selectedCategoryId === cat.id;
+                            return (
+                                <TouchableOpacity
+                                    key={cat.id}
+                                    style={[styles.sidebarItem, isSelected && styles.sidebarItemSelected]}
+                                    onPress={() => setSelectedCategoryId(cat.id)}
+                                >
+                                    <View style={[styles.sidebarIcon, isSelected && styles.sidebarIconSelected]}>
+                                        <Feather name={cat.icon as any} size={20} color={isSelected ? '#fff' : '#555'} />
+                                    </View>
+                                    <Text style={[styles.sidebarText, isSelected && styles.sidebarTextSelected]}>
+                                        {cat.name}
+                                    </Text>
+                                    {isSelected && <View style={styles.activeIndicator} />}
+                                </TouchableOpacity>
+                            );
+                        })}
+                        <View style={{ height: 20 }} />
+                    </ScrollView>
                 </View>
 
-                <View style={styles.gridContainer}>
-                    {CATEGORIES_GRID.map((item) => (
-                        <View key={item.id} style={styles.gridItem}>
-                            <View style={styles.imageContainer}>
-                                <Image source={typeof item.image === 'string' ? { uri: item.image } : item.image} style={styles.gridImage} resizeMode="cover" />
+                {/* Main Content */}
+                <View style={styles.mainContent}>
+                    <View style={styles.categoryHeader}>
+                        <Text style={styles.categoryTitle}>{selectedCategory.name}</Text>
+                        <Text style={styles.categorySubtitle}>{selectedCategory.sections.length} Categories</Text>
+                    </View>
+
+                    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.mainScrollContent}>
+                        {selectedCategory.sections.map((section, index) => (
+                            <View key={index} style={styles.sectionContainer}>
+                                <Text style={styles.sectionTitle}>{section.title}</Text>
+                                <View style={styles.itemsGrid}>
+                                    {section.data.map((item, idx) => (
+                                        <TouchableOpacity key={idx} style={styles.itemCard}>
+                                            <View style={styles.itemImagePlaceholder}>
+                                                {item.image ? (
+                                                    <Image source={item.image} style={styles.itemImage} />
+                                                ) : (
+                                                    <Feather name="image" size={16} color="#ddd" />
+                                                )}
+                                            </View>
+                                            <Text style={styles.itemText}>{item.name}</Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
                             </View>
-                            <Text style={styles.gridLabel}>{item.name}</Text>
-                        </View>
-                    ))}
+                        ))}
+                        <View style={{ height: 40 }} />
+                    </ScrollView>
                 </View>
-
-                {/* Bottom Banner */}
-                <View style={styles.bannerContainer}>
-                    <View style={styles.bannerContent}>
-                        <Text style={styles.bannerLabel}>EXCLUSIVE OFFER</Text>
-                        <Text style={styles.bannerTitle}>Fashion at</Text>
-                        <Text style={styles.bannerTitle}>Lightning Speed</Text>
-                        <Text style={styles.bannerDesc}>Get deliveries in 2-12 hours.</Text>
-
-                        <View style={styles.shopNowButton}>
-                            <Text style={styles.shopNowText}>Shop Now</Text>
-                        </View>
-                    </View>
-                    <View style={styles.boltIcon}>
-                        <Feather name="zap" size={60} color="rgba(255,255,255,0.4)" />
-                    </View>
-                </View>
-
-                {/* Spacer for bottom tab bar */}
-                <View style={{ height: 20 }} />
-            </ScrollView>
-
+            </View>
         </SafeAreaView>
     );
 }
@@ -73,105 +421,124 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: '#fff',
     },
-    scrollContent: {
-        paddingBottom: 20
-    },
-    titleContainer: {
-        paddingHorizontal: 20,
-        marginBottom: 20
-    },
-    pageTitle: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        color: '#1a1a1a',
-        marginBottom: 5
-    },
-    pageSubtitle: {
-        fontSize: 14,
-        color: '#666'
-    },
-    gridContainer: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        paddingHorizontal: 15,
-        justifyContent: 'space-between',
-    },
-    gridItem: {
-        width: (width - 50) / 2, // 2 columns with spacing
-        backgroundColor: '#f9f9f9',
-        borderRadius: 15,
-        marginBottom: 20,
-        alignItems: 'center',
-        paddingBottom: 15,
-        overflow: 'hidden'
-    },
-    imageContainer: {
-        width: '100%',
-        height: 150,
-        backgroundColor: '#eee',
+    searchContainer: {
         marginBottom: 10
     },
-    gridImage: {
-        width: '100%',
-        height: '100%'
-    },
-    gridLabel: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#1a1a1a'
-    },
-    bannerContainer: {
-        marginHorizontal: 20,
-        backgroundColor: '#FBBF24',
-        borderRadius: 20,
-        padding: 24,
-        marginTop: 10,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        overflow: 'hidden',
-        height: 180
-    },
-    bannerContent: {
+    contentContainer: {
         flex: 1,
-        zIndex: 2
+        flexDirection: 'row',
+        borderTopWidth: 1,
+        borderTopColor: '#f0f0f0'
     },
-    bannerLabel: {
+    sidebar: {
+        width: 100,
+        backgroundColor: '#F7F8FA',
+        borderRightWidth: 1,
+        borderRightColor: '#eee'
+    },
+    sidebarItem: {
+        alignItems: 'center',
+        paddingVertical: 20,
+        paddingHorizontal: 5,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f0f0f0'
+    },
+    sidebarItemSelected: {
+        backgroundColor: '#FFFBE6' // Light yellow match
+    },
+    sidebarIcon: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#eee',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 8
+    },
+    sidebarIconSelected: {
+        backgroundColor: '#FBBF24'
+    },
+    sidebarText: {
         fontSize: 10,
-        fontWeight: '700',
-        color: '#fff',
-        marginBottom: 5,
-        opacity: 0.8
+        textAlign: 'center',
+        color: '#666',
+        fontWeight: '500'
     },
-    bannerTitle: {
-        fontSize: 22,
-        fontWeight: '800',
-        color: '#fff',
-        lineHeight: 26
+    sidebarTextSelected: {
+        color: '#1a1a1a',
+        fontWeight: '700'
     },
-    bannerDesc: {
-        color: '#fff',
-        fontSize: 12,
-        marginTop: 5,
-        marginBottom: 15,
-        opacity: 0.9
-    },
-    shopNowButton: {
-        backgroundColor: '#fff',
-        paddingHorizontal: 20,
-        paddingVertical: 10,
-        borderRadius: 25,
-        alignSelf: 'flex-start'
-    },
-    shopNowText: {
-        fontWeight: '700',
-        color: '#FBBF24',
-        fontSize: 12
-    },
-    boltIcon: {
+    activeIndicator: {
         position: 'absolute',
-        right: -10,
-        bottom: -10,
-        transform: [{ rotate: '-15deg' }]
-    }
+        left: 0,
+        top: 0,
+        bottom: 0,
+        width: 4,
+        backgroundColor: '#FBBF24'
+    },
+    mainContent: {
+        flex: 1,
+        backgroundColor: '#fff'
+    },
+    categoryHeader: {
+        padding: 20,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f5f5f5'
+    },
+    categoryTitle: {
+        fontSize: 20,
+        fontWeight: '800',
+        color: '#1a1a1a',
+        marginBottom: 4
+    },
+    categorySubtitle: {
+        fontSize: 12,
+        color: '#888'
+    },
+    mainScrollContent: {
+        padding: 20
+    },
+    sectionContainer: {
+        marginBottom: 25
+    },
+    sectionTitle: {
+        fontSize: 18,
+        fontWeight: '800',
+        color: '#333',
+        marginBottom: 15
+    },
+    itemsGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        marginHorizontal: -5
+    },
+    itemCard: {
+        width: '33.33%',
+        paddingHorizontal: 5,
+        marginBottom: 15,
+        alignItems: 'center'
+    },
+    itemImagePlaceholder: {
+        width: 60,
+        height: 60,
+        backgroundColor: '#f9f9f9',
+        borderRadius: 30, // Circle
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 8,
+        borderWidth: 1,
+        borderColor: '#eee',
+        overflow: 'hidden'
+    },
+    itemImage: {
+        width: '100%',
+        height: '100%',
+        resizeMode: 'cover'
+    },
+    itemText: {
+        fontSize: 12,
+        color: '#555',
+        textAlign: 'center',
+        lineHeight: 14
+    },
 });
