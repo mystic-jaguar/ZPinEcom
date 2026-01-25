@@ -47,70 +47,134 @@ const Sidebar = ({
 
 export default function CategoriesScreen() {
     const [selectedCategoryId, setSelectedCategoryId] = useState(CATEGORY_DATA[0].id);
+    const [searchQuery, setSearchQuery] = useState('');
     const router = useRouter();
 
     const selectedCategory = CATEGORY_DATA.find(c => c.id === selectedCategoryId) || CATEGORY_DATA[0];
 
-    const handleCategoryPress = (subCategoryName: string) => {
+    const handleCategoryPress = (subCategoryName: string, categoryName: string) => {
         router.push({
             pathname: '/product-listing',
             params: {
-                categoryName: selectedCategory.name,
+                categoryName: categoryName,
                 subCategoryName: subCategoryName
             }
         });
     };
 
+    // Flatten all categories for search
+    const allSubCategories = React.useMemo(() => {
+        const flatList: { categoryName: string; name: string; image: any }[] = [];
+        CATEGORY_DATA.forEach(cat => {
+            cat.sections.forEach(sec => {
+                sec.data.forEach(item => {
+                    flatList.push({
+                        categoryName: cat.name, // Main Category Name
+                        name: item.name,        // Sub Category Name
+                        image: item.image
+                    });
+                });
+            });
+        });
+        return flatList;
+    }, []);
+
+    const filteredCategories = searchQuery
+        ? allSubCategories.filter(item =>
+            item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            item.categoryName.toLowerCase().includes(searchQuery.toLowerCase())
+        )
+        : [];
+
     return (
         <SafeAreaView style={styles.container}>
             <Header />
             <View style={styles.searchContainer}>
-                <SearchBar placeholder="Search categories..." />
-            </View>
-
-            <View style={styles.contentContainer}>
-                {/* Sidebar */}
-                <Sidebar
-                    categories={CATEGORY_DATA}
-                    selectedId={selectedCategoryId}
-                    onSelect={setSelectedCategoryId}
+                <SearchBar
+                    placeholder="Search categories..."
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
                 />
-
-                {/* Main Content */}
-                <View style={styles.mainContent}>
-                    <View style={styles.categoryHeader}>
-                        <Text style={styles.categoryTitle}>{selectedCategory.name}</Text>
-                        <Text style={styles.categorySubtitle}>{selectedCategory.sections.length} Categories</Text>
-                    </View>
-
-                    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.mainScrollContent}>
-                        {selectedCategory.sections.map((section, index) => (
-                            <View key={index} style={styles.sectionContainer}>
-                                <Text style={styles.sectionTitle}>{section.title}</Text>
-                                <View style={styles.itemsGrid}>
-                                    {section.data.map((item, idx) => (
-                                        <TouchableOpacity
-                                            key={idx}
-                                            style={styles.itemCard}
-                                            onPress={() => handleCategoryPress(item.name)}
-                                        >
-                                            <View style={styles.itemImagePlaceholder}>
-                                                {item.image ? (
-                                                    <Image source={item.image} style={styles.itemImage} />
-                                                ) : (
-                                                    <Feather name="image" size={16} color="#ddd" />
-                                                )}
-                                            </View>
-                                            <Text style={styles.itemText}>{item.name}</Text>
-                                        </TouchableOpacity>
-                                    ))}
-                                </View>
-                            </View>
-                        ))}
-                        <View style={{ height: 40 }} />
-                    </ScrollView>
-                </View>
             </View>
+
+            {searchQuery.length > 0 ? (
+                // Search Results View
+                <View style={styles.searchResultsContainer}>
+                    {filteredCategories.length > 0 ? (
+                        <ScrollView contentContainerStyle={styles.mainScrollContent}>
+                            <View style={styles.itemsGrid}>
+                                {filteredCategories.map((item, idx) => (
+                                    <TouchableOpacity
+                                        key={idx}
+                                        style={styles.itemCard}
+                                        onPress={() => handleCategoryPress(item.name, item.categoryName)}
+                                    >
+                                        <View style={styles.itemImagePlaceholder}>
+                                            {item.image ? (
+                                                <Image source={item.image} style={styles.itemImage} />
+                                            ) : (
+                                                <Feather name="image" size={16} color="#ddd" />
+                                            )}
+                                        </View>
+                                        <Text style={styles.itemText}>{item.name}</Text>
+                                        <Text style={styles.itemSubText}>{item.categoryName}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        </ScrollView>
+                    ) : (
+                        <View style={styles.noResultsContainer}>
+                            <Feather name="search" size={48} color="#ccc" />
+                            <Text style={styles.noResultsText}>No categories found.</Text>
+                        </View>
+                    )}
+                </View>
+            ) : (
+                // Default View
+                <View style={styles.contentContainer}>
+                    {/* Sidebar */}
+                    <Sidebar
+                        categories={CATEGORY_DATA}
+                        selectedId={selectedCategoryId}
+                        onSelect={setSelectedCategoryId}
+                    />
+
+                    {/* Main Content */}
+                    <View style={styles.mainContent}>
+                        <View style={styles.categoryHeader}>
+                            <Text style={styles.categoryTitle}>{selectedCategory.name}</Text>
+                            <Text style={styles.categorySubtitle}>{selectedCategory.sections.length} Categories</Text>
+                        </View>
+
+                        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.mainScrollContent}>
+                            {selectedCategory.sections.map((section, index) => (
+                                <View key={index} style={styles.sectionContainer}>
+                                    <Text style={styles.sectionTitle}>{section.title}</Text>
+                                    <View style={styles.itemsGrid}>
+                                        {section.data.map((item, idx) => (
+                                            <TouchableOpacity
+                                                key={idx}
+                                                style={styles.itemCard}
+                                                onPress={() => handleCategoryPress(item.name, selectedCategory.name)}
+                                            >
+                                                <View style={styles.itemImagePlaceholder}>
+                                                    {item.image ? (
+                                                        <Image source={item.image} style={styles.itemImage} />
+                                                    ) : (
+                                                        <Feather name="image" size={16} color="#ddd" />
+                                                    )}
+                                                </View>
+                                                <Text style={styles.itemText}>{item.name}</Text>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </View>
+                                </View>
+                            ))}
+                            <View style={{ height: 40 }} />
+                        </ScrollView>
+                    </View>
+                </View>
+            )}
         </SafeAreaView>
     );
 }
@@ -122,6 +186,21 @@ const styles = StyleSheet.create({
     },
     searchContainer: {
         marginBottom: 10
+    },
+    searchResultsContainer: {
+        flex: 1,
+        backgroundColor: '#fff',
+    },
+    noResultsContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: 50
+    },
+    noResultsText: {
+        marginTop: 10,
+        fontSize: 16,
+        color: '#888'
     },
     contentContainer: {
         flex: 1,
@@ -239,5 +318,11 @@ const styles = StyleSheet.create({
         color: '#555',
         textAlign: 'center',
         lineHeight: 14
+    },
+    itemSubText: {
+        fontSize: 10,
+        color: '#999',
+        textAlign: 'center',
+        marginTop: 2
     },
 });

@@ -1,24 +1,45 @@
 import { Feather } from '@expo/vector-icons';
 import React from 'react';
-import { StyleSheet, TextInput, View } from 'react-native';
+import { StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 
 interface SearchBarProps {
     placeholder?: string;
+    value?: string;
+    onChangeText?: (text: string) => void;
+    onPress?: () => void;
+    editable?: boolean;
+    autoFocus?: boolean;
 }
 
-export default function SearchBar({ placeholder = "Search fashion, trends, styles..." }: SearchBarProps) {
+export default function SearchBar({
+    placeholder = "Search fashion, trends, styles...",
+    value,
+    onChangeText,
+    onPress,
+    editable = true,
+    autoFocus = false
+}: SearchBarProps) {
+    const Container = editable ? View : TouchableOpacity;
+
     return (
         <View style={styles.searchContainer}>
-            <View style={styles.searchBar}>
+            <Container
+                style={styles.searchBar}
+                onPress={!editable ? onPress : undefined}
+                activeOpacity={!editable ? 0.7 : 1}
+            >
                 <Feather name="search" size={20} color="#999" testID="search-icon" />
                 <TextInput
                     style={styles.searchInput}
                     placeholder={placeholder}
                     placeholderTextColor="#999"
+                    value={value}
+                    onChangeText={onChangeText}
+                    editable={editable}
+                    autoFocus={autoFocus}
+                    pointerEvents={editable ? 'auto' : 'none'}
                 />
-                {/* Microphone icon - could be interactive */}
-                {/* <Feather name="mic" size={20} color="#FBBF24" /> */}
-            </View>
+            </Container>
         </View>
     );
 }

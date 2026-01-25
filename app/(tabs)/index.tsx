@@ -54,7 +54,11 @@ export default function HomeScreen() {
 
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
 
-                <SearchBar />
+                <SearchBar
+                    editable={false}
+                    onPress={() => router.push('/product-search')}
+                    placeholder="Search products..."
+                />
 
                 {/* Categories Carousel */}
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoriesContainer} contentContainerStyle={styles.categoriesContent}>
