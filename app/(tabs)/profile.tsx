@@ -65,12 +65,12 @@ export default function ProfileScreen() {
                             icon="heart"
                             onPress={() => { }}
                         />
-                        <ProfileOption
+                        {/* <ProfileOption
                             label="Notifications"
                             icon="bell"
                             onPress={() => { }}
                             showBorder={false}
-                        />
+                        /> */}
                     </View>
                 </View>
 
