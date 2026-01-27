@@ -1,4 +1,5 @@
 import { Feather } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import React from 'react';
 import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -12,6 +13,8 @@ const USER = {
 };
 
 export default function ProfileScreen() {
+    const router = useRouter();
+
     return (
         <SafeAreaView style={styles.container}>
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
@@ -53,7 +56,7 @@ export default function ProfileScreen() {
                         <ProfileOption
                             label="Saved Addresses"
                             icon="map-pin"
-                            onPress={() => { }}
+                            onPress={() => router.push('/profile/addresses')}
                         />
                         <ProfileOption
                             label="Payment Methods"

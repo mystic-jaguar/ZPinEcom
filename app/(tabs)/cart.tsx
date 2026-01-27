@@ -20,9 +20,17 @@ export default function CartScreen() {
                 </View>
 
                 {(item.selectedColor || item.selectedSize) && (
-                    <Text style={styles.variantText}>
-                        {item.selectedSize} {item.selectedColor && `• ${item.selectedColor}`}
-                    </Text>
+                    <View style={styles.variantContainer}>
+                        {item.selectedSize && (
+                            <Text style={styles.variantText}>{item.selectedSize}</Text>
+                        )}
+                        {item.selectedSize && item.selectedColor && (
+                            <View style={styles.separator} />
+                        )}
+                        {item.selectedColor && (
+                            <View style={[styles.colorSwatch, { backgroundColor: item.selectedColor }]} />
+                        )}
+                    </View>
                 )}
 
                 <View style={styles.priceRow}>
@@ -154,10 +162,33 @@ const styles = StyleSheet.create({
         marginRight: 8,
         lineHeight: 20
     },
+    variantContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 6
+    },
     variantText: {
-        fontSize: 12,
-        color: '#888',
-        marginTop: 4
+        fontSize: 13,
+        color: '#666',
+        fontWeight: '500'
+    },
+    separator: {
+        width: 1,
+        height: 12,
+        backgroundColor: '#ddd',
+        marginHorizontal: 8
+    },
+    colorSwatch: {
+        width: 18,
+        height: 18,
+        borderRadius: 9,
+        borderWidth: 1.5,
+        borderColor: '#fff',
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 2,
+        elevation: 1
     },
     priceRow: {
         flexDirection: 'row',
