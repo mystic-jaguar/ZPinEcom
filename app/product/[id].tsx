@@ -3,13 +3,17 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import AccordionItem from '../../components/common/AccordionItem';
+import ActionModal from '../../components/common/ActionModal';
 import ProductImageCarousel from '../../components/product/ProductImageCarousel';
 import VariantSelector from '../../components/product/VariantSelector';
 import { PRODUCTS } from '../../constants/products';
+import { useCart } from '../../context/CartContext';
 
 export default function ProductDetails() {
     const { id } = useLocalSearchParams();
     const router = useRouter();
+    const { addToCart } = useCart();
+    const [showSuccessModal, setShowSuccessModal] = useState(false);
 
     // Find product or fallback to first one for demo
     const product = PRODUCTS.find(p => p.id === id) || PRODUCTS[0];
@@ -74,7 +78,13 @@ export default function ProductDetails() {
                             <Feather name="shopping-bag" size={20} color="#1a1a1a" />
                             <Text style={styles.wishlistText}>Wishlist</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity style={styles.addToCartBtn}>
+                        <TouchableOpacity
+                            style={styles.addToCartBtn}
+                            onPress={() => {
+                                addToCart(product, selectedColor, selectedSize);
+                                setShowSuccessModal(true);
+                            }}
+                        >
                             <Feather name="shopping-cart" size={20} color="#1a1a1a" />
                             <Text style={styles.addToCartText}>Add to Cart</Text>
                         </TouchableOpacity>
@@ -143,6 +153,20 @@ export default function ProductDetails() {
                 </View>
 
             </ScrollView>
+
+            <ActionModal
+                visible={showSuccessModal}
+                title="Added to Cart!"
+                message={`Successfully added ${product.name} to your cart.`}
+                primaryButtonText="Go to Cart"
+                onPrimaryPress={() => {
+                    setShowSuccessModal(false);
+                    router.push('/(tabs)/cart');
+                }}
+                secondaryButtonText="Continue Shopping"
+                onSecondaryPress={() => setShowSuccessModal(false)}
+                onClose={() => setShowSuccessModal(false)}
+            />
         </View>
     );
 }

@@ -8,7 +8,7 @@ import ProfileOption from '../../components/profile/ProfileOption';
 const USER = {
     name: 'Jay',
     email: 'jay@example.com',
-    avatar: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?auto=format&fit=crop&w=200&q=80',
+    avatar: require('../../assets/images/profile_icon.jpg'),
 };
 
 export default function ProfileScreen() {
@@ -19,7 +19,7 @@ export default function ProfileScreen() {
                 {/* Header / User Info */}
                 <View style={styles.header}>
                     <View style={styles.avatarContainer}>
-                        <Image source={{ uri: USER.avatar }} style={styles.avatar} />
+                        <Image source={USER.avatar} style={styles.avatar} />
                         <View style={styles.editBadge}>
                             <Feather name="edit-2" size={12} color="#fff" />
                         </View>
