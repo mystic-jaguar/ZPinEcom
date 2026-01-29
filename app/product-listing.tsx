@@ -3,11 +3,13 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { PRODUCTS, Product } from '../constants/products';
+import { useWishlist } from '../context/WishlistContext';
 
 export default function ProductListing() {
     const router = useRouter();
     const params = useLocalSearchParams();
     const { categoryName, subCategoryName } = params;
+    const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
 
     // Filter products based on category and subCategory (if present)
     const filteredProducts = PRODUCTS.filter(product => {
@@ -31,8 +33,21 @@ export default function ProductListing() {
                         <Feather name="image" size={24} color="#ccc" />
                     </View>
                 )}
-                <TouchableOpacity style={styles.favoriteButton}>
-                    <Ionicons name="heart-outline" size={20} color="#333" />
+                <TouchableOpacity
+                    style={styles.favoriteButton}
+                    onPress={() => {
+                        if (isInWishlist(item.id)) {
+                            removeFromWishlist(item.id);
+                        } else {
+                            addToWishlist(item);
+                        }
+                    }}
+                >
+                    <Ionicons
+                        name={isInWishlist(item.id) ? "heart" : "heart-outline"}
+                        size={20}
+                        color={isInWishlist(item.id) ? "#FF3B30" : "#333"}
+                    />
                 </TouchableOpacity>
                 {item.discount > 0 && (
                     <View style={styles.discountBadge}>

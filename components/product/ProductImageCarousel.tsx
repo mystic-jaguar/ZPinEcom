@@ -8,9 +8,11 @@ interface ProductImageCarouselProps {
     images: any[];
     isLightningFast?: boolean;
     onBack?: () => void;
+    isWishlisted?: boolean;
+    onToggleWishlist?: () => void;
 }
 
-export default function ProductImageCarousel({ images, isLightningFast, onBack }: ProductImageCarouselProps) {
+export default function ProductImageCarousel({ images, isLightningFast, onBack, isWishlisted, onToggleWishlist }: ProductImageCarouselProps) {
     const [activeIndex, setActiveIndex] = useState(0);
 
     const onScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -31,8 +33,15 @@ export default function ProductImageCarousel({ images, isLightningFast, onBack }
                     <TouchableOpacity style={styles.iconButton}>
                         <Ionicons name="share-social-outline" size={24} color="#333" />
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.iconButton}>
-                        <Ionicons name="heart-outline" size={24} color="#FF3B30" />
+                    <TouchableOpacity
+                        style={styles.iconButton}
+                        onPress={onToggleWishlist}
+                    >
+                        <Ionicons
+                            name={isWishlisted ? "heart" : "heart-outline"}
+                            size={24}
+                            color={isWishlisted ? "#FF3B30" : "#333"}
+                        />
                     </TouchableOpacity>
                 </View>
             </View>

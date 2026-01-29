@@ -66,7 +66,7 @@ export default function ProfileScreen() {
                         <ProfileOption
                             label="Wishlist"
                             icon="heart"
-                            onPress={() => { }}
+                            onPress={() => router.push('/profile/wishlist')}
                         />
                         {/* <ProfileOption
                             label="Notifications"

@@ -4,15 +4,18 @@ import React, { useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import AccordionItem from '../../components/common/AccordionItem';
 import ActionModal from '../../components/common/ActionModal';
+import DeliveryOptionSelector from '../../components/product/DeliveryOptionSelector';
 import ProductImageCarousel from '../../components/product/ProductImageCarousel';
 import VariantSelector from '../../components/product/VariantSelector';
 import { PRODUCTS } from '../../constants/products';
 import { useCart } from '../../context/CartContext';
+import { useWishlist } from '../../context/WishlistContext';
 
 export default function ProductDetails() {
     const { id } = useLocalSearchParams();
     const router = useRouter();
     const { addToCart } = useCart();
+    const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
     const [showSuccessModal, setShowSuccessModal] = useState(false);
 
     // Find product or fallback to first one for demo
@@ -21,6 +24,7 @@ export default function ProductDetails() {
     // State for selectors
     const [selectedColor, setSelectedColor] = useState(product.colors?.[0] || '');
     const [selectedSize, setSelectedSize] = useState(product.sizes?.[2] || 'M'); // Default to M
+    const [deliveryOption, setDeliveryOption] = useState<'instant' | 'standard'>('instant');
 
     return (
         <View style={styles.container}>
@@ -31,6 +35,14 @@ export default function ProductDetails() {
                         images={product.images || [product.image]}
                         isLightningFast={product.isLightningFast}
                         onBack={() => router.back()}
+                        isWishlisted={isInWishlist(product.id)}
+                        onToggleWishlist={() => {
+                            if (isInWishlist(product.id)) {
+                                removeFromWishlist(product.id);
+                            } else {
+                                addToWishlist(product);
+                            }
+                        }}
                     />
                 </View>
 
@@ -74,10 +86,26 @@ export default function ProductDetails() {
                         Actually ref image has them below offer.
                     */}
                     <View style={styles.actionRow}>
-                        <TouchableOpacity style={styles.wishlistBtn}>
-                            <Feather name="shopping-bag" size={20} color="#1a1a1a" />
+                        <TouchableOpacity
+                            style={styles.wishlistBtn}
+                            onPress={() => {
+                                if (isInWishlist(product.id)) {
+                                    removeFromWishlist(product.id);
+                                } else {
+                                    addToWishlist(product);
+                                }
+                            }}
+                        >
+                            <Feather
+                                name={isInWishlist(product.id) ? "heart" : "heart"}
+                                size={20}
+                                color={isInWishlist(product.id) ? "#F59E0B" : "#1a1a1a"}
+                                style={{ marginRight: 8 }}
+                            />
                             <Text style={styles.wishlistText}>Wishlist</Text>
                         </TouchableOpacity>
+
+                        {/* Wait, the previous block had Text inside. Let's rewrite properly. */}
                         <TouchableOpacity
                             style={styles.addToCartBtn}
                             onPress={() => {
@@ -100,6 +128,24 @@ export default function ProductDetails() {
                         onSelectSize={setSelectedSize}
                     />
 
+                    {/* Delivery Option Toggle */}
+                    <View style={{ marginTop: 20 }}>
+                        <Text style={styles.sectionLabel}>SELECT DELIVERY TYPE</Text>
+                        <DeliveryOptionSelector
+                            selectedOption={deliveryOption}
+                            onSelect={setDeliveryOption}
+                        />
+
+                        <View style={styles.disclaimerBox}>
+                            <Text style={styles.disclaimerText}>
+                                {deliveryOption === 'instant'
+                                    ? "In this delivery type the delivery boy will stay at the location for 15 minutes so that if the customer wishes to buy they can pay the entire amount or if not they can pay the charges for the instant trial only and not the entire amount."
+                                    : "This is standard delivery."
+                                }
+                            </Text>
+                        </View>
+                    </View>
+
                     {/* Delivery Info */}
                     <View style={styles.deliveryRow}>
                         <View style={styles.deliveryItem}>
@@ -112,7 +158,13 @@ export default function ProductDetails() {
                             <View style={styles.deliveryIcon}>
                                 <Feather name="rotate-ccw" size={14} color="#1a1a1a" />
                             </View>
-                            <Text style={styles.deliveryText}>Easy <Text style={{ fontWeight: '700' }}>15 days</Text> return</Text>
+                            <Text style={styles.deliveryText}>
+                                {deliveryOption === 'instant' ? (
+                                    <Text style={{ fontWeight: '700' }}>Instant Return</Text>
+                                ) : (
+                                    <>Easy <Text style={{ fontWeight: '700' }}>5 days</Text> return</>
+                                )}
+                            </Text>
                         </View>
                     </View>
 
@@ -375,5 +427,27 @@ const styles = StyleSheet.create({
         fontSize: 12,
         fontWeight: '700',
         color: '#1a1a1a'
+    },
+    sectionLabel: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#666',
+        marginBottom: 8,
+        letterSpacing: 0.5,
+        textTransform: 'uppercase'
+    },
+    disclaimerBox: {
+        backgroundColor: '#F9FAFB',
+        borderRadius: 8,
+        padding: 12,
+        marginTop: 8,
+        borderWidth: 1,
+        borderColor: '#E5E7EB'
+    },
+    disclaimerText: {
+        fontSize: 12,
+        color: '#555',
+        lineHeight: 18,
+        fontStyle: 'italic'
     }
 });

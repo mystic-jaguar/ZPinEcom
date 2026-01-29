@@ -1,4 +1,5 @@
 import { Feather } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import React from 'react';
 import { FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -6,55 +7,65 @@ import { useCart } from '../../context/CartContext';
 
 export default function CartScreen() {
     const { cartItems, updateQuantity, removeFromCart, totalPrice } = useCart();
+    const router = useRouter();
 
     const renderItem = ({ item }: { item: any }) => (
         <View style={styles.cartItem}>
-            <Image source={item.image} style={styles.itemImage} resizeMode="cover" />
+            <TouchableOpacity
+                style={{ flexDirection: 'row', flex: 1 }}
+                onPress={() => router.push(`/product/${item.id}`)}
+                activeOpacity={0.7}
+            >
+                <Image source={item.image} style={styles.itemImage} resizeMode="cover" />
 
-            <View style={styles.itemDetails}>
-                <View style={styles.headerRow}>
-                    <Text style={styles.itemName} numberOfLines={2}>{item.name}</Text>
-                    <TouchableOpacity onPress={() => removeFromCart(item.cartId)}>
-                        <Feather name="x" size={18} color="#999" />
-                    </TouchableOpacity>
-                </View>
-
-                {(item.selectedColor || item.selectedSize) && (
-                    <View style={styles.variantContainer}>
-                        {item.selectedSize && (
-                            <Text style={styles.variantText}>{item.selectedSize}</Text>
-                        )}
-                        {item.selectedSize && item.selectedColor && (
-                            <View style={styles.separator} />
-                        )}
-                        {item.selectedColor && (
-                            <View style={[styles.colorSwatch, { backgroundColor: item.selectedColor }]} />
-                        )}
-                    </View>
-                )}
-
-                <View style={styles.priceRow}>
-                    <Text style={styles.itemPrice}>₹{(item.price * item.quantity).toLocaleString()}</Text>
-
-                    <View style={styles.quantityControls}>
-                        <TouchableOpacity
-                            style={styles.qtyBtn}
-                            onPress={() => updateQuantity(item.cartId, item.quantity - 1)}
-                        >
-                            <Feather name="minus" size={14} color="#1a1a1a" />
-                        </TouchableOpacity>
-
-                        <Text style={styles.qtyText}>{item.quantity}</Text>
-
-                        <TouchableOpacity
-                            style={styles.qtyBtn}
-                            onPress={() => updateQuantity(item.cartId, item.quantity + 1)}
-                        >
-                            <Feather name="plus" size={14} color="#1a1a1a" />
+                <View style={styles.itemDetails}>
+                    <View style={styles.headerRow}>
+                        <Text style={styles.itemName} numberOfLines={2}>{item.name}</Text>
+                        <TouchableOpacity onPress={(e) => {
+                            e.stopPropagation();
+                            removeFromCart(item.cartId);
+                        }}>
+                            <Feather name="x" size={18} color="#999" />
                         </TouchableOpacity>
                     </View>
+
+                    {(item.selectedColor || item.selectedSize) && (
+                        <View style={styles.variantContainer}>
+                            {item.selectedSize && (
+                                <Text style={styles.variantText}>{item.selectedSize}</Text>
+                            )}
+                            {item.selectedSize && item.selectedColor && (
+                                <View style={styles.separator} />
+                            )}
+                            {item.selectedColor && (
+                                <View style={[styles.colorSwatch, { backgroundColor: item.selectedColor }]} />
+                            )}
+                        </View>
+                    )}
+
+                    <View style={styles.priceRow}>
+                        <Text style={styles.itemPrice}>₹{(item.price * item.quantity).toLocaleString()}</Text>
+
+                        <View style={styles.quantityControls}>
+                            <TouchableOpacity
+                                style={styles.qtyBtn}
+                                onPress={() => updateQuantity(item.cartId, item.quantity - 1)}
+                            >
+                                <Feather name="minus" size={14} color="#1a1a1a" />
+                            </TouchableOpacity>
+
+                            <Text style={styles.qtyText}>{item.quantity}</Text>
+
+                            <TouchableOpacity
+                                style={styles.qtyBtn}
+                                onPress={() => updateQuantity(item.cartId, item.quantity + 1)}
+                            >
+                                <Feather name="plus" size={14} color="#1a1a1a" />
+                            </TouchableOpacity>
+                        </View>
+                    </View>
                 </View>
-            </View>
+            </TouchableOpacity>
         </View>
     );
 
