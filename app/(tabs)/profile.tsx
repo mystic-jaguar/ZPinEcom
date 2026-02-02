@@ -43,7 +43,7 @@ export default function ProfileScreen() {
                         <ProfileOption
                             label="Returns & Refunds"
                             icon="rotate-ccw"
-                            onPress={() => { }}
+                            onPress={() => router.push('/profile/returns')}
                             showBorder={false}
                         />
                     </View>

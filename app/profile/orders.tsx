@@ -7,46 +7,51 @@ import SearchBar from '../../components/SearchBar';
 import OrderCard, { Order } from '../../components/profile/OrderCard';
 import OrderFilters from '../../components/profile/OrderFilters';
 
+import { PRODUCTS } from '../../constants/products';
+
+// Helper to get product details
+const getProduct = (id: string) => PRODUCTS.find(p => p.id === id) || PRODUCTS[0];
+
 // Mock Data
 const ORDERS: Order[] = [
     {
         id: '1',
         orderNumber: 'ZP-29402',
         date: '14 Oct, 2023',
-        total: '₹3,499.00',
+        total: `₹${getProduct('1').price}`,
         status: 'Processing',
         items: [
-            { name: 'Jacket', image: require('../../assets/images/winterwear.jpg') },
+            { name: getProduct('1').name, image: getProduct('1').image },
         ],
     },
     {
         id: '2',
         orderNumber: 'ZP-28511',
         date: '08 Oct, 2023',
-        total: '₹1,250.00',
+        total: `₹${getProduct('2').price}`,
         status: 'Delivered',
         items: [
-            { name: 'Backpack', image: require('../../assets/images/backpacks.jpg') },
+            { name: getProduct('2').name, image: getProduct('2').image },
         ],
     },
     {
         id: '3',
         orderNumber: 'ZP-28399',
         date: '22 Sep, 2023',
-        total: '₹5,999.00',
+        total: `₹${getProduct('5').price}`,
         status: 'Delivered',
         items: [
-            { name: 'Watch', image: require('../../assets/images/analog.jpg') },
+            { name: getProduct('5').name, image: getProduct('5').image },
         ],
     },
     {
         id: '4',
         orderNumber: 'ZP-27104',
         date: '15 Sep, 2023',
-        total: '₹2,199.00',
+        total: `₹${getProduct('9').price}`,
         status: 'Cancelled',
         items: [
-            { name: 'Sunglasses', image: require('../../assets/images/sunglasses.jpg') },
+            { name: getProduct('9').name, image: getProduct('9').image },
         ],
     },
 ];
