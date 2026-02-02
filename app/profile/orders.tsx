@@ -118,7 +118,10 @@ export default function AllOrdersScreen() {
                 renderItem={({ item }) => (
                     <OrderCard
                         order={item}
-                        onPress={() => { }} // Navigate to Order Details
+                        onPress={() => router.push({
+                            pathname: '/profile/order-details',
+                            params: { orderId: item.orderNumber }
+                        })}
                         onTrack={() => { }} // Navigate to Track Order
                         onBuyAgain={() => { }} // Add to Cart
                     />

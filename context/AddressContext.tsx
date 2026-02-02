@@ -19,6 +19,7 @@ interface AddressContextType {
     addAddress: (address: Omit<Address, 'id'>) => void;
     removeAddress: (id: string) => void;
     setDefaultAddress: (id: string) => void;
+    updateAddress: (id: string, address: Omit<Address, 'id'>) => void;
 }
 
 const AddressContext = createContext<AddressContextType | undefined>(undefined);
@@ -76,12 +77,19 @@ export const AddressProvider = ({ children }: { children: ReactNode }) => {
         })));
     };
 
+    const updateAddress = (id: string, updatedAddress: Omit<Address, 'id'>) => {
+        setAddresses(prev => prev.map(a =>
+            a.id === id ? { ...updatedAddress, id } : a
+        ));
+    };
+
     return (
         <AddressContext.Provider value={{
             addresses,
             addAddress,
             removeAddress,
-            setDefaultAddress
+            setDefaultAddress,
+            updateAddress
         }}>
             {children}
         </AddressContext.Provider>

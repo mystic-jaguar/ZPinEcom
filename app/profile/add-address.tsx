@@ -1,6 +1,6 @@
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Input from '../../components/common/Input';
@@ -8,7 +8,9 @@ import { useAddress } from '../../context/AddressContext';
 
 export default function AddAddressScreen() {
     const router = useRouter();
-    const { addAddress } = useAddress();
+    const params = useLocalSearchParams();
+    const { addAddress, updateAddress, addresses } = useAddress();
+    const headerTitle = params.id ? 'Edit Address' : 'Add New Address';
 
     const [form, setForm] = useState({
         name: '',
@@ -21,6 +23,25 @@ export default function AddAddressScreen() {
         phoneNumber: '',
         type: 'Home' as 'Home' | 'Work' | 'Other'
     });
+
+    useEffect(() => {
+        if (params.id) {
+            const existingAddress = addresses.find(a => a.id === params.id);
+            if (existingAddress) {
+                setForm({
+                    name: existingAddress.name,
+                    addressLine: existingAddress.addressLine,
+                    city: existingAddress.city,
+                    state: existingAddress.state,
+                    pincode: existingAddress.pincode,
+                    country: existingAddress.country,
+                    landmark: existingAddress.landmark || '',
+                    phoneNumber: existingAddress.phoneNumber,
+                    type: existingAddress.type
+                });
+            }
+        }
+    }, [params.id, addresses]);
 
     const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -43,13 +64,23 @@ export default function AddAddressScreen() {
 
     const handleSave = () => {
         if (validate()) {
-            addAddress({
-                ...form,
-                isDefault: false // Default to false initially
-            });
-            Alert.alert('Success', 'Address added successfully!', [
-                { text: 'OK', onPress: () => router.back() }
-            ]);
+            if (params.id) {
+                updateAddress(params.id as string, {
+                    ...form,
+                    isDefault: false // Keep existing default status or pass it if needed, simplistic for now
+                });
+                Alert.alert('Success', 'Address updated successfully!', [
+                    { text: 'OK', onPress: () => router.back() }
+                ]);
+            } else {
+                addAddress({
+                    ...form,
+                    isDefault: false // Default to false initially
+                });
+                Alert.alert('Success', 'Address added successfully!', [
+                    { text: 'OK', onPress: () => router.back() }
+                ]);
+            }
         }
     };
 
@@ -59,7 +90,7 @@ export default function AddAddressScreen() {
                 <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
                     <Feather name="arrow-left" size={24} color="#1a1a1a" />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Add New Address</Text>
+                <Text style={styles.headerTitle}>{headerTitle}</Text>
                 <View style={{ width: 24 }} />
             </View>
 

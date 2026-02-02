@@ -26,6 +26,12 @@ export default function SavedAddressesScreen() {
                             <Text style={styles.setDefaultText}>Set Default</Text>
                         </TouchableOpacity>
                     )}
+                    <TouchableOpacity
+                        onPress={() => router.push({ pathname: '/profile/add-address', params: { id: item.id } })}
+                        style={styles.editBtn}
+                    >
+                        <Feather name="edit-2" size={16} color="#FBBF24" />
+                    </TouchableOpacity>
                     <TouchableOpacity onPress={() => removeAddress(item.id)} style={styles.deleteBtn}>
                         <Feather name="trash-2" size={16} color="#EF4444" />
                     </TouchableOpacity>
@@ -184,6 +190,10 @@ const styles = StyleSheet.create({
         fontSize: 12,
         fontWeight: '600',
         color: '#FBBF24'
+    },
+    editBtn: {
+        padding: 4,
+        marginRight: 10
     },
     deleteBtn: {
         padding: 4

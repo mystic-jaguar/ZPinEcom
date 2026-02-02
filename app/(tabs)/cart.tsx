@@ -16,7 +16,7 @@ export default function CartScreen() {
                 onPress={() => router.push(`/product/${item.id}`)}
                 activeOpacity={0.7}
             >
-                <Image source={item.image} style={styles.itemImage} resizeMode="cover" />
+                <Image source={typeof item.image === 'string' ? { uri: item.image } : (item.image || { uri: 'https://via.placeholder.com/80' })} style={styles.itemImage} resizeMode="cover" />
 
                 <View style={styles.itemDetails}>
                     <View style={styles.headerRow}>
@@ -91,7 +91,10 @@ export default function CartScreen() {
                             <Text style={styles.totalLabel}>Total</Text>
                             <Text style={styles.totalAmount}>₹{totalPrice.toLocaleString()}</Text>
                         </View>
-                        <TouchableOpacity style={styles.checkoutBtn}>
+                        <TouchableOpacity
+                            style={styles.checkoutBtn}
+                            onPress={() => router.push('/checkout/address')}
+                        >
                             <Text style={styles.checkoutText}>Proceed to Checkout</Text>
                             <Feather name="arrow-right" size={20} color="#1a1a1a" />
                         </TouchableOpacity>
