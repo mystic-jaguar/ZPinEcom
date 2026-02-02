@@ -3,69 +3,22 @@ import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import SearchBar from '../../components/SearchBar';
-import OrderCard, { Order } from '../../components/profile/OrderCard';
+import OrderCard from '../../components/profile/OrderCard';
 import OrderFilters from '../../components/profile/OrderFilters';
-
-import { PRODUCTS } from '../../constants/products';
-
-// Helper to get product details
-const getProduct = (id: string) => PRODUCTS.find(p => p.id === id) || PRODUCTS[0];
-
-// Mock Data
-const ORDERS: Order[] = [
-    {
-        id: '1',
-        orderNumber: 'ZP-29402',
-        date: '14 Oct, 2023',
-        total: `₹${getProduct('1').price}`,
-        status: 'Processing',
-        items: [
-            { name: getProduct('1').name, image: getProduct('1').image },
-        ],
-    },
-    {
-        id: '2',
-        orderNumber: 'ZP-28511',
-        date: '08 Oct, 2023',
-        total: `₹${getProduct('2').price}`,
-        status: 'Delivered',
-        items: [
-            { name: getProduct('2').name, image: getProduct('2').image },
-        ],
-    },
-    {
-        id: '3',
-        orderNumber: 'ZP-28399',
-        date: '22 Sep, 2023',
-        total: `₹${getProduct('5').price}`,
-        status: 'Delivered',
-        items: [
-            { name: getProduct('5').name, image: getProduct('5').image },
-        ],
-    },
-    {
-        id: '4',
-        orderNumber: 'ZP-27104',
-        date: '15 Sep, 2023',
-        total: `₹${getProduct('9').price}`,
-        status: 'Cancelled',
-        items: [
-            { name: getProduct('9').name, image: getProduct('9').image },
-        ],
-    },
-];
+import SearchBar from '../../components/SearchBar';
+import { useOrder } from '../../context/OrderContext';
 
 export default function AllOrdersScreen() {
     const router = useRouter();
+    const { orders } = useOrder();
     const [searchQuery, setSearchQuery] = useState('');
     const [activeFilter, setActiveFilter] = useState('All');
 
     const filteredOrders = useMemo(() => {
-        return ORDERS.filter((order) => {
+        return orders.filter((order) => {
             // Filter by Status
             if (activeFilter !== 'All') {
-                if (activeFilter === 'In Progress' && order.status !== 'Processing' && order.status !== 'Shipped') return false;
+                if (activeFilter === 'In Progress' && order.status !== 'Processing' && order.status !== 'Shipped' && order.status !== 'Unpacked') return false;
                 if (activeFilter === 'Completed' && order.status !== 'Delivered') return false;
                 if (activeFilter === 'Cancelled' && order.status !== 'Cancelled') return false;
             }
@@ -80,7 +33,7 @@ export default function AllOrdersScreen() {
 
             return true;
         });
-    }, [activeFilter, searchQuery]);
+    }, [activeFilter, searchQuery, orders]);
 
     const renderHeader = () => (
         <View style={styles.header}>
@@ -117,10 +70,17 @@ export default function AllOrdersScreen() {
                 data={filteredOrders}
                 renderItem={({ item }) => (
                     <OrderCard
-                        order={item}
+                        order={{
+                            id: item.id,
+                            orderNumber: item.orderNumber,
+                            date: item.date,
+                            total: `₹${item.total.toFixed(2)}`,
+                            status: item.status === 'Unpacked' ? 'Processing' : item.status, // Map Unpacked to Processing for card display if needed
+                            items: item.items.map(i => ({ name: i.name, image: i.image }))
+                        }}
                         onPress={() => router.push({
                             pathname: '/profile/order-details',
-                            params: { orderId: item.orderNumber }
+                            params: { orderId: item.id }
                         })}
                         onTrack={() => { }} // Navigate to Track Order
                         onBuyAgain={() => { }} // Add to Cart
@@ -131,6 +91,12 @@ export default function AllOrdersScreen() {
                 showsVerticalScrollIndicator={false}
                 ListFooterComponent={
                     <Text style={styles.footerText}>You've reached the end of your orders</Text>
+                }
+                ListEmptyComponent={
+                    <View style={styles.emptyContainer}>
+                        <Feather name="shopping-bag" size={48} color="#E5E7EB" />
+                        <Text style={styles.emptyText}>No orders found</Text>
+                    </View>
                 }
             />
         </SafeAreaView>
@@ -170,6 +136,7 @@ const styles = StyleSheet.create({
     listContent: {
         padding: 20,
         paddingBottom: 40,
+        flexGrow: 1,
     },
     footerText: {
         textAlign: 'center',
@@ -178,4 +145,15 @@ const styles = StyleSheet.create({
         marginBottom: 20,
         fontSize: 14,
     },
+    emptyContainer: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 50
+    },
+    emptyText: {
+        marginTop: 10,
+        fontSize: 16,
+        color: '#9CA3AF'
+    }
 });

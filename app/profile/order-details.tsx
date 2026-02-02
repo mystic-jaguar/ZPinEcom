@@ -6,48 +6,31 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import DeliveryStatusCard from '../../components/profile/DeliveryStatusCard';
 import OrderItemRow from '../../components/profile/OrderItemRow';
 import PriceBreakdown from '../../components/profile/PriceBreakdown';
-import { PRODUCTS } from '../../constants/products';
+import { useOrder } from '../../context/OrderContext';
 
 export default function OrderDetailsScreen() {
     const router = useRouter();
     const params = useLocalSearchParams();
     const { orderId } = params;
+    const { getOrderById } = useOrder();
 
-    // Hardcoded Mock Data for demo purposes based on ID
-    // In a real app, fetch order details by ID
-    const product = PRODUCTS.find(p => p.id === '1')!; // Default to Jacket for demo
+    const order = getOrderById(orderId as string);
 
-    const ORDER_DETAILS = {
-        id: orderId || 'ZP-29402',
-        status: 'Unpacked',
-        estimatedDelivery: 'Wednesday, 18 Oct 2023',
-        deliveryStatus: 'On the way',
-        address: {
-            name: 'Rahul Sharma',
-            details: 'House No. 42, 2nd Floor, Green Park Extension, Near Metro Station, New Delhi - 110016',
-            phone: '+91 98765 43210'
-        },
-        payment: {
-            method: 'UPI (GPay/PhonePe)',
-            status: 'PAID'
-        },
-        items: [
-            {
-                id: product.id,
-                name: product.name,
-                image: product.image,
-                variant: 'Size: L | Color: Jet Black',
-                quantity: 1,
-                price: product.price
-            }
-        ],
-        charges: {
-            subtotal: product.price,
-            instantTrialFee: 99,
-            delivery: 0,
-            total: product.price + 99
-        }
-    };
+    if (!order) {
+        return (
+            <SafeAreaView style={styles.container}>
+                <View style={styles.header}>
+                    <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+                        <Feather name="chevron-left" size={28} color="#1a1a1a" />
+                    </TouchableOpacity>
+                    <Text style={styles.headerTitle}>Order Not Found</Text>
+                </View>
+                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                    <Text>Order details not available.</Text>
+                </View>
+            </SafeAreaView>
+        );
+    }
 
     return (
         <SafeAreaView style={styles.container} edges={['top']}>
@@ -56,15 +39,15 @@ export default function OrderDetailsScreen() {
                 <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
                     <Feather name="chevron-left" size={28} color="#1a1a1a" />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Order #{ORDER_DETAILS.id}</Text>
+                <Text style={styles.headerTitle}>Order #{order.orderNumber}</Text>
                 <View style={{ width: 28 }} />
             </View>
 
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                 {/* Delivery Status */}
                 <DeliveryStatusCard
-                    status="Estimated Delivery"
-                    subtext={`By ${ORDER_DETAILS.estimatedDelivery}`}
+                    status={order.status === 'Unpacked' ? 'Processing' : order.status}
+                    subtext={`By ${order.estimatedDelivery}`}
                 />
 
                 {/* Delivery Address */}
@@ -75,9 +58,9 @@ export default function OrderDetailsScreen() {
                             <Feather name="map-pin" size={16} color="#6B7280" />
                         </View>
                         <View style={styles.addressContent}>
-                            <Text style={styles.addressName}>{ORDER_DETAILS.address.name}</Text>
-                            <Text style={styles.addressDetails}>{ORDER_DETAILS.address.details}</Text>
-                            <Text style={styles.addressPhone}>{ORDER_DETAILS.address.phone}</Text>
+                            <Text style={styles.addressName}>{order.address.name}</Text>
+                            <Text style={styles.addressDetails}>{order.address.addressLine}, {order.address.city}, {order.address.state} - {order.address.pincode}</Text>
+                            <Text style={styles.addressPhone}>+91 {order.address.phoneNumber}</Text>
                         </View>
                     </View>
                 </View>
@@ -88,10 +71,10 @@ export default function OrderDetailsScreen() {
                     <View style={styles.paymentCard}>
                         <View style={styles.paymentRow}>
                             <MaterialIcons name="account-balance-wallet" size={24} color="#6B7280" />
-                            <Text style={styles.paymentMethodText}>{ORDER_DETAILS.payment.method}</Text>
+                            <Text style={styles.paymentMethodText}>{order.paymentMethod}</Text>
                         </View>
                         <View style={styles.paidBadge}>
-                            <Text style={styles.paidText}>{ORDER_DETAILS.payment.status}</Text>
+                            <Text style={styles.paidText}>PAID</Text>
                         </View>
                     </View>
                 </View>
@@ -100,12 +83,12 @@ export default function OrderDetailsScreen() {
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>ITEMS</Text>
                     <View style={styles.itemsCard}>
-                        {ORDER_DETAILS.items.map((item, index) => (
+                        {order.items.map((item, index) => (
                             <OrderItemRow
                                 key={index}
                                 image={item.image}
                                 name={item.name}
-                                variant={item.variant}
+                                variant={item.variant || ''}
                                 quantity={item.quantity}
                                 price={item.price}
                             />
@@ -118,10 +101,10 @@ export default function OrderDetailsScreen() {
                     <Text style={styles.sectionTitle}>PRICE DETAILS</Text>
                     <View style={styles.priceCard}>
                         <PriceBreakdown
-                            itemsTotal={ORDER_DETAILS.charges.subtotal}
-                            instantTrialFee={ORDER_DETAILS.charges.instantTrialFee}
-                            deliveryCharges={ORDER_DETAILS.charges.delivery}
-                            grandTotal={ORDER_DETAILS.charges.total}
+                            itemsTotal={order.subtotal}
+                            instantTrialFee={order.isInstant ? order.deliveryFee : 0}
+                            deliveryCharges={order.isInstant ? 0 : order.deliveryFee}
+                            grandTotal={order.total}
                         />
                     </View>
                 </View>

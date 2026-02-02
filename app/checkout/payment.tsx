@@ -1,8 +1,10 @@
 import { CheckoutProgress } from '@/components/checkout/CheckoutProgress';
 import ActionModal from '@/components/common/ActionModal';
 import { Colors } from '@/constants/Colors';
+import { useAddress } from '@/context/AddressContext';
 import { useCart } from '@/context/CartContext';
 import { useCheckout } from '@/context/CheckoutContext';
+import { Order, useOrder } from '@/context/OrderContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
@@ -10,8 +12,10 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-nati
 
 export default function CheckoutPaymentScreen() {
     const router = useRouter();
-    const { selectedPaymentMethod, setSelectedPaymentMethod, deliveryType } = useCheckout();
+    const { selectedPaymentMethod, setSelectedPaymentMethod, deliveryType, selectedAddressId } = useCheckout();
     const { totalPrice, cartItems, clearCart } = useCart();
+    const { addresses } = useAddress();
+    const { addOrder } = useOrder();
     const [showSuccessModal, setShowSuccessModal] = useState(false);
 
     // Calculate total including taxes/fees (matching summary logic)
@@ -31,6 +35,38 @@ export default function CheckoutPaymentScreen() {
     };
 
     const handleModalPrimary = () => {
+        // Create Order
+        const address = addresses.find(a => a.id === selectedAddressId);
+
+        if (address) {
+            const newOrder: Order = {
+                id: Math.random().toString(36).substr(2, 9),
+                orderNumber: `ZP-${Math.floor(10000 + Math.random() * 90000)}`,
+                date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+                status: 'Processing',
+                items: cartItems.map(item => ({
+                    id: item.id,
+                    name: item.name,
+                    image: item.image,
+                    price: item.price,
+                    quantity: item.quantity,
+                    variant: `Size: ${item.selectedSize} | Color: ${item.selectedColor}`
+                })),
+                total: finalTotal,
+                address: address,
+                paymentMethod: selectedPaymentMethod === 'google_pay' ? 'Google Pay' :
+                    selectedPaymentMethod === 'phone_pe' ? 'PhonePe' :
+                        selectedPaymentMethod === 'card_4242' ? 'Credit Card' : 'Other',
+                estimatedDelivery: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toDateString(), // +3 days
+                deliveryFee: deliveryFee,
+                taxes: tax,
+                subtotal: totalPrice,
+                savings: 0,
+                isInstant: isInstant
+            };
+            addOrder(newOrder);
+        }
+
         setShowSuccessModal(false);
         clearCart();
         router.dismissAll();
