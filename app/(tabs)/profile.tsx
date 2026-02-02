@@ -38,7 +38,7 @@ export default function ProfileScreen() {
                         <ProfileOption
                             label="All Orders"
                             icon="package"
-                            onPress={() => { }}
+                            onPress={() => router.push('/profile/orders')}
                         />
                         <ProfileOption
                             label="Returns & Refunds"
