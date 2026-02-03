@@ -122,7 +122,13 @@ export default function OrderDetailsScreen() {
                 </View>
 
                 {/* Track Button */}
-                <TouchableOpacity style={styles.primaryButton}>
+                <TouchableOpacity
+                    style={styles.primaryButton}
+                    onPress={() => router.push({
+                        pathname: '/profile/track-order',
+                        params: { orderId: order.id }
+                    })}
+                >
                     <Text style={styles.primaryButtonText}>Track Order</Text>
                 </TouchableOpacity>
 

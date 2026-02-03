@@ -82,7 +82,10 @@ export default function AllOrdersScreen() {
                             pathname: '/profile/order-details',
                             params: { orderId: item.id }
                         })}
-                        onTrack={() => { }} // Navigate to Track Order
+                        onTrack={() => router.push({
+                            pathname: '/profile/track-order',
+                            params: { orderId: item.id }
+                        })} // Navigate to Track Order
                         onBuyAgain={() => { }} // Add to Cart
                     />
                 )}
