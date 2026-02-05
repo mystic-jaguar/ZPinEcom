@@ -18,6 +18,8 @@ export default function CheckoutPaymentScreen() {
     const { addOrder } = useOrder();
     const [showSuccessModal, setShowSuccessModal] = useState(false);
 
+    const [redirectCategory, setRedirectCategory] = useState<string | null>(null);
+
     // Calculate total including taxes/fees (matching summary logic)
     const shippingFee = 0;
     const isInstant = deliveryType === 'Instant';
@@ -30,12 +32,7 @@ export default function CheckoutPaymentScreen() {
     };
 
     const handleConfirm = () => {
-        // Dummy payment flow - just show success immediately
-        setShowSuccessModal(true);
-    };
-
-    const handleModalPrimary = () => {
-        // Create Order
+        // Create Order Immediately
         const address = addresses.find(a => a.id === selectedAddressId);
 
         if (address) {
@@ -65,13 +62,42 @@ export default function CheckoutPaymentScreen() {
                 isInstant: isInstant
             };
             addOrder(newOrder);
+
+            // Capture category for redirect
+            if (cartItems.length > 0) {
+                // Check if item has category property, assuming it does based on Product interface
+                // We cast item to any or check properties if TS complains, but CartItem extends Product so it should be fine.
+                setRedirectCategory((cartItems[0] as any).category);
+            }
         }
 
+        setShowSuccessModal(true);
+    };
+
+    const handleModalPrimary = () => {
+        // Continue -> Redirect to Category
+        setShowSuccessModal(false);
+        clearCart();
+        router.dismissAll();
+
+        if (redirectCategory) {
+            router.push({
+                pathname: '/product-listing',
+                params: { categoryName: redirectCategory }
+            });
+        } else {
+            // Fallback to home if no category found
+            router.replace('/(tabs)');
+        }
+    };
+
+    const handleModalClose = () => {
+        // Close -> Redirect to Home
         setShowSuccessModal(false);
         clearCart();
         router.dismissAll();
         router.replace('/(tabs)');
-    };
+    }
 
     const renderOption = (id: string, label: string, iconName?: any, subLabel?: string, isCard: boolean = false) => {
         const isSelected = selectedPaymentMethod === id;
@@ -177,8 +203,8 @@ export default function CheckoutPaymentScreen() {
                 primaryButtonText="Continue"
                 onPrimaryPress={handleModalPrimary}
                 secondaryButtonText="Close"
-                onSecondaryPress={() => setShowSuccessModal(false)}
-                onClose={() => setShowSuccessModal(false)}
+                onSecondaryPress={handleModalClose}
+                onClose={handleModalClose}
                 icon="check-circle"
             />
         </View>

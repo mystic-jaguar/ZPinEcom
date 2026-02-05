@@ -7,12 +7,22 @@ import HelpBanner from '../../components/common/HelpBanner';
 import RefundStatusCard from '../../components/profile/RefundStatusCard';
 import ReturnEligibleCard from '../../components/profile/ReturnEligibleCard';
 
-import { PRODUCTS } from '../../constants/products';
+import { useOrder } from '../../context/OrderContext';
 
 export default function ReturnsRefundsScreen() {
     const router = useRouter();
-    const p1 = PRODUCTS.find(p => p.id === '2')!; // Backpack
-    const p2 = PRODUCTS.find(p => p.id === '7')!; // Face Wash
+    const { orders } = useOrder();
+
+    // Flatten all items from orders to show in returns list
+    // In a real app, you might filter by 'Delivered' status and within return window
+    const returnableItems = orders.flatMap(order =>
+        order.items.map(item => ({
+            ...item,
+            orderId: order.orderNumber,
+            date: order.date,
+            status: order.status
+        }))
+    );
 
     return (
         <SafeAreaView style={styles.container} edges={['top']}>
@@ -43,35 +53,26 @@ export default function ReturnsRefundsScreen() {
                 {/* Eligible Section */}
                 <View style={styles.sectionHeader}>
                     <Text style={styles.sectionTitle}>Eligible for Return</Text>
-                    <Text style={styles.itemCount}>2 ITEMS</Text>
+                    <Text style={styles.itemCount}>{returnableItems.length} ITEMS</Text>
                 </View>
 
-                {/* Card 1 */}
-                <ReturnEligibleCard
-                    image={p1.image}
-                    status="DELIVERED 2 DAYS AGO"
-                    name={p1.name}
-                    variant={p1.subtitle || "Standard Variant"}
-                    onInitiate={() => { }}
-                />
-
-                {/* Card 2 */}
-                <ReturnEligibleCard
-                    image={p2.image}
-                    status="DELIVERED YESTERDAY"
-                    statusColor="#F59E0B"
-                    name={p2.name}
-                    variant={p2.subtitle || "Standard Variant"}
-                    onInitiate={() => { }}
-                />
-
-                {/* Refund Status Section */}
-                <View style={[styles.sectionHeader, styles.mt20]}>
-                    <Text style={styles.sectionTitle}>Refund Status</Text>
-                    <TouchableOpacity>
-                        <Text style={styles.viewHistory}>View History</Text>
-                    </TouchableOpacity>
-                </View>
+                {returnableItems.map((item, index) => (
+                    <ReturnEligibleCard
+                        key={`${item.orderId}-${item.id}-${index}`}
+                        image={item.image}
+                        status={item.status === 'Delivered' ? `DELIVERED ON ${item.date}` : item.status.toUpperCase()}
+                        statusColor={item.status === 'Delivered' ? '#166534' : '#F59E0B'}
+                        name={item.name}
+                        variant={item.variant || "Standard Variant"}
+                        onInitiate={() => router.push({
+                            pathname: '/profile/initiate-return',
+                            params: {
+                                productId: item.id,
+                                orderId: item.orderId
+                            }
+                        })}
+                    />
+                ))}
 
                 <RefundStatusCard
                     orderId="ZP-98231"

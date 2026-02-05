@@ -195,5 +195,292 @@ export const PRODUCTS: Product[] = [
         subCategory: 'Cables',
         description: 'Durable braided fast charging cable for Type-C devices.',
         discount: 60
+    },
+    // Electronics - Headphones & Audio
+    {
+        id: '14',
+        name: 'Noise Cancelling Headphones',
+        price: 3499,
+        originalPrice: 6999,
+        rating: 4.7,
+        image: require('../assets/images/backpacks.jpg'), // Using available asset as placeholder for tech/lifestyle
+        category: 'Electronics',
+        subCategory: 'Audio',
+        description: 'Immersive sound with active noise cancellation.',
+        discount: 50
+    },
+    {
+        id: '15',
+        name: 'Portable Bluetooth Speaker',
+        price: 1299,
+        originalPrice: 2499,
+        rating: 4.5,
+        image: require('../assets/images/smartwatches.jpg'), // Placeholder
+        category: 'Electronics',
+        subCategory: 'Audio',
+        description: 'Compact speaker with powerful bass and long battery life.',
+        discount: 48
+    },
+
+    // Fashion - Women's Accessories
+    {
+        id: '16',
+        name: 'Gold Plated Bangles',
+        price: 599,
+        originalPrice: 1199,
+        rating: 4.4,
+        image: require('../assets/images/bangles.jpg'),
+        category: 'Fashion',
+        subCategory: 'Jewellery',
+        description: 'Traditional gold plated bangles set of 4.',
+        discount: 50
+    },
+    {
+        id: '17',
+        name: 'Bridal Necklace Set',
+        price: 1499,
+        originalPrice: 2999,
+        rating: 4.8,
+        image: require('../assets/images/bridalaccessories.jpg'),
+        category: 'Fashion',
+        subCategory: 'Jewellery',
+        description: 'Exquisite bridal necklace set with matching earrings.',
+        discount: 50
+    },
+    {
+        id: '18',
+        name: 'Statement Earrings',
+        price: 299,
+        originalPrice: 599,
+        rating: 4.3,
+        image: require('../assets/images/earrings.jpg'),
+        category: 'Fashion',
+        subCategory: 'Jewellery',
+        description: 'Trendy statement earrings for party wear.',
+        discount: 50
+    },
+    {
+        id: '19',
+        name: 'Crystal Rings Set',
+        price: 199,
+        originalPrice: 399,
+        rating: 4.2,
+        image: require('../assets/images/rings.jpg'),
+        category: 'Fashion',
+        subCategory: 'Jewellery',
+        description: 'Set of 5 adjustable crystal rings.',
+        discount: 50
+    },
+    {
+        id: '20',
+        name: 'Pearl Necklace',
+        price: 399,
+        originalPrice: 799,
+        rating: 4.5,
+        image: require('../assets/images/necklaces.jpg'),
+        category: 'Fashion',
+        subCategory: 'Jewellery',
+        description: 'Elegant single strand pearl necklace.',
+        discount: 50
+    },
+
+    // Fashion - Accessories
+    {
+        id: '21',
+        name: 'Classic Leather Belt',
+        price: 499,
+        originalPrice: 999,
+        rating: 4.4,
+        image: require('../assets/images/belts.jpg'),
+        category: 'Fashion',
+        subCategory: 'Accessories',
+        description: 'Genuine leather belt with sleek buckle.',
+        discount: 50
+    },
+    {
+        id: '22',
+        name: 'Stylish Sling Bag',
+        price: 699,
+        originalPrice: 1399,
+        rating: 4.6,
+        image: require('../assets/images/slingbags.jpg'),
+        category: 'Fashion',
+        subCategory: 'Bags',
+        description: 'Compact sling bag for everyday essentials.',
+        discount: 50
+    },
+    {
+        id: '23',
+        name: 'Travel Duffel Bag',
+        price: 1599,
+        originalPrice: 3199,
+        rating: 4.7,
+        image: require('../assets/images/travelbags.jpg'),
+        category: 'Fashion',
+        subCategory: 'Bags',
+        description: 'Spacious duffel bag perfect for weekend getaways.',
+        discount: 50
+    },
+    {
+        id: '24',
+        name: 'Card Holder',
+        price: 199,
+        originalPrice: 399,
+        rating: 4.3,
+        image: require('../assets/images/cardholders.jpg'),
+        category: 'Fashion',
+        subCategory: 'Accessories',
+        description: 'Slim card holder made of premium faux leather.',
+        discount: 50
+    },
+    {
+        id: '25',
+        name: 'Printed Scarf',
+        price: 299,
+        originalPrice: 599,
+        rating: 4.5,
+        image: require('../assets/images/scarves.jpg'),
+        category: 'Fashion',
+        subCategory: 'Accessories',
+        description: 'Soft cotton scarf with floral prints.',
+        discount: 50
+    },
+
+    // Beauty - Hair Care
+    {
+        id: '26',
+        name: 'Nourishing Hair Oil',
+        price: 249,
+        originalPrice: 499,
+        rating: 4.6,
+        image: require('../assets/images/hairoil.jpg'),
+        category: 'Beauty',
+        subCategory: 'Hair Care',
+        description: 'Ayurvedic hair oil for hair fall control.',
+        discount: 50
+    },
+    {
+        id: '27',
+        name: 'Volumizing Shampoo',
+        price: 349,
+        originalPrice: 699,
+        rating: 4.4,
+        image: require('../assets/images/shampoo.jpg'),
+        category: 'Beauty',
+        subCategory: 'Hair Care',
+        description: 'Sulphate-free shampoo for extra volume.',
+        discount: 50
+    },
+    {
+        id: '28',
+        name: 'Hair Serum',
+        price: 299,
+        originalPrice: 599,
+        rating: 4.5,
+        image: require('../assets/images/serums.jpg'),
+        category: 'Beauty',
+        subCategory: 'Hair Care',
+        description: 'Anti-frizz hair serum for smooth shine.',
+        discount: 50
+    },
+    {
+        id: '29',
+        name: 'Hair Dryer',
+        price: 1299,
+        originalPrice: 2599,
+        rating: 4.7,
+        image: require('../assets/images/hairdryers.jpg'),
+        category: 'Beauty',
+        subCategory: 'Appliances',
+        description: '1200W hair dryer with cold air setting.',
+        discount: 50
+    },
+
+    // Grooming
+    {
+        id: '30',
+        name: 'Beard Trimmer',
+        price: 999,
+        originalPrice: 1999,
+        rating: 4.5,
+        image: require('../assets/images/trimmers.jpg'),
+        category: 'Grooming',
+        subCategory: 'Appliances',
+        description: 'Rechargeable beard trimmer with adjustable settings.',
+        discount: 50
+    },
+    {
+        id: '31',
+        name: 'Shaving Kit',
+        price: 799,
+        originalPrice: 1599,
+        rating: 4.4,
+        image: require('../assets/images/shaving.jpg'),
+        category: 'Grooming',
+        subCategory: 'Essentials',
+        description: 'Complete shaving kit with razor, foam and brush.',
+        discount: 50
+    },
+    {
+        id: '32',
+        name: 'Men\'s Perfume',
+        price: 599,
+        originalPrice: 1199,
+        rating: 4.3,
+        image: require('../assets/images/perfumes.jpg'),
+        category: 'Grooming',
+        subCategory: 'Fragrance',
+        description: 'Long-lasting woody fragrance for men.',
+        discount: 50
+    },
+    {
+        id: '33',
+        name: 'Deodorant Spray',
+        price: 199,
+        originalPrice: 399,
+        rating: 4.2,
+        image: require('../assets/images/deodorants.jpg'),
+        category: 'Grooming',
+        subCategory: 'Fragrance',
+        description: 'Fresh citrus scent deodorant for daily use.',
+        discount: 50
+    },
+
+    // Eyewear
+    {
+        id: '34',
+        name: 'Aviator Sunglasses',
+        price: 899,
+        originalPrice: 1799,
+        rating: 4.6,
+        image: require('../assets/images/sunglasses.jpg'),
+        category: 'Fashion',
+        subCategory: 'Eyewear',
+        description: 'Classic aviator sunglasses with UV protection.',
+        discount: 50
+    },
+    {
+        id: '35',
+        name: 'Blue Light Glasses',
+        price: 599,
+        originalPrice: 1199,
+        rating: 4.4,
+        image: require('../assets/images/bluelightglasses.jpg'),
+        category: 'Fashion',
+        subCategory: 'Eyewear',
+        description: 'Anti-glare computer glasses for eye strain relief.',
+        discount: 50
+    },
+    {
+        id: '36',
+        name: 'Reading Glasses',
+        price: 399,
+        originalPrice: 799,
+        rating: 4.3,
+        image: require('../assets/images/readingglasses.jpg'),
+        category: 'Fashion',
+        subCategory: 'Eyewear',
+        description: 'Lightweight reading glasses (+1.5 power).',
+        discount: 50
     }
 ];
