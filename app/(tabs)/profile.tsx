@@ -119,13 +119,13 @@ export default function ProfileScreen() {
                             icon="map-pin"
                             onPress={() => router.push('/profile/addresses')}
                         />
-                        <ProfileOption
+                        {/* <ProfileOption
                             label="Notifications"
                             icon="bell"
                             onPress={() => { }}
-                        />
+                        /> */}
                         <ProfileOption
-                            label="Help Center"
+                            label="Help & Support"
                             icon="help-circle"
                             onPress={() => router.push('/profile/help-center')}
                         />
@@ -142,7 +142,7 @@ export default function ProfileScreen() {
                     <View style={styles.referBanner}>
                         <View style={styles.referContent}>
                             <Text style={styles.referTitle}>Refer a Friend</Text>
-                            <Text style={styles.referSubtitle}>Earn $20 for every friend you refer to ZPIN.</Text>
+                            <Text style={styles.referSubtitle}>Earn ₹100 for every friend you refer to ZPIN.</Text>
                             <TouchableOpacity style={styles.inviteButton}>
                                 <Text style={styles.inviteButtonText}>Invite Now</Text>
                             </TouchableOpacity>
@@ -154,9 +154,9 @@ export default function ProfileScreen() {
             </ScrollView>
 
             {/* FAB for Dark Mode (Visual only as per design) */}
-            <TouchableOpacity style={styles.fab}>
+            {/* <TouchableOpacity style={styles.fab}>
                 <Feather name="moon" size={20} color="#fff" />
-            </TouchableOpacity>
+            </TouchableOpacity> */}
         </View>
     );
 }
