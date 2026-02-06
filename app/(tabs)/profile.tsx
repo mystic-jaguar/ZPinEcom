@@ -61,7 +61,7 @@ export default function ProfileScreen() {
                         <ProfileOption
                             label="Payment Methods"
                             icon="credit-card"
-                            onPress={() => { }}
+                            onPress={() => router.push('/profile/payment-methods')}
                         />
                         <ProfileOption
                             label="Wishlist"
