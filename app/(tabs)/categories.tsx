@@ -87,7 +87,7 @@ const CategoryGridSection = ({
                         <View style={[
                             styles.gridImageContainer,
                             styleVariant === 'circle' ? styles.circleImage : styles.rectImage,
-                            styleVariant === 'circle' && index === 0 && styles.highlightedBorder // Example highlight
+                            styleVariant === 'circle' && styles.highlightedBorder
                         ]}>
                             {item.image ? (
                                 <Image source={item.image} style={styles.gridImage} />
