@@ -1,4 +1,5 @@
 import { Feather } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import React from 'react';
 import { Image, StyleSheet, TouchableOpacity, View } from 'react-native';
 
@@ -7,6 +8,8 @@ interface HeaderProps {
 }
 
 export default function Header({ }: HeaderProps) {
+    const router = useRouter();
+
     return (
         <View style={styles.header}>
             <View style={styles.logoContainer}>
@@ -18,10 +21,10 @@ export default function Header({ }: HeaderProps) {
                 />
             </View>
             <View style={styles.headerIcons}>
-                <TouchableOpacity style={styles.iconButton}>
+                <TouchableOpacity style={styles.iconButton} onPress={() => router.push('/profile/wishlist')}>
                     <Feather name="heart" size={24} color="#333" />
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.iconButton}>
+                <TouchableOpacity style={styles.iconButton} onPress={() => router.push('/profile/orders')}>
                     <Feather name="shopping-bag" size={24} color="#333" />
                 </TouchableOpacity>
             </View>

@@ -10,42 +10,51 @@ import SearchBar from '../../components/SearchBar';
 const { width } = Dimensions.get('window');
 
 // Mock Data
+// Use IDs matching constants/categories.ts for navigation
 const CATEGORIES = [
-    { id: '1', name: 'Fashion', image: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=200&q=80' },
-    { id: '2', name: 'Footwear', image: 'https://images.unsplash.com/photo-1549298916-b41d501d3772?auto=format&fit=crop&w=200&q=80' },
-    { id: '3', name: 'Beauty', image: require('../../assets/images/beauty_icon.jpg') },
-    { id: '4', name: 'Home', image: 'https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=200&q=80' },
-    { id: '5', name: 'Gadgets', image: 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=200&q=80' },
+    { id: 'fashion', name: 'Fashion', image: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=200&q=80' },
+    { id: 'accessories', name: 'Accessories', image: 'https://images.unsplash.com/photo-1549298916-b41d501d3772?auto=format&fit=crop&w=200&q=80' },
+    { id: 'beauty', name: 'Beauty', image: require('../../assets/images/beauty_icon.jpg') },
+    { id: 'home', name: 'Home', image: 'https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=200&q=80' },
+    { id: 'gadgets', name: 'Gadgets', image: 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=200&q=80' },
+    { id: 'appliances', name: 'Appliances', image: 'https://images.unsplash.com/photo-1581622558668-b2d9cf047520?auto=format&fit=crop&w=200&q=80' },
 ];
 
 const RECOMMENDED = [
-    { id: '1', name: 'Bags', desc: 'Starting from ₹499', image: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&w=400&q=80' },
-    { id: '2', name: 'Headphones', desc: 'Up to 60% OFF', image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=400&q=80' },
-    { id: '3', name: 'Watches', desc: 'Min 40% OFF', image: 'https://images.unsplash.com/photo-1524592094714-0f0654e20314?auto=format&fit=crop&w=400&q=80' },
-    { id: '4', name: 'Sunglasses', desc: 'Stylish & Cool', image: 'https://images.unsplash.com/photo-1511499767150-a48a237f0083?auto=format&fit=crop&w=400&q=80' },
-    { id: '5', name: 'Wallets', desc: 'Premium Leather', image: 'https://images.unsplash.com/photo-1627123424574-724758594e93?auto=format&fit=crop&w=400&q=80' },
+    { id: '1', name: 'Bags', desc: 'Starting from ₹499', image: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&w=400&q=80', category: 'Accessories', subCategory: 'Bags' },
+    { id: '2', name: 'Headphones', desc: 'Up to 60% OFF', image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=400&q=80', category: 'Gadgets', subCategory: 'Audio Devices' },
+    { id: '3', name: 'Watches', desc: 'Min 40% OFF', image: 'https://images.unsplash.com/photo-1524592094714-0f0654e20314?auto=format&fit=crop&w=400&q=80', category: 'Accessories', subCategory: 'Watches' },
+    { id: '4', name: 'Sunglasses', desc: 'Stylish & Cool', image: 'https://images.unsplash.com/photo-1511499767150-a48a237f0083?auto=format&fit=crop&w=400&q=80', category: 'Accessories', subCategory: 'Sunglasses' },
+    { id: '5', name: 'Wallets', desc: 'Premium Leather', image: 'https://images.unsplash.com/photo-1627123424574-724758594e93?auto=format&fit=crop&w=400&q=80', category: 'Accessories', subCategory: 'Wallets' },
 ];
 
 const FRESH_ARRIVALS = [
-    { id: '1', name: 'Ethnic Wear', offer: '30% - 70% OFF', image: require('../../assets/images/ethnic_wear_icon.jpg'), color: '#6A994E' },
-    { id: '2', name: 'Casual Wear', offer: '20% - 60% OFF', image: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=400&q=80', color: '#E9E3D5' },
-    { id: '3', name: 'Western', offer: 'FLAT 50% OFF', image: 'https://images.unsplash.com/photo-1551232864-3f0890e580d9?auto=format&fit=crop&w=400&q=80', color: '#D4A373' },
+    { id: '1', name: 'Ethnic Wear', offer: '30% - 70% OFF', image: require('../../assets/images/ethnic_wear_icon.jpg'), color: '#6A994E', category: 'Fashion', subCategory: 'Ethnic' },
+    { id: '2', name: 'Casual Wear', offer: '20% - 60% OFF', image: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=400&q=80', color: '#E9E3D5', category: 'Fashion', subCategory: 'T-Shirts' }, // Mapping casual to T-Shirts for now
+    { id: '3', name: 'Western', offer: 'FLAT 50% OFF', image: 'https://images.unsplash.com/photo-1551232864-3f0890e580d9?auto=format&fit=crop&w=400&q=80', color: '#D4A373', category: 'Fashion', subCategory: 'Western' },
 ];
 
 const NEARBY = [
-    { id: '1', name: 'Men', image: require('../../assets/images/men_icon.jpg') },
-    { id: '2', name: 'Women', image: require('../../assets/images/women_icon.jpg') },
-    { id: '3', name: 'Kids', image: 'https://images.unsplash.com/photo-1519457431-44ccd64a579b?auto=format&fit=crop&w=200&q=80' },
-    { id: '4', name: 'Makeup', image: require('../../assets/images/makeup_icon.jpg') },
+    { id: '1', name: 'Men', image: require('../../assets/images/men_icon.jpg'), category: 'Fashion', subCategory: 'Men' },
+    { id: '2', name: 'Women', image: require('../../assets/images/women_icon.jpg'), category: 'Fashion', subCategory: 'Women' },
+    { id: '3', name: 'Kids', image: 'https://images.unsplash.com/photo-1519457431-44ccd64a579b?auto=format&fit=crop&w=200&q=80', category: 'Fashion', subCategory: 'Men' }, // Placeholder for Kids
+    { id: '4', name: 'Makeup', image: require('../../assets/images/makeup_icon.jpg'), category: 'Beauty', subCategory: 'Makeup' },
 ];
 
 const BIG_DISCOUNTS = [
-    { id: '1', name: 'Sneaker Steals', desc: 'Grab a pair before it\'s gone!', image: 'https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?auto=format&fit=crop&w=400&q=80' },
-    { id: '2', name: 'Winter Clearance', desc: 'Up to 80% off jackets', image: 'https://images.unsplash.com/photo-1487222477894-8943e31ef7b2?auto=format&fit=crop&w=400&q=80' },
+    { id: '1', name: 'Sneaker Steals', desc: 'Grab a pair before it\'s gone!', image: 'https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?auto=format&fit=crop&w=400&q=80', category: 'Footwear', subCategory: 'Sports Shoes' },
+    { id: '2', name: 'Winter Clearance', desc: 'Up to 80% off jackets', image: 'https://images.unsplash.com/photo-1487222477894-8943e31ef7b2?auto=format&fit=crop&w=400&q=80', category: 'Fashion', subCategory: 'Jackets' },
 ];
 
 export default function HomeScreen() {
     const router = useRouter();
+
+    const handleProductNav = (category: string, subCategory?: string) => {
+        router.push({
+            pathname: '/product-listing',
+            params: { categoryName: category, subCategoryName: subCategory }
+        });
+    };
 
     return (
         <SafeAreaView style={styles.container}>
@@ -63,7 +72,11 @@ export default function HomeScreen() {
                 {/* Categories Carousel */}
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoriesContainer} contentContainerStyle={styles.categoriesContent}>
                     {CATEGORIES.map((cat) => (
-                        <TouchableOpacity key={cat.id} style={styles.categoryItem} onPress={() => router.navigate('/categories')}>
+                        <TouchableOpacity
+                            key={cat.id}
+                            style={styles.categoryItem}
+                            onPress={() => router.push({ pathname: '/(tabs)/categories', params: { categoryId: cat.id } })}
+                        >
                             <View style={styles.categoryImageContainer}>
                                 <Image
                                     source={typeof cat.image === 'string' ? { uri: cat.image } : cat.image}
@@ -134,13 +147,13 @@ export default function HomeScreen() {
                 </View>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
                     {RECOMMENDED.map((item) => (
-                        <View key={item.id} style={styles.recommendCard}>
+                        <TouchableOpacity key={item.id} style={styles.recommendCard} onPress={() => handleProductNav(item.category, item.subCategory)}>
                             <View style={styles.recommendImageContainer}>
                                 <Image source={{ uri: item.image }} style={styles.recommendImage} />
                             </View>
                             <Text style={styles.recommendName}>{item.name}</Text>
                             <Text style={styles.recommendDesc}>{item.desc}</Text>
-                        </View>
+                        </TouchableOpacity>
                     ))}
                 </ScrollView>
 
@@ -150,7 +163,7 @@ export default function HomeScreen() {
                 </View>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
                     {FRESH_ARRIVALS.map((item) => (
-                        <View key={item.id} style={[styles.freshCard, { backgroundColor: item.color }]}>
+                        <TouchableOpacity key={item.id} style={[styles.freshCard, { backgroundColor: item.color }]} onPress={() => handleProductNav(item.category, item.subCategory)}>
                             <Image
                                 source={typeof item.image === 'string' ? { uri: item.image } : item.image}
                                 style={styles.freshImage}
@@ -162,7 +175,7 @@ export default function HomeScreen() {
                                 <Text style={styles.freshName}>{item.name}</Text>
                                 <Text style={styles.freshOffer}>{item.offer}</Text>
                             </View>
-                        </View>
+                        </TouchableOpacity>
                     ))}
                 </ScrollView>
 
@@ -172,7 +185,7 @@ export default function HomeScreen() {
                 </View>
                 <View style={styles.nearbyGrid}>
                     {NEARBY.map((item) => (
-                        <View key={item.id} style={styles.nearbyItem}>
+                        <TouchableOpacity key={item.id} style={styles.nearbyItem} onPress={() => handleProductNav(item.category, item.subCategory)}>
                             <View style={styles.nearbyImageContainer}>
                                 <Image
                                     source={typeof item.image === 'string' ? { uri: item.image } : item.image}
@@ -180,7 +193,7 @@ export default function HomeScreen() {
                                 />
                             </View>
                             <Text style={styles.nearbyName}>{item.name}</Text>
-                        </View>
+                        </TouchableOpacity>
                     ))}
                 </View>
 
@@ -190,7 +203,7 @@ export default function HomeScreen() {
                 </View>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
                     {BIG_DISCOUNTS.map((item) => (
-                        <View key={item.id} style={styles.discountCard}>
+                        <TouchableOpacity key={item.id} style={styles.discountCard} onPress={() => handleProductNav(item.category, item.subCategory)}>
                             <Image source={{ uri: item.image }} style={styles.discountImage} />
                             <View style={styles.discountOverlay}>
                                 <View style={styles.discountBadge}>
@@ -201,7 +214,7 @@ export default function HomeScreen() {
                                 <Text style={styles.discountName}>{item.name}</Text>
                                 <Text style={styles.discountDesc}>{item.desc}</Text>
                             </View>
-                        </View>
+                        </TouchableOpacity>
                     ))}
                 </ScrollView>
 

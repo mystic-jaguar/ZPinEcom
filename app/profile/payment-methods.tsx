@@ -107,7 +107,7 @@ export default function ProfilePaymentMethodsScreen() {
                     <Text style={styles.sectionTitle}>UPI IDs</Text>
                 </View>
 
-                {renderUpiOption('google_pay', 'Google Pay', 'sarahj@okaxis', 'wallet', '#4285F4')}
+                {renderUpiOption('google_pay', 'Google Pay', 'jaywarale@okaxis', 'wallet', '#4285F4')}
 
                 {/* Add New Method Button */}
                 <TouchableOpacity style={styles.addMethodButton}>

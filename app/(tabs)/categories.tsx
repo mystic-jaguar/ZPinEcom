@@ -1,6 +1,6 @@
 import { Colors } from '@/constants/Colors';
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { Dimensions, Image, LayoutAnimation, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, UIManager, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -200,9 +200,17 @@ const MainCategoryView = ({
 };
 
 export default function CategoriesScreen() {
-    const [selectedCategoryId, setSelectedCategoryId] = useState(CATEGORY_DATA[0].id);
-    const [searchQuery, setSearchQuery] = useState('');
     const router = useRouter();
+    const params = useLocalSearchParams<{ categoryId?: string }>();
+    const [selectedCategoryId, setSelectedCategoryId] = useState(params.categoryId || CATEGORY_DATA[0].id);
+    const [searchQuery, setSearchQuery] = useState('');
+
+    // Update selection if param changes
+    React.useEffect(() => {
+        if (params.categoryId) {
+            setSelectedCategoryId(params.categoryId);
+        }
+    }, [params.categoryId]);
 
     const selectedCategory = CATEGORY_DATA.find(c => c.id === selectedCategoryId) || CATEGORY_DATA[0];
 

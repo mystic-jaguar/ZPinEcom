@@ -1,62 +1,113 @@
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
-import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ProfileOption from '../../components/profile/ProfileOption';
 
+const { width } = Dimensions.get('window');
+
 // Mock User Data
 const USER = {
-    name: 'Jay',
-    email: 'jay@example.com',
-    avatar: require('../../assets/images/profile_icon.jpg'),
+    name: 'Jay Warale', // Updated to match design
+    email: 'jaywarale@example.com',
+    avatar: require('../../assets/images/profile_icon.jpg'), // Using existing asset
+    isPro: true
 };
+
+// Mock Recommended Data
+const RECOMMENDED = [
+    { id: '1', name: 'Bags', desc: 'Starting from ₹499', image: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&w=400&q=80', category: 'Accessories', subCategory: 'Bags' },
+    { id: '2', name: 'Headphones', desc: 'Up to 60% OFF', image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=400&q=80', category: 'Gadgets', subCategory: 'Audio Devices' },
+    { id: '3', name: 'Watches', desc: 'Min 40% OFF', image: 'https://images.unsplash.com/photo-1524592094714-0f0654e20314?auto=format&fit=crop&w=400&q=80', category: 'Accessories', subCategory: 'Watches' },
+    { id: '4', name: 'Sunglasses', desc: 'Stylish & Cool', image: 'https://images.unsplash.com/photo-1511499767150-a48a237f0083?auto=format&fit=crop&w=400&q=80', category: 'Accessories', subCategory: 'Sunglasses' },
+    { id: '5', name: 'Wallets', desc: 'Premium Leather', image: 'https://images.unsplash.com/photo-1627123424574-724758594e93?auto=format&fit=crop&w=400&q=80', category: 'Accessories', subCategory: 'Wallets' },
+];
 
 export default function ProfileScreen() {
     const router = useRouter();
 
+    const QuickAction = ({ icon, label, onPress }: { icon: any, label: string, onPress: () => void }) => (
+        <TouchableOpacity style={styles.quickActionItem} onPress={onPress}>
+            <View style={styles.quickActionIcon}>
+                <Feather name={icon} size={24} color="#FBBF24" />
+            </View>
+            <Text style={styles.quickActionLabel}>{label}</Text>
+        </TouchableOpacity>
+    );
+
     return (
-        <SafeAreaView style={styles.container}>
+        <View style={styles.container}>
+            {/* Header Background */}
+            <View style={styles.headerBg} />
+
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
 
-                {/* Header / User Info */}
-                <View style={styles.header}>
-                    <View style={styles.avatarContainer}>
-                        <Image source={USER.avatar} style={styles.avatar} />
-                        <View style={styles.editBadge}>
-                            <Feather name="edit-2" size={12} color="#fff" />
+                {/* Header Content */}
+                <SafeAreaView edges={['top']} style={styles.headerSafeArea}>
+                    <View style={styles.headerTopRow}>
+                        {/* Settings Icon (Placeholder) */}
+                        <View style={{ flex: 1 }} />
+                        {/* <TouchableOpacity style={styles.settingsButton}>
+                            <Feather name="settings" size={20} color="#333" />
+                        </TouchableOpacity> */}
+                    </View>
+
+                    <View style={styles.profileInfo}>
+                        <View style={styles.avatarContainer}>
+                            <Image source={USER.avatar} style={styles.avatar} />
+                            <View style={styles.onlineBadge} />
                         </View>
-                    </View>
-                    <Text style={styles.userName}>{USER.name}</Text>
-                    <Text style={styles.userEmail}>{USER.email}</Text>
-                </View>
+                        <Text style={styles.userName}>{USER.name}</Text>
 
-                {/* Orders Section */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>My Orders</Text>
-                    <View style={styles.sectionContent}>
-                        <ProfileOption
-                            label="All Orders"
-                            icon="package"
-                            onPress={() => router.push('/profile/orders')}
-                        />
-                        <ProfileOption
-                            label="Returns & Refunds"
-                            icon="rotate-ccw"
-                            onPress={() => router.push('/profile/returns')}
-                            showBorder={false}
-                        />
+                        {USER.isPro && (
+                            <View style={styles.proBadge}>
+                                <Feather name="star" size={12} color="#333" style={{ marginRight: 4 }} />
+                                <Text style={styles.proText}>PRO MEMBER</Text>
+                            </View>
+                        )}
                     </View>
-                </View>
 
-                {/* Account Settings */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Account Settings</Text>
-                    <View style={styles.sectionContent}>
+                    {/* Quick Actions */}
+                    <View style={styles.quickActionsRow}>
+                        <QuickAction icon="shopping-bag" label="Orders" onPress={() => router.push('/profile/orders')} />
+                        <QuickAction icon="heart" label="Wishlist" onPress={() => router.push('/profile/wishlist')} />
+                        <QuickAction icon="gift" label="Coupons" onPress={() => { }} />
+                        <QuickAction icon="refresh-cw" label="Refunds" onPress={() => router.push('/profile/returns')} />
+                    </View>
+                </SafeAreaView>
+
+                {/* Main Content Body */}
+                <View style={styles.bodyContent}>
+
+                    {/* Recommended Section */}
+                    <View style={styles.sectionHeader}>
+                        <Text style={styles.sectionTitle}>Recommended For You</Text>
+                        {/* <TouchableOpacity>
+                            <Text style={styles.viewAllText}>View All</Text>
+                        </TouchableOpacity> */}
+                    </View>
+
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.recommendedList}>
+                        {RECOMMENDED.map((item) => (
+                            <TouchableOpacity key={item.id} style={styles.recommendCard}>
+                                <View style={styles.recommendImageContainer}>
+                                    <Image source={{ uri: item.image }} style={styles.recommendImage} />
+                                </View>
+                                <Text style={styles.recommendName}>{item.name}</Text>
+                                <Text style={styles.recommendDesc}>{item.desc}</Text>
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
+
+                    {/* Account Settings */}
+                    <Text style={[styles.sectionTitle, { marginTop: 20, marginBottom: 15 }]}>Account Settings</Text>
+                    <View style={styles.settingsCard}>
+                        {/* Edit Profile (Placeholder) */}
                         <ProfileOption
-                            label="Saved Addresses"
-                            icon="map-pin"
-                            onPress={() => router.push('/profile/addresses')}
+                            label="Edit Profile"
+                            icon="user"
+                            onPress={() => { }}
                         />
                         <ProfileOption
                             label="Payment Methods"
@@ -64,147 +115,280 @@ export default function ProfileScreen() {
                             onPress={() => router.push('/profile/payment-methods')}
                         />
                         <ProfileOption
-                            label="Wishlist"
-                            icon="heart"
-                            onPress={() => router.push('/profile/wishlist')}
+                            label="Saved Addresses"
+                            icon="map-pin"
+                            onPress={() => router.push('/profile/addresses')}
                         />
-                        {/* <ProfileOption
+                        <ProfileOption
                             label="Notifications"
                             icon="bell"
                             onPress={() => { }}
-                            showBorder={false}
-                        /> */}
-                    </View>
-                </View>
-
-                {/* Support */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Support</Text>
-                    <View style={styles.sectionContent}>
+                        />
                         <ProfileOption
                             label="Help Center"
                             icon="help-circle"
                             onPress={() => router.push('/profile/help-center')}
                         />
                         <ProfileOption
-                            label="Privacy Policy"
-                            icon="lock"
+                            label="Logout"
+                            icon="log-out"
                             onPress={() => { }}
+                            isDestructive={true}
                             showBorder={false}
                         />
                     </View>
+
+                    {/* Refer Banner */}
+                    <View style={styles.referBanner}>
+                        <View style={styles.referContent}>
+                            <Text style={styles.referTitle}>Refer a Friend</Text>
+                            <Text style={styles.referSubtitle}>Earn $20 for every friend you refer to ZPIN.</Text>
+                            <TouchableOpacity style={styles.inviteButton}>
+                                <Text style={styles.inviteButtonText}>Invite Now</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+
+                    <View style={{ height: 100 }} />
                 </View>
-
-                {/* Logout */}
-                <View style={styles.logoutContainer}>
-                    <ProfileOption
-                        label="Log Out"
-                        icon="log-out"
-                        onPress={() => { }}
-                        isDestructive={true}
-                        showBorder={false}
-                    />
-                </View>
-
-                <Text style={styles.versionText}>Version 1.0.0</Text>
-
-                {/* Spacer for bottom tab bar */}
-                <View style={{ height: 20 }} />
-
             </ScrollView>
-        </SafeAreaView>
+
+            {/* FAB for Dark Mode (Visual only as per design) */}
+            <TouchableOpacity style={styles.fab}>
+                <Feather name="moon" size={20} color="#fff" />
+            </TouchableOpacity>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f8f9fa', // Slightly off-white for contrast
+        backgroundColor: '#F3F4F6', // Light gray bg for body
+    },
+    headerBg: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: 380, // Extended height for yellow curve
+        backgroundColor: '#FFD700', // Yellow
+        borderBottomLeftRadius: 40,
+        borderBottomRightRadius: 40,
+    },
+    headerSafeArea: {
+        paddingBottom: 20
     },
     scrollContent: {
-        paddingBottom: 20,
+        flexGrow: 1
     },
-    header: {
-        backgroundColor: '#fff',
+    headerTopRow: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        paddingHorizontal: 20,
+        marginBottom: 10
+    },
+    settingsButton: {
+        width: 40,
+        height: 40,
+        backgroundColor: 'rgba(255,255,255,0.3)',
+        borderRadius: 12,
+        justifyContent: 'center',
+        alignItems: 'center'
+    },
+    profileInfo: {
         alignItems: 'center',
-        paddingVertical: 30,
-        marginBottom: 20,
-        borderBottomLeftRadius: 30,
-        borderBottomRightRadius: 30,
+        marginBottom: 25
+    },
+    avatarContainer: {
+        position: 'relative',
+        marginBottom: 10
+    },
+    avatar: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        borderWidth: 3,
+        borderColor: '#fff'
+    },
+    onlineBadge: {
+        position: 'absolute',
+        bottom: 2,
+        right: 2,
+        width: 16,
+        height: 16,
+        backgroundColor: '#22C55E', // Green
+        borderRadius: 8,
+        borderWidth: 2,
+        borderColor: '#fff'
+    },
+    userName: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: '#1a1a1a',
+        marginBottom: 8
+    },
+    proBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255,255,255,0.4)',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 20
+    },
+    proText: {
+        fontSize: 10,
+        fontWeight: '700',
+        color: '#333'
+    },
+    quickActionsRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-around',
+        paddingHorizontal: 10
+    },
+    quickActionItem: {
+        alignItems: 'center',
+        width: 70
+    },
+    quickActionIcon: {
+        width: 50,
+        height: 50,
+        backgroundColor: '#fff',
+        borderRadius: 18,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 8,
         shadowColor: "#000",
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.05,
-        shadowRadius: 10,
-        elevation: 3,
+        shadowRadius: 4,
+        elevation: 2
     },
-    avatarContainer: {
-        width: 100,
-        height: 100,
-        marginBottom: 15,
-        position: 'relative',
+    quickActionLabel: {
+        fontSize: 11,
+        color: '#333',
+        fontWeight: '500'
     },
-    avatar: {
-        width: '100%',
-        height: '100%',
-        borderRadius: 50,
-        borderWidth: 3,
-        borderColor: '#fff',
-    },
-    editBadge: {
-        position: 'absolute',
-        bottom: 0,
-        right: 0,
-        backgroundColor: '#FBBF24',
-        width: 30,
-        height: 30,
-        borderRadius: 15,
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderWidth: 3,
-        borderColor: '#fff',
-    },
-    userName: {
-        fontSize: 22,
-        fontWeight: 'bold',
-        color: '#1a1a1a',
-        marginBottom: 4,
-    },
-    userEmail: {
-        fontSize: 14,
-        color: '#888',
-    },
-    section: {
+    bodyContent: {
         paddingHorizontal: 20,
-        marginBottom: 25,
+        paddingTop: 20
+    },
+    sectionHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 15
     },
     sectionTitle: {
-        fontSize: 16,
+        fontSize: 18,
         fontWeight: '700',
-        color: '#1a1a1a',
-        marginBottom: 10,
-        marginLeft: 5,
+        color: '#111'
     },
-    sectionContent: {
-        backgroundColor: '#fff',
-        borderRadius: 15,
-        overflow: 'hidden',
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.02,
-        shadowRadius: 5,
-        elevation: 2,
-    },
-    logoutContainer: {
-        marginHorizontal: 20,
-        backgroundColor: '#fff',
-        borderRadius: 15,
-        overflow: 'hidden',
-        marginBottom: 20,
-    },
-    versionText: {
-        textAlign: 'center',
-        color: '#ccc',
+    viewAllText: {
         fontSize: 12,
-        marginBottom: 20,
+        color: '#FBBF24',
+        fontWeight: '600'
+    },
+    recommendedList: {
+        paddingRight: 20
+    },
+    recommendCard: {
+        width: 140,
+        marginRight: 15,
+    },
+    recommendImageContainer: {
+        height: 140,
+        backgroundColor: '#f9f9f9',
+        borderRadius: 15,
+        marginBottom: 10,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 10,
+        shadowColor: "#AAA",
+        shadowOffset: {
+            width: 0,
+            height: 4,
+        },
+        shadowOpacity: 0.1,
+        shadowRadius: 5,
+        elevation: 5,
+    },
+    recommendImage: {
+        width: '90%',
+        height: '90%',
+        resizeMode: 'contain'
+    },
+    recommendName: {
+        fontWeight: '700',
+        color: '#333',
+        fontSize: 14,
+        textAlign: 'center'
+    },
+    recommendDesc: {
+        color: '#888',
+        fontSize: 10,
+        textAlign: 'center'
+    },
+    settingsCard: {
+        backgroundColor: '#fff',
+        borderRadius: 20,
+        overflow: 'hidden',
+        paddingVertical: 5,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.03,
+        shadowRadius: 5,
+        elevation: 2
+    },
+    referBanner: {
+        marginTop: 25,
+        backgroundColor: '#111827', // Dark blue/black
+        borderRadius: 25,
+        padding: 25,
+        overflow: 'hidden'
+    },
+    referContent: {
+        position: 'relative',
+        zIndex: 2
+    },
+    referTitle: {
+        color: '#fff',
+        fontSize: 18,
+        fontWeight: '700',
+        marginBottom: 5
+    },
+    referSubtitle: {
+        color: '#9CA3AF',
+        fontSize: 12,
+        marginBottom: 15,
+        maxWidth: '80%'
+    },
+    inviteButton: {
+        backgroundColor: '#FBBF24',
+        paddingHorizontal: 20,
+        paddingVertical: 10,
+        borderRadius: 20,
+        alignSelf: 'flex-start'
+    },
+    inviteButtonText: {
+        color: '#111',
+        fontWeight: '700',
+        fontSize: 12
+    },
+    fab: {
+        position: 'absolute',
+        bottom: 100,
+        right: 20,
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        backgroundColor: '#111',
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        elevation: 5
     }
 });

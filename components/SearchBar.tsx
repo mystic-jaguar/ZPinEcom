@@ -39,6 +39,11 @@ export default function SearchBar({
                     autoFocus={autoFocus}
                     pointerEvents={editable ? 'auto' : 'none'}
                 />
+                {editable && value && value.length > 0 && (
+                    <TouchableOpacity onPress={() => onChangeText?.('')} style={{ padding: 4 }}>
+                        <Feather name="x-circle" size={18} color="#999" />
+                    </TouchableOpacity>
+                )}
             </Container>
         </View>
     );
