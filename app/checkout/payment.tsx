@@ -6,8 +6,9 @@ import { useCart } from '@/context/CartContext';
 import { useCheckout } from '@/context/CheckoutContext';
 import { Order, useOrder } from '@/context/OrderContext';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function CheckoutPaymentScreen() {
@@ -19,6 +20,16 @@ export default function CheckoutPaymentScreen() {
     const [showSuccessModal, setShowSuccessModal] = useState(false);
 
     const [redirectCategory, setRedirectCategory] = useState<string | null>(null);
+
+    // Guard: If cart is empty, redirect to cart immediately. 
+    // This prevents accessing payment with empty cart and handles "Back" navigation loops.
+    useFocusEffect(
+        useCallback(() => {
+            if (cartItems.length === 0 && !showSuccessModal) {
+                router.replace('/(tabs)/cart');
+            }
+        }, [cartItems, showSuccessModal])
+    );
 
     // Calculate total including taxes/fees (matching summary logic)
     const shippingFee = 0;
@@ -32,6 +43,8 @@ export default function CheckoutPaymentScreen() {
     };
 
     const handleConfirm = () => {
+        if (cartItems.length === 0) return;
+
         // Create Order Immediately
         const address = addresses.find(a => a.id === selectedAddressId);
 
@@ -75,19 +88,25 @@ export default function CheckoutPaymentScreen() {
     };
 
     const handleModalPrimary = () => {
-        // Continue -> Redirect to Category
+        // Capture the category before clearing cart or changing state
+        const targetCategory = redirectCategory;
+
+        // Close modal and clear cart
         setShowSuccessModal(false);
         clearCart();
-        router.dismissAll();
 
-        if (redirectCategory) {
-            router.push({
-                pathname: '/product-listing',
-                params: { categoryName: redirectCategory }
-            });
-        } else {
-            // Fallback to home if no category found
-            router.replace('/(tabs)');
+        // Reset navigation to Home (Tabs)
+        router.dismissAll();
+        router.replace('/(tabs)');
+
+        // Navigate to the product category if we have one
+        if (targetCategory) {
+            setTimeout(() => {
+                router.push({
+                    pathname: '/product-listing',
+                    params: { categoryName: targetCategory }
+                });
+            }, 200); // Increased delay slightly for stability
         }
     };
 

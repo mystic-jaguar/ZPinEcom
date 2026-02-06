@@ -84,7 +84,7 @@ export default function ProfileScreen() {
                         <ProfileOption
                             label="Help Center"
                             icon="help-circle"
-                            onPress={() => { }}
+                            onPress={() => router.push('/profile/help-center')}
                         />
                         <ProfileOption
                             label="Privacy Policy"

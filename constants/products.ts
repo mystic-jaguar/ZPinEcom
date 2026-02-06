@@ -7,8 +7,8 @@ export interface Product {
     rating: number;
     image: any;
     images?: any[]; // Array of images for carousel
-    category: string;
-    subCategory: string;
+    category: string; // Top Level (Fashion, Accessories, etc.)
+    subCategory: string; // Leaf Level (Round Neck, Backpacks, etc.)
     description: string;
     discount: number;
     subtitle?: string; // e.g. "Premium Cotton"
@@ -19,69 +19,141 @@ export interface Product {
 }
 
 export const PRODUCTS: Product[] = [
-    // Accessories - Bags & Backpacks
+    // --- FASHION: MEN ---
     {
-        id: '1',
-        name: 'Vibrant Summer Collection: Floral Midi Dress',
-        price: 1299,
-        originalPrice: 2599,
-        rating: 4.8,
-        image: require('../assets/images/handbags.jpg'), // Using existing as placeholder, ideally needs actual dress image
-        images: [
-            require('../assets/images/handbags.jpg'),
-            require('../assets/images/handbags.jpg'), // Duplicates for carousel demo
-            require('../assets/images/handbags.jpg')
-        ],
-        category: 'Accessories', // Temporarily keeping as Accessories to match existing flows, but name implies Fashion
-        subCategory: 'Handbags', // Kept for consistency with previous steps
-        subtitle: 'Premium Cotton • Sustainable Fashion',
-        description: 'Elevate your summer wardrobe with this premium midi dress.',
-        details: 'Elevate your summer wardrobe with this premium midi dress. Crafted from 100% breathable cotton, it features a flattering A-line silhouette and vibrant floral prints that are perfect for both casual outings and brunch dates.',
+        id: '101',
+        name: 'Classic White Round Neck',
+        price: 499,
+        originalPrice: 999,
+        rating: 4.5,
+        image: { uri: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&q=80&w=800' },
+        category: 'Fashion',
+        subCategory: 'Round Neck',
+        description: 'Essential white round neck t-shirt made from 100% cotton.',
         discount: 50,
-        colors: ['#FBBF24', '#3B82F6', '#F472B6', '#1F2937'], // Yellow, Blue, Pink, Dark
-        sizes: ['XS', 'S', 'M', 'L', 'XL'],
-        isLightningFast: true
+        sizes: ['S', 'M', 'L', 'XL']
     },
     {
-        id: '2',
-        name: 'School Backpack',
+        id: '102',
+        name: 'Black Polo T-Shirt',
+        price: 799,
+        originalPrice: 1599,
+        rating: 4.6,
+        image: { uri: 'https://images.unsplash.com/photo-1626557981101-aae6f84aa6ff?auto=format&fit=crop&q=80&w=800' },
+        category: 'Fashion',
+        subCategory: 'Polo',
+        description: 'Classic fit polo t-shirt with ribbed collar.',
+        discount: 50,
+        sizes: ['M', 'L', 'XL']
+    },
+    {
+        id: '103',
+        name: 'Oversized Graphic Tee',
         price: 899,
-        originalPrice: 1499,
-        rating: 4.2,
+        originalPrice: 1299,
+        rating: 4.7,
+        image: { uri: 'https://images.unsplash.com/photo-1576566588028-4147f3842f27?auto=format&fit=crop&q=80&w=800' },
+        category: 'Fashion',
+        subCategory: 'Oversized',
+        description: 'Streetwear style oversized t-shirt with cool graphic print.',
+        discount: 30,
+        sizes: ['S', 'M', 'L']
+    },
+    {
+        id: '104',
+        name: 'Slim Fit Blue Jeans',
+        price: 1299,
+        originalPrice: 2599,
+        rating: 4.4,
+        image: { uri: 'https://images.unsplash.com/photo-1542272454315-4c01d7abdf4a?auto=format&fit=crop&q=80&w=800' },
+        category: 'Fashion',
+        subCategory: 'Slim Fit', // Jeans -> Slim Fit
+        description: 'Stretchable slim fit denim jeans.',
+        discount: 50,
+        sizes: ['30', '32', '34', '36']
+    },
+    {
+        id: '105',
+        name: 'Casual Checkered Shirt',
+        price: 999,
+        originalPrice: 1999,
+        rating: 4.3,
+        image: { uri: 'https://images.unsplash.com/photo-1596755094514-f87e34085b2c?auto=format&fit=crop&q=80&w=800' },
+        category: 'Fashion',
+        subCategory: 'Checkered',
+        description: 'Stylish checkered shirt for casual outings.',
+        discount: 50,
+        sizes: ['M', 'L', 'XL']
+    },
+
+    // --- FASHION: WOMEN ---
+    {
+        id: '201',
+        name: 'Floral Summer Dress',
+        price: 1499,
+        originalPrice: 2999,
+        rating: 4.8,
+        image: { uri: 'https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?auto=format&fit=crop&q=80&w=800' },
+        category: 'Fashion',
+        subCategory: 'Dresses',
+        description: 'Breezy floral dress perfect for summer days.',
+        discount: 50,
+        sizes: ['XS', 'S', 'M', 'L']
+    },
+    {
+        id: '202',
+        name: 'Classic Blue Denim Jeans',
+        price: 1199,
+        originalPrice: 2399,
+        rating: 4.5,
+        image: { uri: 'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?auto=format&fit=crop&q=80&w=800' },
+        category: 'Fashion',
+        subCategory: 'Jeans & Bottoms',
+        description: 'High-waist classic blue denim.',
+        discount: 50,
+        sizes: ['26', '28', '30', '32']
+    },
+    {
+        id: '203',
+        name: 'Elegant Kurta Set',
+        price: 1899,
+        originalPrice: 3799,
+        rating: 4.7,
+        image: { uri: 'https://images.unsplash.com/photo-1583391733956-6c78276477e2?auto=format&fit=crop&q=80&w=800' },
+        category: 'Fashion',
+        subCategory: 'Kurta Sets',
+        description: 'Embroidered kurta set with dupatta.',
+        discount: 50,
+        sizes: ['S', 'M', 'L', 'XL']
+    },
+
+    // --- ACCESSORIES (Using Filtered Assets) ---
+    {
+        id: '301',
+        name: 'Leather Handbag',
+        price: 1599,
+        originalPrice: 3199,
+        rating: 4.6,
+        image: require('../assets/images/handbags.jpg'),
+        category: 'Accessories',
+        subCategory: 'Handbags',
+        description: 'Premium leather handbag with spacious compartments.',
+        discount: 50
+    },
+    {
+        id: '302',
+        name: 'Travel Backpack',
+        price: 1299,
+        originalPrice: 2599,
+        rating: 4.5,
         image: require('../assets/images/backpacks.jpg'),
         category: 'Accessories',
         subCategory: 'Backpacks',
-        description: 'Durable and spacious school backpack with multiple compartments.',
-        discount: 40
-    },
-    {
-        id: '3',
-        name: 'Slim Laptop Bag',
-        price: 1599,
-        originalPrice: 2999,
-        rating: 4.6,
-        image: require('../assets/images/laptopbags.jpg'),
-        category: 'Accessories',
-        subCategory: 'Laptop Bags',
-        description: 'Water-resistant laptop bag fitting up to 15-inch laptops.',
-        discount: 46
-    },
-    // Accessories - Wallets
-    {
-        id: '4',
-        name: 'Leather Bi-fold Wallet',
-        price: 499,
-        originalPrice: 999,
-        rating: 4.3,
-        image: require('../assets/images/wallets.jpg'),
-        category: 'Accessories',
-        subCategory: 'Wallets',
-        description: 'Genuine leather wallet with card slots and coin pocket.',
+        description: 'Durable backpack with laptop sleeve.',
         discount: 50
     },
-    // Watches
     {
-        id: '5',
+        id: '303',
         name: 'Classic Analog Watch',
         price: 1999,
         originalPrice: 3999,
@@ -89,398 +161,266 @@ export const PRODUCTS: Product[] = [
         image: require('../assets/images/analog.jpg'),
         category: 'Accessories',
         subCategory: 'Analog',
-        description: 'Elegant analog watch with a stainless steel strap.',
+        description: 'Timeless analog watch for everyday elegance.',
         discount: 50
     },
     {
-        id: '6',
-        name: 'Smart Fitness Watch',
-        price: 2499,
-        originalPrice: 4999,
-        rating: 4.4,
-        image: require('../assets/images/smartwatches.jpg'),
+        id: '304',
+        name: 'Digital Sports Watch',
+        price: 899,
+        originalPrice: 1499,
+        rating: 4.3,
+        image: require('../assets/images/digital.jpg'),
         category: 'Accessories',
-        subCategory: 'Smart Watches',
-        description: 'Track your fitness goals with this feature-rich smart watch.',
-        discount: 50
-    },
-
-    // Beauty - Skincare
-    {
-        id: '7',
-        name: 'Hydrating Face Wash',
-        price: 299,
-        originalPrice: 499,
-        rating: 4.5,
-        image: require('../assets/images/facewash.jpg'),
-        category: 'Beauty',
-        subCategory: 'Face Wash & Cleanser',
-        description: 'Gentle face wash for all skin types, paraben-free.',
+        subCategory: 'Digital',
+        description: 'Rugged digital watch with water resistance.',
         discount: 40
     },
     {
-        id: '8',
-        name: 'Daily Moisturizer',
-        price: 399,
-        originalPrice: 599,
-        rating: 4.6,
-        image: require('../assets/images/moisturizers.jpg'),
-        category: 'Beauty',
-        subCategory: 'Moisturizers & Creams',
-        description: 'Lightweight moisturizer for soft and glowing skin.',
-        discount: 33
-    },
-
-    // Beauty - Makeup
-    {
-        id: '9',
-        name: 'Matte Lipstick',
-        price: 450,
-        originalPrice: 900,
-        rating: 4.8,
-        image: require('../assets/images/lipmakeup.jpg'),
-        category: 'Beauty',
-        subCategory: 'Lip Makeup',
-        description: 'Long-lasting matte lipstick in vibrant shades.',
-        discount: 50
-    },
-    {
-        id: '10',
-        name: 'Eye Shadow Palette',
-        price: 850,
-        originalPrice: 1200,
-        rating: 4.3,
-        image: require('../assets/images/eyemakeup.jpg'),
-        category: 'Beauty',
-        subCategory: 'Eye Makeup',
-        description: 'Highly pigmented eye shadow palette with 12 colors.',
-        discount: 29
-    },
-
-    // Home - Kitchenware
-    {
-        id: '11',
-        name: 'Non-Stick Cookware Set',
+        id: '305',
+        name: 'Smart Watch Series 5',
         price: 2499,
         originalPrice: 4999,
         rating: 4.6,
-        image: null, // Placeholder if no specific image
-        category: 'Home & Living',
-        subCategory: 'Cookware',
-        description: '3-piece non-stick cookware set including fry pan and kadhai.',
+        image: require('../assets/images/smartwatches.jpg'),
+        category: 'Accessories', // Or Gadgets > Smart Devices > Smart Watches. Kept flexible.
+        subCategory: 'Smart Watches',
+        description: 'Track fitness, calls and more.',
         discount: 50
     },
-
-    // Gadgets
     {
-        id: '12',
-        name: 'Wireless Earbuds',
-        price: 1299,
-        originalPrice: 2999,
+        id: '306',
+        name: 'Aviator Sunglasses',
+        price: 999,
+        originalPrice: 1999,
         rating: 4.4,
-        image: null,
-        category: 'Gadgets',
-        subCategory: 'Earphones',
-        description: 'True wireless earbuds with noise cancellation.',
-        discount: 56
+        image: require('../assets/images/sunglasses.jpg'),
+        category: 'Accessories',
+        subCategory: 'Sunglasses',
+        description: 'Classic aviator style with UV protection.',
+        discount: 50
     },
     {
-        id: '13',
-        name: 'Fast Charging Cable',
-        price: 199,
-        originalPrice: 499,
+        id: '307',
+        name: 'Anti-Glare Glasses',
+        price: 699,
+        originalPrice: 1299,
         rating: 4.2,
-        image: null,
-        category: 'Gadgets',
-        subCategory: 'Cables',
-        description: 'Durable braided fast charging cable for Type-C devices.',
-        discount: 60
-    },
-    // Electronics - Headphones & Audio
-    {
-        id: '14',
-        name: 'Noise Cancelling Headphones',
-        price: 3499,
-        originalPrice: 6999,
-        rating: 4.7,
-        image: require('../assets/images/backpacks.jpg'), // Using available asset as placeholder for tech/lifestyle
-        category: 'Electronics',
-        subCategory: 'Audio',
-        description: 'Immersive sound with active noise cancellation.',
-        discount: 50
+        image: require('../assets/images/bluelightglasses.jpg'),
+        category: 'Accessories',
+        subCategory: 'Blue Light Glasses',
+        description: 'Protect your eyes from digital strain.',
+        discount: 46
     },
     {
-        id: '15',
-        name: 'Portable Bluetooth Speaker',
-        price: 1299,
-        originalPrice: 2499,
-        rating: 4.5,
-        image: require('../assets/images/smartwatches.jpg'), // Placeholder
-        category: 'Electronics',
-        subCategory: 'Audio',
-        description: 'Compact speaker with powerful bass and long battery life.',
-        discount: 48
-    },
-
-    // Fashion - Women's Accessories
-    {
-        id: '16',
+        id: '308',
         name: 'Gold Plated Bangles',
-        price: 599,
-        originalPrice: 1199,
-        rating: 4.4,
+        price: 499,
+        originalPrice: 999,
+        rating: 4.5,
         image: require('../assets/images/bangles.jpg'),
-        category: 'Fashion',
-        subCategory: 'Jewellery',
-        description: 'Traditional gold plated bangles set of 4.',
+        category: 'Accessories',
+        subCategory: 'Bangles & Bracelets',
+        description: 'Traditional gold plated bangles.',
         discount: 50
     },
     {
-        id: '17',
-        name: 'Bridal Necklace Set',
-        price: 1499,
-        originalPrice: 2999,
-        rating: 4.8,
-        image: require('../assets/images/bridalaccessories.jpg'),
-        category: 'Fashion',
-        subCategory: 'Jewellery',
-        description: 'Exquisite bridal necklace set with matching earrings.',
-        discount: 50
-    },
-    {
-        id: '18',
-        name: 'Statement Earrings',
+        id: '309',
+        name: 'Crystal Earrings',
         price: 299,
         originalPrice: 599,
         rating: 4.3,
         image: require('../assets/images/earrings.jpg'),
-        category: 'Fashion',
-        subCategory: 'Jewellery',
-        description: 'Trendy statement earrings for party wear.',
+        category: 'Accessories',
+        subCategory: 'Earrings',
+        description: 'Elegant crystal stud earrings.',
         discount: 50
     },
     {
-        id: '19',
-        name: 'Crystal Rings Set',
-        price: 199,
-        originalPrice: 399,
-        rating: 4.2,
-        image: require('../assets/images/rings.jpg'),
-        category: 'Fashion',
-        subCategory: 'Jewellery',
-        description: 'Set of 5 adjustable crystal rings.',
-        discount: 50
-    },
-    {
-        id: '20',
-        name: 'Pearl Necklace',
-        price: 399,
-        originalPrice: 799,
+        id: '310',
+        name: 'Leather Belt',
+        price: 799,
+        originalPrice: 1599,
         rating: 4.5,
-        image: require('../assets/images/necklaces.jpg'),
-        category: 'Fashion',
-        subCategory: 'Jewellery',
-        description: 'Elegant single strand pearl necklace.',
-        discount: 50
-    },
-
-    // Fashion - Accessories
-    {
-        id: '21',
-        name: 'Classic Leather Belt',
-        price: 499,
-        originalPrice: 999,
-        rating: 4.4,
         image: require('../assets/images/belts.jpg'),
-        category: 'Fashion',
-        subCategory: 'Accessories',
-        description: 'Genuine leather belt with sleek buckle.',
-        discount: 50
-    },
-    {
-        id: '22',
-        name: 'Stylish Sling Bag',
-        price: 699,
-        originalPrice: 1399,
-        rating: 4.6,
-        image: require('../assets/images/slingbags.jpg'),
-        category: 'Fashion',
-        subCategory: 'Bags',
-        description: 'Compact sling bag for everyday essentials.',
-        discount: 50
-    },
-    {
-        id: '23',
-        name: 'Travel Duffel Bag',
-        price: 1599,
-        originalPrice: 3199,
-        rating: 4.7,
-        image: require('../assets/images/travelbags.jpg'),
-        category: 'Fashion',
-        subCategory: 'Bags',
-        description: 'Spacious duffel bag perfect for weekend getaways.',
-        discount: 50
-    },
-    {
-        id: '24',
-        name: 'Card Holder',
-        price: 199,
-        originalPrice: 399,
-        rating: 4.3,
-        image: require('../assets/images/cardholders.jpg'),
-        category: 'Fashion',
-        subCategory: 'Accessories',
-        description: 'Slim card holder made of premium faux leather.',
-        discount: 50
-    },
-    {
-        id: '25',
-        name: 'Printed Scarf',
-        price: 299,
-        originalPrice: 599,
-        rating: 4.5,
-        image: require('../assets/images/scarves.jpg'),
-        category: 'Fashion',
-        subCategory: 'Accessories',
-        description: 'Soft cotton scarf with floral prints.',
+        category: 'Accessories',
+        subCategory: 'Belts',
+        description: 'Genuine leather belt for men.',
         discount: 50
     },
 
-    // Beauty - Hair Care
+    // --- BEAUTY (Using Assets) ---
     {
-        id: '26',
-        name: 'Nourishing Hair Oil',
+        id: '401',
+        name: 'Hydrating Face Wash',
         price: 249,
         originalPrice: 499,
-        rating: 4.6,
-        image: require('../assets/images/hairoil.jpg'),
+        rating: 4.4,
+        image: require('../assets/images/facewash.jpg'),
         category: 'Beauty',
-        subCategory: 'Hair Care',
-        description: 'Ayurvedic hair oil for hair fall control.',
+        subCategory: 'Face Wash & Cleanser',
+        description: 'Deep cleansing face wash suitable for all skin types.',
         discount: 50
     },
     {
-        id: '27',
-        name: 'Volumizing Shampoo',
+        id: '402',
+        name: 'Daily Moisturizer',
+        price: 399,
+        originalPrice: 699,
+        rating: 4.5,
+        image: require('../assets/images/moisturizers.jpg'),
+        category: 'Beauty',
+        subCategory: 'Moisturizers & Creams',
+        description: 'Lightweight moisturizer for 24h hydration.',
+        discount: 43
+    },
+    {
+        id: '403',
+        name: 'Matte Lipstick Red',
+        price: 499,
+        originalPrice: 999,
+        rating: 4.7,
+        image: require('../assets/images/lipmakeup.jpg'),
+        category: 'Beauty',
+        subCategory: 'Lip Makeup',
+        description: 'Long stay matte lipstick in bold red.',
+        discount: 50
+    },
+    {
+        id: '404',
+        name: 'Eye Shadow Palette',
+        price: 899,
+        originalPrice: 1299,
+        rating: 4.3,
+        image: require('../assets/images/eyemakeup.jpg'),
+        category: 'Beauty',
+        subCategory: 'Eye Makeup',
+        description: '12-shade eyeshadow palette.',
+        discount: 30
+    },
+    {
+        id: '405',
+        name: 'Nourishing Shampoo',
         price: 349,
         originalPrice: 699,
         rating: 4.4,
         image: require('../assets/images/shampoo.jpg'),
         category: 'Beauty',
-        subCategory: 'Hair Care',
-        description: 'Sulphate-free shampoo for extra volume.',
+        subCategory: 'Shampoo & Conditioner',
+        description: 'Strengthening shampoo for smooth hair.',
         discount: 50
     },
     {
-        id: '28',
-        name: 'Hair Serum',
+        id: '406',
+        name: 'Hair Growth Oil',
         price: 299,
         originalPrice: 599,
-        rating: 4.5,
-        image: require('../assets/images/serums.jpg'),
+        rating: 4.6,
+        image: require('../assets/images/hairoil.jpg'),
         category: 'Beauty',
-        subCategory: 'Hair Care',
-        description: 'Anti-frizz hair serum for smooth shine.',
+        subCategory: 'Hair Oil & Serum',
+        description: 'Herbal oil for hair regrowth.',
         discount: 50
     },
     {
-        id: '29',
-        name: 'Hair Dryer',
-        price: 1299,
-        originalPrice: 2599,
-        rating: 4.7,
-        image: require('../assets/images/hairdryers.jpg'),
-        category: 'Beauty',
-        subCategory: 'Appliances',
-        description: '1200W hair dryer with cold air setting.',
-        discount: 50
-    },
-
-    // Grooming
-    {
-        id: '30',
-        name: 'Beard Trimmer',
-        price: 999,
-        originalPrice: 1999,
-        rating: 4.5,
-        image: require('../assets/images/trimmers.jpg'),
-        category: 'Grooming',
-        subCategory: 'Appliances',
-        description: 'Rechargeable beard trimmer with adjustable settings.',
-        discount: 50
-    },
-    {
-        id: '31',
-        name: 'Shaving Kit',
-        price: 799,
-        originalPrice: 1599,
-        rating: 4.4,
-        image: require('../assets/images/shaving.jpg'),
-        category: 'Grooming',
-        subCategory: 'Essentials',
-        description: 'Complete shaving kit with razor, foam and brush.',
-        discount: 50
-    },
-    {
-        id: '32',
-        name: 'Men\'s Perfume',
-        price: 599,
-        originalPrice: 1199,
-        rating: 4.3,
-        image: require('../assets/images/perfumes.jpg'),
-        category: 'Grooming',
-        subCategory: 'Fragrance',
-        description: 'Long-lasting woody fragrance for men.',
-        discount: 50
-    },
-    {
-        id: '33',
-        name: 'Deodorant Spray',
+        id: '407',
+        name: 'Styling Gel',
         price: 199,
         originalPrice: 399,
         rating: 4.2,
-        image: require('../assets/images/deodorants.jpg'),
-        category: 'Grooming',
-        subCategory: 'Fragrance',
-        description: 'Fresh citrus scent deodorant for daily use.',
+        image: require('../assets/images/stylingproducts.jpg'),
+        category: 'Beauty',
+        subCategory: 'Styling Products',
+        description: 'Strong hold hair styling gel.',
+        discount: 50
+    },
+    {
+        id: '408',
+        name: 'Luxury Perfume',
+        price: 1499,
+        originalPrice: 2999,
+        rating: 4.8,
+        image: require('../assets/images/perfumes.jpg'),
+        category: 'Beauty',
+        subCategory: 'Perfumes',
+        description: 'Premium fragrance with long-lasting scent.',
+        discount: 50
+    },
+    {
+        id: '409',
+        name: 'Beard Trimmer',
+        price: 1299,
+        originalPrice: 2499,
+        rating: 4.5,
+        image: require('../assets/images/trimmers.jpg'),
+        category: 'Beauty', // Mapped to Beauty > Grooming in categories.ts
+        subCategory: 'Trimmers & Shavers', // Leaf name match
+        description: 'Cordless beard trimmer.',
+        discount: 48
+    },
+
+    // --- GADGETS (Partial web / assets) ---
+    {
+        id: '501',
+        name: 'Wireless Earbuds',
+        price: 1999,
+        originalPrice: 4999,
+        rating: 4.3,
+        image: { uri: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?auto=format&fit=crop&q=80&w=800' },
+        category: 'Gadgets',
+        subCategory: 'Audio Devices', // Needs to match leaf... Wait, Audio Devices is Section. Leaves are Earphones, Headphones.
+        description: 'TWS Earbuds with noise cancellation.',
+        discount: 60
+    },
+    // Correction: Valid Leaves for Gadgets -> Audio Devices: 'Earphones', 'Headphones', 'Bluetooth Speakers'
+    {
+        id: '502',
+        name: 'Wireless Earbuds Pro',
+        price: 2199,
+        originalPrice: 4500,
+        rating: 4.5,
+        image: { uri: 'https://images.unsplash.com/photo-1606220588913-b3aacb4d2f46?auto=format&fit=crop&q=80&w=800' },
+        category: 'Gadgets',
+        subCategory: 'Earphones',
+        description: 'Pro grade wireless earphones.',
+        discount: 51
+    },
+    {
+        id: '503',
+        name: 'Over-Ear Headphones',
+        price: 2999,
+        originalPrice: 5999,
+        rating: 4.7,
+        image: { uri: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&q=80&w=800' },
+        category: 'Gadgets',
+        subCategory: 'Headphones',
+        description: 'Comfortable over-ear headphones with deep bass.',
         discount: 50
     },
 
-    // Eyewear
+    // --- HOME & LIVING ---
     {
-        id: '34',
-        name: 'Aviator Sunglasses',
+        id: '601',
+        name: 'Ceramic Dinner Set',
+        price: 2499,
+        originalPrice: 4999,
+        rating: 4.6,
+        image: { uri: 'https://images.unsplash.com/photo-1623959679886-bf4047a21fb6?auto=format&fit=crop&q=80&w=800' },
+        category: 'Home & Living',
+        subCategory: 'Dinner Sets',
+        description: 'Elegant 16-piece ceramic dinner set.',
+        discount: 50
+    },
+    {
+        id: '602',
+        name: 'Cotton Bedsheet',
         price: 899,
         originalPrice: 1799,
-        rating: 4.6,
-        image: require('../assets/images/sunglasses.jpg'),
-        category: 'Fashion',
-        subCategory: 'Eyewear',
-        description: 'Classic aviator sunglasses with UV protection.',
-        discount: 50
-    },
-    {
-        id: '35',
-        name: 'Blue Light Glasses',
-        price: 599,
-        originalPrice: 1199,
         rating: 4.4,
-        image: require('../assets/images/bluelightglasses.jpg'),
-        category: 'Fashion',
-        subCategory: 'Eyewear',
-        description: 'Anti-glare computer glasses for eye strain relief.',
-        discount: 50
-    },
-    {
-        id: '36',
-        name: 'Reading Glasses',
-        price: 399,
-        originalPrice: 799,
-        rating: 4.3,
-        image: require('../assets/images/readingglasses.jpg'),
-        category: 'Fashion',
-        subCategory: 'Eyewear',
-        description: 'Lightweight reading glasses (+1.5 power).',
+        image: { uri: 'https://images.unsplash.com/photo-1522771753003-24b4d576ef99?auto=format&fit=crop&q=80&w=800' },
+        category: 'Home & Living',
+        subCategory: 'Bedsheets',
+        description: 'Soft double bedsheet with pillow covers.',
         discount: 50
     }
 ];

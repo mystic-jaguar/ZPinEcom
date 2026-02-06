@@ -155,9 +155,9 @@ export default function HomeScreen() {
                                 source={typeof item.image === 'string' ? { uri: item.image } : item.image}
                                 style={styles.freshImage}
                             />
-                            <TouchableOpacity style={styles.freshFavIcon}>
+                            {/* <TouchableOpacity style={styles.freshFavIcon}>
                                 <Feather name="heart" size={16} color="#333" />
-                            </TouchableOpacity>
+                            </TouchableOpacity> */}
                             <View style={styles.freshInfo}>
                                 <Text style={styles.freshName}>{item.name}</Text>
                                 <Text style={styles.freshOffer}>{item.offer}</Text>

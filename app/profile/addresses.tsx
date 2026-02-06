@@ -62,9 +62,7 @@ export default function SavedAddressesScreen() {
                     <Feather name="arrow-left" size={24} color="#1a1a1a" />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Saved Addresses</Text>
-                <TouchableOpacity onPress={() => { /* Mock Add */ }}>
-                    <Feather name="plus" size={24} color="#1a1a1a" />
-                </TouchableOpacity>
+                <View style={{ width: 34 }} />
             </View>
 
             <FlatList

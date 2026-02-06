@@ -1,244 +1,221 @@
-Accessories
-
-Handbags & Sling Bags
-Backpacks & Travel Bags
-Wallets, Belts & Card Holders
-Watches (Analog, Smart)
-Sunglasses & Frames
-Jewellery (Necklace, Earrings, Bangles)
-Hair Accessories (Clips, Bands)
-Winter Accessories (Gloves, Caps)
-
-- Bags & Backpacks
-Handbags
-Backpacks
-Laptop Bags
-School bags
-Travel/Gym Bags
-Sling & Clutch Bags
-
-- Wallets & Belts
-Wallets
-Belts
-Card Holders
-Coin Pouches
-
-- Watches
-Analog
-Digital
-Smart Watches
-Sports Watches
-
-- Sunglasses & Eyewear
-Sunglasses
-Blue Light Glasses
-Reading Glasses
-Frames
-
-- Jewellery 
-Earrings
-Necklaces
-Bangles & Bracelets
-Rings
-Jewellery Sets
-
-- Hair Accessories
-Clips & Pins
-Hair Bands & Scrunchies
-Headbands
-Bridal Accessories
-
-- Caps & Hats
-Caps
-Hats
-Winter Caps
-
-- Scarves & Stoles
-Scarves
-Stoles
-Winter Wear
-
-Beauty
-
-Skincare
-Haircare
-Makeup
-Personal Care
-Grooming 
-Fragrances & Deodorants
-Beauty Tools & Appliances
-
-- Skincare
-Face Wash & Cleanser
-Moisturizers & Creams
-Sunscreen
-Serums & Masks
-
-- Haircare
-Shampoo & Conditioner
-Hair Oil & Serum
-Hair Color
-Styling Products
-
-- Makeup
-Face Makeup
-Eye Makeup
-Lip Makeup
-Makeup Kits
-
-- Personal Care
-Soaps & Body Wash
-Deodorants
-Oral Care
-Feminine Hygiene
-
-- Grooming 
-Shaving & Trimming
-Hair Removal
-Grooming Kits
-Beard & Styling Products
-
-- Fragrances & Deodorants
-Perfumes
-Body Sprays
-Roll-Ons
-Gift Sets
-
-- Beauty Tools & Appliances
-Hair Dryers
-Straighteners & Curlers
-Trimmers & Shavers
-Face & Skin Tools
-
-Home & Living
-
-Kitchenware
-Dining Essentials
-Storage & Organizers
-Cleaning & Utility
-Bedding & Linen
-Bathroom Accessories
-Home Improvement Items
-
-- Kitchenware
-Cookware
-Utensils
-Storage Containers
-Kitchen Tools
-
-- Dining Essentials
-Dinner Sets
-Plates & Bowls
-Glasses & Mugs
-Serving Items
-
-- Storage & Organizers
-Storage Boxes
-Wardrobe Organizers
-Kitchen Organizers
-Multipurpose Racks
-
-- Cleaning & Utility
-Cleaning Tools
-Cleaning Supplies
-Laundry Items
-Utility Accessories
-
-- Bedding & Linen
-Bedsheets
-Blankets & Quilts
-Pillow Covers
-Towels
-
-- Bathroom Accessories
-Soap Dispensers & Holders
-Bathroom Racks
-Mirrors
-Bath Essentials
-
-- Home Improvement Items
-Tools & Hardware
-Electrical Fittings
-Plumbing Essentials
-Repair & Maintenance
-
-Gadgets
-
-Mobile Accessories
-Audio Devices (Earphones, Speakers)
-Smart Devices (Smartwatch, Bands)
-Computer Accessories
-Gaming Accessories
-Chargers & Power Banks
-
-- Mobile Accessories
-Mobile Covers
-Screen Guards
-Mobile Holders
-Cables
-
-- Audio Devices
-Earphones
-Headphones
-Bluetooth Speakers
-
-- Smart Devices
-Smart Watches
-Fitness Bands
-Smart Accessories
-
-- Computer Accessories
-Keyboards & Mouse
-Laptop Bags
-Webcam & Mic
-USB & Storage Devices
-
-- Gaming Accessories
-Controllers
-Gaming Mouse & Keyboard
-Headsets
-Gaming Chairs
-
-- Chargers & Power Banks
-Mobile Chargers
-Fast Chargers
-Power Banks
-Multi-port Chargers
-
-Electrical Appliances
-
-Large Appliances (Fridge, Washing Machine)
-Small Appliances (Mixer, Toaster)
-Kitchen Appliances
-Heating & Cooling Appliances
-Personal Appliances (Iron, Trimmer)
-
-- Large Appliances
-Refrigerator
-Washing Machine
-Air Conditioner
-Television
-
-- Small Appliances
-Mixer Grinder
-Toaster
-Electric Kettle
-Juicer
-
-- Kitchen Appliances
-Microwave Oven
-Induction Cooktop
-Gas Stove
-Rice Cooker
-
-- Heating & Cooling Appliances
-Room Heater
-Geyser
-Fans
-Air Coolers
-
-- Personal Appliances
-Iron
-Trimmer & Shaver
-Hair Dryer
-Straightener
+ROOT
+│
+├── Fashion
+│   │
+│   ├── Men
+│   │   │
+│   │   ├── Casual
+│   │   │   ├── T-Shirts
+│   │   │   │   ├── Round Neck
+│   │   │   │   ├── Polo
+│   │   │   │   ├── Oversized
+│   │   │   │   ├── Slim Fit
+│   │   │   │   ├── Varsity
+│   │   │   │   ├── Printed
+│   │   │   │   ├── Solid
+│   │   │   │   └── Striped
+│   │   │   │
+│   │   │   ├── Shirts
+│   │   │   │   ├── Casual
+│   │   │   │   ├── Denim
+│   │   │   │   ├── Linen
+│   │   │   │   ├── Cotton
+│   │   │   │   ├── Checkered
+│   │   │   │   ├── Striped
+│   │   │   │   ├── Oversized
+│   │   │   │   └── Cuban Collar
+│   │   │   │
+│   │   │   ├── Sweatshirts
+│   │   │   │   ├── Hooded
+│   │   │   │   ├── Zip-Up
+│   │   │   │   ├── Oversized
+│   │   │   │   ├── Printed
+│   │   │   │   └── Typography
+│   │   │   │
+│   │   │   ├── Jackets
+│   │   │   │   ├── Bomber
+│   │   │   │   ├── Denim
+│   │   │   │   ├── Varsity
+│   │   │   │   ├── Sports
+│   │   │   │   └── Graphic
+│   │   │   │
+│   │   │   ├── Sweaters
+│   │   │   │   ├── Pullover
+│   │   │   │   ├── Cardigan
+│   │   │   │   ├── Vest
+│   │   │   │   ├── V-Neck
+│   │   │   │   └── Turtle Neck
+│   │   │   │
+│   │   │   ├── Co-Ords
+│   │   │   │   ├── Casual
+│   │   │   │   ├── Partywear
+│   │   │   │   ├── Formal
+│   │   │   │   └── Travel
+│   │   │   │
+│   │   │   └── Bottom Wear
+│   │   │       ├── Jeans
+│   │   │       │   ├── Slim Fit
+│   │   │       │   ├── Straight Fit
+│   │   │       │   ├── Baggy
+│   │   │       │   └── Bootcut
+│   │   │       │
+│   │   │       ├── Trousers
+│   │   │       │   ├── Cargo
+│   │   │       │   ├── Chinos
+│   │   │       │   ├── Parachute
+│   │   │       │   └── Linen
+│   │   │       │
+│   │   │       └── Shorts
+│   │   │           ├── Cargo
+│   │   │           ├── Denim
+│   │   │           ├── Bermuda
+│   │   │           └── Sports
+│   │   │
+│   │   ├── Ethnic
+│   │   │   ├── Kurtas
+│   │   │   │   ├── Cotton
+│   │   │   │   ├── Printed
+│   │   │   │   ├── Chikankari
+│   │   │   │   └── Festive
+│   │   │   │
+│   │   │   ├── Short Kurtas
+│   │   │   │   ├── Pathani
+│   │   │   │   ├── Nehru Collar
+│   │   │   │   └── Casual
+│   │   │   │
+│   │   │   ├── Kurta Sets
+│   │   │   │
+│   │   │   ├── Sherwani
+│   │   │   │   ├── Achkan
+│   │   │   │   ├── Indo-Western
+│   │   │   │   ├── Velvet
+│   │   │   │   └── Designer
+│   │   │   │
+│   │   │   ├── Jackets & Blazers
+│   │   │   │   ├── Nehru Jacket
+│   │   │   │   ├── Bandhgala
+│   │   │   │   └── Festive
+│   │   │   │
+│   │   │   ├── Dhoti
+│   │   │   │   ├── Cotton
+│   │   │   │   ├── Silk
+│   │   │   │   └── Ready-to-Wear
+│   │   │   │
+│   │   │   └── 3-Piece Sets
+│   │   │
+│   │   ├── Sportswear
+│   │   │   ├── T-Shirts
+│   │   │   ├── Shorts
+│   │   │   ├── Track Pants
+│   │   │   ├── Tracksuits
+│   │   │   └── Swimwear
+│   │   │
+│   │   ├── Workwear
+│   │   │   ├── Shirts
+│   │   │   ├── Trousers
+│   │   │   ├── Blazers
+│   │   │   └── Formal Shoes
+│   │   │
+│   │   └── Essentials
+│   │       ├── Innerwear
+│   │       │   ├── Boxers
+│   │       │   ├── Briefs
+│   │       │   └── Trunks
+│   │       │
+│   │       ├── Vests
+│   │       │
+│   │       └── Loungewear
+│   │
+│   ├── Women
+│   │   ├── Western
+│   │   │   ├── Dresses
+│   │   │   ├── Tops
+│   │   │   ├── Jeans & Bottoms
+│   │   │   ├── Tees
+│   │   │   └── Jumpsuits
+│   │   │
+│   │   ├── Ethnic
+│   │   │   ├── Kurta Sets
+│   │   │   ├── Sarees
+│   │   │   ├── Lehengas
+│   │   │   ├── Co-Ords
+│   │   │   ├── Indie Wear
+│   │   │   ├── Designer Wear
+│   │   │   └── Gowns
+│   │   │
+│   │   ├── Fusion
+│   │   │   ├── Indie Fusion
+│   │   │   ├── Boho Fusion
+│   │   │   ├── Street Fusion
+│   │   │   ├── Festive Fusion
+│   │   │   ├── Contemporary Fusion
+│   │   │   └── Luxury Fusion
+│   │   │
+│   │   ├── Sportswear
+│   │   │   ├── Activewear
+│   │   │   ├── Gym Wear
+│   │   │   ├── Running Wear
+│   │   │   └── Yoga & Athleisure
+│   │   │
+│   │   └── Essentials
+│   │       ├── Bras
+│   │       ├── Panties
+│   │       ├── Shapewear
+│   │       ├── Nightwear
+│   │       └── Maternity Wear
+│   │
+│   └── Footwear
+│       ├── Men
+│       │   ├── Casual Shoes
+│       │   ├── Sports Shoes
+│       │   ├── Formal Shoes
+│       │   └── Sandals & Flip-Flops
+│       │
+│       └── Women
+│           ├── Heels
+│           ├── Flats
+│           ├── Sandals
+│           └── Sports Shoes
+│
+├── Accessories
+│   ├── Bags & Backpacks
+│   ├── Wallets & Belts
+│   ├── Watches
+│   ├── Sunglasses & Eyewear
+│   ├── Jewellery
+│   ├── Hair Accessories
+│   ├── Caps & Hats
+│   └── Scarves & Stoles
+│
+├── Beauty
+│   ├── Skincare
+│   ├── Haircare
+│   ├── Makeup
+│   ├── Personal Care
+│   ├── Grooming
+│   ├── Fragrances
+│   └── Beauty Tools & Appliances
+│
+├── Home & Living
+│   ├── Kitchenware
+│   ├── Dining Essentials
+│   ├── Storage & Organizers
+│   ├── Cleaning & Utility
+│   ├── Bedding & Linen
+│   ├── Bathroom Accessories
+│   └── Home Improvement
+│
+├── Gadgets
+│   ├── Mobile Accessories
+│   ├── Audio Devices
+│   ├── Smart Devices
+│   ├── Computer Accessories
+│   ├── Gaming Accessories
+│   └── Chargers & Power Banks
+│
+└── Electrical Appliances
+    ├── Large Appliances
+    ├── Small Appliances
+    ├── Kitchen Appliances
+    ├── Heating & Cooling
+    └── Personal Appliances
