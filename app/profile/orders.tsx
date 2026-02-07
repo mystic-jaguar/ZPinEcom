@@ -76,7 +76,7 @@ export default function AllOrdersScreen() {
                             date: item.date,
                             total: `₹${item.total.toFixed(2)}`,
                             status: item.status === 'Unpacked' ? 'Processing' : item.status, // Map Unpacked to Processing for card display if needed
-                            items: item.items.map(i => ({ name: i.name, image: i.image }))
+                            items: item.items.map(i => ({ id: i.id, name: i.name, image: i.image }))
                         }}
                         onPress={() => router.push({
                             pathname: '/profile/order-details',
@@ -86,7 +86,11 @@ export default function AllOrdersScreen() {
                             pathname: '/profile/track-order',
                             params: { orderId: item.id }
                         })} // Navigate to Track Order
-                        onBuyAgain={() => { }} // Add to Cart
+                        onBuyAgain={() => {
+                            if (item.items.length > 0) {
+                                router.push(`/product/${item.items[0].id}`);
+                            }
+                        }} // Buy Again - Navigate to product detail page
                     />
                 )}
                 keyExtractor={(item) => item.id}

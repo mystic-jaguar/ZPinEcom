@@ -10,6 +10,7 @@ export interface Order {
     total: string;
     status: OrderStatus;
     items: {
+        id: string;
         name: string;
         image: any; // Using any for require() images, or string for remote
     }[];

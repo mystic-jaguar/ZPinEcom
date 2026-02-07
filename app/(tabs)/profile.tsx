@@ -5,15 +5,9 @@ import { Dimensions, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ProfileOption from '../../components/profile/ProfileOption';
 
-const { width } = Dimensions.get('window');
+import { useUser } from '../../context/UserContext';
 
-// Mock User Data
-const USER = {
-    name: 'Jay Warale', // Updated to match design
-    email: 'jaywarale@example.com',
-    avatar: require('../../assets/images/profile_icon.jpg'), // Using existing asset
-    isPro: true
-};
+const { width } = Dimensions.get('window');
 
 // Mock Recommended Data
 const RECOMMENDED = [
@@ -25,6 +19,7 @@ const RECOMMENDED = [
 ];
 
 export default function ProfileScreen() {
+    const { user } = useUser();
     const router = useRouter();
 
     const QuickAction = ({ icon, label, onPress }: { icon: any, label: string, onPress: () => void }) => (
@@ -55,12 +50,12 @@ export default function ProfileScreen() {
 
                     <View style={styles.profileInfo}>
                         <View style={styles.avatarContainer}>
-                            <Image source={USER.avatar} style={styles.avatar} />
+                            <Image source={user.profileImage} style={styles.avatar} />
                             <View style={styles.onlineBadge} />
                         </View>
-                        <Text style={styles.userName}>{USER.name}</Text>
+                        <Text style={styles.userName}>{user.name}</Text>
 
-                        {USER.isPro && (
+                        {user.isPro && (
                             <View style={styles.proBadge}>
                                 <Feather name="star" size={12} color="#333" style={{ marginRight: 4 }} />
                                 <Text style={styles.proText}>PRO MEMBER</Text>
@@ -107,7 +102,7 @@ export default function ProfileScreen() {
                         <ProfileOption
                             label="Edit Profile"
                             icon="user"
-                            onPress={() => { }}
+                            onPress={() => router.push('/profile/edit-profile')}
                         />
                         <ProfileOption
                             label="Payment Methods"
@@ -122,7 +117,7 @@ export default function ProfileScreen() {
                         {/* <ProfileOption
                             label="Notifications"
                             icon="bell"
-                            onPress={() => { }}
+                            onPress={() => router.push('/profile/edit-profile')}
                         /> */}
                         <ProfileOption
                             label="Help & Support"
@@ -160,6 +155,7 @@ export default function ProfileScreen() {
         </View>
     );
 }
+
 
 const styles = StyleSheet.create({
     container: {
