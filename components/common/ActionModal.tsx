@@ -8,8 +8,8 @@ interface ActionModalProps {
     message: string;
     primaryButtonText: string;
     onPrimaryPress: () => void;
-    secondaryButtonText: string;
-    onSecondaryPress: () => void;
+    secondaryButtonText?: string;
+    onSecondaryPress?: () => void;
     onClose: () => void;
     icon?: keyof typeof Feather.glyphMap;
 }
@@ -46,9 +46,11 @@ export default function ActionModal({
                             <Text style={styles.primaryButtonText}>{primaryButtonText}</Text>
                         </TouchableOpacity>
 
-                        <TouchableOpacity style={styles.secondaryButton} onPress={onSecondaryPress}>
-                            <Text style={styles.secondaryButtonText}>{secondaryButtonText}</Text>
-                        </TouchableOpacity>
+                        {secondaryButtonText && onSecondaryPress && (
+                            <TouchableOpacity style={styles.secondaryButton} onPress={onSecondaryPress}>
+                                <Text style={styles.secondaryButtonText}>{secondaryButtonText}</Text>
+                            </TouchableOpacity>
+                        )}
                     </View>
                 </View>
             </View>

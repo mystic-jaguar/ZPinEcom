@@ -20,19 +20,20 @@ export default function ReturnEligibleCard({
 }: ReturnEligibleCardProps) {
     return (
         <View style={styles.card}>
-            <View style={styles.content}>
+            <View style={styles.contentRow}>
                 <View style={styles.imageContainer}>
                     <Image source={image} style={styles.image} resizeMode="contain" />
                 </View>
                 <View style={styles.details}>
                     <Text style={[styles.status, { color: statusColor }]}>{status}</Text>
-                    <Text style={styles.name}>{name}</Text>
+                    <Text style={styles.name} numberOfLines={1}>{name}</Text>
                     <Text style={styles.variant}>{variant}</Text>
+
+                    <TouchableOpacity style={styles.button} onPress={onInitiate}>
+                        <Text style={styles.buttonText}>Initiate Return</Text>
+                    </TouchableOpacity>
                 </View>
             </View>
-            <TouchableOpacity style={styles.button} onPress={onInitiate}>
-                <Text style={styles.buttonText}>Initiate Return</Text>
-            </TouchableOpacity>
         </View>
     );
 }
@@ -40,28 +41,27 @@ export default function ReturnEligibleCard({
 const styles = StyleSheet.create({
     card: {
         backgroundColor: '#fff',
-        borderRadius: 16,
-        padding: 12,
+        borderRadius: 24,
+        padding: 16,
         marginBottom: 16,
         // Shadow
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
+        shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.05,
-        shadowRadius: 8,
-        elevation: 2,
+        shadowRadius: 12,
+        elevation: 3,
     },
-    content: {
+    contentRow: {
         flexDirection: 'row',
-        marginBottom: 12,
     },
     imageContainer: {
-        width: 80,
-        height: 80,
-        backgroundColor: '#F3F4F6',
-        borderRadius: 8,
+        width: 100,
+        height: 100,
+        backgroundColor: '#F9FAFB',
+        borderRadius: 16,
         justifyContent: 'center',
         alignItems: 'center',
-        overflow: 'hidden',
+        marginRight: 16, // Space between image and details
     },
     image: {
         width: '80%',
@@ -69,34 +69,38 @@ const styles = StyleSheet.create({
     },
     details: {
         flex: 1,
-        marginLeft: 12,
-        justifyContent: 'center',
+        justifyContent: 'space-between',
+        // We use space-between so elements spread out vertically if there's height,
+        // but here we just stack them.
     },
     status: {
         fontSize: 10,
-        fontWeight: '700',
+        fontWeight: '800',
         marginBottom: 4,
         letterSpacing: 0.5,
+        textTransform: 'uppercase'
     },
     name: {
-        fontSize: 14,
-        fontWeight: '700',
-        color: '#1a1a1a',
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#111827',
         marginBottom: 2,
     },
     variant: {
-        fontSize: 12,
+        fontSize: 13,
         color: '#6B7280',
+        marginBottom: 12,
     },
     button: {
-        backgroundColor: '#FDE047', // Yellow-300 matches design
-        borderRadius: 8,
+        backgroundColor: '#FFD700', // Gold/Yellow
+        borderRadius: 20, // Rounded pill shape
         paddingVertical: 10,
         alignItems: 'center',
+        width: '100%'
     },
     buttonText: {
-        fontSize: 14,
-        fontWeight: '600',
+        fontSize: 13,
+        fontWeight: '700',
         color: '#1a1a1a',
     },
 });

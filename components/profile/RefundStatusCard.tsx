@@ -26,53 +26,50 @@ export default function RefundStatusCard({
     return (
         <View style={styles.card}>
             <View style={styles.header}>
-                <Text style={styles.orderId}>Order #{orderId}</Text>
+                <View>
+                    <Text style={styles.orderId}>Order #{orderId}</Text>
+                    <Text style={styles.amount}>Refund amount: {amount}</Text>
+                </View>
                 <View style={styles.badge}>
                     <Text style={styles.badgeText}>{statusLabel}</Text>
                 </View>
             </View>
-            <Text style={styles.amount}>Refund amount: {amount}</Text>
 
-            <View style={styles.stepperContainer}>
-                {steps.map((step, index) => {
-                    const isActive = step.state === 'active';
-                    const isCompleted = step.state === 'completed';
-                    const isLast = index === steps.length - 1;
+            <View style={styles.stepperWrapper}>
+                {/* Horizontal Line Background - absolute to sit behind circles */}
+                <View style={styles.lineBackground} />
 
-                    return (
-                        <View key={index} style={[styles.stepWrapper, !isLast && { flex: 1 }]}>
-                            <View style={styles.iconContainer}>
-                                <View style={[
-                                    styles.iconCircle,
-                                    (isActive || isCompleted) ? styles.activeCircle : styles.inactiveCircle
-                                ]}>
-                                    <Feather
-                                        name={step.icon}
-                                        size={14}
-                                        color={(isActive || isCompleted) ? '#1a1a1a' : '#9CA3AF'}
-                                    />
+                <View style={styles.stepperContainer}>
+                    {steps.map((step, index) => {
+                        const isCompleted = step.state === 'completed';
+                        const isActive = step.state === 'active';
+                        // Determine fill color for circle
+                        const circleColor = isCompleted || isActive ? '#FFD700' : '#E5E7EB';
+                        const iconColor = isCompleted || isActive ? '#1a1a1a' : '#9CA3AF';
+
+                        return (
+                            <View key={index} style={styles.stepItem}>
+                                <View style={[styles.iconCircle, { backgroundColor: circleColor }]}>
+                                    <Feather name={step.icon} size={14} color={iconColor} />
                                 </View>
                                 <Text style={[
                                     styles.stepLabel,
-                                    (isActive || isCompleted) ? styles.activeLabel : styles.inactiveLabel
-                                ]}>{step.label}</Text>
+                                    (isCompleted || isActive) ? styles.activeLabel : styles.inactiveLabel
+                                ]}>
+                                    {step.label}
+                                </Text>
                             </View>
-
-                            {/* Line connector */}
-                            {!isLast && (
-                                <View style={[
-                                    styles.connector,
-                                    (steps[index + 1].state !== 'pending') ? styles.activeConnector : styles.inactiveConnector
-                                ]} />
-                            )}
-                        </View>
-                    );
-                })}
+                        );
+                    })}
+                </View>
+                {/* Current implementation aligns line by absolute positioning or flex, we'll use a simple absolute line approach behind circles */}
             </View>
 
             {infoText && (
                 <View style={styles.infoBox}>
-                    <Feather name="info" size={16} color="#3B82F6" style={styles.infoIcon} />
+                    <View style={styles.infoIconContainer}>
+                        <Feather name="info" size={16} color="#3B82F6" />
+                    </View>
                     <Text style={styles.infoText}>{infoText}</Text>
                 </View>
             )}
@@ -83,30 +80,35 @@ export default function RefundStatusCard({
 const styles = StyleSheet.create({
     card: {
         backgroundColor: '#fff',
-        borderRadius: 16,
+        borderRadius: 24,
         padding: 20,
         marginBottom: 20,
-        // Shadow
+        // Shadow around card
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
+        shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.05,
-        shadowRadius: 8,
+        shadowRadius: 10,
         elevation: 2,
     },
     header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 4,
+        alignItems: 'flex-start',
+        marginBottom: 24,
     },
     orderId: {
         fontSize: 16,
-        fontWeight: '700',
-        color: '#1a1a1a',
+        fontWeight: '800',
+        color: '#111827',
+        marginBottom: 4,
+    },
+    amount: {
+        fontSize: 14,
+        color: '#6B7280',
     },
     badge: {
         backgroundColor: '#DCFCE7', // Green-100
-        paddingHorizontal: 8,
+        paddingHorizontal: 10,
         paddingVertical: 4,
         borderRadius: 12,
     },
@@ -114,41 +116,38 @@ const styles = StyleSheet.create({
         fontSize: 10,
         fontWeight: '700',
         color: '#166534', // Green-800
+        textTransform: 'uppercase'
     },
-    amount: {
-        fontSize: 14,
-        color: '#6B7280',
+    stepperWrapper: {
+        position: 'relative',
         marginBottom: 24,
+        paddingHorizontal: 10 // To allow labels to overflow a bit without clip if needed
+    },
+    lineBackground: {
+        position: 'absolute',
+        top: 14, // Roughly half of circle height (30/2 = 15) minus half line height (2/1=1) -> 14
+        left: 25, // Start after first circle's center
+        right: 25, // End before last circle's center
+        height: 2,
+        backgroundColor: '#E5E7EB', // Gray line background
+        zIndex: 0,
     },
     stepperContainer: {
         flexDirection: 'row',
-        alignItems: 'flex-start',
-        marginBottom: 24,
-        // Ensure steps take up space properly
         justifyContent: 'space-between',
+        zIndex: 1,
     },
-    stepWrapper: {
-        flexDirection: 'row',
-        alignItems: 'center', // Align line with circle center vertical
-    },
-    iconContainer: {
+    stepItem: {
         alignItems: 'center',
-        zIndex: 1, // Above line
-        width: 60, // Fixed width for label centering
+        width: 70, // Fixed width to center text
     },
     iconCircle: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
+        width: 30,
+        height: 30,
+        borderRadius: 15,
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 8,
-    },
-    activeCircle: {
-        backgroundColor: '#FBBF24', // Yellow
-    },
-    inactiveCircle: {
-        backgroundColor: '#F3F4F6',
     },
     stepLabel: {
         fontSize: 12,
@@ -156,37 +155,30 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
     activeLabel: {
-        color: '#1a1a1a',
+        color: '#111827',
     },
     inactiveLabel: {
-        color: '#D1D5DB', // Light gray
-    },
-    connector: {
-        height: 2,
-        flex: 1,
-        marginTop: -25, // Pull up to align with circle center (approx)
-        marginHorizontal: -15, // Overlap to connect
-    },
-    activeConnector: {
-        backgroundColor: '#FBBF24',
-    },
-    inactiveConnector: {
-        backgroundColor: '#F3F4F6',
+        color: '#9CA3AF',
     },
     infoBox: {
         flexDirection: 'row',
-        backgroundColor: '#EFF6FF', // Blue-50
-        padding: 12,
-        borderRadius: 8,
+        backgroundColor: '#F3F4F6', // Light gray bg
+        padding: 16,
+        borderRadius: 16,
         alignItems: 'flex-start',
     },
-    infoIcon: {
-        marginTop: 2,
-        marginRight: 8,
+    infoIconContainer: {
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+        backgroundColor: '#EFF6FF',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 10,
     },
     infoText: {
         flex: 1,
-        fontSize: 12,
+        fontSize: 13,
         color: '#4B5563',
         lineHeight: 18,
     },

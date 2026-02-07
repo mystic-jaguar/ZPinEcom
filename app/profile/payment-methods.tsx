@@ -1,18 +1,46 @@
+import ActionModal from '@/components/common/ActionModal';
 import { Colors } from '@/constants/Colors';
+import { PaymentCard, PaymentUPI, usePayment } from '@/context/PaymentContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React from 'react';
+import React, { useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function ProfilePaymentMethodsScreen() {
     const router = useRouter();
-    // In a real app, we would fetch saved methods from a user context or API
-    // For now, we use the same mock data as the design
+    const { cards, upis, deleteCard, deleteUPI } = usePayment();
 
-    // --- Mock Data Rendering Helper ---
-    const renderSavedCard = (id: string, bankName: string, cardType: string, number: string, expiry: string, iconName: any, iconColor: string) => {
+    const [modalVisible, setModalVisible] = useState(false);
+    const [itemToDelete, setItemToDelete] = useState<{ type: 'Card' | 'UPI', id: string } | null>(null);
+
+    const confirmDelete = (type: 'Card' | 'UPI', id: string) => {
+        setItemToDelete({ type, id });
+        setModalVisible(true);
+    };
+
+    const handleDelete = () => {
+        if (itemToDelete) {
+            if (itemToDelete.type === 'Card') {
+                deleteCard(itemToDelete.id);
+            } else {
+                deleteUPI(itemToDelete.id);
+            }
+        }
+        setModalVisible(false);
+        setItemToDelete(null);
+    };
+
+    const handleEdit = (type: 'Card' | 'UPI', id: string) => {
+        router.push({
+            pathname: '/profile/add-payment-method',
+            params: { id, type }
+        });
+    };
+
+    const renderSavedCard = (card: PaymentCard) => {
         return (
             <TouchableOpacity
+                key={card.id}
                 activeOpacity={0.9}
                 style={[styles.cardContainer]}
                 onPress={() => { }}
@@ -20,18 +48,18 @@ export default function ProfilePaymentMethodsScreen() {
                 <View style={styles.cardHeader}>
                     <View style={styles.bankInfo}>
                         <View style={styles.bankIcon}>
-                            <Ionicons name={iconName} size={24} color={iconColor} />
+                            <Ionicons name={card.iconName} size={24} color={card.iconColor} />
                         </View>
                         <View>
-                            <Text style={styles.bankName}>{bankName}</Text>
-                            <Text style={styles.cardType}>{cardType}</Text>
+                            <Text style={styles.bankName}>{card.bankName}</Text>
+                            <Text style={styles.cardType}>{card.cardType.toUpperCase()}</Text>
                         </View>
                     </View>
                     <View style={styles.cardActions}>
-                        <TouchableOpacity style={styles.actionIcon}>
+                        <TouchableOpacity style={styles.actionIcon} onPress={() => handleEdit('Card', card.id)}>
                             <Ionicons name="pencil" size={18} color="#90A4AE" />
                         </TouchableOpacity>
-                        <TouchableOpacity style={styles.actionIcon}>
+                        <TouchableOpacity style={styles.actionIcon} onPress={() => confirmDelete('Card', card.id)}>
                             <Ionicons name="trash" size={18} color="#90A4AE" />
                         </TouchableOpacity>
                     </View>
@@ -39,12 +67,11 @@ export default function ProfilePaymentMethodsScreen() {
 
                 <View style={styles.cardNumberContainer}>
                     <Text style={styles.cardNumberDots}>••••   ••••   ••••</Text>
-                    <Text style={styles.cardNumberLast}>{number}</Text>
+                    <Text style={styles.cardNumberLast}>{card.cardNumber.slice(-4)}</Text>
                 </View>
 
                 <View style={styles.cardFooter}>
-                    <Text style={styles.expiryText}>{expiry}</Text>
-                    {/* Mock Card Type Icon */}
+                    <Text style={styles.expiryText}>EXP {card.expiryDate}</Text>
                     <View style={styles.cardNetworkIcon}>
                         <Ionicons name="card" size={20} color="#757575" />
                     </View>
@@ -53,26 +80,27 @@ export default function ProfilePaymentMethodsScreen() {
         );
     };
 
-    const renderUpiOption = (id: string, label: string, subLabel: string, logoName: any, logoColor: string) => {
+    const renderUpiOption = (upi: PaymentUPI) => {
         return (
             <TouchableOpacity
+                key={upi.id}
                 style={[styles.upiContainer]}
                 onPress={() => { }}
             >
                 <View style={styles.upiLeft}>
                     <View style={styles.upiIcon}>
-                        <Ionicons name={logoName} size={24} color={logoColor} />
+                        <Ionicons name="wallet" size={24} color="#4285F4" />
                     </View>
                     <View>
-                        <Text style={styles.upiLabel}>{label}</Text>
-                        <Text style={styles.upiSubLabel}>{subLabel}</Text>
+                        <Text style={styles.upiLabel}>{upi.label}</Text>
+                        <Text style={styles.upiSubLabel}>{upi.subLabel}</Text>
                     </View>
                 </View>
                 <View style={styles.upiActions}>
-                    <TouchableOpacity style={styles.editButton}>
+                    <TouchableOpacity style={styles.editButton} onPress={() => handleEdit('UPI', upi.id)}>
                         <Text style={styles.editButtonText}>EDIT</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.removeButton}>
+                    <TouchableOpacity style={styles.removeButton} onPress={() => confirmDelete('UPI', upi.id)}>
                         <Text style={styles.removeButtonText}>REMOVE</Text>
                     </TouchableOpacity>
                 </View>
@@ -96,27 +124,41 @@ export default function ProfilePaymentMethodsScreen() {
                 {/* Saved Cards */}
                 <View style={styles.sectionHeaderRow}>
                     <Text style={styles.sectionTitle}>Saved Cards</Text>
-                    <Text style={styles.cardCount}>2 CARDS</Text>
+                    <Text style={styles.cardCount}>{cards.length} CARDS</Text>
                 </View>
 
-                {renderSavedCard('hdfc_credit', 'HDFC Bank', 'CREDIT CARD', '1 2 3 4', 'EXP 09/28', 'business', '#1565C0')}
-                {renderSavedCard('icici_debit', 'ICICI Bank', 'DEBIT CARD', '5 6 7 8', 'EXP 12/26', 'home', '#E65100')}
+                {cards.map(renderSavedCard)}
 
                 {/* UPI IDs */}
                 <View style={styles.sectionHeaderRow}>
                     <Text style={styles.sectionTitle}>UPI IDs</Text>
                 </View>
 
-                {renderUpiOption('google_pay', 'Google Pay', 'jaywarale@okaxis', 'wallet', '#4285F4')}
+                {upis.map(renderUpiOption)}
 
                 {/* Add New Method Button */}
-                <TouchableOpacity style={styles.addMethodButton}>
-                    <Ionicons name="add-circle" size={24} color="#000" />
-                    <Text style={styles.addMethodText}>ADD NEW PAYMENT METHOD</Text>
+                <TouchableOpacity
+                    style={styles.addButton}
+                    onPress={() => router.push('/profile/add-payment-method')}
+                >
+                    <Ionicons name="add-circle-outline" size={24} color="#000" />
+                    <Text style={styles.addButtonText}>ADD NEW PAYMENT METHOD</Text>
                 </TouchableOpacity>
 
                 <View style={{ height: 40 }} />
             </ScrollView>
+
+            <ActionModal
+                visible={modalVisible}
+                title="Delete Payment Method"
+                message="Are you sure you want to delete this payment method?"
+                primaryButtonText="DELETE"
+                onPrimaryPress={handleDelete}
+                secondaryButtonText="CANCEL"
+                onSecondaryPress={() => setModalVisible(false)}
+                onClose={() => setModalVisible(false)}
+                icon="trash"
+            />
         </View>
     );
 }
@@ -331,7 +373,7 @@ const styles = StyleSheet.create({
     },
 
     // Add Method Button
-    addMethodButton: {
+    addButton: {
         backgroundColor: Colors.light.tint,
         borderRadius: 16,
         paddingVertical: 18,
@@ -345,7 +387,7 @@ const styles = StyleSheet.create({
         shadowRadius: 10,
         elevation: 6,
     },
-    addMethodText: {
+    addButtonText: {
         fontSize: 14,
         fontWeight: 'bold',
         color: '#000',

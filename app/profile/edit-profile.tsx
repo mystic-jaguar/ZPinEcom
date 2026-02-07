@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { Alert, Image, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import ActionModal from '../../components/common/ActionModal';
 import Input from '../../components/common/Input';
 import { useUser } from '../../context/UserContext';
 // import DateTimePicker from '@react-native-community/datetimepicker'; // Assuming we might want a date picker later
@@ -25,6 +26,7 @@ export default function EditProfileScreen() {
     });
 
     const [showGenderPicker, setShowGenderPicker] = useState(false);
+    const [showSuccessModal, setShowSuccessModal] = useState(false);
 
     const handleSave = () => {
         // Validation
@@ -34,9 +36,12 @@ export default function EditProfileScreen() {
         }
 
         updateUser(form);
-        Alert.alert('Success', 'Profile updated successfully!', [
-            { text: 'OK', onPress: () => router.back() }
-        ]);
+        setShowSuccessModal(true);
+    };
+
+    const handleModalClose = () => {
+        setShowSuccessModal(false);
+        router.back();
     };
 
     const togglePreference = (key: keyof typeof user.preferences) => {
@@ -174,6 +179,16 @@ export default function EditProfileScreen() {
 
                 <View style={{ height: 40 }} />
             </ScrollView>
+
+            <ActionModal
+                visible={showSuccessModal}
+                title="Success"
+                message="Profile updated successfully!"
+                primaryButtonText="OK"
+                onPrimaryPress={handleModalClose}
+                onClose={handleModalClose}
+                icon="check-circle"
+            />
 
             {/* Dark Mode FAB (Visual) removed as per clean UI request or can handle via preferences */}
             {/* Keeping it if user wants consistent "visual" from previous design elsewhere, but strictly following 'above image' */}
