@@ -1,10 +1,12 @@
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React from 'react';
+import React, { useState } from 'react';
 import { Dimensions, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ProfileOption from '../../components/profile/ProfileOption';
 
+import ActionModal from '@/components/common/ActionModal';
+import { authService } from '@/services/auth';
 import { useUser } from '../../context/UserContext';
 
 const { width } = Dimensions.get('window');
@@ -21,6 +23,18 @@ const RECOMMENDED = [
 export default function ProfileScreen() {
     const { user } = useUser();
     const router = useRouter();
+    const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+
+    const handleLogout = async () => {
+        try {
+            await authService.logout();
+            setLogoutModalVisible(false);
+            router.replace('/auth/login');
+        } catch (error) {
+            console.error('Logout error:', error);
+            setLogoutModalVisible(false);
+        }
+    };
 
     const QuickAction = ({ icon, label, onPress }: { icon: any, label: string, onPress: () => void }) => (
         <TouchableOpacity style={styles.quickActionItem} onPress={onPress}>
@@ -127,7 +141,7 @@ export default function ProfileScreen() {
                         <ProfileOption
                             label="Logout"
                             icon="log-out"
-                            onPress={() => { }}
+                            onPress={() => setLogoutModalVisible(true)}
                             isDestructive={true}
                             showBorder={false}
                         />
@@ -152,6 +166,19 @@ export default function ProfileScreen() {
             {/* <TouchableOpacity style={styles.fab}>
                 <Feather name="moon" size={20} color="#fff" />
             </TouchableOpacity> */}
+
+            {/* Logout Confirmation Modal */}
+            <ActionModal
+                visible={logoutModalVisible}
+                title="Logout"
+                message="Are you sure you want to logout?"
+                icon="log-out"
+                primaryButtonText="LOGOUT"
+                onPrimaryPress={handleLogout}
+                secondaryButtonText="CANCEL"
+                onSecondaryPress={() => setLogoutModalVisible(false)}
+                onClose={() => setLogoutModalVisible(false)}
+            />
         </View>
     );
 }
