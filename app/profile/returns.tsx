@@ -1,6 +1,6 @@
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React from 'react';
+import React, { useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import RefundStatusCard from '../../components/profile/RefundStatusCard';
@@ -11,6 +11,8 @@ import { useOrder } from '../../context/OrderContext';
 export default function ReturnsRefundsScreen() {
     const router = useRouter();
     const { orders } = useOrder();
+    const [searchQuery, setSearchQuery] = useState('');
+    const [showHistory, setShowHistory] = useState(false);
 
     // Flatten all items from orders to show in returns list
     // In a real app, you might filter by 'Delivered' status and within return window
@@ -23,6 +25,44 @@ export default function ReturnsRefundsScreen() {
         }))
     );
 
+    // Filter items based on search query
+    const filteredItems = returnableItems.filter(item => {
+        if (!searchQuery.trim()) return true;
+        const query = searchQuery.toLowerCase();
+        return (
+            item.name.toLowerCase().includes(query) ||
+            item.orderId.toLowerCase().includes(query)
+        );
+    });
+
+    // Mock completed refunds for history
+    const completedRefunds = [
+        {
+            orderId: 'ZP-95432',
+            amount: '₹1,299.00',
+            statusLabel: 'COMPLETED',
+            completedDate: '15th Nov 2024',
+            steps: [
+                { label: 'Requested', state: 'completed' as const, icon: 'check' as const },
+                { label: 'Picked up', state: 'completed' as const, icon: 'truck' as const },
+                { label: 'Refunded', state: 'completed' as const, icon: 'dollar-sign' as const },
+            ],
+            infoText: 'Refund completed on 15th Nov. Amount credited to your account.'
+        },
+        {
+            orderId: 'ZP-94201',
+            amount: '₹899.00',
+            statusLabel: 'COMPLETED',
+            completedDate: '8th Nov 2024',
+            steps: [
+                { label: 'Requested', state: 'completed' as const, icon: 'check' as const },
+                { label: 'Picked up', state: 'completed' as const, icon: 'truck' as const },
+                { label: 'Refunded', state: 'completed' as const, icon: 'dollar-sign' as const },
+            ],
+            infoText: 'Refund completed on 8th Nov. Amount credited to your account.'
+        },
+    ];
+
     return (
         <View style={styles.container}>
             {/* Custom Yellow Header */}
@@ -34,7 +74,7 @@ export default function ReturnsRefundsScreen() {
                             <Feather name="chevron-left" size={28} color="#1a1a1a" />
                         </TouchableOpacity>
                         <Text style={styles.headerTitle}>Returns & Refunds</Text>
-                        <TouchableOpacity style={styles.iconButton}>
+                        <TouchableOpacity onPress={() => router.push('/profile/help-center')} style={styles.iconButton}>
                             <Feather name="help-circle" size={24} color="#1a1a1a" />
                         </TouchableOpacity>
                     </View>
@@ -48,6 +88,8 @@ export default function ReturnsRefundsScreen() {
                                 placeholderTextColor="#9CA3AF"
                                 style={styles.searchInput}
                                 textAlign="center"
+                                value={searchQuery}
+                                onChangeText={setSearchQuery}
                             />
                         </View>
                     </View>
@@ -58,32 +100,45 @@ export default function ReturnsRefundsScreen() {
                 {/* Eligible Section */}
                 <View style={styles.sectionHeader}>
                     <Text style={styles.sectionTitle}>Eligible for Return</Text>
-                    <Text style={styles.itemCount}>{returnableItems.length} ITEMS</Text>
+                    <Text style={styles.itemCount}>{filteredItems.length} ITEMS</Text>
                 </View>
 
-                {returnableItems.map((item, index) => (
-                    <ReturnEligibleCard
-                        key={`${item.orderId}-${item.id}-${index}`}
-                        image={item.image}
-                        status={item.status === 'Delivered' ? `DELIVERED ${item.date}` : item.status.toUpperCase()} // Removed "ON" to match design compactness usually
-                        statusColor={item.status === 'Delivered' ? '#D97706' : '#F59E0B'} // Using a darker yellow/orange for text
-                        name={item.name}
-                        variant={item.variant || "Standard Variant"}
-                        onInitiate={() => router.push({
-                            pathname: '/profile/initiate-return',
-                            params: {
-                                productId: item.id,
-                                orderId: item.orderId
-                            }
-                        })}
-                    />
-                ))}
+                {filteredItems.length === 0 ? (
+                    <View style={styles.emptyState}>
+                        <Feather name="inbox" size={48} color="#9CA3AF" />
+                        <Text style={styles.emptyText}>
+                            {searchQuery ? 'No items match your search' : 'No returnable items'}
+                        </Text>
+                    </View>
+                ) : (
+                    filteredItems.map((item, index) => (
+                        <ReturnEligibleCard
+                            key={`${item.orderId}-${item.id}-${index}`}
+                            image={item.image}
+                            status={item.status === 'Delivered' ? `DELIVERED ${item.date}` : item.status.toUpperCase()}
+                            statusColor={item.status === 'Delivered' ? '#D97706' : '#F59E0B'}
+                            name={item.name}
+                            variant={item.variant || "Standard Variant"}
+                            onInitiate={() => router.push({
+                                pathname: '/profile/initiate-return',
+                                params: {
+                                    productId: item.id,
+                                    orderId: item.orderId,
+                                    productName: item.name,
+                                    productImage: item.image
+                                }
+                            })}
+                        />
+                    ))
+                )}
 
                 {/* Refund Status Section */}
                 <View style={styles.sectionHeader}>
                     <Text style={styles.sectionTitle}>Refund Status</Text>
-                    <TouchableOpacity>
-                        <Text style={styles.viewHistoryText}>View History</Text>
+                    <TouchableOpacity onPress={() => setShowHistory(!showHistory)}>
+                        <Text style={styles.viewHistoryText}>
+                            {showHistory ? 'Hide History' : 'View History'}
+                        </Text>
                     </TouchableOpacity>
                 </View>
 
@@ -99,8 +154,28 @@ export default function ReturnsRefundsScreen() {
                     infoText="The item was picked up on 24th Oct. Your refund will be processed within 3-5 business days."
                 />
 
+                {/* Completed Refunds History */}
+                {showHistory && (
+                    <View style={styles.historySection}>
+                        <Text style={styles.historySectionTitle}>Completed Refunds</Text>
+                        {completedRefunds.map((refund, index) => (
+                            <RefundStatusCard
+                                key={refund.orderId}
+                                orderId={refund.orderId}
+                                amount={refund.amount}
+                                statusLabel={refund.statusLabel}
+                                steps={refund.steps}
+                                infoText={refund.infoText}
+                            />
+                        ))}
+                    </View>
+                )}
+
                 {/* Support Card */}
-                <TouchableOpacity style={styles.supportCard}>
+                <TouchableOpacity
+                    style={styles.supportCard}
+                    onPress={() => router.push('/profile/help-center')}
+                >
                     <View style={styles.supportIconContainer}>
                         {/* Simple face icon representation */}
                         <View style={styles.supportFace}>
@@ -255,5 +330,27 @@ const styles = StyleSheet.create({
     supportSubtitle: {
         fontSize: 13,
         color: '#6B7280'
-    }
+    },
+    emptyState: {
+        alignItems: 'center',
+        paddingVertical: 40,
+        paddingHorizontal: 20,
+    },
+    emptyText: {
+        marginTop: 16,
+        fontSize: 15,
+        color: '#6B7280',
+        textAlign: 'center',
+    },
+    historySection: {
+        marginTop: 20,
+    },
+    historySectionTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#6B7280',
+        marginBottom: 16,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
 });

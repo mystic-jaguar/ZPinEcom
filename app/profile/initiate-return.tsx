@@ -1,9 +1,10 @@
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import ActionModal from '@/components/common/ActionModal';
 import { PRODUCTS } from '../../constants/products';
 
 export default function InitiateReturnScreen() {
@@ -23,6 +24,8 @@ export default function InitiateReturnScreen() {
 
     const [selectedReason, setSelectedReason] = useState<string | null>(null);
     const [comments, setComments] = useState('');
+    const [confirmModalVisible, setConfirmModalVisible] = useState(false);
+    const [successModalVisible, setSuccessModalVisible] = useState(false);
 
     const reasons = [
         'Size too large',
@@ -30,6 +33,27 @@ export default function InitiateReturnScreen() {
         'Different from image',
         'Instant Trial – Not purchased'
     ];
+
+    const handleSubmit = () => {
+        if (!selectedReason) {
+            Alert.alert('Required', 'Please select a return reason');
+            return;
+        }
+        setConfirmModalVisible(true);
+    };
+
+    const handleConfirmSubmit = () => {
+        setConfirmModalVisible(false);
+        // TODO: Implement API call to create return request
+        setTimeout(() => {
+            setSuccessModalVisible(true);
+        }, 300);
+    };
+
+    const handleSuccessClose = () => {
+        setSuccessModalVisible(false);
+        router.back();
+    };
 
     return (
         <SafeAreaView style={styles.container} edges={['top']}>
@@ -133,10 +157,34 @@ export default function InitiateReturnScreen() {
 
             {/* Submit Button */}
             <View style={styles.footer}>
-                <TouchableOpacity style={styles.submitBtn}>
+                <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit}>
                     <Text style={styles.submitBtnText}>SUBMIT RETURN REQUEST</Text>
                 </TouchableOpacity>
             </View>
+
+            {/* Confirmation Modal */}
+            <ActionModal
+                visible={confirmModalVisible}
+                title="Submit Return Request"
+                message="Are you sure you want to submit this return request?"
+                icon="package"
+                primaryButtonText="SUBMIT"
+                onPrimaryPress={handleConfirmSubmit}
+                secondaryButtonText="CANCEL"
+                onSecondaryPress={() => setConfirmModalVisible(false)}
+                onClose={() => setConfirmModalVisible(false)}
+            />
+
+            {/* Success Modal */}
+            <ActionModal
+                visible={successModalVisible}
+                title="Return Initiated"
+                message="Your return request has been submitted successfully. We will contact you shortly."
+                icon="check-circle"
+                primaryButtonText="OK"
+                onPrimaryPress={handleSuccessClose}
+                onClose={handleSuccessClose}
+            />
         </SafeAreaView>
     );
 }
