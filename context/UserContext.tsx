@@ -28,6 +28,7 @@ export interface User {
 interface UserContextType {
     user: User;
     updateUser: (updates: Partial<User>) => void;
+    resetUser: () => void;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -65,8 +66,12 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         setUser(prev => ({ ...prev, ...updates }));
     };
 
+    const resetUser = () => {
+        setUser(INITIAL_USER);
+    };
+
     return (
-        <UserContext.Provider value={{ user, updateUser }}>
+        <UserContext.Provider value={{ user, updateUser, resetUser }}>
             {children}
         </UserContext.Provider>
     );

@@ -6,6 +6,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import ProfileOption from '../../components/profile/ProfileOption';
 
 import ActionModal from '@/components/common/ActionModal';
+import { useCart } from '@/context/CartContext';
+import { useWishlist } from '@/context/WishlistContext';
 import { authService } from '@/services/auth';
 import { useUser } from '../../context/UserContext';
 
@@ -21,14 +23,26 @@ const RECOMMENDED = [
 ];
 
 export default function ProfileScreen() {
-    const { user } = useUser();
+    const { user, resetUser } = useUser();
+    const { clearCart } = useCart();
+    const { clearWishlist } = useWishlist();
     const router = useRouter();
     const [logoutModalVisible, setLogoutModalVisible] = useState(false);
 
     const handleLogout = async () => {
         try {
+            // Call the auth service to clear tokens and AsyncStorage
             await authService.logout();
+
+            // Clear all context states
+            resetUser();
+            clearCart();
+            clearWishlist();
+
+            // Close modal
             setLogoutModalVisible(false);
+
+            // Navigate to login screen
             router.replace('/auth/login');
         } catch (error) {
             console.error('Logout error:', error);
