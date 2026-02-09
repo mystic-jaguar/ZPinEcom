@@ -1,9 +1,9 @@
+import ActionModal from '@/components/common/ActionModal';
 import { Colors } from '@/constants/Colors';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-    Alert,
     KeyboardAvoidingView,
     Platform,
     ScrollView,
@@ -25,6 +25,9 @@ export default function VerifyResetOTPScreen() {
     const [loading, setLoading] = useState(false);
     const [resendTimer, setResendTimer] = useState(60);
     const [canResend, setCanResend] = useState(false);
+    const [showErrorModal, setShowErrorModal] = useState(false);
+    const [showSuccessModal, setShowSuccessModal] = useState(false);
+    const [errorMessage, setErrorMessage] = useState('');
 
     const inputRefs = useRef<(TextInput | null)[]>([]);
 
@@ -65,7 +68,8 @@ export default function VerifyResetOTPScreen() {
         const otpString = otp.join('');
 
         if (otpString.length !== 6) {
-            Alert.alert('Error', 'Please enter the complete 6-digit OTP');
+            setErrorMessage('Please enter the complete 6-digit OTP');
+            setShowErrorModal(true);
             return;
         }
 
@@ -93,15 +97,11 @@ export default function VerifyResetOTPScreen() {
             // Mock reset token - in real implementation, get this from API response
             const resetToken = 'mock_reset_token_' + Date.now();
 
-            // Navigate to reset password screen with token
-            router.push({
-                pathname: '/auth/reset-password',
-                params: { resetToken }
-            });
-
-            Alert.alert('Success', 'OTP verified successfully');
+            // Show success modal
+            setShowSuccessModal(true);
         } catch (error) {
-            Alert.alert('Error', 'Invalid OTP. Please try again.');
+            setErrorMessage('Invalid OTP. Please try again.');
+            setShowErrorModal(true);
         } finally {
             setLoading(false);
         }
@@ -128,12 +128,12 @@ export default function VerifyResetOTPScreen() {
             // Simulate API call
             await new Promise(resolve => setTimeout(resolve, 1000));
 
-            Alert.alert('Success', 'OTP has been resent');
             setResendTimer(60);
             setCanResend(false);
             setOtp(['', '', '', '', '', '']);
         } catch (error) {
-            Alert.alert('Error', 'Failed to resend OTP. Please try again.');
+            setErrorMessage('Failed to resend OTP. Please try again.');
+            setShowErrorModal(true);
         } finally {
             setLoading(false);
         }
@@ -214,6 +214,35 @@ export default function VerifyResetOTPScreen() {
                     </TouchableOpacity>
                 </ScrollView>
             </KeyboardAvoidingView>
+
+            {/* Error Modal */}
+            <ActionModal
+                visible={showErrorModal}
+                title="Error"
+                message={errorMessage}
+                primaryButtonText="Try Again"
+                onPrimaryPress={() => setShowErrorModal(false)}
+                onClose={() => setShowErrorModal(false)}
+                icon="alert-circle"
+            />
+
+            {/* Success Modal */}
+            <ActionModal
+                visible={showSuccessModal}
+                title="Verified!"
+                message="OTP verified successfully. Let's reset your password."
+                primaryButtonText="Continue"
+                onPrimaryPress={() => {
+                    setShowSuccessModal(false);
+                    const resetToken = 'mock_reset_token_' + Date.now();
+                    router.push({
+                        pathname: '/auth/reset-password',
+                        params: { resetToken }
+                    });
+                }}
+                onClose={() => setShowSuccessModal(false)}
+                icon="check-circle"
+            />
         </SafeAreaView>
     );
 }

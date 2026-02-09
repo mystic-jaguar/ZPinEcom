@@ -1,9 +1,9 @@
+import ActionModal from '@/components/common/ActionModal';
 import { Colors } from '@/constants/Colors';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-    Alert,
     KeyboardAvoidingView,
     Platform,
     ScrollView,
@@ -25,6 +25,9 @@ export default function ResetPasswordScreen() {
     const [showNewPassword, setShowNewPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [showErrorModal, setShowErrorModal] = useState(false);
+    const [showSuccessModal, setShowSuccessModal] = useState(false);
+    const [errorMessage, setErrorMessage] = useState('');
 
     const getPasswordStrength = (password: string) => {
         if (password.length === 0) return { text: '', color: '#E0E0E0', widthPercent: 0 };
@@ -35,22 +38,26 @@ export default function ResetPasswordScreen() {
 
     const validatePasswords = () => {
         if (!newPassword.trim()) {
-            Alert.alert('Error', 'Please enter a new password');
+            setErrorMessage('Please enter a new password');
+            setShowErrorModal(true);
             return false;
         }
 
         if (newPassword.length < 6) {
-            Alert.alert('Error', 'Password must be at least 6 characters long');
+            setErrorMessage('Password must be at least 6 characters long');
+            setShowErrorModal(true);
             return false;
         }
 
         if (!confirmPassword.trim()) {
-            Alert.alert('Error', 'Please confirm your password');
+            setErrorMessage('Please confirm your password');
+            setShowErrorModal(true);
             return false;
         }
 
         if (newPassword !== confirmPassword) {
-            Alert.alert('Error', 'Passwords do not match');
+            setErrorMessage('Passwords do not match');
+            setShowErrorModal(true);
             return false;
         }
 
@@ -80,21 +87,11 @@ export default function ResetPasswordScreen() {
             // Simulate API call
             await new Promise(resolve => setTimeout(resolve, 1000));
 
-            Alert.alert(
-                'Success',
-                'Your password has been reset successfully',
-                [
-                    {
-                        text: 'OK',
-                        onPress: () => {
-                            // Navigate back to login screen
-                            router.replace('/auth/login');
-                        }
-                    }
-                ]
-            );
+            // Show success modal
+            setShowSuccessModal(true);
         } catch (error) {
-            Alert.alert('Error', 'Failed to reset password. Please try again.');
+            setErrorMessage('Failed to reset password. Please try again.');
+            setShowErrorModal(true);
         } finally {
             setLoading(false);
         }
@@ -239,6 +236,31 @@ export default function ResetPasswordScreen() {
                     </View>
                 </ScrollView>
             </KeyboardAvoidingView>
+
+            {/* Error Modal */}
+            <ActionModal
+                visible={showErrorModal}
+                title="Error"
+                message={errorMessage}
+                primaryButtonText="Try Again"
+                onPrimaryPress={() => setShowErrorModal(false)}
+                onClose={() => setShowErrorModal(false)}
+                icon="alert-circle"
+            />
+
+            {/* Success Modal */}
+            <ActionModal
+                visible={showSuccessModal}
+                title="Password Reset!"
+                message="Your password has been reset successfully. You can now login with your new password."
+                primaryButtonText="Go to Login"
+                onPrimaryPress={() => {
+                    setShowSuccessModal(false);
+                    router.replace('/auth/login');
+                }}
+                onClose={() => setShowSuccessModal(false)}
+                icon="check-circle"
+            />
         </SafeAreaView>
     );
 }

@@ -1,0 +1,358 @@
+ Safe-Area handling on iOS & Android
+ 
+ Authentication Flow
+ 
+ Login Screen
+
+ Email/username validation works
+
+ Password min/max length enforced
+
+ Show/Hide password toggle works
+
+ Empty field error messages shown
+
+ Invalid credentials handled gracefully
+
+ Loading indicator visible during login
+
+ “Forgot password” navigation works
+
+ Back navigation behaves correctly
+
+Signup Screen
+
+ All mandatory fields validated
+
+ Password & confirm password match
+
+ Terms & conditions checkbox required
+
+ Keyboard does not hide inputs
+
+ Signup button disabled until valid
+
+ Navigation to OTP screen works
+
+OTP Verification
+
+ Only numeric input allowed
+
+ Exactly 6 digits accepted
+
+ Auto-focus next input
+
+ Resend OTP timer works
+
+ Incorrect OTP error shown
+
+ Successful OTP redirects correctly
+
+3️⃣ Navigation & Routing
+
+ Bottom tabs visible on all tab screens
+
+ Active tab highlight works
+
+ Cart badge updates in real time
+
+ Deep linking works (product/[id])
+
+ Back button behavior is logical everywhere
+
+ Auth routes protected properly
+
+ Checkout routes inaccessible without cart items
+
+ No broken routes or blank screens
+
+4️⃣ Home Screen
+
+ Hero banner renders correctly
+
+ Category carousel scrolls smoothly
+
+ Category tap navigates correctly
+
+ Search bar opens search screen
+
+ Recommended products load
+
+ Fresh arrivals render correctly
+
+ Discounts section shows correct prices
+
+ Empty state handled (if no data)
+
+ Scroll performance is smooth
+
+ Images lazy-load correctly
+
+5️⃣ Categories & Product Listing
+Categories Screen
+
+ Root categories display correctly
+
+ Subcategory drill-down works
+
+ Breadcrumb updates correctly
+
+ Back navigation works
+
+ Category images load properly
+
+Product Listing
+
+ Grid layout consistent
+
+ Product card tap opens details
+
+ Price & discount calculations correct
+
+ Rating stars render properly
+
+ Filters UI opens/closes
+
+ Sorting UI works (UI-level)
+
+ Empty category handled gracefully
+
+6️⃣ Search
+
+ Search input auto-focuses
+
+ Typing shows real-time results
+
+ Recent searches persist (if implemented)
+
+ Popular searches clickable
+
+ Clear search works
+
+ No-result state shown correctly
+
+ Keyboard dismissal handled properly
+
+7️⃣ Product Detail Page (Critical)
+
+ Image carousel swipes smoothly
+
+ Images zoom correctly (if enabled)
+
+ Product name & description correct
+
+ Discount percentage accurate
+
+ Ratings & reviews visible
+
+ Color variant selection works
+
+ Size variant selection works
+
+ Variant selection required before add to cart
+
+ Delivery option selector works
+
+ Add to cart updates cart badge
+
+ Add to wishlist toggles correctly
+
+ Similar products load
+
+8️⃣ Wishlist
+
+ Add to wishlist from product page
+
+ Remove from wishlist
+
+ Wishlist persistence across sessions
+
+ Add to cart from wishlist
+
+ Empty wishlist state shown
+
+ Wishlist badge count correct
+
+9️⃣ Cart (High-Risk Area)
+
+ Cart item list renders correctly
+
+ Quantity increment works
+
+ Quantity decrement stops at 1
+
+ Remove item works
+
+ Variant info displayed correctly
+
+ Subtotal calculation correct
+
+ Savings calculation correct
+
+ Empty cart state shown
+
+ Proceed to checkout disabled if empty
+
+🔟 Checkout Flow
+Address Selection
+
+ Default address pre-selected
+
+ Add new address works
+
+ Edit address works
+
+ Delete address confirmation shown
+
+ Address validation enforced
+
+Summary Screen
+
+ Selected address displayed
+
+ Delivery option selection works
+
+ Instant trial info shown correctly
+
+ Price breakdown accurate
+
+ Total payable amount correct
+
+ Proceed button enabled only when valid
+
+Payment
+
+ Payment method selection works
+
+ Default payment highlighted
+
+ Final amount matches summary
+
+ Place order triggers order creation
+
+ Cart clears after order success
+
+1️⃣1️⃣ Orders & Tracking
+Orders List
+
+ Orders sorted by date
+
+ Order status badges correct
+
+ Filter by status works
+
+ Order card opens details
+
+Order Details
+
+ Order info correct
+
+ Address displayed correctly
+
+ Price breakdown accurate
+
+ Cancel order button logic correct
+
+ Return option shown only if eligible
+
+ Invoice download works (UI level)
+
+Track Order
+
+ Timeline steps accurate
+
+ Delivery partner info visible
+
+ Map renders correctly
+
+ ETA updates logically
+
+ Contact delivery partner action works
+
+1️⃣2️⃣ Returns & Refunds
+
+ Return eligibility rules enforced
+
+ Select items to return works
+
+ Return reason mandatory
+
+ Image upload works
+
+ Return submission confirmation shown
+
+ Refund status displayed clearly
+
+1️⃣3️⃣ Profile & Account
+
+ Profile info loads correctly
+
+ Edit profile saves changes
+
+ Profile image upload works
+
+ Addresses management works fully
+
+ Payment methods add/remove works
+
+ Logout clears user data
+
+ Logout redirects to auth flow
+
+1️⃣4️⃣ Error Handling & Edge Cases
+
+ Network error UI shown
+
+ API error messages handled
+
+ Empty data states handled everywhere
+
+ Loading skeletons visible
+
+ ErrorBoundary catches crashes
+
+ App recovers after error
+
+1️⃣5️⃣ Performance & UX
+
+ No unnecessary re-renders
+
+ FlatList used for long lists
+
+ Image sizes optimized
+
+ Animations smooth (Reanimated)
+
+ Touch targets large enough
+
+ Keyboard avoiding views work
+
+ App usable on small screens
+
+1️⃣6️⃣ Security & Production Readiness (Frontend)
+
+ No secrets hardcoded
+
+ Token storage strategy planned
+
+ Sensitive screens protected
+
+ Input sanitization applied
+
+ API error masking planned
+
+ Logs removed in production
+
+1️⃣7️⃣ Testing (To Be Added)
+
+ Unit tests for contexts
+
+ Component snapshot tests
+
+ Integration tests (cart → checkout)
+
+ E2E tests (login → order → track)
+
+ Performance testing
+
+ Accessibility testing (labels, contrast)

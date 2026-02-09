@@ -1,9 +1,9 @@
+import ActionModal from '@/components/common/ActionModal';
 import { Colors } from '@/constants/Colors';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-    Alert,
     KeyboardAvoidingView,
     Platform,
     ScrollView,
@@ -18,11 +18,16 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 export default function ForgotPasswordScreen() {
     const router = useRouter();
     const [emailOrPhone, setEmailOrPhone] = useState('');
+    const [showErrorModal, setShowErrorModal] = useState(false);
+    const [showSuccessModal, setShowSuccessModal] = useState(false);
+    const [errorMessage, setErrorMessage] = useState('');
     const [loading, setLoading] = useState(false);
+    const [isEmail, setIsEmail] = useState(false);
 
     const validateInput = () => {
         if (!emailOrPhone.trim()) {
-            Alert.alert('Error', 'Please enter your email or phone number');
+            setErrorMessage('Please enter your email or phone number');
+            setShowErrorModal(true);
             return false;
         }
 
@@ -31,7 +36,8 @@ export default function ForgotPasswordScreen() {
         const phoneRegex = /^[0-9]{10}$/;
 
         if (!emailRegex.test(emailOrPhone) && !phoneRegex.test(emailOrPhone)) {
-            Alert.alert('Error', 'Please enter a valid email address or 10-digit phone number');
+            setErrorMessage('Please enter a valid email address or 10-digit phone number');
+            setShowErrorModal(true);
             return false;
         }
 
@@ -63,18 +69,14 @@ export default function ForgotPasswordScreen() {
             // Simulate API call
             await new Promise(resolve => setTimeout(resolve, 1000));
 
-            // Navigate to OTP verification screen
-            router.push({
-                pathname: '/auth/verify-reset-otp',
-                params: {
-                    emailOrPhone: emailOrPhone,
-                    isEmail: isEmail ? 'true' : 'false'
-                }
-            });
+            // Store isEmail for navigation
+            setIsEmail(isEmail);
 
-            Alert.alert('Success', 'OTP has been sent to your ' + (isEmail ? 'email' : 'phone number'));
+            // Show success modal first
+            setShowSuccessModal(true);
         } catch (error) {
-            Alert.alert('Error', 'Failed to send OTP. Please try again.');
+            setErrorMessage('Failed to send OTP. Please try again.');
+            setShowErrorModal(true);
         } finally {
             setLoading(false);
         }
@@ -161,6 +163,37 @@ export default function ForgotPasswordScreen() {
                     </View>
                 </ScrollView>
             </KeyboardAvoidingView>
+
+            {/* Error Modal */}
+            <ActionModal
+                visible={showErrorModal}
+                title="Error"
+                message={errorMessage}
+                primaryButtonText="Try Again"
+                onPrimaryPress={() => setShowErrorModal(false)}
+                onClose={() => setShowErrorModal(false)}
+                icon="alert-circle"
+            />
+
+            {/* Success Modal */}
+            <ActionModal
+                visible={showSuccessModal}
+                title="OTP Sent!"
+                message={`We've sent a verification code to ${emailOrPhone}`}
+                primaryButtonText="Continue"
+                onPrimaryPress={() => {
+                    setShowSuccessModal(false);
+                    router.push({
+                        pathname: '/auth/verify-reset-otp',
+                        params: {
+                            emailOrPhone: emailOrPhone,
+                            isEmail: isEmail ? 'true' : 'false'
+                        }
+                    });
+                }}
+                onClose={() => setShowSuccessModal(false)}
+                icon="mail"
+            />
         </SafeAreaView>
     );
 }
