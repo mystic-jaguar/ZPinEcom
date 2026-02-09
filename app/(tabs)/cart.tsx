@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useCart } from '../../context/CartContext';
 
 export default function CartScreen() {
-    const { cartItems, updateQuantity, removeFromCart, totalPrice } = useCart();
+    const { cartItems, updateQuantity, removeFromCart, totalPrice, totalSavings } = useCart();
     const router = useRouter();
 
     const renderItem = ({ item }: { item: any }) => (
@@ -91,6 +91,9 @@ export default function CartScreen() {
                             <Text style={styles.totalLabel}>Total</Text>
                             <Text style={styles.totalAmount}>₹{totalPrice.toLocaleString()}</Text>
                         </View>
+                        {totalSavings > 0 && (
+                            <Text style={styles.savingsText}>You saved ₹{totalSavings.toLocaleString()}</Text>
+                        )}
                         <TouchableOpacity
                             style={styles.checkoutBtn}
                             onPress={() => router.push('/checkout/address')}
@@ -272,6 +275,13 @@ const styles = StyleSheet.create({
         fontSize: 24,
         fontWeight: '800',
         color: '#1a1a1a'
+    },
+    savingsText: {
+        fontSize: 13,
+        color: '#4CAF50',
+        fontWeight: '600',
+        marginBottom: 12,
+        marginTop: -8
     },
     checkoutBtn: {
         backgroundColor: '#FBBF24',

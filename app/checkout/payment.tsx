@@ -31,12 +31,12 @@ export default function CheckoutPaymentScreen() {
         }, [cartItems, showSuccessModal])
     );
 
-    // Calculate total including taxes/fees (matching summary logic)
+    //Calculate total including taxes/fees (matching summary logic)
     const shippingFee = 0;
     const isInstant = deliveryType === 'Instant';
-    const deliveryFee = isInstant ? 10.00 : 0;
-    const tax = 15.80;
-    const finalTotal = totalPrice + shippingFee + deliveryFee + tax;
+    const deliveryFee = isInstant ? 50.00 : 0; // Updated to ₹50
+    const gst = totalPrice * 0.18; // 18% GST
+    const finalTotal = totalPrice + shippingFee + deliveryFee + gst;
 
     const handlePaymentSelect = (method: string) => {
         setSelectedPaymentMethod(method);
@@ -69,7 +69,7 @@ export default function CheckoutPaymentScreen() {
                         selectedPaymentMethod === 'card_4242' ? 'Credit Card' : 'Other',
                 estimatedDelivery: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toDateString(), // +3 days
                 deliveryFee: deliveryFee,
-                taxes: tax,
+                taxes: gst,
                 subtotal: totalPrice,
                 savings: 0,
                 isInstant: isInstant

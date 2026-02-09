@@ -1,4 +1,8 @@
-import React, { createContext, ReactNode, useContext, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
+
+const PAYMENT_CARDS_STORAGE_KEY = '@ZPinEcom:paymentCards';
+const PAYMENT_UPIS_STORAGE_KEY = '@ZPinEcom:paymentUPIs';
 
 export interface PaymentCard {
     id: string;
@@ -72,6 +76,26 @@ export const PaymentProvider = ({ children }: { children: ReactNode }) => {
         }
     ]);
 
+    // Load payment methods from AsyncStorage
+    // API: GET /api/v1/users/payment-methods
+    useEffect(() => {
+        loadPaymentMethods();
+    }, []);
+
+    const loadPaymentMethods = async () => {
+        try {
+            const [cardsData, upisData] = await Promise.all([
+                AsyncStorage.getItem(PAYMENT_CARDS_STORAGE_KEY),
+                AsyncStorage.getItem(PAYMENT_UPIS_STORAGE_KEY)
+            ]);
+
+            if (cardsData) setCards(JSON.parse(cardsData));
+            if (upisData) setUpis(JSON.parse(upisData));
+        } catch (error) {
+            console.error('Error loading payment methods:', error);
+        }
+    };
+
     const addCard = (card: Omit<PaymentCard, 'id' | 'bankName' | 'iconName' | 'iconColor'>) => {
         const newCard: PaymentCard = {
             id: Math.random().toString(36).substr(2, 9),
@@ -80,15 +104,22 @@ export const PaymentProvider = ({ children }: { children: ReactNode }) => {
             iconName: 'card', // Default icon
             iconColor: '#4CAF50'
         };
-        setCards([...cards, newCard]);
+        const newCards = [...cards, newCard];
+        setCards(newCards);
+        AsyncStorage.setItem(PAYMENT_CARDS_STORAGE_KEY, JSON.stringify(newCards));
+        // API: POST /api/v1/users/payment-methods
     };
 
     const updateCard = (id: string, updates: Partial<PaymentCard>) => {
-        setCards(cards.map(c => c.id === id ? { ...c, ...updates } : c));
+        const updatedCards = cards.map(c => c.id === id ? { ...c, ...updates } : c);
+        setCards(updatedCards);
+        AsyncStorage.setItem(PAYMENT_CARDS_STORAGE_KEY, JSON.stringify(updatedCards));
     };
 
     const deleteCard = (id: string) => {
-        setCards(cards.filter(c => c.id !== id));
+        const filteredCards = cards.filter(c => c.id !== id);
+        setCards(filteredCards);
+        AsyncStorage.setItem(PAYMENT_CARDS_STORAGE_KEY, JSON.stringify(filteredCards));
     };
 
     const addUPI = (upiId: string, upiApp: 'Google Pay' | 'PhonePe' | 'Paytm') => {
@@ -99,15 +130,22 @@ export const PaymentProvider = ({ children }: { children: ReactNode }) => {
             subLabel: upiId,
             upiApp: upiApp
         };
-        setUpis([...upis, newUPI]);
+        const newUpis = [...upis, newUPI];
+        setUpis(newUpis);
+        AsyncStorage.setItem(PAYMENT_UPIS_STORAGE_KEY, JSON.stringify(newUpis));
+        // API: POST /api/v1/users/payment-methods
     };
 
     const updateUPI = (id: string, upiId: string, upiApp: 'Google Pay' | 'PhonePe' | 'Paytm') => {
-        setUpis(upis.map(u => u.id === id ? { ...u, upiId, label: upiApp, subLabel: upiId, upiApp: upiApp } : u));
+        const updatedUpis = upis.map(u => u.id === id ? { ...u, upiId, label: upiApp, subLabel: upiId, upiApp: upiApp } : u);
+        setUpis(updatedUpis);
+        AsyncStorage.setItem(PAYMENT_UPIS_STORAGE_KEY, JSON.stringify(updatedUpis));
     };
 
     const deleteUPI = (id: string) => {
-        setUpis(upis.filter(u => u.id !== id));
+        const filteredUpis = upis.filter(u => u.id !== id);
+        setUpis(filteredUpis);
+        AsyncStorage.setItem(PAYMENT_UPIS_STORAGE_KEY, JSON.stringify(filteredUpis));
     };
 
     const getCard = (id: string) => cards.find(c => c.id === id);

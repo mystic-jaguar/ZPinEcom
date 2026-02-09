@@ -11,21 +11,21 @@ import { FlatList, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View }
 export default function CheckoutSummaryScreen() {
     const router = useRouter();
     const { addresses } = useAddress();
-    const { cartItems, totalPrice, clearCart } = useCart();
+    const { cartItems, totalPrice, totalSavings, clearCart } = useCart();
     const { selectedAddressId, selectedPaymentMethod, deliveryType, setDeliveryType } = useCheckout();
 
     const selectedAddress = addresses.find(a => a.id === selectedAddressId);
 
     // Delivery fees logic
     const shippingFee = 0; // FREE
-    const instantTrialFee = 10.00;
-    const tax = 15.80; // Mock tax
+    const instantTrialFee = 50.00; // Updated to ₹50
+    const gst = totalPrice * 0.18; // 18% GST on product total
 
     const isInstant = deliveryType === 'Instant';
     const deliveryFee = isInstant ? instantTrialFee : 0;
 
-    const finalTotal = totalPrice + shippingFee + deliveryFee + tax;
-    const savings = 45.00; // Mock savings
+    const finalTotal = totalPrice + shippingFee + deliveryFee + gst;
+    // Use totalSavings from CartContext instead of mock
 
 
 
@@ -133,7 +133,7 @@ export default function CheckoutSummaryScreen() {
             <View style={styles.footer}>
                 <View style={styles.totalRow}>
                     <Text style={styles.totalLabel}>TOTAL PAYABLE</Text>
-                    <Text style={styles.savingsText}>YOU SAVED ₹{savings.toFixed(2)}</Text>
+                    <Text style={styles.savingsText}>YOU SAVED ₹{totalSavings.toFixed(2)}</Text>
                 </View>
                 <Text style={styles.totalAmount}>₹{finalTotal.toFixed(2)}</Text>
 
@@ -165,8 +165,8 @@ export default function CheckoutSummaryScreen() {
                         </View>
                     )}
                     <View style={styles.breakdownRow}>
-                        <Text style={styles.breakdownLabel}>Tax (GST)</Text>
-                        <Text style={styles.breakdownValue}>₹{tax.toFixed(2)}</Text>
+                        <Text style={styles.breakdownLabel}>Tax (GST 18%)</Text>
+                        <Text style={styles.breakdownValue}>₹{gst.toFixed(2)}</Text>
                     </View>
                     <View style={[styles.breakdownRow, { marginTop: 10 }]}>
                         <Text style={styles.totalLabelSmall}>Total Amount</Text>
