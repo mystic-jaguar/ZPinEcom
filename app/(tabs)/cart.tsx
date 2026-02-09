@@ -1,16 +1,63 @@
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React from 'react';
-import { FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import React, { useEffect, useRef } from 'react';
+import { Animated, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useCart } from '../../context/CartContext';
 
-export default function CartScreen() {
-    const { cartItems, updateQuantity, removeFromCart, totalPrice, totalSavings } = useCart();
-    const router = useRouter();
+interface CartItemProps {
+    item: any;
+    index: number;
+    onRemove: (cartId: string) => void;
+    onUpdateQuantity: (cartId: string, quantity: number) => void;
+}
 
-    const renderItem = ({ item }: { item: any }) => (
-        <View style={styles.cartItem}>
+function CartItem({ item, index, onRemove, onUpdateQuantity }: CartItemProps) {
+    const router = useRouter();
+    const fadeAnim = useRef(new Animated.Value(0)).current;
+    const slideAnim = useRef(new Animated.Value(50)).current;
+
+    useEffect(() => {
+        Animated.parallel([
+            Animated.timing(fadeAnim, {
+                toValue: 1,
+                duration: 300,
+                delay: index * 50,
+                useNativeDriver: true,
+            }),
+            Animated.timing(slideAnim, {
+                toValue: 0,
+                duration: 300,
+                delay: index * 50,
+                useNativeDriver: true,
+            }),
+        ]).start();
+    }, []);
+
+    const handleRemove = () => {
+        Animated.parallel([
+            Animated.timing(fadeAnim, {
+                toValue: 0,
+                duration: 200,
+                useNativeDriver: true,
+            }),
+            Animated.timing(slideAnim, {
+                toValue: 100,
+                duration: 200,
+                useNativeDriver: true,
+            }),
+        ]).start(() => {
+            onRemove(item.cartId);
+        });
+    };
+
+    return (
+        <Animated.View style={[
+            styles.cartItem,
+            {
+                opacity: fadeAnim,
+                transform: [{ translateX: slideAnim }],
+            },
+        ]}>
             <TouchableOpacity
                 style={{ flexDirection: 'row', flex: 1 }}
                 onPress={() => router.push(`/product/${item.id}`)}
@@ -23,7 +70,7 @@ export default function CartScreen() {
                         <Text style={styles.itemName} numberOfLines={2}>{item.name}</Text>
                         <TouchableOpacity onPress={(e) => {
                             e.stopPropagation();
-                            removeFromCart(item.cartId);
+                            handleRemove();
                         }}>
                             <Feather name="x" size={18} color="#999" />
                         </TouchableOpacity>
@@ -49,7 +96,7 @@ export default function CartScreen() {
                         <View style={styles.quantityControls}>
                             <TouchableOpacity
                                 style={styles.qtyBtn}
-                                onPress={() => updateQuantity(item.cartId, item.quantity - 1)}
+                                onPress={() => onUpdateQuantity(item.cartId, item.quantity - 1)}
                             >
                                 <Feather name="minus" size={14} color="#1a1a1a" />
                             </TouchableOpacity>
@@ -58,7 +105,7 @@ export default function CartScreen() {
 
                             <TouchableOpacity
                                 style={styles.qtyBtn}
-                                onPress={() => updateQuantity(item.cartId, item.quantity + 1)}
+                                onPress={() => onUpdateQuantity(item.cartId, item.quantity + 1)}
                             >
                                 <Feather name="plus" size={14} color="#1a1a1a" />
                             </TouchableOpacity>
@@ -66,34 +113,56 @@ export default function CartScreen() {
                     </View>
                 </View>
             </TouchableOpacity>
-        </View>
+        </Animated.View>
     );
+}
+
+export default function CartScreen() {
+    const { cartItems, updateQuantity, removeFromCart, totalPrice, totalSavings } = useCart();
+    const router = useRouter();
 
     return (
-        <SafeAreaView style={styles.container}>
+        <View style={styles.container}>
             <View style={styles.header}>
                 <Text style={styles.headerTitle}>My Cart</Text>
-                <Text style={styles.itemCount}>{cartItems.length} Items</Text>
+                <Text style={styles.itemCount}>{cartItems.length} {cartItems.length === 1 ? 'item' : 'items'}</Text>
             </View>
 
-            {cartItems.length > 0 ? (
+            {cartItems.length === 0 ? (
+                <View style={styles.emptyState}>
+                    <Feather name="shopping-cart" size={80} color="#ddd" />
+                    <Text style={styles.emptyText}>Your cart is empty</Text>
+                    <Text style={styles.emptySubtext}>Add items to get started</Text>
+                </View>
+            ) : (
                 <>
-                    <FlatList
+                    <Animated.FlatList
                         data={cartItems}
-                        renderItem={renderItem}
-                        keyExtractor={item => item.cartId}
+                        renderItem={({ item, index }) => (
+                            <CartItem
+                                item={item}
+                                index={index}
+                                onRemove={removeFromCart}
+                                onUpdateQuantity={updateQuantity}
+                            />
+                        )}
+                        keyExtractor={(item) => item.cartId}
                         contentContainerStyle={styles.listContent}
                         showsVerticalScrollIndicator={false}
                     />
 
                     <View style={styles.footer}>
+                        {totalSavings > 0 && (
+                            <Text style={styles.savingsText}>
+                                You're saving ₹{totalSavings.toLocaleString()}!
+                            </Text>
+                        )}
+
                         <View style={styles.totalRow}>
                             <Text style={styles.totalLabel}>Total</Text>
                             <Text style={styles.totalAmount}>₹{totalPrice.toLocaleString()}</Text>
                         </View>
-                        {totalSavings > 0 && (
-                            <Text style={styles.savingsText}>You saved ₹{totalSavings.toLocaleString()}</Text>
-                        )}
+
                         <TouchableOpacity
                             style={styles.checkoutBtn}
                             onPress={() => router.push('/checkout/address')}
@@ -103,14 +172,8 @@ export default function CartScreen() {
                         </TouchableOpacity>
                     </View>
                 </>
-            ) : (
-                <View style={styles.emptyState}>
-                    <Feather name="shopping-cart" size={64} color="#ccc" />
-                    <Text style={styles.emptyText}>Your cart is empty</Text>
-                    <Text style={styles.emptySubtext}>Add items to see them here</Text>
-                </View>
             )}
-        </SafeAreaView>
+        </View>
     );
 }
 

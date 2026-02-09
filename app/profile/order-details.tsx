@@ -1,8 +1,9 @@
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useState } from 'react';
+import { Alert, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import ActionModal from '../../components/common/ActionModal';
 import DeliveryStatusCard from '../../components/profile/DeliveryStatusCard';
 import OrderItemRow from '../../components/profile/OrderItemRow';
 import PriceBreakdown from '../../components/profile/PriceBreakdown';
@@ -12,9 +13,37 @@ export default function OrderDetailsScreen() {
     const router = useRouter();
     const params = useLocalSearchParams();
     const { orderId } = params;
-    const { getOrderById } = useOrder();
+    const { getOrderById, cancelOrder } = useOrder();
+    const [showCancelModal, setShowCancelModal] = useState(false);
 
     const order = getOrderById(orderId as string);
+
+    // Calculate if order can be cancelled (within 24 hours of placement)
+    const canCancel = order && ['Processing', 'Unpacked'].includes(order.status);
+
+    // Calculate if order is eligible for return (within 5 days of delivery)
+    const canReturn = order && order.status === 'Delivered';
+
+    const handleCancelOrder = () => {
+        if (!order) return;
+        // API: PUT /api/v1/orders/:id/cancel
+        cancelOrder(order.id);
+        setShowCancelModal(false);
+        Alert.alert('Order Cancelled', 'Your order has been cancelled successfully.');
+        router.back();
+    };
+
+    const handleDownloadInvoice = () => {
+        // API: GET /api/v1/orders/:id/invoice
+        Alert.alert('Invoice', 'Invoice will be downloaded to your device.');
+        // Implement file download logic here
+    };
+
+    const handleContactDelivery = () => {
+        // Contact delivery partner via phone
+        const phoneNumber = '+919876543210'; // Mock delivery partner number
+        Linking.openURL(`tel:${phoneNumber}`);
+    };
 
     if (!order) {
         return (
@@ -111,15 +140,32 @@ export default function OrderDetailsScreen() {
 
                 {/* Action Buttons */}
                 <View style={styles.actionButtonsRow}>
-                    <TouchableOpacity style={styles.outlineButton}>
+                    <TouchableOpacity
+                        style={styles.outlineButton}
+                        onPress={handleDownloadInvoice}
+                    >
                         <Feather name="file-text" size={18} color="#1a1a1a" style={styles.btnIcon} />
                         <Text style={styles.outlineButtonText}>Invoice</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.outlineButton}>
+                    <TouchableOpacity
+                        style={styles.outlineButton}
+                        onPress={() => router.push('/profile/help-center')}
+                    >
                         <Feather name="help-circle" size={18} color="#1a1a1a" style={styles.btnIcon} />
                         <Text style={styles.outlineButtonText}>Need Help?</Text>
                     </TouchableOpacity>
                 </View>
+
+                {/* Contact Delivery Partner (only if order is out for delivery or in transit) */}
+                {['Out for Delivery', 'In Transit'].includes(order.status) && (
+                    <TouchableOpacity
+                        style={styles.contactButton}
+                        onPress={handleContactDelivery}
+                    >
+                        <Feather name="phone" size={18} color="#4CAF50" />
+                        <Text style={styles.contactButtonText}>Contact Delivery Partner</Text>
+                    </TouchableOpacity>
+                )}
 
                 {/* Track Button */}
                 <TouchableOpacity
@@ -132,8 +178,41 @@ export default function OrderDetailsScreen() {
                     <Text style={styles.primaryButtonText}>Track Order</Text>
                 </TouchableOpacity>
 
+                {/* Cancel Order Button (only if eligible) */}
+                {canCancel && (
+                    <TouchableOpacity
+                        style={styles.cancelButton}
+                        onPress={() => setShowCancelModal(true)}
+                    >
+                        <Text style={styles.cancelButtonText}>Cancel Order</Text>
+                    </TouchableOpacity>
+                )}
+
+                {/* Return Order Button (only if eligible) */}
+                {canReturn && (
+                    <TouchableOpacity
+                        style={styles.returnButton}
+                        onPress={() => router.push('/profile/returns')}
+                    >
+                        <Text style={styles.returnButtonText}>Return Items</Text>
+                    </TouchableOpacity>
+                )}
+
                 <View style={{ height: 40 }} />
             </ScrollView>
+
+            {/* Cancel Confirmation Modal */}
+            <ActionModal
+                visible={showCancelModal}
+                title="Cancel Order?"
+                message="Are you sure you want to cancel this order? This action cannot be undone."
+                icon="x-circle"
+                primaryButtonText="Yes, Cancel Order"
+                onPrimaryPress={handleCancelOrder}
+                secondaryButtonText="No, Keep Order"
+                onSecondaryPress={() => setShowCancelModal(false)}
+                onClose={() => setShowCancelModal(false)}
+            />
         </SafeAreaView>
     );
 }
@@ -285,5 +364,52 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '700',
         color: '#1a1a1a',
+    },
+    contactButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: 50,
+        backgroundColor: '#ECFDF5',
+        borderRadius: 12,
+        marginBottom: 15,
+        borderWidth: 1,
+        borderColor: '#4CAF50',
+        gap: 8,
+    },
+    contactButtonText: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#4CAF50',
+    },
+    cancelButton: {
+        height: 50,
+        backgroundColor: '#FEE2E2',
+        borderRadius: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 15,
+        borderWidth: 1,
+        borderColor: '#EF4444',
+    },
+    cancelButtonText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#EF4444',
+    },
+    returnButton: {
+        height: 50,
+        backgroundColor: '#FEF3C7',
+        borderRadius: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 15,
+        borderWidth: 1,
+        borderColor: '#F59E0B',
+    },
+    returnButtonText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#F59E0B',
     },
 });

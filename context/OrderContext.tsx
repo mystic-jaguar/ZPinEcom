@@ -32,6 +32,7 @@ interface OrderContextType {
     orders: Order[];
     addOrder: (order: Order) => void;
     getOrderById: (id: string) => Order | undefined;
+    cancelOrder: (id: string) => void;
 }
 
 const OrderContext = createContext<OrderContextType | undefined>(undefined);
@@ -121,11 +122,19 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
         return orders.find(o => o.orderNumber === id || o.id === id);
     };
 
+    const cancelOrder = (id: string) => {
+        // API: PUT /api/v1/orders/:id/cancel
+        setOrders(prev => prev.map(order =>
+            order.id === id ? { ...order, status: 'Cancelled' as const } : order
+        ));
+    };
+
     return (
         <OrderContext.Provider value={{
             orders,
             addOrder,
-            getOrderById
+            getOrderById,
+            cancelOrder
         }}>
             {children}
         </OrderContext.Provider>

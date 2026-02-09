@@ -101,9 +101,24 @@ export const authService = {
         } catch (error) {
             console.error('Logout API error:', error);
         } finally {
-            // Always clear local data
+            // Always clear local data - Clear all AsyncStorage keys for complete logout
             await tokenManager.clearTokens();
             await userDataManager.clearUserData();
+
+            // Clear all app data contexts
+            try {
+                const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+                await AsyncStorage.multiRemove([
+                    '@ZPinEcom:cart',
+                    '@ZPinEcom:wishlist',
+                    '@ZPinEcom:paymentCards',
+                    '@ZPinEcom:paymentUPIs',
+                    '@ZPinEcom:recentSearches',
+                    '@ZPinEcom:userPreferences'
+                ]);
+            } catch (storageError) {
+                console.error('Error clearing AsyncStorage:', storageError);
+            }
         }
     },
 

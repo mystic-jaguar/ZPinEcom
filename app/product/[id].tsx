@@ -17,6 +17,7 @@ export default function ProductDetails() {
     const { addToCart } = useCart();
     const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
     const [showSuccessModal, setShowSuccessModal] = useState(false);
+    const [showVariantWarningModal, setShowVariantWarningModal] = useState(false);
 
     // Find product or fallback to first one for demo
     const product = PRODUCTS.find(p => p.id === id) || PRODUCTS[0];
@@ -25,6 +26,20 @@ export default function ProductDetails() {
     const [selectedColor, setSelectedColor] = useState(product.colors?.[0] || '');
     const [selectedSize, setSelectedSize] = useState(product.sizes?.[2] || 'M'); // Default to M
     const [deliveryOption, setDeliveryOption] = useState<'instant' | 'standard'>('instant');
+
+    const handleAddToCart = () => {
+        // Validate variant selection if product has variants
+        const requiresColor = product.colors && product.colors.length > 0;
+        const requiresSize = product.sizes && product.sizes.length > 0;
+
+        if ((requiresColor && !selectedColor) || (requiresSize && !selectedSize)) {
+            setShowVariantWarningModal(true);
+            return;
+        }
+
+        addToCart(product, selectedColor, selectedSize);
+        setShowSuccessModal(true);
+    };
 
     return (
         <View style={styles.container}>
@@ -108,10 +123,7 @@ export default function ProductDetails() {
                         {/* Wait, the previous block had Text inside. Let's rewrite properly. */}
                         <TouchableOpacity
                             style={styles.addToCartBtn}
-                            onPress={() => {
-                                addToCart(product, selectedColor, selectedSize);
-                                setShowSuccessModal(true);
-                            }}
+                            onPress={handleAddToCart}
                         >
                             <Feather name="shopping-cart" size={20} color="#1a1a1a" />
                             <Text style={styles.addToCartText}>Add to Cart</Text>
@@ -206,6 +218,7 @@ export default function ProductDetails() {
 
             </ScrollView>
 
+
             <ActionModal
                 visible={showSuccessModal}
                 title="Added to Cart!"
@@ -218,6 +231,17 @@ export default function ProductDetails() {
                 secondaryButtonText="Continue Shopping"
                 onSecondaryPress={() => setShowSuccessModal(false)}
                 onClose={() => setShowSuccessModal(false)}
+            />
+
+            {/* Variant Warning Modal */}
+            <ActionModal
+                visible={showVariantWarningModal}
+                title="Selection Required"
+                message="Please select color and size before adding to cart."
+                icon="alert-circle"
+                primaryButtonText="OK"
+                onPrimaryPress={() => setShowVariantWarningModal(false)}
+                onClose={() => setShowVariantWarningModal(false)}
             />
         </View>
     );
