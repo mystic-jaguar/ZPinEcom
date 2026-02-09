@@ -98,8 +98,12 @@ export const authService = {
     async logout() {
         try {
             await apiClient.post('auth/logout');
-        } catch (error) {
-            console.error('Logout API error:', error);
+        } catch (error: any) {
+            // Ignore 401 errors - token may have expired, which is fine for logout
+            // Only log other unexpected errors
+            if (error?.response?.status !== 401) {
+                console.error('Logout API error:', error);
+            }
         } finally {
             // Always clear local data - Clear all AsyncStorage keys for complete logout
             await tokenManager.clearTokens();
