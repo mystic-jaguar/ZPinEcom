@@ -5,6 +5,7 @@ import { useAddress } from '@/context/AddressContext';
 import { useCart } from '@/context/CartContext';
 import { useCheckout } from '@/context/CheckoutContext';
 import { Order, useOrder } from '@/context/OrderContext';
+import { usePayment } from '@/context/PaymentContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
@@ -17,6 +18,7 @@ export default function CheckoutPaymentScreen() {
     const { totalPrice, cartItems, clearCart } = useCart();
     const { addresses } = useAddress();
     const { addOrder } = useOrder();
+    const { cards, upis } = usePayment();
     const [showSuccessModal, setShowSuccessModal] = useState(false);
 
     const [redirectCategory, setRedirectCategory] = useState<string | null>(null);
@@ -49,6 +51,27 @@ export default function CheckoutPaymentScreen() {
         const address = addresses.find(a => a.id === selectedAddressId);
 
         if (address) {
+            // Determine payment method display name
+            let paymentMethodName = 'Other';
+
+            // Check if it's a saved UPI
+            const savedUPI = upis.find(u => u.id === selectedPaymentMethod);
+            if (savedUPI) {
+                paymentMethodName = savedUPI.label;
+            } else {
+                // Check if it's a saved card
+                const savedCard = cards.find(c => c.id === selectedPaymentMethod);
+                if (savedCard) {
+                    paymentMethodName = `${savedCard.cardType} (${savedCard.cardNumber.slice(-4)})`;
+                } else {
+                    // Fallback to old logic for hardcoded methods
+                    paymentMethodName = selectedPaymentMethod === 'google_pay' ? 'Google Pay' :
+                        selectedPaymentMethod === 'phone_pe' ? 'PhonePe' :
+                            selectedPaymentMethod === 'card_4242' ? 'Credit Card' :
+                                selectedPaymentMethod === 'net_banking' ? 'Net Banking' : 'Other';
+                }
+            }
+
             const newOrder: Order = {
                 id: Math.random().toString(36).substr(2, 9),
                 orderNumber: `ZP-${Math.floor(10000 + Math.random() * 90000)}`,
@@ -64,9 +87,7 @@ export default function CheckoutPaymentScreen() {
                 })),
                 total: finalTotal,
                 address: address,
-                paymentMethod: selectedPaymentMethod === 'google_pay' ? 'Google Pay' :
-                    selectedPaymentMethod === 'phone_pe' ? 'PhonePe' :
-                        selectedPaymentMethod === 'card_4242' ? 'Credit Card' : 'Other',
+                paymentMethod: paymentMethodName,
                 estimatedDelivery: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toDateString(), // +3 days
                 deliveryFee: deliveryFee,
                 taxes: gst,
@@ -170,12 +191,20 @@ export default function CheckoutPaymentScreen() {
 
                 <Text style={styles.sectionTitle}>UPI PAYMENTS</Text>
                 <View style={styles.sectionContainer}>
-                    {renderOption('google_pay', 'Google Pay', 'logo-google', 'pay@google')}
-                    <View style={styles.divider} />
-                    {renderOption('phone_pe', 'PhonePe', 'phone-portrait-outline', 'user@ybl')}
+                    {upis.map((upi, index) => (
+                        <React.Fragment key={upi.id}>
+                            {index > 0 && <View style={styles.divider} />}
+                            {renderOption(
+                                upi.id,
+                                upi.label,
+                                upi.upiApp === 'Google Pay' ? 'logo-google' : 'phone-portrait-outline',
+                                upi.subLabel
+                            )}
+                        </React.Fragment>
+                    ))}
 
-                    <View style={styles.divider} />
-                    <TouchableOpacity style={styles.addOption}>
+                    {upis.length > 0 && <View style={styles.divider} />}
+                    <TouchableOpacity style={styles.addOption} onPress={() => router.push('/profile/add-payment-method')}>
                         <Ionicons name="add-circle" size={24} color={Colors.light.tint} />
                         <Text style={styles.addOptionText}>Add New UPI ID</Text>
                     </TouchableOpacity>
@@ -183,10 +212,21 @@ export default function CheckoutPaymentScreen() {
 
                 <Text style={styles.sectionTitle}>CREDIT / DEBIT CARDS</Text>
                 <View style={styles.sectionContainer}>
-                    {renderOption('card_4242', '•••• •••• •••• 4242', undefined, 'Exp: 12/26', true)}
+                    {cards.map((card, index) => (
+                        <React.Fragment key={card.id}>
+                            {index > 0 && <View style={styles.divider} />}
+                            {renderOption(
+                                card.id,
+                                `•••• •••• •••• ${card.cardNumber.slice(-4)}`,
+                                undefined,
+                                `Exp: ${card.expiryDate}`,
+                                true
+                            )}
+                        </React.Fragment>
+                    ))}
 
-                    <View style={styles.divider} />
-                    <TouchableOpacity style={styles.addOption}>
+                    {cards.length > 0 && <View style={styles.divider} />}
+                    <TouchableOpacity style={styles.addOption} onPress={() => router.push('/profile/add-payment-method')}>
                         <Ionicons name="card" size={24} color={Colors.light.tint} />
                         <Text style={styles.addOptionText}>Add New Card</Text>
                     </TouchableOpacity>

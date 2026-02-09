@@ -2,6 +2,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useRef } from 'react';
 import { Animated, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useCart } from '../../context/CartContext';
 
 interface CartItemProps {
@@ -122,7 +123,7 @@ export default function CartScreen() {
     const router = useRouter();
 
     return (
-        <View style={styles.container}>
+        <SafeAreaView style={styles.container} edges={['top']}>
             <View style={styles.header}>
                 <Text style={styles.headerTitle}>My Cart</Text>
                 <Text style={styles.itemCount}>{cartItems.length} {cartItems.length === 1 ? 'item' : 'items'}</Text>
@@ -173,7 +174,7 @@ export default function CartScreen() {
                     </View>
                 </>
             )}
-        </View>
+        </SafeAreaView>
     );
 }
 
