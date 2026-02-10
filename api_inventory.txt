@@ -1,0 +1,77 @@
+API Inventory Report
+====================
+
+Total API Calls identified: 46
+
+Breakdown by Service:
+---------------------
+
+1. services/api.ts (1 Call)
+   - POST :- /api/v1/users/refresh-token
+
+2. services/auth.ts (8 Calls)
+   - POST :- /api/v1/auth/signup
+   - POST :- /api/v1/auth/login
+   - POST :- /api/v1/auth/verification/sendOTP
+   - POST :- /api/v1/auth/verification/verifyOTP
+   - POST :- /api/v1/auth/logout
+   - POST :- /api/v1/auth/forgetPassword/sendOTP
+   - POST :- /api/v1/auth/forgetPassword/verifyOTP
+   - POST :- /api/v1/auth/forgetPassword/resetPassword
+
+3. services/cart.ts (6 Calls)
+   - GET    :- /api/v1/cart
+   - POST   :- /api/v1/cart
+   - PUT    :- /api/v1/cart/:productId
+   - DELETE :- /api/v1/cart/:productId
+   - DELETE :- /api/v1/cart
+   - GET    :- /api/v1/cart/count
+
+4. services/order.ts (7 Calls)
+   - POST   :- /api/v1/orders
+   - GET    :- /api/v1/orders
+   - GET    :- /api/v1/orders/:id
+   - PUT    :- /api/v1/orders/:id/cancel
+   - GET    :- /api/v1/orders/:id/track
+   - POST   :- /api/v1/orders/:id/return
+   - GET    :- /api/v1/orders/:id/invoice
+
+5. services/payment.ts (6 Calls)
+   - POST   :- /api/v1/payments/create
+   - POST   :- /api/v1/orders/:orderId/payment/verify
+   - POST   :- /api/v1/orders/:orderId/payment/retry
+   - GET    :- /api/v1/payments/:paymentId
+   - POST   :- /api/v1/payments/:paymentId/refund
+   - POST   :- /api/v1/payments/cod/confirm
+
+6. services/product.ts (7 Calls)
+   - GET    :- /api/v1/products
+   - GET    :- /api/v1/products/:id
+   - POST   :- /api/v1/products/addProduct
+   - PUT    :- /api/v1/products/:id
+   - DELETE :- /api/v1/products/:id
+   - GET    :- /api/v1/products/seller/:userId
+   - GET    :- /api/v1/products/category/:categoryId
+
+7. services/user.ts (6 Calls)
+   - GET    :- /api/v1/users
+   - GET    :- /api/v1/users/:id
+   - GET    :- /api/v1/users/orders
+   - PUT    :- /api/v1/users/profileDetails
+   - POST   :- /api/v1/users/customer/profile
+   - POST   :- /api/v1/users/shipping-address
+
+8. services/wishlist.ts (5 Calls)
+   - GET    :- /api/v1/wishlist
+   - GET    :- /api/v1/wishlist/count
+   - POST   :- /api/v1/wishlist
+   - DELETE :- /api/v1/wishlist/:productId
+   - DELETE :- /api/v1/wishlist/clear
+
+Explanation:
+------------
+This file lists every specific API endpoint called by the application's frontend. 
+The calls are organized by the service file they are defined in.
+The format is `METHOD :- ENDPOINT`, where:
+- METHOD is the HTTP verb (GET, POST, PUT, DELETE)
+- ENDPOINT is the URL path relative to the base API URL (/api/v1).

@@ -72,9 +72,6 @@ const CategoryGridSection = ({
             {sectionTitle && (
                 <View style={styles.sectionHeaderRow}>
                     <Text style={styles.gridSectionTitle}>{sectionTitle.toUpperCase()}</Text>
-                    <TouchableOpacity>
-                        <Text style={styles.seeAllText}>See All</Text>
-                    </TouchableOpacity>
                 </View>
             )}
             <View style={styles.gridContainer}>

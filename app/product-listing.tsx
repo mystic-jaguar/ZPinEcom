@@ -13,6 +13,7 @@ import {
     View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import FilterModal, { FilterState } from '../components/product/FilterModal';
 import { CATEGORY_DATA, CategoryNode } from '../constants/categories'; // Import categories
 import { PRODUCTS, Product } from '../constants/products';
 import { useWishlist } from '../context/WishlistContext';
@@ -27,6 +28,16 @@ export default function ProductListing() {
     const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
 
     const [activeFilter, setActiveFilter] = useState<string>('All');
+
+    // Filter Modal State
+    const [filterModalVisible, setFilterModalVisible] = useState(false);
+    const [filterState, setFilterState] = useState<FilterState>({
+        sortBy: 'relevance',
+        priceRanges: [],
+        brands: [],
+        ratings: [],
+        discounts: []
+    });
 
     // 1. Find the current category node (e.g. "T-Shirts") from the deep tree
     const currentCategoryNode = useMemo(() => {
@@ -100,6 +111,90 @@ export default function ProductListing() {
             return baseMatches.filter(p => p.deepestCategoryName === activeFilter);
         }
     }, [activeFilter, allDescendantLabels, currentCategoryNode]);
+
+    // 4. Advanced Filter & Sort Logic (Applied on top of Category Filter)
+    const finalFilteredProducts = useMemo(() => {
+        let result = [...filteredProducts];
+
+        // A. Filter by Brand
+        if (filterState.brands.length > 0) {
+            result = result.filter(p => {
+                const brand = p.subtitle ? p.subtitle.toUpperCase() : 'CLASSIC';
+                return filterState.brands.includes(brand);
+            });
+        }
+
+        // B. Filter by Price Range
+        if (filterState.priceRanges.length > 0) {
+            result = result.filter(p => {
+                return filterState.priceRanges.some(range => {
+                    if (range === 'Under ₹500') return p.price < 500;
+                    if (range === '₹500 - ₹1000') return p.price >= 500 && p.price <= 1000;
+                    if (range === '₹1000 - ₹2000') return p.price >= 1000 && p.price <= 2000;
+                    if (range === '₹2000 - ₹5000') return p.price >= 2000 && p.price <= 5000;
+                    if (range === 'Above ₹5000') return p.price > 5000;
+                    return false;
+                });
+            });
+        }
+
+        // C. Filter by Rating
+        if (filterState.ratings.length > 0) {
+            result = result.filter(p => {
+                return filterState.ratings.some(r => {
+                    const minRating = parseFloat(r);
+                    return (p.rating || 0) >= minRating;
+                });
+            });
+        }
+
+        // D. Filter by Discount
+        if (filterState.discounts.length > 0) {
+            result = result.filter(p => {
+                return filterState.discounts.some(d => {
+                    const minDiscount = parseInt(d);
+                    return (p.discount || 0) >= minDiscount;
+                });
+            });
+        }
+
+        // E. Sort
+        switch (filterState.sortBy) {
+            case 'price_low':
+                result.sort((a, b) => a.price - b.price);
+                break;
+            case 'price_high':
+                result.sort((a, b) => b.price - a.price);
+                break;
+            case 'new':
+                // Mock: using ID or timestamp if available. 
+                // Let's assume higher ID is newer for this mock
+                result.sort((a, b) => parseInt(b.productId) - parseInt(a.productId));
+                break;
+            case 'rating':
+                result.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+                break;
+            case 'discount':
+                result.sort((a, b) => (b.discount || 0) - (a.discount || 0));
+                break;
+            case 'relevance':
+            default:
+                // Keep default order (which satisfies relevance for now)
+                break;
+        }
+
+        return result;
+    }, [filteredProducts, filterState]);
+
+    // Extract available brands for the current category context for the filter modal
+    const availableBrands = useMemo(() => {
+        const brands = new Set<string>();
+        filteredProducts.forEach(p => {
+            if (p.subtitle) brands.add(p.subtitle.toUpperCase());
+            else brands.add('CLASSIC');
+        });
+        return Array.from(brands).sort();
+    }, [filteredProducts]);
 
 
     // Render Item
@@ -221,8 +316,8 @@ export default function ProductListing() {
 
             {/* Count & Sort Bar */}
             <View style={styles.sortBar}>
-                <Text style={styles.productCount}>{filteredProducts.length} Products</Text>
-                <TouchableOpacity style={styles.sortButton}>
+                <Text style={styles.productCount}>{finalFilteredProducts.length} Products</Text>
+                <TouchableOpacity style={styles.sortButton} onPress={() => setFilterModalVisible(true)}>
                     <Feather name="sliders" size={14} color="#000" style={{ marginRight: 6 }} />
                     <Text style={styles.sortButtonText}>Sort & Filter</Text>
                 </TouchableOpacity>
@@ -230,7 +325,7 @@ export default function ProductListing() {
 
             {/* Product Grid */}
             <FlatList
-                data={filteredProducts}
+                data={finalFilteredProducts}
                 renderItem={renderProductItem}
                 keyExtractor={item => item.productId}
                 numColumns={2}
@@ -243,6 +338,15 @@ export default function ProductListing() {
                         <Text style={styles.emptyText}>No products found.</Text>
                     </View>
                 }
+            />
+
+            {/* Filter Modal */}
+            <FilterModal
+                visible={filterModalVisible}
+                onClose={() => setFilterModalVisible(false)}
+                onApply={setFilterState}
+                initialFilters={filterState}
+                availableBrands={availableBrands}
             />
         </SafeAreaView>
     );
