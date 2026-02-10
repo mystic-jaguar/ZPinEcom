@@ -1,7 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import ActionModal from '@/components/common/ActionModal';
@@ -12,20 +12,22 @@ export default function InitiateReturnScreen() {
     const params = useLocalSearchParams();
     const { productId, orderId } = params;
 
-    const productData = PRODUCTS.find(p => p.id === productId);
+    const productData = PRODUCTS.find(p => p.productId === productId);
 
     // Fallback data if params are missing (for dev/preview) or product found
     const product = {
-        name: productData?.name || params.name || 'Quilted Bomber Jacket',
+        name: productData?.productName || params.name || 'Quilted Bomber Jacket',
         variant: productData?.subtitle || params.variant || 'Size: L • Color: Olive Green',
         orderId: orderId || params.orderId || '#ZP-98231',
-        image: productData?.image || (params.image ? { uri: params.image } : require('../../assets/images/handbags.jpg')),
+        image: productData?.images?.[0] ? { uri: productData.images[0] } : (params.image ? { uri: params.image } : require('../../assets/images/handbags.jpg')),
     };
 
     const [selectedReason, setSelectedReason] = useState<string | null>(null);
     const [comments, setComments] = useState('');
     const [confirmModalVisible, setConfirmModalVisible] = useState(false);
     const [successModalVisible, setSuccessModalVisible] = useState(false);
+    const [errorModalVisible, setErrorModalVisible] = useState(false);
+    const [errorMessage, setErrorMessage] = useState('');
 
     const reasons = [
         'Size too large',
@@ -36,7 +38,8 @@ export default function InitiateReturnScreen() {
 
     const handleSubmit = () => {
         if (!selectedReason) {
-            Alert.alert('Required', 'Please select a return reason');
+            setErrorMessage('Please select a return reason');
+            setErrorModalVisible(true);
             return;
         }
         setConfirmModalVisible(true);
@@ -174,7 +177,6 @@ export default function InitiateReturnScreen() {
                 onSecondaryPress={() => setConfirmModalVisible(false)}
                 onClose={() => setConfirmModalVisible(false)}
             />
-
             {/* Success Modal */}
             <ActionModal
                 visible={successModalVisible}
@@ -184,6 +186,17 @@ export default function InitiateReturnScreen() {
                 primaryButtonText="OK"
                 onPrimaryPress={handleSuccessClose}
                 onClose={handleSuccessClose}
+            />
+
+            {/* Error Modal */}
+            <ActionModal
+                visible={errorModalVisible}
+                title="Required"
+                message={errorMessage}
+                icon="alert-circle"
+                primaryButtonText="OK"
+                onPrimaryPress={() => setErrorModalVisible(false)}
+                onClose={() => setErrorModalVisible(false)}
             />
         </SafeAreaView>
     );

@@ -8,8 +8,8 @@ import { useCart } from '../../context/CartContext';
 interface CartItemProps {
     item: any;
     index: number;
-    onRemove: (cartId: string) => void;
-    onUpdateQuantity: (cartId: string, quantity: number) => void;
+    onRemove: (cartItemId: string) => void;
+    onUpdateQuantity: (cartItemId: string, quantity: number) => void;
 }
 
 function CartItem({ item, index, onRemove, onUpdateQuantity }: CartItemProps) {
@@ -47,7 +47,7 @@ function CartItem({ item, index, onRemove, onUpdateQuantity }: CartItemProps) {
                 useNativeDriver: true,
             }),
         ]).start(() => {
-            onRemove(item.cartId);
+            onRemove(item.cartItemId);
         });
     };
 
@@ -61,14 +61,22 @@ function CartItem({ item, index, onRemove, onUpdateQuantity }: CartItemProps) {
         ]}>
             <TouchableOpacity
                 style={{ flexDirection: 'row', flex: 1 }}
-                onPress={() => router.push(`/product/${item.id}`)}
+                onPress={() => router.push(`/product/${item.productId || item.product?.productId || item.id}`)}
                 activeOpacity={0.7}
             >
-                <Image source={typeof item.image === 'string' ? { uri: item.image } : (item.image || { uri: 'https://via.placeholder.com/80' })} style={styles.itemImage} resizeMode="cover" />
+                <Image
+                    source={
+                        item.product?.images?.[0]
+                            ? { uri: item.product.images[0] }
+                            : (typeof item.image === 'string' ? { uri: item.image } : (item.image || { uri: 'https://via.placeholder.com/80' }))
+                    }
+                    style={styles.itemImage}
+                    resizeMode="cover"
+                />
 
                 <View style={styles.itemDetails}>
                     <View style={styles.headerRow}>
-                        <Text style={styles.itemName} numberOfLines={2}>{item.name}</Text>
+                        <Text style={styles.itemName} numberOfLines={2}>{item.product?.productName || item.name}</Text>
                         <TouchableOpacity onPress={(e) => {
                             e.stopPropagation();
                             handleRemove();
@@ -92,12 +100,12 @@ function CartItem({ item, index, onRemove, onUpdateQuantity }: CartItemProps) {
                     )}
 
                     <View style={styles.priceRow}>
-                        <Text style={styles.itemPrice}>₹{(item.price * item.quantity).toLocaleString()}</Text>
+                        <Text style={styles.itemPrice}>₹{((item.product?.price || item.price) * item.quantity).toLocaleString()}</Text>
 
                         <View style={styles.quantityControls}>
                             <TouchableOpacity
                                 style={styles.qtyBtn}
-                                onPress={() => onUpdateQuantity(item.cartId, item.quantity - 1)}
+                                onPress={() => onUpdateQuantity(item.cartItemId, item.quantity - 1)}
                             >
                                 <Feather name="minus" size={14} color="#1a1a1a" />
                             </TouchableOpacity>
@@ -106,7 +114,7 @@ function CartItem({ item, index, onRemove, onUpdateQuantity }: CartItemProps) {
 
                             <TouchableOpacity
                                 style={styles.qtyBtn}
-                                onPress={() => onUpdateQuantity(item.cartId, item.quantity + 1)}
+                                onPress={() => onUpdateQuantity(item.cartItemId, item.quantity + 1)}
                             >
                                 <Feather name="plus" size={14} color="#1a1a1a" />
                             </TouchableOpacity>
@@ -147,7 +155,7 @@ export default function CartScreen() {
                                 onUpdateQuantity={updateQuantity}
                             />
                         )}
-                        keyExtractor={(item) => item.cartId}
+                        keyExtractor={(item) => item.cartItemId}
                         contentContainerStyle={styles.listContent}
                         showsVerticalScrollIndicator={false}
                     />

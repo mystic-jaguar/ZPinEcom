@@ -12,34 +12,34 @@ export default function ProductSearchScreen() {
 
     const filteredProducts = searchQuery
         ? PRODUCTS.filter(product =>
-            product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            product.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            product.subCategory.toLowerCase().includes(searchQuery.toLowerCase())
+            product.productName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            product.categoryPath.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            product.deepestCategoryName.toLowerCase().includes(searchQuery.toLowerCase())
         )
         : [];
 
     const renderProductItem = ({ item }: { item: Product }) => (
         <TouchableOpacity
             style={styles.productCard}
-            onPress={() => router.push(`/product/${item.id}`)}
+            onPress={() => router.push(`/product/${item.productId}`)}
         >
             <View style={styles.imageContainer}>
-                {item.image ? (
-                    <Image source={item.image} style={styles.productImage} />
+                {item.images?.[0] ? (
+                    <Image source={{ uri: item.images[0] }} style={styles.productImage} />
                 ) : (
                     <View style={[styles.productImage, { backgroundColor: '#f0f0f0', alignItems: 'center', justifyContent: 'center' }]}>
                         <Feather name="image" size={24} color="#ccc" />
                     </View>
                 )}
-                {item.discount > 0 && (
+                {(item.discount ?? 0) > 0 && (
                     <View style={styles.discountBadge}>
-                        <Text style={styles.discountText}>{item.discount}% OFF</Text>
+                        <Text style={styles.discountText}>{(item.discount || 0)}% OFF</Text>
                     </View>
                 )}
             </View>
             <View style={styles.productInfo}>
-                <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
-                <Text style={styles.productCategory}>{item.subCategory}</Text>
+                <Text style={styles.productName} numberOfLines={1}>{item.productName}</Text>
+                <Text style={styles.productCategory}>{item.deepestCategoryName}</Text>
                 <View style={styles.priceRow}>
                     <Text style={styles.price}>₹{item.price}</Text>
                     {item.originalPrice && (
@@ -74,7 +74,7 @@ export default function ProductSearchScreen() {
                         <FlatList
                             data={filteredProducts}
                             renderItem={renderProductItem}
-                            keyExtractor={item => item.id}
+                            keyExtractor={item => item.productId}
                             numColumns={2}
                             columnWrapperStyle={styles.columnWrapper}
                             contentContainerStyle={styles.listContent}

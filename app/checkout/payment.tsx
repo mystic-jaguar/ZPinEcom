@@ -4,8 +4,9 @@ import { Colors } from '@/constants/Colors';
 import { useAddress } from '@/context/AddressContext';
 import { useCart } from '@/context/CartContext';
 import { useCheckout } from '@/context/CheckoutContext';
-import { Order, useOrder } from '@/context/OrderContext';
+import { useOrder } from '@/context/OrderContext';
 import { usePayment } from '@/context/PaymentContext';
+import { OrderObject } from '@/types/types';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
@@ -72,25 +73,30 @@ export default function CheckoutPaymentScreen() {
                 }
             }
 
-            const newOrder: Order = {
+            const newOrder: OrderObject = {
                 id: Math.random().toString(36).substr(2, 9),
+                userId: 'user-current',
+                sellerId: 'seller-123',
                 orderNumber: `ZP-${Math.floor(10000 + Math.random() * 90000)}`,
-                date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
-                status: 'Processing',
+                status: 'processing',
+                paymentStatus: 'paid',
+                totalAmount: totalPrice,
+                shippingAmount: shippingFee,
+                taxAmount: gst,
+                finalAmount: finalTotal,
+                shippingAddress: address,
+                paymentMethod: 'razorpay',
+                paymentId: `pay_${Date.now()}`,
                 items: cartItems.map(item => ({
-                    id: item.id,
-                    name: item.name,
-                    image: item.image,
-                    price: item.price,
-                    quantity: item.quantity,
-                    variant: `Size: ${item.selectedSize} | Color: ${item.selectedColor}`
+                    productId: item.productId,
+                    productName: item.product.productName,
+                    image: item.product.images?.[0] || '',
+                    price: item.product.price,
+                    quantity: item.quantity
                 })),
-                total: finalTotal,
-                address: address,
-                paymentMethod: paymentMethodName,
-                estimatedDelivery: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toDateString(), // +3 days
-                deliveryFee: deliveryFee,
-                taxes: gst,
+                estimatedDelivery: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
                 subtotal: totalPrice,
                 savings: 0,
                 isInstant: isInstant
@@ -98,10 +104,8 @@ export default function CheckoutPaymentScreen() {
             addOrder(newOrder);
 
             // Capture category for redirect
-            if (cartItems.length > 0) {
-                // Check if item has category property, assuming it does based on Product interface
-                // We cast item to any or check properties if TS complains, but CartItem extends Product so it should be fine.
-                setRedirectCategory((cartItems[0] as any).category);
+            if (cartItems.length > 0 && cartItems[0].product) {
+                setRedirectCategory(cartItems[0].product.categoryPath || null);
             }
         }
 
@@ -109,9 +113,6 @@ export default function CheckoutPaymentScreen() {
     };
 
     const handleModalPrimary = () => {
-        // Capture the category before clearing cart or changing state
-        const targetCategory = redirectCategory;
-
         // Close modal and clear cart
         setShowSuccessModal(false);
         clearCart();
@@ -120,15 +121,10 @@ export default function CheckoutPaymentScreen() {
         router.dismissAll();
         router.replace('/(tabs)');
 
-        // Navigate to the product category if we have one
-        if (targetCategory) {
-            setTimeout(() => {
-                router.push({
-                    pathname: '/product-listing',
-                    params: { categoryName: targetCategory }
-                });
-            }, 200); // Increased delay slightly for stability
-        }
+        // Navigate to categories page
+        setTimeout(() => {
+            router.push('/categories');
+        }, 200);
     };
 
     const handleModalClose = () => {

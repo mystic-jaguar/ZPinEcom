@@ -1,62 +1,64 @@
 import React, { createContext, ReactNode, useContext, useState } from 'react';
-
-export interface Address {
-    id: string;
-    name: string;
-    addressLine: string;
-    city: string;
-    state: string;
-    pincode: string;
-    country: string;
-    landmark?: string;
-    phoneNumber: string;
-    isDefault: boolean;
-    type: 'Home' | 'Work' | 'Other';
-}
+import { AddressObject } from '../types/types';
 
 interface AddressContextType {
-    addresses: Address[];
-    addAddress: (address: Omit<Address, 'id'>) => void;
+    addresses: AddressObject[];
+    addAddress: (address: Omit<AddressObject, 'id'>) => void;
     removeAddress: (id: string) => void;
     setDefaultAddress: (id: string) => void;
-    updateAddress: (id: string, address: Omit<Address, 'id'>) => void;
+    updateAddress: (id: string, address: Omit<AddressObject, 'id'>) => void;
+    getDefaultAddress: () => AddressObject | undefined;
 }
 
 const AddressContext = createContext<AddressContextType | undefined>(undefined);
 
-const DUMMY_ADDRESSES: Address[] = [
+const DUMMY_ADDRESSES: AddressObject[] = [
     {
         id: '1',
         name: 'Jay',
-        addressLine: '123, Green Park Society, Main Road',
+        phone: '9876543210',
+        address: '123, Green Park Society, Main Road',
+        addressLine1: '123, Green Park Society',
+        addressLine2: 'Main Road',
         city: 'Ahmedabad',
         state: 'Gujarat',
         pincode: '380001',
         country: 'India',
-        phoneNumber: '9876543210',
+        landmark: 'Near Central Mall',
+        label: 'Home',
         isDefault: true,
-        type: 'Home'
+        coordinates: {
+            type: 'Point',
+            coordinates: [72.5714, 23.0225] // Ahmedabad coordinates
+        }
     },
     {
         id: '2',
         name: 'Jay Office',
-        addressLine: '404, Tech Hub, Cyber City',
+        phone: '9876543210',
+        address: '404, Tech Hub, Cyber City',
+        addressLine1: '404, Tech Hub',
+        addressLine2: 'Cyber City',
         city: 'Gandhinagar',
         state: 'Gujarat',
         pincode: '382007',
         country: 'India',
-        phoneNumber: '9876543210',
+        landmark: 'Near GIFT City',
+        label: 'Work',
         isDefault: false,
-        type: 'Work'
+        coordinates: {
+            type: 'Point',
+            coordinates: [72.6369, 23.2156] // Gandhinagar coordinates
+        }
     }
 ];
 
 export const AddressProvider = ({ children }: { children: ReactNode }) => {
-    const [addresses, setAddresses] = useState<Address[]>(DUMMY_ADDRESSES);
+    const [addresses, setAddresses] = useState<AddressObject[]>(DUMMY_ADDRESSES);
 
-    const addAddress = (newAddress: Omit<Address, 'id'>) => {
+    const addAddress = (newAddress: Omit<AddressObject, 'id'>) => {
         const id = Math.random().toString(36).substr(2, 9);
-        const addressWithId = { ...newAddress, id };
+        const addressWithId: AddressObject = { ...newAddress, id };
 
         setAddresses(prev => {
             if (newAddress.isDefault) {
@@ -77,10 +79,25 @@ export const AddressProvider = ({ children }: { children: ReactNode }) => {
         })));
     };
 
-    const updateAddress = (id: string, updatedAddress: Omit<Address, 'id'>) => {
-        setAddresses(prev => prev.map(a =>
-            a.id === id ? { ...updatedAddress, id } : a
-        ));
+    const updateAddress = (id: string, updatedAddress: Omit<AddressObject, 'id'>) => {
+        setAddresses(prev => prev.map(a => {
+            if (a.id === id) {
+                // If isDefault is being set to true, unset all others
+                if (updatedAddress.isDefault) {
+                    return { ...updatedAddress, id };
+                }
+                return { ...updatedAddress, id };
+            }
+            // If the updated address is being set as default, unset others
+            if (updatedAddress.isDefault && a.isDefault) {
+                return { ...a, isDefault: false };
+            }
+            return a;
+        }));
+    };
+
+    const getDefaultAddress = () => {
+        return addresses.find(a => a.isDefault);
     };
 
     return (
@@ -89,7 +106,8 @@ export const AddressProvider = ({ children }: { children: ReactNode }) => {
             addAddress,
             removeAddress,
             setDefaultAddress,
-            updateAddress
+            updateAddress,
+            getDefaultAddress
         }}>
             {children}
         </AddressContext.Provider>

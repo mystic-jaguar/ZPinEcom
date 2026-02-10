@@ -74,13 +74,13 @@ export default function CheckoutSummaryScreen() {
                     <View style={styles.addressCard}>
                         <Text style={styles.addrName}>{selectedAddress.name}</Text>
                         <Text style={styles.addrText}>
-                            {selectedAddress.addressLine}, {selectedAddress.city},
+                            {selectedAddress.address}, {selectedAddress.city},
                         </Text>
                         <Text style={styles.addrText}>
                             {selectedAddress.state} {selectedAddress.pincode}, {selectedAddress.country}
                         </Text>
                         <Text style={styles.addrPhone}>
-                            +91 {selectedAddress.phoneNumber}
+                            +91 {selectedAddress.phone}
                         </Text>
                     </View>
                 ) : (
@@ -122,7 +122,7 @@ export default function CheckoutSummaryScreen() {
                 <FlatList
                     data={cartItems}
                     renderItem={renderOrderItem}
-                    keyExtractor={item => item.cartId}
+                    keyExtractor={item => item.cartItemId}
                     horizontal
                     showsHorizontalScrollIndicator={false}
                     contentContainerStyle={{ paddingLeft: 5 }}

@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import OrderCard from '../../components/profile/OrderCard';
+import OrderCard, { OrderStatus } from '../../components/profile/OrderCard';
 import OrderFilters from '../../components/profile/OrderFilters';
 import SearchBar from '../../components/SearchBar';
 import { useOrder } from '../../context/OrderContext';
@@ -18,16 +18,16 @@ export default function AllOrdersScreen() {
         return orders.filter((order) => {
             // Filter by Status
             if (activeFilter !== 'All') {
-                if (activeFilter === 'In Progress' && order.status !== 'Processing' && order.status !== 'Shipped' && order.status !== 'Unpacked') return false;
-                if (activeFilter === 'Completed' && order.status !== 'Delivered') return false;
-                if (activeFilter === 'Cancelled' && order.status !== 'Cancelled') return false;
+                if (activeFilter === 'In Progress' && order.status !== 'processing' && order.status !== 'shipped' && order.status !== 'confirmed') return false;
+                if (activeFilter === 'Completed' && order.status !== 'delivered') return false;
+                if (activeFilter === 'Cancelled' && order.status !== 'cancelled') return false;
             }
 
             // Filter by Search Query
             if (searchQuery) {
                 const query = searchQuery.toLowerCase();
                 const matchesId = order.orderNumber.toLowerCase().includes(query);
-                const matchesItem = order.items.some((item) => item.name.toLowerCase().includes(query));
+                const matchesItem = order.items.some((item) => item.productName.toLowerCase().includes(query));
                 return matchesId || matchesItem;
             }
 
@@ -73,10 +73,10 @@ export default function AllOrdersScreen() {
                         order={{
                             id: item.id,
                             orderNumber: item.orderNumber,
-                            date: item.date,
-                            total: `₹${item.total.toFixed(2)}`,
-                            status: item.status === 'Unpacked' ? 'Processing' : item.status, // Map Unpacked to Processing for card display if needed
-                            items: item.items.map(i => ({ id: i.id, name: i.name, image: i.image }))
+                            date: new Date(item.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+                            total: `₹${item.finalAmount.toFixed(2)}`,
+                            status: (item.status === 'processing' || item.status === 'shipped' ? 'In Progress' : item.status.charAt(0).toUpperCase() + item.status.slice(1)) as OrderStatus,
+                            items: item.items.map(i => ({ id: i.productId, name: i.productName, image: i.image }))
                         }}
                         onPress={() => router.push({
                             pathname: '/profile/order-details',
@@ -88,7 +88,7 @@ export default function AllOrdersScreen() {
                         })} // Navigate to Track Order
                         onBuyAgain={() => {
                             if (item.items.length > 0) {
-                                router.push(`/product/${item.items[0].id}`);
+                                router.push(`/product/${item.items[0].productId}`);
                             }
                         }} // Buy Again - Navigate to product detail page
                     />

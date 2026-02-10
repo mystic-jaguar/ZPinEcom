@@ -1,12 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
-import { Product } from '../constants/products';
+import { ProductObject } from '../types/types';
 
 const WISHLIST_STORAGE_KEY = '@ZPinEcom:wishlist';
 
 interface WishlistContextType {
-    wishlistItems: Product[];
-    addToWishlist: (product: Product) => void;
+    wishlistItems: ProductObject[];
+    addToWishlist: (product: ProductObject) => void;
     removeFromWishlist: (productId: string) => void;
     isInWishlist: (productId: string) => boolean;
     clearWishlist: () => void;
@@ -16,7 +16,7 @@ interface WishlistContextType {
 const WishlistContext = createContext<WishlistContextType | undefined>(undefined);
 
 export const WishlistProvider = ({ children }: { children: ReactNode }) => {
-    const [wishlistItems, setWishlistItems] = useState<Product[]>([]);
+    const [wishlistItems, setWishlistItems] = useState<ProductObject[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
     // Load wishlist from AsyncStorage on mount
@@ -38,7 +38,7 @@ export const WishlistProvider = ({ children }: { children: ReactNode }) => {
         }
     };
 
-    const saveWishlist = async (items: Product[]) => {
+    const saveWishlist = async (items: ProductObject[]) => {
         try {
             await AsyncStorage.setItem(WISHLIST_STORAGE_KEY, JSON.stringify(items));
             // API: POST /api/v1/wishlist - Sync with backend
@@ -47,9 +47,9 @@ export const WishlistProvider = ({ children }: { children: ReactNode }) => {
         }
     };
 
-    const addToWishlist = (product: Product) => {
+    const addToWishlist = (product: ProductObject) => {
         setWishlistItems(prev => {
-            if (prev.some(item => item.id === product.id)) {
+            if (prev.some(item => item.productId === product.productId)) {
                 return prev;
             }
             const newItems = [...prev, product];
@@ -60,14 +60,14 @@ export const WishlistProvider = ({ children }: { children: ReactNode }) => {
 
     const removeFromWishlist = (productId: string) => {
         setWishlistItems(prev => {
-            const newItems = prev.filter(item => item.id !== productId);
+            const newItems = prev.filter(item => item.productId !== productId);
             saveWishlist(newItems);
             return newItems;
         });
     };
 
     const isInWishlist = (productId: string) => {
-        return wishlistItems.some(item => item.id === productId);
+        return wishlistItems.some(item => item.productId === productId);
     };
 
     const clearWishlist = () => {

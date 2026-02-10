@@ -1,8 +1,9 @@
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import ActionModal from '../../components/common/ActionModal';
 import Input from '../../components/common/Input';
 import { useAddress } from '../../context/AddressContext';
 
@@ -14,15 +15,19 @@ export default function AddAddressScreen() {
 
     const [form, setForm] = useState({
         name: '',
-        addressLine: '',
+        phone: '',
+        addressLine1: '',
+        addressLine2: '',
         city: '',
         state: '',
         pincode: '',
         country: 'India',
         landmark: '',
-        phoneNumber: '',
-        type: 'Home' as 'Home' | 'Work' | 'Other'
+        label: 'Home' as 'Home' | 'Work' | 'Other'
     });
+
+    const [showSuccessModal, setShowSuccessModal] = useState(false);
+    const [successMessage, setSuccessMessage] = useState('');
 
     useEffect(() => {
         if (params.id) {
@@ -30,14 +35,15 @@ export default function AddAddressScreen() {
             if (existingAddress) {
                 setForm({
                     name: existingAddress.name,
-                    addressLine: existingAddress.addressLine,
+                    phone: existingAddress.phone,
+                    addressLine1: existingAddress.addressLine1 || existingAddress.address || '',
+                    addressLine2: existingAddress.addressLine2 || '',
                     city: existingAddress.city,
                     state: existingAddress.state,
                     pincode: existingAddress.pincode,
                     country: existingAddress.country,
                     landmark: existingAddress.landmark || '',
-                    phoneNumber: existingAddress.phoneNumber,
-                    type: existingAddress.type
+                    label: existingAddress.label
                 });
             }
         }
@@ -50,11 +56,11 @@ export default function AddAddressScreen() {
         let newErrors: Record<string, string> = {};
 
         if (!form.name) { newErrors.name = 'Name is required'; valid = false; }
-        if (!form.phoneNumber) { newErrors.phoneNumber = 'Phone number is required'; valid = false; }
-        else if (form.phoneNumber.length < 10) { newErrors.phoneNumber = 'Invalid phone number'; valid = false; }
+        if (!form.phone) { newErrors.phone = 'Phone number is required'; valid = false; }
+        else if (form.phone.length < 10) { newErrors.phone = 'Invalid phone number'; valid = false; }
 
         if (!form.pincode) { newErrors.pincode = 'Pincode is required'; valid = false; }
-        if (!form.addressLine) { newErrors.addressLine = 'Address is required'; valid = false; }
+        if (!form.addressLine1) { newErrors.addressLine1 = 'Address is required'; valid = false; }
         if (!form.city) { newErrors.city = 'City is required'; valid = false; }
         if (!form.state) { newErrors.state = 'State is required'; valid = false; }
 
@@ -64,22 +70,25 @@ export default function AddAddressScreen() {
 
     const handleSave = () => {
         if (validate()) {
+            // Construct the combined address field
+            const combinedAddress = form.addressLine2
+                ? `${form.addressLine1}, ${form.addressLine2}`
+                : form.addressLine1;
+
+            const addressData = {
+                ...form,
+                address: combinedAddress,
+                isDefault: false
+            };
+
             if (params.id) {
-                updateAddress(params.id as string, {
-                    ...form,
-                    isDefault: false // Keep existing default status or pass it if needed, simplistic for now
-                });
-                Alert.alert('Success', 'Address updated successfully!', [
-                    { text: 'OK', onPress: () => router.back() }
-                ]);
+                updateAddress(params.id as string, addressData);
+                setSuccessMessage('Address updated successfully!');
+                setShowSuccessModal(true);
             } else {
-                addAddress({
-                    ...form,
-                    isDefault: false // Default to false initially
-                });
-                Alert.alert('Success', 'Address added successfully!', [
-                    { text: 'OK', onPress: () => router.back() }
-                ]);
+                addAddress(addressData);
+                setSuccessMessage('Address added successfully!');
+                setShowSuccessModal(true);
             }
         }
     };
@@ -108,9 +117,9 @@ export default function AddAddressScreen() {
                     placeholder="Enter 10-digit number"
                     keyboardType="phone-pad"
                     maxLength={10}
-                    value={form.phoneNumber}
-                    onChangeText={t => setForm({ ...form, phoneNumber: t })}
-                    error={errors.phoneNumber}
+                    value={form.phone}
+                    onChangeText={t => setForm({ ...form, phone: t })}
+                    error={errors.phone}
                 />
 
                 <Text style={styles.sectionHeader}>Address Details</Text>
@@ -159,10 +168,18 @@ export default function AddAddressScreen() {
 
                 <Input
                     label="House No., Building Name"
-                    placeholder="Enter Address"
-                    value={form.addressLine}
-                    onChangeText={t => setForm({ ...form, addressLine: t })}
-                    error={errors.addressLine}
+                    placeholder="Enter Address Line 1"
+                    value={form.addressLine1}
+                    onChangeText={t => setForm({ ...form, addressLine1: t })}
+                    error={errors.addressLine1}
+                    multiline
+                />
+
+                <Input
+                    label="Road, Area, Colony (Optional)"
+                    placeholder="Enter Address Line 2"
+                    value={form.addressLine2}
+                    onChangeText={t => setForm({ ...form, addressLine2: t })}
                     multiline
                 />
 
@@ -180,18 +197,18 @@ export default function AddAddressScreen() {
                             key={type}
                             style={[
                                 styles.typeChip,
-                                form.type === type && styles.selectedTypeChip
+                                form.label === type && styles.selectedTypeChip
                             ]}
-                            onPress={() => setForm({ ...form, type: type as any })}
+                            onPress={() => setForm({ ...form, label: type as any })}
                         >
                             <Feather
                                 name={type === 'Home' ? 'home' : type === 'Work' ? 'briefcase' : 'map-pin'}
                                 size={16}
-                                color={form.type === type ? '#fff' : '#555'}
+                                color={form.label === type ? '#fff' : '#555'}
                             />
                             <Text style={[
                                 styles.typeText,
-                                form.type === type && styles.selectedTypeText
+                                form.label === type && styles.selectedTypeText
                             ]}>{type}</Text>
                         </TouchableOpacity>
                     ))}
@@ -204,6 +221,23 @@ export default function AddAddressScreen() {
                     <Text style={styles.saveBtnText}>Save Address</Text>
                 </TouchableOpacity>
             </View>
+
+            {/* Success Modal */}
+            <ActionModal
+                visible={showSuccessModal}
+                title="Success"
+                message={successMessage}
+                icon="check-circle"
+                primaryButtonText="OK"
+                onPrimaryPress={() => {
+                    setShowSuccessModal(false);
+                    router.back();
+                }}
+                onClose={() => {
+                    setShowSuccessModal(false);
+                    router.back();
+                }}
+            />
         </SafeAreaView>
     );
 }

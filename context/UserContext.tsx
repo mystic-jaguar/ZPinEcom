@@ -1,77 +1,80 @@
 import React, { createContext, ReactNode, useContext, useState } from 'react';
-
-export interface User {
-    _id: string;
-    userId: string;
-    name: string;
-    email: string;
-    dob: string;
-    address: string;
-    city: string;
-    state: string;
-    pincode: string;
-    coordinates: {
-        type: 'Point';
-        coordinates: [number, number];
-    };
-    gender: string;
-    profileImage: any; // Using 'any' to support both require() and URI strings for now
-    createdAt: string;
-    isPro: boolean;
-    phoneNumber: string;
-    preferences: {
-        receivePushNotifications: boolean;
-        twoFactorAuth: boolean;
-    };
-}
+import { CompleteUserProfile, UserDetailsObject, UserObject } from '../types/types';
 
 interface UserContextType {
-    user: User;
-    updateUser: (updates: Partial<User>) => void;
+    user: UserObject;
+    userDetails?: UserDetailsObject;
+    updateUser: (updates: Partial<UserObject>) => void;
+    updateUserDetails: (details: UserDetailsObject) => void;
+    setCompleteProfile: (profile: CompleteUserProfile) => void;
     resetUser: () => void;
+    isAuthenticated: boolean;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
-// Mock Initial Data
-const INITIAL_USER: User = {
-    _id: "",
-    userId: "",
+// Initial Empty User with extended fields for app functionality
+const INITIAL_USER: any = {
+    id: '',
     name: '',
     email: '',
-    dob: "",
-    address: "",
-    city: "",
-    state: "",
-    pincode: "",
-    coordinates: {
-        type: "Point",
-        coordinates: [0, 0]
-    },
-    gender: "",
-    profileImage: require('../assets/images/profile_icon.jpg'), // Keeping default asset as placeholder
-    createdAt: new Date().toISOString(),
-    isPro: false,
+    mobile: '',
+    userName: '',
+    userRole: 'customer',
+    isVerified: false,
+    profileImage: require('../assets/images/profile_icon.jpg'),
+    timeStamp: new Date().toISOString(),
+    // Extended fields for app functionality
+    dob: '',
+    gender: '',
     phoneNumber: '',
+    address: '',
+    city: '',
+    state: '',
+    pincode: '',
     preferences: {
-        receivePushNotifications: false,
-        twoFactorAuth: false
+        receivePushNotifications: true,
+        receiveEmailUpdates: false,
+        receiveOrderUpdates: true
     }
 };
 
 export const UserProvider = ({ children }: { children: ReactNode }) => {
-    const [user, setUser] = useState<User>(INITIAL_USER);
+    const [user, setUser] = useState<UserObject>(INITIAL_USER);
+    const [userDetails, setUserDetails] = useState<UserDetailsObject | undefined>(undefined);
 
-    const updateUser = (updates: Partial<User>) => {
+    const updateUser = (updates: Partial<UserObject>) => {
         setUser(prev => ({ ...prev, ...updates }));
+    };
+
+    const updateUserDetails = (details: UserDetailsObject) => {
+        setUserDetails(details);
+    };
+
+    const setCompleteProfile = (profile: CompleteUserProfile) => {
+        setUser(profile.user);
+        if (profile.details) {
+            setUserDetails(profile.details);
+        }
     };
 
     const resetUser = () => {
         setUser(INITIAL_USER);
+        setUserDetails(undefined);
     };
 
+    const isAuthenticated = user.id !== '';
+
     return (
-        <UserContext.Provider value={{ user, updateUser, resetUser }}>
+        <UserContext.Provider value={{
+            user,
+            userDetails,
+            updateUser,
+            updateUserDetails,
+            setCompleteProfile,
+            resetUser,
+            isAuthenticated
+        }}>
             {children}
         </UserContext.Provider>
     );

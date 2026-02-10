@@ -20,7 +20,7 @@ export default function ProductDetails() {
     const [showVariantWarningModal, setShowVariantWarningModal] = useState(false);
 
     // Find product or fallback to first one for demo
-    const product = PRODUCTS.find(p => p.id === id) || PRODUCTS[0];
+    const product = PRODUCTS.find(p => p.productId === id) || PRODUCTS[0];
 
     // State for selectors
     const [selectedColor, setSelectedColor] = useState(product.colors?.[0] || '');
@@ -47,13 +47,13 @@ export default function ProductDetails() {
                 {/* Images Carousel */}
                 <View style={{ position: 'relative' }}>
                     <ProductImageCarousel
-                        images={product.images || [product.image]}
+                        images={product.images || [product.images?.[0]]}
                         isLightningFast={product.isLightningFast}
                         onBack={() => router.back()}
-                        isWishlisted={isInWishlist(product.id)}
+                        isWishlisted={isInWishlist(product.productId)}
                         onToggleWishlist={() => {
-                            if (isInWishlist(product.id)) {
-                                removeFromWishlist(product.id);
+                            if (isInWishlist(product.productId)) {
+                                removeFromWishlist(product.productId);
                             } else {
                                 addToWishlist(product);
                             }
@@ -64,7 +64,7 @@ export default function ProductDetails() {
                 {/* Main Info */}
                 <View style={styles.mainInfo}>
                     <View style={styles.titleRow}>
-                        <Text style={styles.productName}>{product.name}</Text>
+                        <Text style={styles.productName}>{product.productName}</Text>
                         <View style={styles.ratingBadge}>
                             <Text style={styles.ratingText}>{product.rating}</Text>
                             <Ionicons name="star" size={10} color="#fff" />
@@ -104,17 +104,17 @@ export default function ProductDetails() {
                         <TouchableOpacity
                             style={styles.wishlistBtn}
                             onPress={() => {
-                                if (isInWishlist(product.id)) {
-                                    removeFromWishlist(product.id);
+                                if (isInWishlist(product.productId)) {
+                                    removeFromWishlist(product.productId);
                                 } else {
                                     addToWishlist(product);
                                 }
                             }}
                         >
                             <Feather
-                                name={isInWishlist(product.id) ? "heart" : "heart"}
+                                name={isInWishlist(product.productId) ? "heart" : "heart"}
                                 size={20}
-                                color={isInWishlist(product.id) ? "#F59E0B" : "#1a1a1a"}
+                                color={isInWishlist(product.productId) ? "#F59E0B" : "#1a1a1a"}
                                 style={{ marginRight: 8 }}
                             />
                             <Text style={styles.wishlistText}>Wishlist</Text>
@@ -209,7 +209,7 @@ export default function ProductDetails() {
                                     {/* Use generic placeholder logic if image requires loop */}
                                     <Text style={{ fontSize: 10, color: '#aaa' }}>Img</Text>
                                 </View>
-                                <Text style={styles.recTitle} numberOfLines={1}>{p.name}</Text>
+                                <Text style={styles.recTitle} numberOfLines={1}>{p.productName}</Text>
                                 <Text style={styles.recPrice}>₹{p.price}</Text>
                             </View>
                         ))}
@@ -222,7 +222,7 @@ export default function ProductDetails() {
             <ActionModal
                 visible={showSuccessModal}
                 title="Added to Cart!"
-                message={`Successfully added ${product.name} to your cart.`}
+                message={`Successfully added ${product.productName} to your cart.`}
                 primaryButtonText="Go to Cart"
                 onPrimaryPress={() => {
                     setShowSuccessModal(false);

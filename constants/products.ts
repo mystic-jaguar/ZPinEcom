@@ -1,26 +1,56 @@
+// Import ProductObject from centralized types
+import { ProductObject } from '../types/types';
 
-export interface Product {
+// Export ProductObject as the main Product type
+export type Product = ProductObject;
+
+// Helper function to create mock product with required fields
+const createMockProduct = (data: Partial<ProductObject> & {
     id: string;
     name: string;
     price: number;
-    originalPrice?: number;
-    rating: number;
     image: any;
-    images?: any[]; // Array of images for carousel
-    category: string; // Top Level (Fashion, Accessories, etc.)
-    subCategory: string; // Leaf Level (Round Neck, Backpacks, etc.)
+    category: string;
+    subCategory: string;
     description: string;
-    discount: number;
-    subtitle?: string; // e.g. "Premium Cotton"
-    colors?: string[]; // hex codes
-    sizes?: string[]; // e.g. ["S", "M", "L"]
-    details?: string; // Long description
-    isLightningFast?: boolean;
-}
+}): ProductObject => {
+    return {
+        productId: data.id,
+        userId: 'seller-123',
+        productName: data.name,
+        description: data.description,
+        categoryId: `cat-${data.category.toLowerCase()}`,
+        deepestCategoryName: data.subCategory,
+        categoryPath: `${data.category.toLowerCase()}-${data.subCategory.toLowerCase().replace(/\s+/g, '-')}`,
+        price: data.price,
+        quantity: 100,
+        inStock: true,
+        images: Array.isArray(data.image) ? data.image.map(img => typeof img === 'string' ? img : (img.uri || 'https://via.placeholder.com/400')) : [typeof data.image === 'object' && data.image.uri ? data.image.uri : 'https://via.placeholder.com/400'],
+        sellerLocation: {
+            city: 'Mumbai',
+            state: 'Maharashtra',
+            pincode: '400001',
+            coordinates: {
+                type: 'Point',
+                coordinates: [72.8777, 19.0760]
+            }
+        },
+        distance: undefined,
+        timeStamp: new Date().toISOString(),
+        originalPrice: data.originalPrice,
+        rating: data.rating || 4.5,
+        discount: data.discount || 0,
+        subtitle: data.subtitle,
+        colors: data.colors,
+        sizes: data.sizes,
+        details: data.details || data.description,
+        isLightningFast: data.isLightningFast
+    };
+};
 
 export const PRODUCTS: Product[] = [
     // --- FASHION: MEN ---
-    {
+    createMockProduct({
         id: '101',
         name: 'Classic White Round Neck',
         price: 499,
@@ -32,8 +62,8 @@ export const PRODUCTS: Product[] = [
         description: 'Essential white round neck t-shirt made from 100% cotton.',
         discount: 50,
         sizes: ['S', 'M', 'L', 'XL']
-    },
-    {
+    }),
+    createMockProduct({
         id: '102',
         name: 'Black Polo T-Shirt',
         price: 799,
@@ -45,382 +75,240 @@ export const PRODUCTS: Product[] = [
         description: 'Classic fit polo t-shirt with ribbed collar.',
         discount: 50,
         sizes: ['M', 'L', 'XL']
-    },
-    {
+    }),
+    createMockProduct({
         id: '103',
-        name: 'Oversized Graphic Tee',
-        price: 899,
-        originalPrice: 1299,
-        rating: 4.7,
-        image: { uri: 'https://images.unsplash.com/photo-1576566588028-4147f3842f27?auto=format&fit=crop&q=80&w=800' },
-        category: 'Fashion',
-        subCategory: 'Oversized',
-        description: 'Streetwear style oversized t-shirt with cool graphic print.',
-        discount: 30,
-        sizes: ['S', 'M', 'L']
-    },
-    {
-        id: '104',
-        name: 'Slim Fit Blue Jeans',
+        name: 'Navy Blue Sweatshirt',
         price: 1299,
         originalPrice: 2599,
-        rating: 4.4,
-        image: { uri: 'https://images.unsplash.com/photo-1542272454315-4c01d7abdf4a?auto=format&fit=crop&q=80&w=800' },
+        rating: 4.7,
+        image: { uri: 'https://images.unsplash.com/photo-1556821840-3a63f95609a7?auto=format&fit=crop&q=80&w=800' },
         category: 'Fashion',
-        subCategory: 'Slim Fit', // Jeans -> Slim Fit
-        description: 'Stretchable slim fit denim jeans.',
-        discount: 50,
-        sizes: ['30', '32', '34', '36']
-    },
-    {
-        id: '105',
-        name: 'Casual Checkered Shirt',
-        price: 999,
-        originalPrice: 1999,
-        rating: 4.3,
-        image: { uri: 'https://images.unsplash.com/photo-1596755094514-f87e34085b2c?auto=format&fit=crop&q=80&w=800' },
-        category: 'Fashion',
-        subCategory: 'Checkered',
-        description: 'Stylish checkered shirt for casual outings.',
+        subCategory: 'Sweatshirt',
+        description: 'Comfortable navy sweatshirt with fleece lining.',
         discount: 50,
         sizes: ['M', 'L', 'XL']
-    },
-
-    // --- FASHION: WOMEN ---
-    {
-        id: '201',
-        name: 'Floral Summer Dress',
+    }),
+    createMockProduct({
+        id: '104',
+        name: 'Premium Grey Hoodie',
         price: 1499,
         originalPrice: 2999,
         rating: 4.8,
-        image: { uri: 'https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?auto=format&fit=crop&q=80&w=800' },
+        image: { uri: 'https://images.unsplash.com/photo-1556821840-3a63f95609a7?auto=format&fit=crop&q=80&w=800' },
         category: 'Fashion',
-        subCategory: 'Dresses',
-        description: 'Breezy floral dress perfect for summer days.',
-        discount: 50,
-        sizes: ['XS', 'S', 'M', 'L']
-    },
-    {
-        id: '202',
-        name: 'Classic Blue Denim Jeans',
-        price: 1199,
-        originalPrice: 2399,
-        rating: 4.5,
-        image: { uri: 'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?auto=format&fit=crop&q=80&w=800' },
-        category: 'Fashion',
-        subCategory: 'Jeans & Bottoms',
-        description: 'High-waist classic blue denim.',
-        discount: 50,
-        sizes: ['26', '28', '30', '32']
-    },
-    {
-        id: '203',
-        name: 'Elegant Kurta Set',
-        price: 1899,
-        originalPrice: 3799,
-        rating: 4.7,
-        image: { uri: 'https://images.unsplash.com/photo-1583391733956-6c78276477e2?auto=format&fit=crop&q=80&w=800' },
-        category: 'Fashion',
-        subCategory: 'Kurta Sets',
-        description: 'Embroidered kurta set with dupatta.',
+        subCategory: 'Hoodie',
+        description: 'Soft grey hoodie with adjustable drawstring.',
         discount: 50,
         sizes: ['S', 'M', 'L', 'XL']
-    },
-
-    // --- ACCESSORIES (Using Filtered Assets) ---
-    {
-        id: '301',
-        name: 'Leather Handbag',
-        price: 1599,
-        originalPrice: 3199,
+    }),
+    createMockProduct({
+        id: '105',
+        name: 'Slim Fit Denim Jeans',
+        price: 1999,
+        originalPrice: 3999,
         rating: 4.6,
-        image: require('../assets/images/handbags.jpg'),
-        category: 'Accessories',
-        subCategory: 'Handbags',
-        description: 'Premium leather handbag with spacious compartments.',
-        discount: 50
-    },
-    {
-        id: '302',
-        name: 'Travel Backpack',
-        price: 1299,
-        originalPrice: 2599,
-        rating: 4.5,
+        image: { uri: 'https://images.unsplash.com/photo-1542272604-787c3835535d?auto=format&fit=crop&q=80&w=800' },
+        category: 'Fashion',
+        subCategory: 'Jeans',
+        description: 'Classic blue denim with slim fit cut.',
+        discount: 50,
+        sizes: ['30', '32', '34', '36']
+    }),
+
+    // --- ACCESSORIES ---
+    createMockProduct({
+        id: '2',
+        name: 'School Backpack',
+        price: 899,
+        originalPrice: 1499,
+        rating: 4.4,
         image: require('../assets/images/backpacks.jpg'),
         category: 'Accessories',
         subCategory: 'Backpacks',
-        description: 'Durable backpack with laptop sleeve.',
-        discount: 50
-    },
-    {
-        id: '303',
-        name: 'Classic Analog Watch',
-        price: 1999,
-        originalPrice: 3999,
-        rating: 4.7,
-        image: require('../assets/images/analog.jpg'),
-        category: 'Accessories',
-        subCategory: 'Analog',
-        description: 'Timeless analog watch for everyday elegance.',
-        discount: 50
-    },
-    {
-        id: '304',
-        name: 'Digital Sports Watch',
-        price: 899,
-        originalPrice: 1499,
-        rating: 4.3,
-        image: require('../assets/images/digital.jpg'),
-        category: 'Accessories',
-        subCategory: 'Digital',
-        description: 'Rugged digital watch with water resistance.',
+        description: 'Durable school backpack with multiple compartments.',
         discount: 40
-    },
-    {
-        id: '305',
-        name: 'Smart Watch Series 5',
-        price: 2499,
-        originalPrice: 4999,
-        rating: 4.6,
-        image: require('../assets/images/smartwatches.jpg'),
-        category: 'Accessories', // Or Gadgets > Smart Devices > Smart Watches. Kept flexible.
-        subCategory: 'Smart Watches',
-        description: 'Track fitness, calls and more.',
-        discount: 50
-    },
-    {
-        id: '306',
+    }),
+    createMockProduct({
+        id: '201',
+        name: 'Leather Wallet',
+        price: 699,
+        originalPrice: 1299,
+        rating: 4.5,
+        image: require('../assets/images/wallets.jpg'),
+        category: 'Accessories',
+        subCategory: 'Wallets',
+        description: 'Premium leather wallet with card slots.',
+        discount: 46
+    }),
+    createMockProduct({
+        id: '202',
         name: 'Aviator Sunglasses',
-        price: 999,
-        originalPrice: 1999,
-        rating: 4.4,
+        price: 1299,
+        originalPrice: 2599,
+        rating: 4.6,
         image: require('../assets/images/sunglasses.jpg'),
         category: 'Accessories',
         subCategory: 'Sunglasses',
-        description: 'Classic aviator style with UV protection.',
+        description: 'Classic aviator sunglasses with UV protection.',
         discount: 50
-    },
-    {
-        id: '307',
-        name: 'Anti-Glare Glasses',
-        price: 699,
-        originalPrice: 1299,
-        rating: 4.2,
-        image: require('../assets/images/bluelightglasses.jpg'),
+    }),
+    createMockProduct({
+        id: '203',
+        name: 'Analog Wristwatch',
+        price: 2499,
+        originalPrice: 4999,
+        rating: 4.7,
+        image: require('../assets/images/smartwatches.jpg'),
         category: 'Accessories',
-        subCategory: 'Blue Light Glasses',
-        description: 'Protect your eyes from digital strain.',
-        discount: 46
-    },
-    {
-        id: '308',
-        name: 'Gold Plated Bangles',
-        price: 499,
-        originalPrice: 999,
-        rating: 4.5,
-        image: require('../assets/images/bangles.jpg'),
-        category: 'Accessories',
-        subCategory: 'Bangles & Bracelets',
-        description: 'Traditional gold plated bangles.',
+        subCategory: 'Watches',
+        description: 'Elegant analog watch with leather strap.',
         discount: 50
-    },
-    {
-        id: '309',
-        name: 'Crystal Earrings',
-        price: 299,
-        originalPrice: 599,
-        rating: 4.3,
-        image: require('../assets/images/earrings.jpg'),
-        category: 'Accessories',
-        subCategory: 'Earrings',
-        description: 'Elegant crystal stud earrings.',
-        discount: 50
-    },
-    {
-        id: '310',
+    }),
+    createMockProduct({
+        id: '204',
         name: 'Leather Belt',
-        price: 799,
-        originalPrice: 1599,
-        rating: 4.5,
+        price: 599,
+        originalPrice: 1199,
+        rating: 4.4,
         image: require('../assets/images/belts.jpg'),
         category: 'Accessories',
         subCategory: 'Belts',
-        description: 'Genuine leather belt for men.',
+        description: 'Genuine leather belt with metal buckle.',
         discount: 50
-    },
-
-    // --- BEAUTY (Using Assets) ---
-    {
-        id: '401',
-        name: 'Hydrating Face Wash',
-        price: 249,
-        originalPrice: 499,
-        rating: 4.4,
-        image: require('../assets/images/facewash.jpg'),
-        category: 'Beauty',
-        subCategory: 'Face Wash & Cleanser',
-        description: 'Deep cleansing face wash suitable for all skin types.',
-        discount: 50
-    },
-    {
-        id: '402',
-        name: 'Daily Moisturizer',
+    }),
+    createMockProduct({
+        id: '205',
+        name: 'Cotton Scarf',
         price: 399,
-        originalPrice: 699,
+        originalPrice: 799,
+        rating: 4.3,
+        image: require('../assets/images/scarves.jpg'),
+        category: 'Accessories',
+        subCategory: 'Scarves',
+        description: 'Soft cotton scarf in various colors.',
+        discount: 50
+    }),
+    createMockProduct({
+        id: '206',
+        name: 'Leather Gloves',
+        price: 799,
+        originalPrice: 1599,
         rating: 4.5,
-        image: require('../assets/images/moisturizers.jpg'),
-        category: 'Beauty',
-        subCategory: 'Moisturizers & Creams',
-        description: 'Lightweight moisturizer for 24h hydration.',
-        discount: 43
-    },
-    {
-        id: '403',
-        name: 'Matte Lipstick Red',
+        image: { uri: 'https://images.unsplash.com/photo-1584210689716-c94788f41bc2?auto=format&fit=crop&q=80&w=800' },
+        category: 'Accessories',
+        subCategory: 'Gloves',
+        description: 'Warm leather gloves for winter.',
+        discount: 50
+    }),
+    createMockProduct({
+        id: '207',
+        name: 'Baseball Cap',
         price: 499,
         originalPrice: 999,
-        rating: 4.7,
-        image: require('../assets/images/lipmakeup.jpg'),
-        category: 'Beauty',
-        subCategory: 'Lip Makeup',
-        description: 'Long stay matte lipstick in bold red.',
-        discount: 50
-    },
-    {
-        id: '404',
-        name: 'Eye Shadow Palette',
-        price: 899,
-        originalPrice: 1299,
-        rating: 4.3,
-        image: require('../assets/images/eyemakeup.jpg'),
-        category: 'Beauty',
-        subCategory: 'Eye Makeup',
-        description: '12-shade eyeshadow palette.',
-        discount: 30
-    },
-    {
-        id: '405',
-        name: 'Nourishing Shampoo',
-        price: 349,
-        originalPrice: 699,
         rating: 4.4,
-        image: require('../assets/images/shampoo.jpg'),
-        category: 'Beauty',
-        subCategory: 'Shampoo & Conditioner',
-        description: 'Strengthening shampoo for smooth hair.',
+        image: require('../assets/images/caps.jpg'),
+        category: 'Accessories',
+        subCategory: 'Caps',
+        description: 'Adjustable baseball cap with embroidered logo.',
         discount: 50
-    },
-    {
-        id: '406',
-        name: 'Hair Growth Oil',
-        price: 299,
-        originalPrice: 599,
+    }),
+    createMockProduct({
+        id: '208',
+        name: 'Silk Tie',
+        price: 599,
+        originalPrice: 1199,
         rating: 4.6,
-        image: require('../assets/images/hairoil.jpg'),
-        category: 'Beauty',
-        subCategory: 'Hair Oil & Serum',
-        description: 'Herbal oil for hair regrowth.',
+        image: { uri: 'https://images.unsplash.com/photo-1599663253687-fdceaa1eee48?auto=format&fit=crop&q=80&w=800' },
+        category: 'Accessories',
+        subCategory: 'Ties',
+        description: 'Premium silk tie for formal occasions.',
         discount: 50
-    },
-    {
-        id: '407',
-        name: 'Styling Gel',
-        price: 199,
-        originalPrice: 399,
-        rating: 4.2,
-        image: require('../assets/images/stylingproducts.jpg'),
-        category: 'Beauty',
-        subCategory: 'Styling Products',
-        description: 'Strong hold hair styling gel.',
-        discount: 50
-    },
-    {
-        id: '408',
-        name: 'Luxury Perfume',
-        price: 1499,
-        originalPrice: 2999,
-        rating: 4.8,
-        image: require('../assets/images/perfumes.jpg'),
-        category: 'Beauty',
-        subCategory: 'Perfumes',
-        description: 'Premium fragrance with long-lasting scent.',
-        discount: 50
-    },
-    {
-        id: '409',
-        name: 'Beard Trimmer',
-        price: 1299,
-        originalPrice: 2499,
-        rating: 4.5,
-        image: require('../assets/images/trimmers.jpg'),
-        category: 'Beauty', // Mapped to Beauty > Grooming in categories.ts
-        subCategory: 'Trimmers & Shavers', // Leaf name match
-        description: 'Cordless beard trimmer.',
-        discount: 48
-    },
-
-    // --- GADGETS (Partial web / assets) ---
-    {
-        id: '501',
-        name: 'Wireless Earbuds',
-        price: 1999,
-        originalPrice: 4999,
-        rating: 4.3,
-        image: { uri: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?auto=format&fit=crop&q=80&w=800' },
-        category: 'Gadgets',
-        subCategory: 'Audio Devices', // Needs to match leaf... Wait, Audio Devices is Section. Leaves are Earphones, Headphones.
-        description: 'TWS Earbuds with noise cancellation.',
-        discount: 60
-    },
-    // Correction: Valid Leaves for Gadgets -> Audio Devices: 'Earphones', 'Headphones', 'Bluetooth Speakers'
-    {
-        id: '502',
-        name: 'Wireless Earbuds Pro',
-        price: 2199,
-        originalPrice: 4500,
-        rating: 4.5,
-        image: { uri: 'https://images.unsplash.com/photo-1606220588913-b3aacb4d2f46?auto=format&fit=crop&q=80&w=800' },
-        category: 'Gadgets',
-        subCategory: 'Earphones',
-        description: 'Pro grade wireless earphones.',
-        discount: 51
-    },
-    {
-        id: '503',
-        name: 'Over-Ear Headphones',
-        price: 2999,
-        originalPrice: 5999,
-        rating: 4.7,
-        image: { uri: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&q=80&w=800' },
-        category: 'Gadgets',
-        subCategory: 'Headphones',
-        description: 'Comfortable over-ear headphones with deep bass.',
-        discount: 50
-    },
-
-    // --- HOME & LIVING ---
-    {
-        id: '601',
-        name: 'Ceramic Dinner Set',
+    }),
+    createMockProduct({
+        id: '209',
+        name: 'Leather Messenger Bag',
         price: 2499,
         originalPrice: 4999,
-        rating: 4.6,
-        image: { uri: 'https://images.unsplash.com/photo-1623959679886-bf4047a21fb6?auto=format&fit=crop&q=80&w=800' },
-        category: 'Home & Living',
-        subCategory: 'Dinner Sets',
-        description: 'Elegant 16-piece ceramic dinner set.',
+        rating: 4.7,
+        image: { uri: 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&q=80&w=800' },
+        category: 'Accessories',
+        subCategory: 'Bags',
+        description: 'Stylish messenger bag with laptop compartment.',
         discount: 50
-    },
-    {
-        id: '602',
-        name: 'Cotton Bedsheet',
+    }),
+
+    // --- HOME & BEAUTY ---
+    createMockProduct({
+        id: '7',
+        name: 'Hydrating Face Wash',
+        price: 299,
+        originalPrice: 499,
+        rating: 4.5,
+        image: require('../assets/images/facewash.jpg'),
+        category: 'Beauty',
+        subCategory: 'Face Wash',
+        description: 'Gentle hydrating face wash for daily use.',
+        discount: 40
+    }),
+    createMockProduct({
+        id: '301',
+        name: 'Anti-Aging Serum',
+        price: 1499,
+        originalPrice: 2999,
+        rating: 4.7,
+        image: { uri: 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?auto=format&fit=crop&q=80&w=800' },
+        category: 'Beauty',
+        subCategory: 'Serums',
+        description: 'Advanced anti-aging serum with vitamin C.',
+        discount: 50
+    }),
+    createMockProduct({
+        id: '302',
+        name: 'Moisturizing Cream',
+        price: 699,
+        originalPrice: 1399,
+        rating: 4.6,
+        image: require('../assets/images/moisturizers.jpg'),
+        category: 'Beauty',
+        subCategory: 'Moisturizers',
+        description: 'Rich moisturizing cream for all skin types.',
+        discount: 50
+    }),
+    createMockProduct({
+        id: '303',
+        name: 'Sunscreen SPF 50',
+        price: 599,
+        originalPrice: 1199,
+        rating: 4.5,
+        image: { uri: 'https://images.unsplash.com/photo-1556228994-a37afe7ff2e8?auto=format&fit=crop&q=80&w=800' },
+        category: 'Beauty',
+        subCategory: 'Sunscreen',
+        description: 'Broad spectrum sunscreen with SPF 50.',
+        discount: 50
+    }),
+    createMockProduct({
+        id: '401',
+        name: 'Scented Candle Set',
         price: 899,
         originalPrice: 1799,
-        rating: 4.4,
-        image: { uri: 'https://images.unsplash.com/photo-1522771753003-24b4d576ef99?auto=format&fit=crop&q=80&w=800' },
-        category: 'Home & Living',
-        subCategory: 'Bedsheets',
-        description: 'Soft double bedsheet with pillow covers.',
+        rating: 4.6,
+        image: { uri: 'https://images.unsplash.com/photo-1602874801006-95415c67b6a6?auto=format&fit=crop&q=80&w=800' },
+        category: 'Home',
+        subCategory: 'Candles',
+        description: 'Set of 3 aromatic scented candles.',
         discount: 50
-    }
+    }),
+    createMockProduct({
+        id: '402',
+        name: 'Cotton Bed Sheets',
+        price: 1999,
+        originalPrice: 3999,
+        rating: 4.7,
+        image: { uri: 'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?auto=format&fit=crop&q=80&w=800' },
+        category: 'Home',
+        subCategory: 'Bedding',
+        description: 'Soft cotton bed sheet set with pillowcases.',
+        discount: 50
+    }),
 ];

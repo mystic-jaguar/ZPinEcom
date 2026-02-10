@@ -1,7 +1,7 @@
 import React from 'react';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-export type OrderStatus = 'Processing' | 'Delivered' | 'Cancelled' | 'Shipped';
+export type OrderStatus = 'Processing' | 'Delivered' | 'Cancelled' | 'Shipped' | 'In Progress';
 
 export interface Order {
     id: string;
@@ -28,6 +28,8 @@ export default function OrderCard({ order, onPress, onTrack, onBuyAgain }: Order
         switch (status) {
             case 'Processing':
                 return { bg: '#FFFCF2', text: '#FBBF24', border: '#FFFBE6' };
+            case 'In Progress':
+                return { bg: '#EFF6FF', text: '#3B82F6', border: '#DBEAFE' };
             case 'Delivered':
                 return { bg: '#F0FDF4', text: '#22C55E', border: '#DCFCE7' };
             case 'Cancelled':
@@ -67,7 +69,7 @@ export default function OrderCard({ order, onPress, onTrack, onBuyAgain }: Order
                     <Text style={styles.outlineButtonText}>View Details</Text>
                 </TouchableOpacity>
 
-                {order.status === 'Processing' || order.status === 'Shipped' ? (
+                {order.status === 'Processing' || order.status === 'Shipped' || order.status === 'In Progress' ? (
                     <TouchableOpacity style={styles.primaryButton} onPress={onTrack}>
                         <Text style={styles.primaryButtonText}>Track Order</Text>
                     </TouchableOpacity>

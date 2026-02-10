@@ -3,7 +3,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-    Alert,
     Image,
     KeyboardAvoidingView,
     Platform,
@@ -15,6 +14,7 @@ import {
     View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import ActionModal from '../../components/common/ActionModal';
 
 export default function LoginScreen() {
     const router = useRouter();
@@ -22,18 +22,23 @@ export default function LoginScreen() {
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [showErrorModal, setShowErrorModal] = useState(false);
+    const [errorMessage, setErrorMessage] = useState('');
 
     const validateInputs = () => {
         if (!email.trim()) {
-            Alert.alert('Error', 'Please enter your email or username');
+            setErrorMessage('Please enter your email or username');
+            setShowErrorModal(true);
             return false;
         }
         if (!password.trim()) {
-            Alert.alert('Error', 'Please enter your password');
+            setErrorMessage('Please enter your password');
+            setShowErrorModal(true);
             return false;
         }
         if (password.length < 6) {
-            Alert.alert('Error', 'Password must be at least 6 characters');
+            setErrorMessage('Password must be at least 6 characters');
+            setShowErrorModal(true);
             return false;
         }
         return true;
@@ -53,7 +58,8 @@ export default function LoginScreen() {
             // For now, just navigate to home
             router.replace('/(tabs)');
         } catch (error) {
-            Alert.alert('Login Failed', 'Invalid email or password');
+            setErrorMessage('Invalid email or password');
+            setShowErrorModal(true);
         } finally {
             setLoading(false);
         }
@@ -167,6 +173,17 @@ export default function LoginScreen() {
                     </View>
                 </ScrollView>
             </KeyboardAvoidingView>
+
+            {/* Error Modal */}
+            <ActionModal
+                visible={showErrorModal}
+                title="Error"
+                message={errorMessage}
+                icon="x-circle"
+                primaryButtonText="OK"
+                onPrimaryPress={() => setShowErrorModal(false)}
+                onClose={() => setShowErrorModal(false)}
+            />
         </SafeAreaView>
     );
 }

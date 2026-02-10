@@ -3,7 +3,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-    Alert,
     Image,
     KeyboardAvoidingView,
     Platform,
@@ -15,6 +14,7 @@ import {
     View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import ActionModal from '../../components/common/ActionModal';
 
 export default function SignupScreen() {
     const router = useRouter();
@@ -27,43 +27,54 @@ export default function SignupScreen() {
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [agreedToTerms, setAgreedToTerms] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [showErrorModal, setShowErrorModal] = useState(false);
+    const [errorMessage, setErrorMessage] = useState('');
 
     const validateInputs = () => {
         if (!name.trim()) {
-            Alert.alert('Error', 'Please enter your name');
+            setErrorMessage('Please enter your name');
+            setShowErrorModal(true);
             return false;
         }
         if (!email.trim()) {
-            Alert.alert('Error', 'Please enter your email');
+            setErrorMessage('Please enter your email');
+            setShowErrorModal(true);
             return false;
         }
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(email)) {
-            Alert.alert('Error', 'Please enter a valid email address');
+            setErrorMessage('Please enter a valid email address');
+            setShowErrorModal(true);
             return false;
         }
         if (!mobile.trim()) {
-            Alert.alert('Error', 'Please enter your mobile number');
+            setErrorMessage('Please enter your mobile number');
+            setShowErrorModal(true);
             return false;
         }
         if (!/^\d{10}$/.test(mobile)) {
-            Alert.alert('Error', 'Please enter a valid 10-digit mobile number');
+            setErrorMessage('Please enter a valid 10-digit mobile number');
+            setShowErrorModal(true);
             return false;
         }
         if (!password.trim()) {
-            Alert.alert('Error', 'Please enter a password');
+            setErrorMessage('Please enter a password');
+            setShowErrorModal(true);
             return false;
         }
         if (password.length < 6) {
-            Alert.alert('Error', 'Password must be at least 6 characters');
+            setErrorMessage('Password must be at least 6 characters');
+            setShowErrorModal(true);
             return false;
         }
         if (password !== confirmPassword) {
-            Alert.alert('Error', 'Passwords do not match');
+            setErrorMessage('Passwords do not match');
+            setShowErrorModal(true);
             return false;
         }
         if (!agreedToTerms) {
-            Alert.alert('Error', 'Please agree to the Terms and Conditions');
+            setErrorMessage('Please agree to the Terms and Conditions');
+            setShowErrorModal(true);
             return false;
         }
         return true;
@@ -83,7 +94,8 @@ export default function SignupScreen() {
             // Navigate to OTP verification
             router.push({ pathname: '/auth/verify-otp', params: { mobile } });
         } catch (error) {
-            Alert.alert('Signup Failed', 'An error occurred. Please try again.');
+            setErrorMessage('An error occurred. Please try again.');
+            setShowErrorModal(true);
         } finally {
             setLoading(false);
         }
@@ -265,6 +277,17 @@ export default function SignupScreen() {
                     </View>
                 </ScrollView>
             </KeyboardAvoidingView>
+
+            {/* Error Modal */}
+            <ActionModal
+                visible={showErrorModal}
+                title="Error"
+                message={errorMessage}
+                icon="x-circle"
+                primaryButtonText="OK"
+                onPrimaryPress={() => setShowErrorModal(false)}
+                onClose={() => setShowErrorModal(false)}
+            />
         </SafeAreaView>
     );
 }

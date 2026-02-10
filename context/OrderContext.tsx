@@ -1,110 +1,85 @@
 import React, { createContext, ReactNode, useContext, useState } from 'react';
-import { Address } from './AddressContext';
-
-export interface OrderItem {
-    id: string; // Product ID
-    name: string;
-    image: any;
-    price: number;
-    quantity: number;
-    variant?: string;
-    cartId?: string;
-}
-
-export interface Order {
-    id: string;
-    orderNumber: string;
-    date: string;
-    status: 'Processing' | 'Shipped' | 'Delivered' | 'Cancelled' | 'Unpacked';
-    items: OrderItem[];
-    total: number;
-    address: Address;
-    paymentMethod: string;
-    estimatedDelivery: string;
-    deliveryFee: number;
-    taxes: number;
-    subtotal: number;
-    savings: number;
-    isInstant: boolean;
-}
+import { AddressObject, OrderObject } from '../types/types';
 
 interface OrderContextType {
-    orders: Order[];
-    addOrder: (order: Order) => void;
-    getOrderById: (id: string) => Order | undefined;
+    orders: OrderObject[];
+    addOrder: (order: OrderObject) => void;
+    getOrderById: (id: string) => OrderObject | undefined;
     cancelOrder: (id: string) => void;
+    updateOrderStatus: (id: string, status: OrderObject['status']) => void;
 }
 
 const OrderContext = createContext<OrderContextType | undefined>(undefined);
 
 // Mock initial data
-const DUMMY_ORDERS: Order[] = [
+const DUMMY_ADDRESS: AddressObject = {
+    id: 'addr-1',
+    name: 'John Doe',
+    phone: '9876543210',
+    address: '123 Main St',
+    addressLine1: '123 Main St',
+    city: 'Mumbai',
+    state: 'Maharashtra',
+    pincode: '400001',
+    country: 'India',
+    landmark: 'Near Park',
+    label: 'Home',
+    isDefault: true
+};
+
+const DUMMY_ORDERS: OrderObject[] = [
     {
         id: 'mock-1',
+        userId: 'user-456',
+        sellerId: 'seller-789',
         orderNumber: 'ZP-98231',
-        date: '2024-10-24',
-        status: 'Delivered',
+        status: 'delivered',
+        paymentStatus: 'paid',
+        totalAmount: 899,
+        shippingAmount: 0,
+        taxAmount: 0,
+        finalAmount: 899,
+        shippingAddress: DUMMY_ADDRESS,
+        paymentMethod: 'razorpay',
+        paymentId: 'pay_123',
         items: [{
-            id: '2',
-            name: 'School Backpack',
-            image: require('../assets/images/backpacks.jpg'),
+            productId: '2',
+            productName: 'School Backpack',
+            image: 'https://example.com/backpack.jpg',
             price: 899,
-            quantity: 1,
-            variant: 'Standard Variant'
+            quantity: 1
         }],
-        total: 899,
-        address: {
-            id: 'addr-1',
-            name: 'John Doe',
-            addressLine: '123 Main St',
-            city: 'Mumbai',
-            state: 'Maharashtra',
-            pincode: '400001',
-            phoneNumber: '9876543210',
-            country: 'India',
-            type: 'Home',
-            isDefault: true,
-            landmark: 'Near Park'
-        },
-        paymentMethod: 'UPI',
-        estimatedDelivery: 'Oct 26, 2024',
-        deliveryFee: 0,
-        taxes: 0,
+        estimatedDelivery: '2024-10-26T00:00:00Z',
+        createdAt: '2024-10-24T00:00:00Z',
+        updatedAt: '2024-10-24T00:00:00Z',
         subtotal: 899,
         savings: 0,
         isInstant: false
     },
     {
         id: 'mock-2',
+        userId: 'user-456',
+        sellerId: 'seller-890',
         orderNumber: 'ZP-98232',
-        date: '2024-10-25',
-        status: 'Unpacked', // Will show as Processing
+        status: 'processing',
+        paymentStatus: 'paid',
+        totalAmount: 598,
+        shippingAmount: 40,
+        taxAmount: 0,
+        finalAmount: 638,
+        shippingAddress: DUMMY_ADDRESS,
+        paymentMethod: 'razorpay',
+        paymentId: 'pay_456',
         items: [{
-            id: '7',
-            name: 'Hydrating Face Wash',
-            image: require('../assets/images/facewash.jpg'),
+            productId: '7',
+            productName: 'Hydrating Face Wash',
+            image: 'https://example.com/facewash.jpg',
             price: 299,
-            quantity: 2,
-            variant: '100ml'
+            quantity: 2
         }],
-        total: 598,
-        address: {
-            id: 'addr-1',
-            name: 'John Doe',
-            addressLine: '123 Main St',
-            city: 'Mumbai',
-            state: 'Maharashtra',
-            pincode: '400001',
-            phoneNumber: '9876543210',
-            country: 'India',
-            type: 'Home',
-            isDefault: true,
-            landmark: 'Near Park'
-        },
-        paymentMethod: 'Credit Card',
-        estimatedDelivery: 'Oct 28, 2024',
-        deliveryFee: 40,
-        taxes: 0,
+        estimatedDelivery: '2024-10-28T00:00:00Z',
+        createdAt: '2024-10-25T00:00:00Z',
+        updatedAt: '2024-10-25T00:00:00Z',
         subtotal: 598,
         savings: 0,
         isInstant: true
@@ -112,9 +87,9 @@ const DUMMY_ORDERS: Order[] = [
 ];
 
 export const OrderProvider = ({ children }: { children: ReactNode }) => {
-    const [orders, setOrders] = useState<Order[]>(DUMMY_ORDERS);
+    const [orders, setOrders] = useState<OrderObject[]>(DUMMY_ORDERS);
 
-    const addOrder = (order: Order) => {
+    const addOrder = (order: OrderObject) => {
         setOrders(prev => [order, ...prev]);
     };
 
@@ -125,7 +100,15 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
     const cancelOrder = (id: string) => {
         // API: PUT /api/v1/orders/:id/cancel
         setOrders(prev => prev.map(order =>
-            order.id === id ? { ...order, status: 'Cancelled' as const } : order
+            order.id === id
+                ? { ...order, status: 'cancelled' as const, paymentStatus: 'refunded' as const }
+                : order
+        ));
+    };
+
+    const updateOrderStatus = (id: string, status: OrderObject['status']) => {
+        setOrders(prev => prev.map(order =>
+            order.id === id ? { ...order, status, updatedAt: new Date().toISOString() } : order
         ));
     };
 
@@ -134,7 +117,8 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
             orders,
             addOrder,
             getOrderById,
-            cancelOrder
+            cancelOrder,
+            updateOrderStatus
         }}>
             {children}
         </OrderContext.Provider>

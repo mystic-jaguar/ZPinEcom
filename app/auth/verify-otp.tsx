@@ -3,7 +3,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-    Alert,
     StyleSheet,
     Text,
     TextInput,
@@ -11,6 +10,7 @@ import {
     View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import ActionModal from '../../components/common/ActionModal';
 
 export default function VerifyOTPScreen() {
     const router = useRouter();
@@ -21,6 +21,9 @@ export default function VerifyOTPScreen() {
     const [loading, setLoading] = useState(false);
     const [resendTimer, setResendTimer] = useState(30);
     const [canResend, setCanResend] = useState(false);
+    const [showErrorModal, setShowErrorModal] = useState(false);
+    const [showSuccessModal, setShowSuccessModal] = useState(false);
+    const [modalMessage, setModalMessage] = useState('');
 
     const inputRefs = useRef<Array<TextInput | null>>([]);
 
@@ -68,7 +71,8 @@ export default function VerifyOTPScreen() {
         const code = otpCode || otp.join('');
 
         if (code.length !== 6) {
-            Alert.alert('Error', 'Please enter the complete OTP');
+            setModalMessage('Please enter the complete OTP');
+            setShowErrorModal(true);
             return;
         }
 
@@ -80,11 +84,11 @@ export default function VerifyOTPScreen() {
             // Simulate API call
             await new Promise(resolve => setTimeout(resolve, 1000));
 
-            Alert.alert('Success', 'Account verified successfully!', [
-                { text: 'OK', onPress: () => router.replace('/auth/login') }
-            ]);
+            setModalMessage('Account verified successfully!');
+            setShowSuccessModal(true);
         } catch (error) {
-            Alert.alert('Verification Failed', 'Invalid OTP. Please try again.');
+            setModalMessage('Invalid OTP. Please try again.');
+            setShowErrorModal(true);
             setOtp(['', '', '', '', '', '']);
             inputRefs.current[0]?.focus();
         } finally {
@@ -104,9 +108,11 @@ export default function VerifyOTPScreen() {
 
             setResendTimer(30);
             setCanResend(false);
-            Alert.alert('OTP Sent', 'A new OTP has been sent to your mobile');
+            setModalMessage('A new OTP has been sent to your mobile');
+            setShowSuccessModal(true);
         } catch (error) {
-            Alert.alert('Error', 'Failed to resend OTP. Please try again.');
+            setModalMessage('Failed to resend OTP. Please try again.');
+            setShowErrorModal(true);
         }
     };
 
@@ -185,6 +191,38 @@ export default function VerifyOTPScreen() {
                     <Text style={styles.changeNumberText}>Change Mobile Number</Text>
                 </TouchableOpacity>
             </View>
+
+            {/* Error Modal */}
+            <ActionModal
+                visible={showErrorModal}
+                title="Error"
+                message={modalMessage}
+                icon="x-circle"
+                primaryButtonText="OK"
+                onPrimaryPress={() => setShowErrorModal(false)}
+                onClose={() => setShowErrorModal(false)}
+            />
+
+            {/* Success Modal */}
+            <ActionModal
+                visible={showSuccessModal}
+                title="Success"
+                message={modalMessage}
+                icon="check-circle"
+                primaryButtonText="OK"
+                onPrimaryPress={() => {
+                    setShowSuccessModal(false);
+                    if (modalMessage.includes('verified')) {
+                        router.replace('/auth/login');
+                    }
+                }}
+                onClose={() => {
+                    setShowSuccessModal(false);
+                    if (modalMessage.includes('verified')) {
+                        router.replace('/auth/login');
+                    }
+                }}
+            />
         </SafeAreaView>
     );
 }

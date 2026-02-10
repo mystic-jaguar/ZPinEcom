@@ -14,11 +14,11 @@ export default function SavedAddressesScreen() {
             <View style={styles.cardHeader}>
                 <View style={styles.typeTag}>
                     <Feather
-                        name={item.type === 'Home' ? 'home' : item.type === 'Work' ? 'briefcase' : 'map-pin'}
+                        name={item.label === 'Home' ? 'home' : item.label === 'Work' ? 'briefcase' : 'map-pin'}
                         size={12}
                         color="#1a1a1a"
                     />
-                    <Text style={styles.typeText}>{item.type}</Text>
+                    <Text style={styles.typeText}>{item.label}</Text>
                 </View>
                 <View style={styles.actions}>
                     {!item.isDefault && (
@@ -40,10 +40,10 @@ export default function SavedAddressesScreen() {
 
             <View style={styles.details}>
                 <Text style={styles.name}>{item.name}</Text>
-                <Text style={styles.addressText}>{item.addressLine}</Text>
+                <Text style={styles.addressText}>{item.address}</Text>
                 <Text style={styles.addressText}>{item.landmark ? `${item.landmark}, ` : ''}{item.city}, {item.state} - {item.pincode}</Text>
                 <Text style={styles.addressText}>{item.country}</Text>
-                <Text style={styles.phone}>Mobile: {item.phoneNumber}</Text>
+                <Text style={styles.phone}>Mobile: {item.phone}</Text>
             </View>
 
             {item.isDefault && (

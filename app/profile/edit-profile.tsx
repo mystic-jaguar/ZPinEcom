@@ -1,7 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, Image, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { Image, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
 import Input from '../../components/common/Input';
@@ -14,28 +14,20 @@ export default function EditProfileScreen() {
 
     const [form, setForm] = useState({
         name: user.name,
-        dob: user.dob,
-        gender: user.gender,
-        phoneNumber: user.phoneNumber,
-        preferences: user.preferences,
-        address: user.address, // Street Address
-        city: user.city,
-        state: user.state,
-        pincode: user.pincode,
-        // profileImage: user.profileImage // handled separately usually, but for now just display
+        dob: (user as any).dob || '',
+        gender: (user as any).gender || '',
+        preferences: (user as any).preferences || {
+            receivePushNotifications: true,
+            receiveEmailUpdates: false,
+            receiveOrderUpdates: true
+        },
     });
 
     const [showGenderPicker, setShowGenderPicker] = useState(false);
     const [showSuccessModal, setShowSuccessModal] = useState(false);
 
     const handleSave = () => {
-        // Validation
-        if (form.phoneNumber.length !== 10 || !/^\d+$/.test(form.phoneNumber)) {
-            Alert.alert('Invalid Phone Number', 'Please enter a valid 10-digit mobile number starting without any extension.');
-            return;
-        }
-
-        updateUser(form);
+        updateUser(form as any);
         setShowSuccessModal(true);
     };
 
@@ -44,7 +36,7 @@ export default function EditProfileScreen() {
         router.back();
     };
 
-    const togglePreference = (key: keyof typeof user.preferences) => {
+    const togglePreference = (key: 'receivePushNotifications' | 'receiveEmailUpdates' | 'receiveOrderUpdates') => {
         setForm(prev => ({
             ...prev,
             preferences: {
@@ -70,7 +62,13 @@ export default function EditProfileScreen() {
                 {/* Profile Image Section */}
                 <View style={styles.imageSection}>
                     <View style={styles.imageContainer}>
-                        <Image source={user.profileImage} style={styles.image} />
+                        <Image
+                            source={typeof user.profileImage === 'string'
+                                ? { uri: user.profileImage }
+                                : user.profileImage || require('../../assets/images/profile_icon.jpg')
+                            }
+                            style={styles.image}
+                        />
                         <TouchableOpacity style={styles.cameraIcon}>
                             <Feather name="camera" size={16} color="#000" />
                         </TouchableOpacity>
@@ -140,21 +138,6 @@ export default function EditProfileScreen() {
                             </View>
                         )}
                     </View>
-                </View>
-
-                {/* Phone Number */}
-                <Text style={styles.label}>PHONE NUMBER</Text>
-                <View style={[styles.phoneInputContainer, { marginBottom: 20 }]}>
-                    <Feather name="smartphone" size={20} color="#9CA3AF" style={{ marginRight: 10 }} />
-                    <Input
-                        value={form.phoneNumber}
-                        onChangeText={t => setForm({ ...form, phoneNumber: t })}
-                        placeholder="1234567890"
-                        keyboardType="number-pad"
-                        maxLength={10}
-                        containerStyle={{ flex: 1, marginTop: 0, marginBottom: 0, borderWidth: 0, paddingHorizontal: 0, backgroundColor: 'transparent' }}
-                        style={{ height: '100%', borderWidth: 0, paddingLeft: 0 }} // Removed text padding for better alignment
-                    />
                 </View>
 
                 {/* Preferences */}

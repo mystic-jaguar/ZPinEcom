@@ -1,33 +1,27 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
-import { Product } from '../constants/products';
+import { CartItemObject, ProductObject } from '../types/types';
 
 const CART_STORAGE_KEY = '@ZPinEcom:cart';
 
-export interface CartItem extends Product {
-    cartId: string; // Unique ID for the cart item (productID + variant)
-    quantity: number;
-    selectedColor: string;
-    selectedSize: string;
-    originalPrice?: number; // For savings calculation
-}
-
 interface CartContextType {
-    cartItems: CartItem[];
-    addToCart: (product: Product, selectedColor: string, selectedSize: string) => void;
-    removeFromCart: (cartId: string) => void;
-    updateQuantity: (cartId: string, quantity: number) => void;
+    cartItems: CartItemObject[];
+    addToCart: (product: ProductObject, selectedColor?: string, selectedSize?: string) => void;
+    removeFromCart: (cartItemId: string) => void;
+    updateQuantity: (cartItemId: string, quantity: number) => void;
     clearCart: () => void;
     totalPrice: number;
     totalItems: number;
     totalSavings: number;
+    hasUnavailableItems: boolean;
+    hasPriceChanges: boolean;
     isLoading: boolean;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export const CartProvider = ({ children }: { children: ReactNode }) => {
-    const [cartItems, setCartItems] = useState<CartItem[]>([]);
+    const [cartItems, setCartItems] = useState<CartItemObject[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
     // Load cart from AsyncStorage on mount
@@ -49,7 +43,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
         }
     };
 
-    const saveCart = async (items: CartItem[]) => {
+    const saveCart = async (items: CartItemObject[]) => {
         try {
             await AsyncStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
             // API: POST /api/v1/cart - Sync with backend
@@ -58,28 +52,32 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
         }
     };
 
-    const addToCart = (product: Product, selectedColor: string, selectedSize: string) => {
-        const cartId = `${product.id}-${selectedColor}-${selectedSize}`;
+    const addToCart = (product: ProductObject, selectedColor?: string, selectedSize?: string) => {
+        const cartItemId = `${product.productId}-${selectedColor || 'default'}-${selectedSize || 'default'}`;
 
         setCartItems(prevItems => {
-            const existingItem = prevItems.find(item => item.cartId === cartId);
+            const existingItem = prevItems.find(item => item.cartItemId === cartItemId);
 
-            let newItems: CartItem[];
+            let newItems: CartItemObject[];
             if (existingItem) {
                 newItems = prevItems.map(item =>
-                    item.cartId === cartId
+                    item.cartItemId === cartItemId
                         ? { ...item, quantity: item.quantity + 1 }
                         : item
                 );
             } else {
-                newItems = [...prevItems, {
-                    ...product,
+                const newCartItem: CartItemObject = {
+                    cartItemId,
+                    productId: product.productId,
+                    product,
                     quantity: 1,
+                    priceAtAdd: product.price,
+                    isAvailable: product.inStock,
+                    timeStamp: new Date().toISOString(),
                     selectedColor,
-                    selectedSize,
-                    cartId,
-                    originalPrice: product.originalPrice || product.price
-                }];
+                    selectedSize
+                };
+                newItems = [...prevItems, newCartItem];
             }
 
             saveCart(newItems);
@@ -87,23 +85,23 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
         });
     };
 
-    const removeFromCart = (cartId: string) => {
+    const removeFromCart = (cartItemId: string) => {
         setCartItems(prevItems => {
-            const newItems = prevItems.filter(item => item.cartId !== cartId);
+            const newItems = prevItems.filter(item => item.cartItemId !== cartItemId);
             saveCart(newItems);
             return newItems;
         });
     };
 
-    const updateQuantity = (cartId: string, quantity: number) => {
+    const updateQuantity = (cartItemId: string, quantity: number) => {
         if (quantity < 1) {
-            removeFromCart(cartId);
+            removeFromCart(cartItemId);
             return;
         }
 
         setCartItems(prevItems => {
             const newItems = prevItems.map(item =>
-                item.cartId === cartId
+                item.cartItemId === cartItemId
                     ? { ...item, quantity }
                     : item
             );
@@ -118,12 +116,15 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
         // API: DELETE /api/v1/cart - Clear cart on backend
     };
 
-    const totalPrice = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const totalPrice = cartItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
     const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0);
     const totalSavings = cartItems.reduce((sum, item) => {
-        const originalPrice = item.originalPrice || item.price;
-        return sum + ((originalPrice - item.price) * item.quantity);
+        const originalPrice = item.product.originalPrice || item.product.price;
+        return sum + ((originalPrice - item.product.price) * item.quantity);
     }, 0);
+
+    const hasUnavailableItems = cartItems.some(item => !item.isAvailable);
+    const hasPriceChanges = cartItems.some(item => item.priceAtAdd !== item.product.price);
 
     return (
         <CartContext.Provider value={{
@@ -135,6 +136,8 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
             totalPrice,
             totalItems,
             totalSavings,
+            hasUnavailableItems,
+            hasPriceChanges,
             isLoading
         }}>
             {children}

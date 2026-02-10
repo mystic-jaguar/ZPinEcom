@@ -75,8 +75,8 @@ export default function ProductListing() {
             // We search if product.subCategory is one of the descendant labels
             // OR if product.category matches currentCategoryNode (fallback)
 
-            if (allDescendantLabels.includes(p.subCategory)) return true;
-            if (allDescendantLabels.includes(p.category)) return true;
+            if (allDescendantLabels.includes(p.deepestCategoryName)) return true;
+            if (allDescendantLabels.includes(p.categoryPath.split('-')[0])) return true;
 
             return false;
         });
@@ -92,12 +92,12 @@ export default function ProductListing() {
                 // Get all descendants for this specific child (e.g. "Men" -> "Round Neck", "Polo")
                 const childDescendants = collectLabels(selectedChildNode);
                 return baseMatches.filter(p =>
-                    childDescendants.includes(p.subCategory) || childDescendants.includes(p.category)
+                    childDescendants.includes(p.deepestCategoryName) || childDescendants.includes(p.categoryPath.split('-')[0])
                 );
             }
 
             // Fallback (exact match)
-            return baseMatches.filter(p => p.subCategory === activeFilter);
+            return baseMatches.filter(p => p.deepestCategoryName === activeFilter);
         }
     }, [activeFilter, allDescendantLabels, currentCategoryNode]);
 
@@ -106,12 +106,12 @@ export default function ProductListing() {
     const renderProductItem = ({ item }: { item: Product }) => (
         <TouchableOpacity
             style={styles.productCard}
-            onPress={() => router.push(`/product/${item.id}`)}
+            onPress={() => router.push(`/product/${item.productId}`)}
             activeOpacity={0.9}
         >
             <View style={styles.imageContainer}>
-                {item.image ? (
-                    <Image source={item.image} style={styles.productImage} />
+                {item.images?.[0] ? (
+                    <Image source={{ uri: item.images[0] }} style={styles.productImage} />
                 ) : (
                     <View style={styles.placeholderImage}>
                         <Feather name="image" size={24} color="#ccc" />
@@ -121,17 +121,17 @@ export default function ProductListing() {
                 {/* Favorite Icon */}
                 <TouchableOpacity
                     style={styles.favoriteButton}
-                    onPress={() => isInWishlist(item.id) ? removeFromWishlist(item.id) : addToWishlist(item)}
+                    onPress={() => isInWishlist(item.productId) ? removeFromWishlist(item.productId) : addToWishlist(item)}
                 >
                     <Ionicons
-                        name={isInWishlist(item.id) ? "heart" : "heart-outline"}
+                        name={isInWishlist(item.productId) ? "heart" : "heart-outline"}
                         size={20}
-                        color={isInWishlist(item.id) ? "#FF3B30" : "#333"}
+                        color={isInWishlist(item.productId) ? "#FF3B30" : "#333"}
                     />
                 </TouchableOpacity>
 
                 {/* New Arrival Badge (Mock logic: odd IDs) */}
-                {parseInt(item.id) % 2 !== 0 && (
+                {parseInt(item.productId) % 2 !== 0 && (
                     <View style={styles.newBadge}>
                         <Text style={styles.newBadgeText}>NEW ARRIVAL</Text>
                     </View>
@@ -145,7 +145,7 @@ export default function ProductListing() {
                 </Text>
 
                 {/* Name */}
-                <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
+                <Text style={styles.productName} numberOfLines={2}>{item.productName}</Text>
 
                 {/* Price Row */}
                 <View style={styles.priceRow}>
@@ -232,7 +232,7 @@ export default function ProductListing() {
             <FlatList
                 data={filteredProducts}
                 renderItem={renderProductItem}
-                keyExtractor={item => item.id}
+                keyExtractor={item => item.productId}
                 numColumns={2}
                 columnWrapperStyle={styles.columnWrapper}
                 contentContainerStyle={styles.listContent}

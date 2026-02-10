@@ -1,47 +1,28 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
+import { PaymentCardObject, PaymentUPIObject } from '../types/types';
 
 const PAYMENT_CARDS_STORAGE_KEY = '@ZPinEcom:paymentCards';
 const PAYMENT_UPIS_STORAGE_KEY = '@ZPinEcom:paymentUPIs';
 
-export interface PaymentCard {
-    id: string;
-    cardNumber: string; // Stored securely in real app, here just string
-    cardHolderName: string;
-    expiryDate: string;
-    cvv: string;
-    bankName: string; // Derived or mock
-    cardType: 'Credit Card' | 'Debit Card'; // CREDIT CARD / DEBIT CARD
-    iconName: any; // Ionicons name
-    iconColor: string;
-}
-
-export interface PaymentUPI {
-    id: string;
-    upiId: string;
-    label: string; // e.g., Google Pay
-    subLabel: string; // e.g., username@okaxis
-    upiApp: 'Google Pay' | 'PhonePe' | 'Paytm';
-}
-
 interface PaymentContextType {
-    cards: PaymentCard[];
-    upis: PaymentUPI[];
-    addCard: (card: Omit<PaymentCard, 'id' | 'bankName' | 'iconName' | 'iconColor'>) => void;
-    updateCard: (id: string, updates: Partial<PaymentCard>) => void;
+    cards: PaymentCardObject[];
+    upis: PaymentUPIObject[];
+    addCard: (card: Omit<PaymentCardObject, 'id' | 'bankName' | 'iconName' | 'iconColor'>) => void;
+    updateCard: (id: string, updates: Partial<PaymentCardObject>) => void;
     deleteCard: (id: string) => void;
     addUPI: (upiId: string, upiApp: 'Google Pay' | 'PhonePe' | 'Paytm') => void;
     updateUPI: (id: string, upiId: string, upiApp: 'Google Pay' | 'PhonePe' | 'Paytm') => void;
     deleteUPI: (id: string) => void;
-    getCard: (id: string) => PaymentCard | undefined;
-    getUPI: (id: string) => PaymentUPI | undefined;
+    getCard: (id: string) => PaymentCardObject | undefined;
+    getUPI: (id: string) => PaymentUPIObject | undefined;
 }
 
 const PaymentContext = createContext<PaymentContextType | undefined>(undefined);
 
 export const PaymentProvider = ({ children }: { children: ReactNode }) => {
     // Initial Mock Data
-    const [cards, setCards] = useState<PaymentCard[]>([
+    const [cards, setCards] = useState<PaymentCardObject[]>([
         {
             id: '1',
             cardNumber: '1234567812341234',
@@ -66,7 +47,7 @@ export const PaymentProvider = ({ children }: { children: ReactNode }) => {
         }
     ]);
 
-    const [upis, setUpis] = useState<PaymentUPI[]>([
+    const [upis, setUpis] = useState<PaymentUPIObject[]>([
         {
             id: '1',
             upiId: 'jaywarale@okaxis',
@@ -96,8 +77,8 @@ export const PaymentProvider = ({ children }: { children: ReactNode }) => {
         }
     };
 
-    const addCard = (card: Omit<PaymentCard, 'id' | 'bankName' | 'iconName' | 'iconColor'>) => {
-        const newCard: PaymentCard = {
+    const addCard = (card: Omit<PaymentCardObject, 'id' | 'bankName' | 'iconName' | 'iconColor'>) => {
+        const newCard: PaymentCardObject = {
             id: Math.random().toString(36).substr(2, 9),
             ...card,
             bankName: 'HDFC Bank', // Mock logic for bank name
@@ -110,7 +91,7 @@ export const PaymentProvider = ({ children }: { children: ReactNode }) => {
         // API: POST /api/v1/users/payment-methods
     };
 
-    const updateCard = (id: string, updates: Partial<PaymentCard>) => {
+    const updateCard = (id: string, updates: Partial<PaymentCardObject>) => {
         const updatedCards = cards.map(c => c.id === id ? { ...c, ...updates } : c);
         setCards(updatedCards);
         AsyncStorage.setItem(PAYMENT_CARDS_STORAGE_KEY, JSON.stringify(updatedCards));
@@ -123,7 +104,7 @@ export const PaymentProvider = ({ children }: { children: ReactNode }) => {
     };
 
     const addUPI = (upiId: string, upiApp: 'Google Pay' | 'PhonePe' | 'Paytm') => {
-        const newUPI: PaymentUPI = {
+        const newUPI: PaymentUPIObject = {
             id: Math.random().toString(36).substr(2, 9),
             upiId,
             label: upiApp,

@@ -3,7 +3,7 @@ import { Colors } from '@/constants/Colors';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, Linking, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Linking, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 type FAQ = {
@@ -20,6 +20,14 @@ export default function HelpCenterScreen() {
     const [showAllFaqs, setShowAllFaqs] = useState(false);
     const [bookingModalVisible, setBookingModalVisible] = useState(false);
     const [chatModalVisible, setChatModalVisible] = useState(false);
+
+    // Generic Modal State
+    const [infoModalVisible, setInfoModalVisible] = useState(false);
+    const [infoModalConfig, setInfoModalConfig] = useState({
+        title: '',
+        message: '',
+        icon: 'info' as any
+    });
 
     const toggleFaq = (id: string) => {
         setExpandedFaq(expandedFaq === id ? null : id);
@@ -82,13 +90,23 @@ export default function HelpCenterScreen() {
 
     const handleCallSupport = () => {
         Linking.openURL('tel:+911234567890').catch(() => {
-            Alert.alert('Error', 'Unable to make a call. Please dial +91-1234-567890 manually.');
+            setInfoModalConfig({
+                title: 'Error',
+                message: 'Unable to make a call. Please dial +91-1234-567890 manually.',
+                icon: 'x-circle'
+            });
+            setInfoModalVisible(true);
         });
     };
 
     const handleEmailSupport = () => {
         Linking.openURL('mailto:support@zpin.com?subject=Support Request').catch(() => {
-            Alert.alert('Error', 'Unable to open email. Please email us at support@zpin.com');
+            setInfoModalConfig({
+                title: 'Error',
+                message: 'Unable to open email. Please email us at support@zpin.com',
+                icon: 'x-circle'
+            });
+            setInfoModalVisible(true);
         });
     };
 
@@ -232,7 +250,15 @@ export default function HelpCenterScreen() {
                 primaryButtonText="START CHAT"
                 onPrimaryPress={() => {
                     setChatModalVisible(false);
-                    Alert.alert('Coming Soon', 'Chat feature will be available soon!');
+                    // Slight delay to allow previous modal to close smoothly
+                    setTimeout(() => {
+                        setInfoModalConfig({
+                            title: 'Coming Soon',
+                            message: 'Chat feature will be available soon!',
+                            icon: 'info'
+                        });
+                        setInfoModalVisible(true);
+                    }, 300);
                 }}
                 secondaryButtonText="CANCEL"
                 onSecondaryPress={() => setChatModalVisible(false)}
@@ -248,11 +274,29 @@ export default function HelpCenterScreen() {
                 primaryButtonText="CONFIRM BOOKING"
                 onPrimaryPress={() => {
                     setBookingModalVisible(false);
-                    Alert.alert('Success', 'Your session has been booked! We\'ll send you a confirmation email shortly.');
+                    setTimeout(() => {
+                        setInfoModalConfig({
+                            title: 'Success',
+                            message: 'Your session has been booked! We\'ll send you a confirmation email shortly.',
+                            icon: 'check-circle'
+                        });
+                        setInfoModalVisible(true);
+                    }, 300);
                 }}
                 secondaryButtonText="CANCEL"
                 onSecondaryPress={() => setBookingModalVisible(false)}
                 onClose={() => setBookingModalVisible(false)}
+            />
+
+            {/* Generic Info/Error/Success Modal */}
+            <ActionModal
+                visible={infoModalVisible}
+                title={infoModalConfig.title}
+                message={infoModalConfig.message}
+                icon={infoModalConfig.icon}
+                primaryButtonText="OK"
+                onPrimaryPress={() => setInfoModalVisible(false)}
+                onClose={() => setInfoModalVisible(false)}
             />
         </View>
     );

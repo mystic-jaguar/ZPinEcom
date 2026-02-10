@@ -9,7 +9,7 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-nati
 
 export default function CheckoutAddressScreen() {
     const router = useRouter();
-    const { addresses } = useAddress();
+    const { addresses, removeAddress } = useAddress();
     const { selectedAddressId, setSelectedAddressId } = useCheckout();
 
     // Set default selection if none selected
@@ -52,19 +52,19 @@ export default function CheckoutAddressScreen() {
                     </View>
                     <Text style={styles.name}>{item.name}</Text>
                     <View style={styles.tagContainer}>
-                        <Text style={styles.tagText}>{item.type.toUpperCase()}</Text>
+                        <Text style={styles.tagText}>{item.label?.toUpperCase() || 'OTHER'}</Text>
                     </View>
                 </View>
 
                 <View style={styles.addressContent}>
                     <Text style={styles.addressText}>
-                        {item.addressLine}, {item.city},
+                        {item.address}, {item.city},
                     </Text>
                     <Text style={styles.addressText}>
                         {item.state} {item.pincode}, {item.country}
                     </Text>
                     <Text style={styles.phoneText}>
-                        +91 {item.phoneNumber}
+                        +91 {item.phone}
                     </Text>
                 </View>
 
@@ -75,7 +75,7 @@ export default function CheckoutAddressScreen() {
                     >
                         <Text style={styles.editText}>EDIT ADDRESS</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity>
+                    <TouchableOpacity onPress={() => removeAddress(item.id)}>
                         <Ionicons name="trash-outline" size={20} color="#9E9E9E" />
                     </TouchableOpacity>
                 </View>

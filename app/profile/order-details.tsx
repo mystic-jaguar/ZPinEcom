@@ -1,7 +1,7 @@
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
 import DeliveryStatusCard from '../../components/profile/DeliveryStatusCard';
@@ -15,27 +15,30 @@ export default function OrderDetailsScreen() {
     const { orderId } = params;
     const { getOrderById, cancelOrder } = useOrder();
     const [showCancelModal, setShowCancelModal] = useState(false);
+    const [showSuccessModal, setShowSuccessModal] = useState(false);
+    const [successMessage, setSuccessMessage] = useState('');
+    const [showInvoiceModal, setShowInvoiceModal] = useState(false);
 
     const order = getOrderById(orderId as string);
 
     // Calculate if order can be cancelled (within 24 hours of placement)
-    const canCancel = order && ['Processing', 'Unpacked'].includes(order.status);
+    const canCancel = order && ['processing', 'pending'].includes(order.status);
 
     // Calculate if order is eligible for return (within 5 days of delivery)
-    const canReturn = order && order.status === 'Delivered';
+    const canReturn = order && order.status === 'delivered';
 
     const handleCancelOrder = () => {
         if (!order) return;
         // API: PUT /api/v1/orders/:id/cancel
         cancelOrder(order.id);
         setShowCancelModal(false);
-        Alert.alert('Order Cancelled', 'Your order has been cancelled successfully.');
-        router.back();
+        setSuccessMessage('Your order has been cancelled successfully.');
+        setShowSuccessModal(true);
     };
 
     const handleDownloadInvoice = () => {
         // API: GET /api/v1/orders/:id/invoice
-        Alert.alert('Invoice', 'Invoice will be downloaded to your device.');
+        setShowInvoiceModal(true);
         // Implement file download logic here
     };
 
@@ -75,7 +78,7 @@ export default function OrderDetailsScreen() {
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                 {/* Delivery Status */}
                 <DeliveryStatusCard
-                    status={order.status === 'Unpacked' ? 'Processing' : order.status}
+                    status={order.status === 'pending' ? 'processing' : order.status}
                     subtext={`By ${order.estimatedDelivery}`}
                 />
 
@@ -87,9 +90,9 @@ export default function OrderDetailsScreen() {
                             <Feather name="map-pin" size={16} color="#6B7280" />
                         </View>
                         <View style={styles.addressContent}>
-                            <Text style={styles.addressName}>{order.address.name}</Text>
-                            <Text style={styles.addressDetails}>{order.address.addressLine}, {order.address.city}, {order.address.state} - {order.address.pincode}</Text>
-                            <Text style={styles.addressPhone}>+91 {order.address.phoneNumber}</Text>
+                            <Text style={styles.addressName}>{order.shippingAddress.name}</Text>
+                            <Text style={styles.addressDetails}>{order.shippingAddress.address}, {order.shippingAddress.city}, {order.shippingAddress.state} - {order.shippingAddress.pincode}</Text>
+                            <Text style={styles.addressPhone}>+91 {order.shippingAddress.phone}</Text>
                         </View>
                     </View>
                 </View>
@@ -116,7 +119,7 @@ export default function OrderDetailsScreen() {
                             <OrderItemRow
                                 key={index}
                                 image={item.image}
-                                name={item.name}
+                                name={item.productName}
                                 variant={item.variant || ''}
                                 quantity={item.quantity}
                                 price={item.price}
@@ -130,10 +133,10 @@ export default function OrderDetailsScreen() {
                     <Text style={styles.sectionTitle}>PRICE DETAILS</Text>
                     <View style={styles.priceCard}>
                         <PriceBreakdown
-                            itemsTotal={order.subtotal}
-                            instantTrialFee={order.isInstant ? order.deliveryFee : 0}
-                            deliveryCharges={order.isInstant ? 0 : order.deliveryFee}
-                            grandTotal={order.total}
+                            itemsTotal={order.totalAmount}
+                            instantTrialFee={order.deliveryFee ?? 0}
+                            deliveryCharges={0}
+                            grandTotal={order.finalAmount}
                         />
                     </View>
                 </View>
@@ -167,16 +170,18 @@ export default function OrderDetailsScreen() {
                     </TouchableOpacity>
                 )}
 
-                {/* Track Button */}
-                <TouchableOpacity
-                    style={styles.primaryButton}
-                    onPress={() => router.push({
-                        pathname: '/profile/track-order',
-                        params: { orderId: order.id }
-                    })}
-                >
-                    <Text style={styles.primaryButtonText}>Track Order</Text>
-                </TouchableOpacity>
+                {/* Track Button - Hidden for cancelled/returned orders */}
+                {order.status !== 'cancelled' && order.status !== 'returned' && (
+                    <TouchableOpacity
+                        style={styles.primaryButton}
+                        onPress={() => router.push({
+                            pathname: '/profile/track-order',
+                            params: { orderId: order.id }
+                        })}
+                    >
+                        <Text style={styles.primaryButtonText}>Track Order</Text>
+                    </TouchableOpacity>
+                )}
 
                 {/* Cancel Order Button (only if eligible) */}
                 {canCancel && (
@@ -212,6 +217,34 @@ export default function OrderDetailsScreen() {
                 secondaryButtonText="No, Keep Order"
                 onSecondaryPress={() => setShowCancelModal(false)}
                 onClose={() => setShowCancelModal(false)}
+            />
+
+            {/* Success Modal */}
+            <ActionModal
+                visible={showSuccessModal}
+                title="Order Cancelled"
+                message={successMessage}
+                icon="check-circle"
+                primaryButtonText="OK"
+                onPrimaryPress={() => {
+                    setShowSuccessModal(false);
+                    router.back();
+                }}
+                onClose={() => {
+                    setShowSuccessModal(false);
+                    router.back();
+                }}
+            />
+
+            {/* Invoice Modal */}
+            <ActionModal
+                visible={showInvoiceModal}
+                title="Invoice Download"
+                message="Invoice will be downloaded to your device."
+                icon="file-text"
+                primaryButtonText="OK"
+                onPrimaryPress={() => setShowInvoiceModal(false)}
+                onClose={() => setShowInvoiceModal(false)}
             />
         </SafeAreaView>
     );

@@ -15,15 +15,15 @@ export default function WishlistScreen() {
         <View style={styles.itemCard}>
             <TouchableOpacity
                 style={styles.imageContainer}
-                onPress={() => router.push(`/product/${item.id}`)}
+                onPress={() => router.push(`/product/${item.productId}`)}
             >
-                <Image source={item.image} style={styles.itemImage} resizeMode="cover" />
+                <Image source={item.images?.[0] ? { uri: item.images[0] } : { uri: 'https://via.placeholder.com/80' }} style={styles.itemImage} resizeMode="cover" />
             </TouchableOpacity>
 
             <View style={styles.itemDetails}>
                 <View style={styles.headerRow}>
-                    <Text style={styles.itemName} numberOfLines={2}>{item.name}</Text>
-                    <TouchableOpacity onPress={() => removeFromWishlist(item.id)}>
+                    <Text style={styles.itemName} numberOfLines={2}>{item.productName}</Text>
+                    <TouchableOpacity onPress={() => removeFromWishlist(item.productId)}>
                         <Feather name="x" size={18} color="#999" />
                     </TouchableOpacity>
                 </View>
@@ -37,7 +37,7 @@ export default function WishlistScreen() {
                         // For now simply add with defaults or redirect to product page?
                         // Let's redirect to product page for options, but user expects quick add often.
                         // Given we need size/color, safe bet is redirect.
-                        router.push(`/product/${item.id}`);
+                        router.push(`/product/${item.productId}`);
                     }}
                 >
                     <Text style={styles.addToCartText}>View Details</Text>
@@ -61,7 +61,7 @@ export default function WishlistScreen() {
                 <FlatList
                     data={wishlistItems}
                     renderItem={renderItem}
-                    keyExtractor={item => item.id}
+                    keyExtractor={item => item.productId}
                     contentContainerStyle={styles.listContent}
                     showsVerticalScrollIndicator={false}
                 />
