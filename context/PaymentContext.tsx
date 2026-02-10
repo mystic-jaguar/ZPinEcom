@@ -24,7 +24,7 @@ export const PaymentProvider = ({ children }: { children: ReactNode }) => {
     // Initial Mock Data
     const [cards, setCards] = useState<PaymentCardObject[]>([
         {
-            id: '1',
+            id: 'card_1',
             cardNumber: '1234567812341234',
             cardHolderName: 'Jay Warale',
             expiryDate: '09/28',
@@ -35,7 +35,7 @@ export const PaymentProvider = ({ children }: { children: ReactNode }) => {
             iconColor: '#1565C0'
         },
         {
-            id: '2',
+            id: 'card_2',
             cardNumber: '8765432187655678',
             cardHolderName: 'Jay Warale',
             expiryDate: '12/26',
@@ -49,7 +49,7 @@ export const PaymentProvider = ({ children }: { children: ReactNode }) => {
 
     const [upis, setUpis] = useState<PaymentUPIObject[]>([
         {
-            id: '1',
+            id: 'upi_1',
             upiId: 'jaywarale@okaxis',
             label: 'Google Pay',
             subLabel: 'jaywarale@okaxis',
