@@ -25,10 +25,10 @@ export interface CreateProductData {
 export const productService = {
     /**
      * Get all products with optional location-based filtering
-     * GET /api/v1/products
      */
     async getProducts(params?: ProductListParams) {
         try {
+            // GET :- /api/v1/products
             const response = await apiClient.get<ApiPaginatedResponse<ProductObject>>('products', { params });
             return response.data;
         } catch (error) {
@@ -38,10 +38,10 @@ export const productService = {
 
     /**
      * Get specific product by ID
-     * GET /api/v1/products/:id
      */
     async getProductById(id: string) {
         try {
+            // GET :- /api/v1/products/:id
             const response = await apiClient.get<ApiSuccessResponse<ProductObject>>(`products/${id}`);
             return response.data;
         } catch (error) {
@@ -51,10 +51,10 @@ export const productService = {
 
     /**
      * Create new product (seller only)
-     * POST /api/v1/products/addProduct
      */
     async createProduct(data: FormData) {
         try {
+            // POST :- /api/v1/products/addProduct
             const response = await apiClient.post<ApiSuccessResponse<ProductObject>>('products/addProduct', data, {
                 headers: {
                     'Content-Type': 'multipart/form-data',
@@ -68,10 +68,10 @@ export const productService = {
 
     /**
      * Update product (seller only - own products)
-     * PUT /api/v1/products/:id
      */
     async updateProduct(id: string, data: Partial<ProductObject>) {
         try {
+            // PUT :- /api/v1/products/:id
             const response = await apiClient.put<ApiSuccessResponse<ProductObject>>(`products/${id}`, data);
             return response.data;
         } catch (error) {
@@ -81,10 +81,10 @@ export const productService = {
 
     /**
      * Delete product (seller only - own products)
-     * DELETE /api/v1/products/:id
      */
     async deleteProduct(id: string) {
         try {
+            // DELETE :- /api/v1/products/:id
             const response = await apiClient.delete<ApiSuccessResponse<any>>(`products/${id}`);
             return response.data;
         } catch (error) {
@@ -94,10 +94,10 @@ export const productService = {
 
     /**
      * Get products by seller
-     * GET /api/v1/products/seller/:userId
      */
     async getProductsBySeller(userId: string, page?: number, limit?: number) {
         try {
+            // GET :- /api/v1/products/seller/:userId
             const response = await apiClient.get<ApiPaginatedResponse<ProductObject>>(`products/seller/${userId}`, {
                 params: { page, limit },
             });
@@ -109,10 +109,10 @@ export const productService = {
 
     /**
      * Get products by category
-     * GET /api/v1/products/category/:categoryId
      */
     async getProductsByCategory(categoryId: string, params?: ProductListParams) {
         try {
+            // GET :- /api/v1/products/category/:categoryId
             const response = await apiClient.get<ApiPaginatedResponse<ProductObject>>(`products/category/${categoryId}`, {
                 params,
             });

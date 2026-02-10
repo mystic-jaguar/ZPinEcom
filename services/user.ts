@@ -16,10 +16,10 @@ export interface UpdateProfileData {
 export const userService = {
     /**
      * Get all users (admin/public endpoint)
-     * GET /api/v1/users
      */
     async getUsers(page?: number, limit?: number) {
         try {
+            // GET :- /api/v1/users
             const response = await apiClient.get<ApiPaginatedResponse<UserObject>>('users', {
                 params: { page, limit },
             });
@@ -31,10 +31,10 @@ export const userService = {
 
     /**
      * Get specific user by ID
-     * GET /api/v1/users/:id
      */
     async getUserById(id: string) {
         try {
+            // GET :- /api/v1/users/:id
             const response = await apiClient.get<ApiSuccessResponse<UserObject>>(`users/${id}`);
             return response.data;
         } catch (error) {
@@ -44,10 +44,10 @@ export const userService = {
 
     /**
      * Get user's orders
-     * GET /api/v1/users/orders
      */
     async getUserOrders(page?: number, limit?: number) {
         try {
+            // GET :- /api/v1/users/orders
             const response = await apiClient.get<ApiPaginatedResponse<any>>('users/orders', {
                 params: { page, limit },
             });
@@ -59,10 +59,10 @@ export const userService = {
 
     /**
      * Update user profile
-     * PUT /api/v1/users/profileDetails
      */
     async updateProfile(data: FormData) {
         try {
+            // PUT :- /api/v1/users/profileDetails
             const response = await apiClient.put<ApiSuccessResponse<{ message: string }>>('users/profileDetails', data, {
                 headers: {
                     'Content-Type': 'multipart/form-data',
@@ -76,10 +76,10 @@ export const userService = {
 
     /**
      * Add customer profile details
-     * POST /api/v1/users/customer/profile
      */
     async addCustomerProfile(data: FormData) {
         try {
+            // POST :- /api/v1/users/customer/profile
             const response = await apiClient.post<ApiSuccessResponse<any>>('users/customer/profile', data, {
                 headers: {
                     'Content-Type': 'multipart/form-data',
@@ -93,7 +93,6 @@ export const userService = {
 
     /**
      * Add shipping address
-     * POST /api/v1/users/shipping-address
      */
     async addShippingAddress(data: {
         name: string;
@@ -110,6 +109,7 @@ export const userService = {
         isDefault: boolean;
     }) {
         try {
+            // POST :- /api/v1/users/shipping-address
             const response = await apiClient.post<ApiSuccessResponse<any>>('users/shipping-address', data);
             return response.data;
         } catch (error) {

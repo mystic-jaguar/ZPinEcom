@@ -25,10 +25,10 @@ export interface CancelOrderData {
 export const orderService = {
     /**
      * Create new order from cart items
-     * POST /api/v1/orders
      */
     async createOrder(data: CreateOrderData) {
         try {
+            // POST :- /api/v1/orders
             const response = await apiClient.post<ApiSuccessResponse<{
                 order: OrderObject;
                 orderItems: any[];
@@ -42,10 +42,10 @@ export const orderService = {
 
     /**
      * Get user's orders with pagination and filtering
-     * GET /api/v1/orders
      */
     async getOrders(params?: OrderListParams) {
         try {
+            // GET :- /api/v1/orders
             const response = await apiClient.get<ApiPaginatedResponse<OrderObject>>('orders', { params });
             return response.data;
         } catch (error) {
@@ -55,10 +55,10 @@ export const orderService = {
 
     /**
      * Get specific order details
-     * GET /api/v1/orders/:id
      */
     async getOrderById(id: string) {
         try {
+            // GET :- /api/v1/orders/:id
             const response = await apiClient.get<ApiSuccessResponse<{
                 order: OrderObject;
                 orderItems: any[];
@@ -72,10 +72,10 @@ export const orderService = {
 
     /**
      * Cancel order
-     * PUT /api/v1/orders/:id/cancel
      */
     async cancelOrder(id: string, data: CancelOrderData) {
         try {
+            // PUT :- /api/v1/orders/:id/cancel
             const response = await apiClient.put<ApiSuccessResponse<{
                 message: string;
                 refundAmount: number;
@@ -89,10 +89,10 @@ export const orderService = {
 
     /**
      * Get order tracking information
-     * GET /api/v1/orders/:id/track
      */
     async trackOrder(id: string) {
         try {
+            // GET :- /api/v1/orders/:id/track
             const response = await apiClient.get<ApiSuccessResponse<{
                 trackingNumber: string;
                 currentStatus: string;
@@ -107,7 +107,6 @@ export const orderService = {
 
     /**
      * Initiate return request
-     * POST /api/v1/orders/:id/return
      */
     async returnOrder(id: string, data: {
         orderItemIds: string[];
@@ -116,6 +115,7 @@ export const orderService = {
         images?: string[];
     }) {
         try {
+            // POST :- /api/v1/orders/:id/return
             const response = await apiClient.post<ApiSuccessResponse<{
                 returnId: string;
                 status: string;
@@ -129,10 +129,10 @@ export const orderService = {
 
     /**
      * Download order invoice
-     * GET /api/v1/orders/:id/invoice
      */
     async downloadInvoice(id: string) {
         try {
+            // GET :- /api/v1/orders/:id/invoice
             const response = await apiClient.get(`orders/${id}/invoice`, {
                 responseType: 'blob',
             });

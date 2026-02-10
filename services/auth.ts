@@ -20,6 +20,7 @@ export const authService = {
      */
     async signup(data: SignupData) {
         try {
+            // POST :- /api/v1/auth/signup
             const response = await apiClient.post('auth/signup', {
                 userName: data.email.split('@')[0], // Generate username from email
                 mobile: data.mobile,
@@ -39,6 +40,7 @@ export const authService = {
      */
     async login(email: string, password: string) {
         try {
+            // POST :- /api/v1/auth/login
             const response = await apiClient.post('auth/login', {
                 email, // Can be email or username
                 password,
@@ -68,6 +70,7 @@ export const authService = {
      */
     async sendOTP(mobile: string) {
         try {
+            // POST :- /api/v1/auth/verification/sendOTP
             const response = await apiClient.post('auth/verification/sendOTP', {
                 mobile,
             });
@@ -82,6 +85,7 @@ export const authService = {
      */
     async verifyOTP(mobile: string, otp: string) {
         try {
+            // POST :- /api/v1/auth/verification/verifyOTP
             const response = await apiClient.post('auth/verification/verifyOTP', {
                 mobile,
                 otp,
@@ -97,6 +101,7 @@ export const authService = {
      */
     async logout() {
         try {
+            // POST :- /api/v1/auth/logout
             await apiClient.post('auth/logout');
         } catch (error: any) {
             // Ignore 401 errors - token may have expired, which is fine for logout
@@ -131,6 +136,7 @@ export const authService = {
      */
     async sendPasswordResetOTP(mobile: string, email: string) {
         try {
+            // POST :- /api/v1/auth/forgetPassword/sendOTP
             const response = await apiClient.post('auth/forgetPassword/sendOTP', {
                 mobile,
                 email,
@@ -146,6 +152,7 @@ export const authService = {
      */
     async verifyPasswordResetOTP(mobile: string, email: string, otp: string) {
         try {
+            // POST :- /api/v1/auth/forgetPassword/verifyOTP
             const response = await apiClient.post('auth/forgetPassword/verifyOTP', {
                 mobile,
                 email,
@@ -162,6 +169,7 @@ export const authService = {
      */
     async resetPassword(resetToken: string, newPassword: string) {
         try {
+            // POST :- /api/v1/auth/forgetPassword/resetPassword
             const response = await apiClient.post('auth/forgetPassword/resetPassword', {
                 resetToken,
                 newPassword,

@@ -53,6 +53,7 @@ apiClient.interceptors.response.use(
             try {
                 const refreshToken = await AsyncStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
                 if (refreshToken) {
+                    // POST :- /api/v1/users/refresh-token
                     const response = await axios.post(`${BASE_URL}users/refresh-token`, {
                         refreshToken,
                     });

@@ -9,10 +9,10 @@ export interface WishlistParams {
 export const wishlistService = {
     /**
      * Get user's wishlist with pagination
-     * GET /api/v1/wishlist
      */
     async getWishlist(params?: WishlistParams) {
         try {
+            // GET :- /api/v1/wishlist
             const response = await apiClient.get<ApiPaginatedResponse<ProductObject>>('wishlist', { params });
             return response.data;
         } catch (error) {
@@ -22,10 +22,10 @@ export const wishlistService = {
 
     /**
      * Get wishlist item count
-     * GET /api/v1/wishlist/count
      */
     async getWishlistCount() {
         try {
+            // GET :- /api/v1/wishlist/count
             const response = await apiClient.get<ApiSuccessResponse<{ count: number }>>('wishlist/count');
             return response.data;
         } catch (error) {
@@ -35,10 +35,10 @@ export const wishlistService = {
 
     /**
      * Add product to wishlist
-     * POST /api/v1/wishlist
      */
     async addToWishlist(productId: string) {
         try {
+            // POST :- /api/v1/wishlist
             const response = await apiClient.post<ApiSuccessResponse<{ message: string }>>('wishlist', { productId });
             return response.data;
         } catch (error) {
@@ -48,10 +48,10 @@ export const wishlistService = {
 
     /**
      * Remove product from wishlist
-     * DELETE /api/v1/wishlist/:productId
      */
     async removeFromWishlist(productId: string) {
         try {
+            // DELETE :- /api/v1/wishlist/:productId
             const response = await apiClient.delete<ApiSuccessResponse<{ message: string }>>(`wishlist/${productId}`);
             return response.data;
         } catch (error) {
@@ -61,10 +61,10 @@ export const wishlistService = {
 
     /**
      * Clear entire wishlist
-     * DELETE /api/v1/wishlist/clear
      */
     async clearWishlist() {
         try {
+            // DELETE :- /api/v1/wishlist/clear
             const response = await apiClient.delete<ApiSuccessResponse<{ message: string }>>('wishlist/clear');
             return response.data;
         } catch (error) {

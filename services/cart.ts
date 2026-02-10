@@ -13,10 +13,10 @@ export interface UpdateCartData {
 export const cartService = {
     /**
      * Get user's cart with full details
-     * GET /api/v1/cart
      */
     async getCart() {
         try {
+            // GET :- /api/v1/cart
             const response = await apiClient.get<ApiSuccessResponse<CartResponseObject>>('cart');
             return response.data;
         } catch (error) {
@@ -26,10 +26,10 @@ export const cartService = {
 
     /**
      * Add product to cart
-     * POST /api/v1/cart
      */
     async addToCart(data: AddToCartData) {
         try {
+            // POST :- /api/v1/cart
             const response = await apiClient.post<ApiSuccessResponse<{ message: string }>>('cart', data);
             return response.data;
         } catch (error) {
@@ -39,10 +39,10 @@ export const cartService = {
 
     /**
      * Update cart item quantity
-     * PUT /api/v1/cart/:productId
      */
     async updateCartItem(productId: string, data: UpdateCartData) {
         try {
+            // PUT :- /api/v1/cart/:productId
             const response = await apiClient.put<ApiSuccessResponse<{ message: string }>>(`cart/${productId}`, data);
             return response.data;
         } catch (error) {
@@ -52,10 +52,10 @@ export const cartService = {
 
     /**
      * Remove item from cart
-     * DELETE /api/v1/cart/:productId
      */
     async removeFromCart(productId: string) {
         try {
+            // DELETE :- /api/v1/cart/:productId
             const response = await apiClient.delete<ApiSuccessResponse<{ message: string }>>(`cart/${productId}`);
             return response.data;
         } catch (error) {
@@ -65,10 +65,10 @@ export const cartService = {
 
     /**
      * Clear entire cart
-     * DELETE /api/v1/cart
      */
     async clearCart() {
         try {
+            // DELETE :- /api/v1/cart
             const response = await apiClient.delete<ApiSuccessResponse<{ message: string }>>('cart');
             return response.data;
         } catch (error) {
@@ -78,10 +78,10 @@ export const cartService = {
 
     /**
      * Get cart item count
-     * GET /api/v1/cart/count
      */
     async getCartCount() {
         try {
+            // GET :- /api/v1/cart/count
             const response = await apiClient.get<ApiSuccessResponse<{ count: number }>>('cart/count');
             return response.data;
         } catch (error) {

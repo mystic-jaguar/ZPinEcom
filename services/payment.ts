@@ -17,10 +17,10 @@ export interface VerifyPaymentData {
 export const paymentService = {
     /**
      * Create payment intent for order
-     * POST /api/v1/payments/create
      */
     async createPayment(data: CreatePaymentData) {
         try {
+            // POST :- /api/v1/payments/create
             const response = await apiClient.post<ApiSuccessResponse<{
                 payment: any;
                 gatewayData: {
@@ -40,10 +40,10 @@ export const paymentService = {
 
     /**
      * Verify payment after gateway response
-     * POST /api/v1/orders/:id/payment/verify
      */
     async verifyPayment(orderId: string, data: VerifyPaymentData) {
         try {
+            // POST :- /api/v1/orders/:orderId/payment/verify
             const response = await apiClient.post<ApiSuccessResponse<{
                 message: string;
                 paymentStatus: string;
@@ -57,10 +57,10 @@ export const paymentService = {
 
     /**
      * Retry payment for failed orders
-     * POST /api/v1/orders/:id/payment/retry
      */
     async retryPayment(orderId: string, paymentMethod: 'razorpay' | 'cod' | 'wallet') {
         try {
+            // POST :- /api/v1/orders/:orderId/payment/retry
             const response = await apiClient.post<ApiSuccessResponse<{
                 paymentDetails: {
                     paymentId: string;
@@ -76,10 +76,10 @@ export const paymentService = {
 
     /**
      * Get payment details
-     * GET /api/v1/payments/:id
      */
     async getPaymentDetails(paymentId: string) {
         try {
+            // GET :- /api/v1/payments/:paymentId
             const response = await apiClient.get<ApiSuccessResponse<{
                 payment: any;
                 order: any;
@@ -92,10 +92,10 @@ export const paymentService = {
 
     /**
      * Request refund
-     * POST /api/v1/payments/:id/refund
      */
     async requestRefund(paymentId: string, amount?: number, reason?: string) {
         try {
+            // POST :- /api/v1/payments/:paymentId/refund
             const response = await apiClient.post<ApiSuccessResponse<{
                 refund: {
                     id: string;
@@ -115,10 +115,10 @@ export const paymentService = {
 
     /**
      * Confirm COD payment
-     * POST /api/v1/payments/cod/confirm
      */
     async confirmCOD(orderId: string, collectedAmount: number, deliveryPersonId: string) {
         try {
+            // POST :- /api/v1/payments/cod/confirm
             const response = await apiClient.post<ApiSuccessResponse<{
                 payment: any;
                 order: any;
