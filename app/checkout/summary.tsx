@@ -6,7 +6,7 @@ import { useCheckout } from '@/context/CheckoutContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
-import { FlatList, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { FlatList, Image, LayoutAnimation, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, UIManager, View } from 'react-native';
 
 export default function CheckoutSummaryScreen() {
     const router = useRouter();
@@ -45,6 +45,21 @@ export default function CheckoutSummaryScreen() {
             <Image source={getImageSource(item)} style={styles.itemImage} />
         </View>
     );
+
+
+
+    const [expanded, setExpanded] = React.useState(false);
+
+    if (Platform.OS === 'android') {
+        if (UIManager.setLayoutAnimationEnabledExperimental) {
+            UIManager.setLayoutAnimationEnabledExperimental(true);
+        }
+    }
+
+    const toggleExpanded = () => {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        setExpanded(!expanded);
+    };
 
     return (
         <View style={styles.container}>
@@ -131,11 +146,16 @@ export default function CheckoutSummaryScreen() {
             </ScrollView>
 
             <View style={styles.footer}>
-                <View style={styles.totalRow}>
-                    <Text style={styles.totalLabel}>TOTAL PAYABLE</Text>
-                    <Text style={styles.savingsText}>YOU SAVED ₹{totalSavings.toFixed(2)}</Text>
-                </View>
-                <Text style={styles.totalAmount}>₹{finalTotal.toFixed(2)}</Text>
+                <TouchableOpacity onPress={toggleExpanded} activeOpacity={0.8}>
+                    <View style={styles.totalRow}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <Text style={styles.totalLabel}>TOTAL PAYABLE</Text>
+                            <Ionicons name={expanded ? "chevron-down" : "chevron-up"} size={16} color="#90A4AE" style={{ marginLeft: 5 }} />
+                        </View>
+                        <Text style={styles.savingsText}>YOU SAVED ₹{totalSavings.toFixed(2)}</Text>
+                    </View>
+                    <Text style={styles.totalAmount}>₹{finalTotal.toFixed(2)}</Text>
+                </TouchableOpacity>
 
                 <TouchableOpacity
                     style={styles.confirmButton}
@@ -146,34 +166,35 @@ export default function CheckoutSummaryScreen() {
                 </TouchableOpacity>
 
                 {/* Breakdown */}
-                <View style={styles.breakdownContainer}>
-                    <View style={styles.breakdownRow}>
-                        <Text style={styles.breakdownLabel}>Subtotal ({cartItems.length} items)</Text>
-                        <Text style={styles.breakdownValue}>₹{totalPrice.toFixed(2)}</Text>
-                    </View>
-                    <View style={styles.breakdownRow}>
-                        <Text style={styles.breakdownLabel}>Shipping Fee</Text>
-                        <Text style={[styles.breakdownValue, { color: '#4CAF50' }]}>FREE</Text>
-                    </View>
-                    {isInstant && (
+                {expanded && (
+                    <View style={styles.breakdownContainer}>
                         <View style={styles.breakdownRow}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                <Text style={[styles.breakdownLabel, { color: '#FFA000' }]}>Instant Trial Fee</Text>
-                                <Ionicons name="help-circle" size={14} color="#FFA000" style={{ marginLeft: 5 }} />
-                            </View>
-                            <Text style={[styles.breakdownValue, { color: '#FFA000' }]}>₹{instantTrialFee.toFixed(2)}</Text>
+                            <Text style={styles.breakdownLabel}>Subtotal ({cartItems.length} items)</Text>
+                            <Text style={styles.breakdownValue}>₹{totalPrice.toFixed(2)}</Text>
                         </View>
-                    )}
-                    <View style={styles.breakdownRow}>
-                        <Text style={styles.breakdownLabel}>Tax (GST 18%)</Text>
-                        <Text style={styles.breakdownValue}>₹{gst.toFixed(2)}</Text>
+                        <View style={styles.breakdownRow}>
+                            <Text style={styles.breakdownLabel}>Shipping Fee</Text>
+                            <Text style={[styles.breakdownValue, { color: '#4CAF50' }]}>FREE</Text>
+                        </View>
+                        {isInstant && (
+                            <View style={styles.breakdownRow}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                    <Text style={[styles.breakdownLabel, { color: '#FFA000' }]}>Instant Trial Fee</Text>
+                                    <Ionicons name="help-circle" size={14} color="#FFA000" style={{ marginLeft: 5 }} />
+                                </View>
+                                <Text style={[styles.breakdownValue, { color: '#FFA000' }]}>₹{instantTrialFee.toFixed(2)}</Text>
+                            </View>
+                        )}
+                        <View style={styles.breakdownRow}>
+                            <Text style={styles.breakdownLabel}>Tax (GST 18%)</Text>
+                            <Text style={styles.breakdownValue}>₹{gst.toFixed(2)}</Text>
+                        </View>
+                        <View style={[styles.breakdownRow, { marginTop: 10 }]}>
+                            <Text style={styles.totalLabelSmall}>Total Amount</Text>
+                            <Text style={styles.totalValueSmall}>₹{finalTotal.toFixed(2)}</Text>
+                        </View>
                     </View>
-                    <View style={[styles.breakdownRow, { marginTop: 10 }]}>
-                        <Text style={styles.totalLabelSmall}>Total Amount</Text>
-                        <Text style={styles.totalValueSmall}>₹{finalTotal.toFixed(2)}</Text>
-                    </View>
-
-                </View>
+                )}
             </View>
         </View>
     );
