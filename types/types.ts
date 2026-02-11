@@ -44,8 +44,9 @@ export interface UserObject {
     email: string;                 // From Users entity
     userRole: 'customer' | 'seller' | 'delivery';  // From Users entity
     isVerified: boolean;           // Derived from verification logic
-    profileImage?: string;         // From User_Details entity (Cloudinary URL)
+    profileImage?: any;            // From User_Details entity (Cloudinary URL) or local require
     timeStamp: string;             // From Users entity (ISO 8601)
+    isPro?: boolean;               // Pro member status
 }
 
 /**

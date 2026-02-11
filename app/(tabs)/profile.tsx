@@ -78,7 +78,14 @@ export default function ProfileScreen() {
 
                     <View style={styles.profileInfo}>
                         <View style={styles.avatarContainer}>
-                            <Image source={user.profileImage} style={styles.avatar} />
+                            <Image
+                                source={
+                                    typeof user.profileImage === 'string'
+                                        ? { uri: user.profileImage }
+                                        : user.profileImage
+                                }
+                                style={styles.avatar}
+                            />
                             <View style={styles.onlineBadge} />
                         </View>
                         <Text style={styles.userName}>{user.name}</Text>
@@ -95,7 +102,7 @@ export default function ProfileScreen() {
                     <View style={styles.quickActionsRow}>
                         <QuickAction icon="shopping-bag" label="Orders" onPress={() => router.push('/profile/orders')} />
                         <QuickAction icon="heart" label="Wishlist" onPress={() => router.push('/profile/wishlist')} />
-                        <QuickAction icon="gift" label="Coupons" onPress={() => { }} />
+                        <QuickAction icon="gift" label="Coupons" onPress={() => router.push('/profile/coupons')} />
                         <QuickAction icon="refresh-cw" label="Refunds" onPress={() => router.push('/profile/returns')} />
                     </View>
                 </SafeAreaView>
