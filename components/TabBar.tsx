@@ -45,6 +45,8 @@ export default function TabBar({ state, descriptors, navigation }: BottomTabBarP
                 } else if (route.name === 'profile') {
                     label = "Profile";
                     iconName = "user";
+                } else {
+                    return null;
                 }
 
                 const color = isFocused ? '#FBBF24' : '#999';

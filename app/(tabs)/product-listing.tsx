@@ -13,10 +13,10 @@ import {
     View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import FilterModal, { FilterState } from '../components/product/FilterModal';
-import { CATEGORY_DATA, CategoryNode } from '../constants/categories'; // Import categories
-import { PRODUCTS, Product } from '../constants/products';
-import { useWishlist } from '../context/WishlistContext';
+import FilterModal, { FilterState } from '../../components/product/FilterModal';
+import { CATEGORY_DATA, CategoryNode } from '../../constants/categories'; // Import categories
+import { PRODUCTS, Product } from '../../constants/products';
+import { useWishlist } from '../../context/WishlistContext';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width / 2) - 20;

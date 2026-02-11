@@ -23,7 +23,6 @@ export default function RootLayout() {
                       <Stack screenOptions={{ headerShown: false }}>
                         <Stack.Screen name="auth" options={{ headerShown: false }} />
                         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                        <Stack.Screen name="product-listing" options={{ headerShown: false }} />
                         <Stack.Screen name="profile/addresses" options={{ title: 'Saved Addresses', headerShown: false }} />
                         <Stack.Screen name="profile/add-address" options={{ title: 'Add Address', headerShown: false }} />
                         <Stack.Screen name="profile/edit-profile" options={{ title: 'Edit Profile', headerShown: false }} />
