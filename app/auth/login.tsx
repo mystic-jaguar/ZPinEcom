@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
+import { useUser } from '../../context/UserContext';
 
 export default function LoginScreen() {
     const router = useRouter();
@@ -24,6 +25,8 @@ export default function LoginScreen() {
     const [loading, setLoading] = useState(false);
     const [showErrorModal, setShowErrorModal] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
+
+    const { updateUser } = useUser();
 
     const validateInputs = () => {
         if (!email.trim()) {
@@ -55,8 +58,17 @@ export default function LoginScreen() {
             // Simulate API call
             await new Promise(resolve => setTimeout(resolve, 1000));
 
-            // For now, just navigate to home
-            router.replace('/(tabs)');
+            // Update User Context
+            updateUser({
+                id: 'user-123',
+                name: 'John Doe',
+                email: email,
+                userRole: 'customer',
+                isVerified: true
+            });
+
+            // Redirect is handled by RootLayout, but we can also push if needed.
+            // However, since we update state, the effect in _layout will trigger.
         } catch (error) {
             setErrorMessage('Invalid email or password');
             setShowErrorModal(true);

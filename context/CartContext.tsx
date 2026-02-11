@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
-import { CartItemObject, ProductObject } from '../types/types';
+import { COUPONS } from '../constants/coupons';
+import { CartItemObject, CouponObject, ProductObject } from '../types/types';
 
 const CART_STORAGE_KEY = '@ZPinEcom:cart';
 
@@ -16,6 +17,10 @@ interface CartContextType {
     hasUnavailableItems: boolean;
     hasPriceChanges: boolean;
     isLoading: boolean;
+    appliedCoupon: CouponObject | null;
+    couponDiscount: number;
+    applyCoupon: (code: string) => { success: boolean; message: string };
+    removeCoupon: () => void;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -112,9 +117,17 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
 
     const clearCart = async () => {
         setCartItems([]);
+        setAppliedCoupon(null);
         await AsyncStorage.removeItem(CART_STORAGE_KEY);
         // API: DELETE /api/v1/cart - Clear cart on backend
     };
+
+    const [appliedCoupon, setAppliedCoupon] = useState<CouponObject | null>(null);
+
+    // Mock Coupons
+    // Mock Coupons
+    // Replaced with imported COUPONS constant
+    const AVAILABLE_COUPONS: CouponObject[] = COUPONS;
 
     const totalPrice = cartItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
     const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0);
@@ -122,6 +135,43 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
         const originalPrice = item.product.originalPrice || item.product.price;
         return sum + ((originalPrice - item.product.price) * item.quantity);
     }, 0);
+
+    // Calculate Coupon Discount
+    const couponDiscount = React.useMemo(() => {
+        if (!appliedCoupon) return 0;
+        if (totalPrice < appliedCoupon.minOrderValue) return 0;
+
+        let discount = 0;
+        if (appliedCoupon.discountType === 'percentage') {
+            discount = (totalPrice * appliedCoupon.discountValue) / 100;
+            if (appliedCoupon.maxDiscount) {
+                discount = Math.min(discount, appliedCoupon.maxDiscount);
+            }
+        } else {
+            discount = appliedCoupon.discountValue;
+        }
+
+        return discount;
+    }, [totalPrice, appliedCoupon]);
+
+    const applyCoupon = (code: string) => {
+        const coupon = AVAILABLE_COUPONS.find(c => c.code.toUpperCase() === code.toUpperCase());
+
+        if (!coupon) {
+            return { success: false, message: 'Invalid coupon code' };
+        }
+
+        if (totalPrice < coupon.minOrderValue) {
+            return { success: false, message: `Minimum order value of ₹${coupon.minOrderValue} required` };
+        }
+
+        setAppliedCoupon(coupon);
+        return { success: true, message: 'Coupon applied successfully' };
+    };
+
+    const removeCoupon = () => {
+        setAppliedCoupon(null);
+    };
 
     const hasUnavailableItems = cartItems.some(item => !item.isAvailable);
     const hasPriceChanges = cartItems.some(item => item.priceAtAdd !== item.product.price);
@@ -138,7 +188,11 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
             totalSavings,
             hasUnavailableItems,
             hasPriceChanges,
-            isLoading
+            isLoading,
+            appliedCoupon,
+            couponDiscount,
+            applyCoupon,
+            removeCoupon
         }}>
             {children}
         </CartContext.Provider>

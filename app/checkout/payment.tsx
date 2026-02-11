@@ -16,7 +16,7 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-nati
 export default function CheckoutPaymentScreen() {
     const router = useRouter();
     const { selectedPaymentMethod, setSelectedPaymentMethod, deliveryType, selectedAddressId } = useCheckout();
-    const { totalPrice, cartItems, clearCart } = useCart();
+    const { totalPrice, cartItems, clearCart, couponDiscount, totalSavings } = useCart();
     const { addresses } = useAddress();
     const { addOrder } = useOrder();
     const { cards, upis } = usePayment();
@@ -39,7 +39,7 @@ export default function CheckoutPaymentScreen() {
     const isInstant = deliveryType === 'Instant';
     const deliveryFee = isInstant ? 50.00 : 0; // Updated to ₹50
     const gst = totalPrice * 0.18; // 18% GST
-    const finalTotal = totalPrice + shippingFee + deliveryFee + gst;
+    const finalTotal = totalPrice + shippingFee + deliveryFee + gst - couponDiscount;
 
     const handlePaymentSelect = (method: string) => {
         setSelectedPaymentMethod(method);
@@ -98,7 +98,7 @@ export default function CheckoutPaymentScreen() {
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString(),
                 subtotal: totalPrice,
-                savings: 0,
+                savings: totalSavings + couponDiscount,
                 isInstant: isInstant
             };
             addOrder(newOrder);

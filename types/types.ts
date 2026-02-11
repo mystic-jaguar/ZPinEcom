@@ -208,6 +208,27 @@ export interface CartResponseObject {
 }
 
 // ============================================================================
+// COUPON TYPES
+// ============================================================================
+
+/**
+ * Coupon Object
+ */
+export interface CouponObject {
+    id: string;
+    code: string;
+    title: string;
+    description: string;
+    discountType: 'percentage' | 'fixed';
+    discountValue: number;
+    minOrderValue: number;
+    maxDiscount?: number;
+    expiryDate?: string; // ISO 8601 or display string
+    type?: string;
+    status?: 'active' | 'used' | 'expired';
+}
+
+// ============================================================================
 // ORDER TYPES
 // ============================================================================
 

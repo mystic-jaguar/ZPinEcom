@@ -1,5 +1,9 @@
-import React, { createContext, ReactNode, useContext, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 import { CompleteUserProfile, UserDetailsObject, UserObject } from '../types/types';
+
+const USER_STORAGE_KEY = '@ZPinEcom:user';
+const USER_DETAILS_STORAGE_KEY = '@ZPinEcom:userDetails';
 
 interface UserContextType {
     user: UserObject;
@@ -9,6 +13,7 @@ interface UserContextType {
     setCompleteProfile: (profile: CompleteUserProfile) => void;
     resetUser: () => void;
     isAuthenticated: boolean;
+    isLoading: boolean;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -42,25 +47,58 @@ const INITIAL_USER: any = {
 export const UserProvider = ({ children }: { children: ReactNode }) => {
     const [user, setUser] = useState<UserObject>(INITIAL_USER);
     const [userDetails, setUserDetails] = useState<UserDetailsObject | undefined>(undefined);
+    const [isLoading, setIsLoading] = useState(true);
 
-    const updateUser = (updates: Partial<UserObject>) => {
-        setUser(prev => ({ ...prev, ...updates }));
-    };
+    // Load User from Storage
+    useEffect(() => {
+        loadUser();
+    }, []);
 
-    const updateUserDetails = (details: UserDetailsObject) => {
-        setUserDetails(details);
-    };
+    const loadUser = async () => {
+        try {
+            const userData = await AsyncStorage.getItem(USER_STORAGE_KEY);
+            const userDetailsData = await AsyncStorage.getItem(USER_DETAILS_STORAGE_KEY);
 
-    const setCompleteProfile = (profile: CompleteUserProfile) => {
-        setUser(profile.user);
-        if (profile.details) {
-            setUserDetails(profile.details);
+            if (userData) {
+                setUser(JSON.parse(userData));
+            }
+            if (userDetailsData) {
+                setUserDetails(JSON.parse(userDetailsData));
+            }
+        } catch (error) {
+            console.error('Error loading user:', error);
+        } finally {
+            setIsLoading(false);
         }
     };
 
-    const resetUser = () => {
+    const updateUser = async (updates: Partial<UserObject>) => {
+        setUser(prev => {
+            const newUser = { ...prev, ...updates };
+            AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(newUser)).catch(console.error);
+            return newUser;
+        });
+    };
+
+    const updateUserDetails = async (details: UserDetailsObject) => {
+        setUserDetails(details);
+        await AsyncStorage.setItem(USER_DETAILS_STORAGE_KEY, JSON.stringify(details));
+    };
+
+    const setCompleteProfile = async (profile: CompleteUserProfile) => {
+        setUser(profile.user);
+        await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(profile.user));
+
+        if (profile.details) {
+            setUserDetails(profile.details);
+            await AsyncStorage.setItem(USER_DETAILS_STORAGE_KEY, JSON.stringify(profile.details));
+        }
+    };
+
+    const resetUser = async () => {
         setUser(INITIAL_USER);
         setUserDetails(undefined);
+        await AsyncStorage.multiRemove([USER_STORAGE_KEY, USER_DETAILS_STORAGE_KEY]);
     };
 
     const isAuthenticated = user.id !== '';
@@ -73,7 +111,8 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
             updateUserDetails,
             setCompleteProfile,
             resetUser,
-            isAuthenticated
+            isAuthenticated,
+            isLoading
         }}>
             {children}
         </UserContext.Provider>

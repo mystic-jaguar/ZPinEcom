@@ -5,59 +5,10 @@ import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native
 import { SafeAreaView } from 'react-native-safe-area-context';
 import CouponCard, { CouponStatus, CouponType } from '../../components/Coupons/CouponCard';
 
-interface Coupon {
-    id: string;
-    title: string;
-    discount: string;
-    description: string;
-    code: string;
-    expiry: string;
-    type: CouponType;
-    status: CouponStatus;
-}
+import { COUPONS } from '../../constants/coupons';
 
-const couponsData: Coupon[] = [
-    {
-        id: '1',
-        title: 'FASHION50',
-        discount: '50%',
-        description: 'Get 50% off on your first summer collection purchase.',
-        code: 'FASHION50',
-        expiry: '2 days left',
-        type: 'Fashion',
-        status: 'active',
-    },
-    {
-        id: '2',
-        title: 'SNEAK20',
-        discount: '₹200',
-        description: 'Flat discount on all Nike and Adidas sneakers.',
-        code: 'SNEAK20',
-        expiry: 'Dec 31',
-        type: 'Footwear',
-        status: 'active',
-    },
-    {
-        id: '3',
-        title: 'GLOW15',
-        discount: '15%',
-        description: 'Skincare products discount for premium members.',
-        code: 'GLOW15',
-        expiry: 'Expired',
-        type: 'Beauty',
-        status: 'used',
-    },
-    {
-        id: '4',
-        title: 'FREESHIP',
-        discount: 'FREE',
-        description: 'Free shipping on all orders above $50.',
-        code: 'FREESHIP',
-        expiry: 'Jan 15',
-        type: 'Free Shipping',
-        status: 'active',
-    },
-];
+// Use imported COUPONS
+const couponsData = COUPONS;
 
 const TABS = ['All', 'Fashion', 'Footwear', 'Beauty'];
 
@@ -122,12 +73,12 @@ export default function CouponsScreen() {
                     renderItem={({ item }) => (
                         <CouponCard
                             title={item.title}
-                            discount={item.discount}
+                            discount={item.discountType === 'percentage' ? `${item.discountValue}%` : `₹${item.discountValue}`} // Derive display string
                             description={item.description}
                             code={item.code}
-                            expiry={item.expiry}
-                            type={item.type}
-                            status={item.status}
+                            expiry={item.expiryDate || ''}
+                            type={item.type as CouponType}
+                            status={item.status as CouponStatus}
                         />
                     )}
                     showsVerticalScrollIndicator={false}

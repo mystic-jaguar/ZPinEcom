@@ -1,20 +1,24 @@
 import { CheckoutProgress } from '@/components/checkout/CheckoutProgress';
+import ActionModal from '@/components/common/ActionModal';
 import { Colors } from '@/constants/Colors';
 import { useAddress } from '@/context/AddressContext';
 import { useCart } from '@/context/CartContext';
 import { useCheckout } from '@/context/CheckoutContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React from 'react';
-import { FlatList, Image, LayoutAnimation, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, UIManager, View } from 'react-native';
+import React, { useState } from 'react';
+import { FlatList, Image, LayoutAnimation, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, UIManager, View } from 'react-native';
 
 export default function CheckoutSummaryScreen() {
     const router = useRouter();
     const { addresses } = useAddress();
-    const { cartItems, totalPrice, totalSavings, clearCart } = useCart();
+    const { cartItems, totalPrice, totalSavings, clearCart, appliedCoupon, couponDiscount, applyCoupon, removeCoupon } = useCart();
     const { selectedAddressId, selectedPaymentMethod, deliveryType, setDeliveryType } = useCheckout();
 
     const selectedAddress = addresses.find(a => a.id === selectedAddressId);
+    const [couponCode, setCouponCode] = React.useState('');
+    const [modalVisible, setModalVisible] = useState(false);
+    const [modalConfig, setModalConfig] = useState({ title: '', message: '', icon: 'check-circle' as any });
 
     // Delivery fees logic
     const shippingFee = 0; // FREE
@@ -24,8 +28,30 @@ export default function CheckoutSummaryScreen() {
     const isInstant = deliveryType === 'Instant';
     const deliveryFee = isInstant ? instantTrialFee : 0;
 
-    const finalTotal = totalPrice + shippingFee + deliveryFee + gst;
+    const finalTotal = totalPrice + shippingFee + deliveryFee + gst - couponDiscount;
     // Use totalSavings from CartContext instead of mock
+
+    const handleApplyCoupon = () => {
+        if (!couponCode.trim()) return;
+        const result = applyCoupon(couponCode);
+        if (result.success) {
+            setModalConfig({
+                title: 'Coupon Applied!',
+                message: result.message,
+                icon: 'check-circle'
+            });
+            setModalVisible(true);
+            setExpanded(true); // Expand to show discount details
+        } else {
+            setModalConfig({
+                title: 'Invalid Coupon',
+                message: result.message,
+                icon: 'alert-circle'
+            });
+            setModalVisible(true);
+        }
+        setCouponCode('');
+    };
 
 
 
@@ -132,6 +158,51 @@ export default function CheckoutSummaryScreen() {
                     </View>
                 </TouchableOpacity>
 
+                {/* Coupon Section */}
+                <View style={[styles.sectionHeader, { marginTop: 25 }]}>
+                    <View style={styles.iconTitleRow}>
+                        <Ionicons name="pricetag" size={18} color={Colors.light.tint} />
+                        <Text style={styles.sectionTitleText}>Coupon Code</Text>
+                    </View>
+                </View>
+
+                {appliedCoupon ? (
+                    <View style={styles.appliedCouponCard}>
+                        <View style={styles.couponRow}>
+                            <View style={styles.couponContent}>
+                                <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                                <View style={styles.couponTextContainer}>
+                                    <Text style={styles.couponCodeText}>{appliedCoupon.code}</Text>
+                                    <Text style={styles.couponDescText} numberOfLines={2}>{appliedCoupon.description}</Text>
+                                </View>
+                            </View>
+                            <TouchableOpacity onPress={removeCoupon} style={styles.removeButton}>
+                                <Text style={styles.removeCouponText}>Remove</Text>
+                            </TouchableOpacity>
+                        </View>
+                        <Text style={styles.couponSavingsText}>
+                            Savings: ₹{couponDiscount.toFixed(2)}
+                        </Text>
+                    </View>
+                ) : (
+                    <View style={styles.couponInputContainer}>
+                        <TextInput
+                            style={styles.couponInput}
+                            placeholder="Enter Coupon Code"
+                            value={couponCode}
+                            onChangeText={setCouponCode}
+                            autoCapitalize="characters"
+                        />
+                        <TouchableOpacity
+                            style={[styles.applyCouponButton, !couponCode && { opacity: 0.5 }]}
+                            onPress={handleApplyCoupon}
+                            disabled={!couponCode}
+                        >
+                            <Text style={styles.applyCouponButtonText}>APPLY</Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
+
                 {/* Order Items Section */}
                 <Text style={[styles.sectionTitleText, { marginTop: 25, marginBottom: 15, marginLeft: 5 }]}>Order Items</Text>
                 <FlatList
@@ -152,7 +223,7 @@ export default function CheckoutSummaryScreen() {
                             <Text style={styles.totalLabel}>TOTAL PAYABLE</Text>
                             <Ionicons name={expanded ? "chevron-down" : "chevron-up"} size={16} color="#90A4AE" style={{ marginLeft: 5 }} />
                         </View>
-                        <Text style={styles.savingsText}>YOU SAVED ₹{totalSavings.toFixed(2)}</Text>
+                        <Text style={styles.savingsText}>YOU SAVED ₹{(totalSavings + couponDiscount).toFixed(2)}</Text>
                     </View>
                     <Text style={styles.totalAmount}>₹{finalTotal.toFixed(2)}</Text>
                 </TouchableOpacity>
@@ -189,6 +260,12 @@ export default function CheckoutSummaryScreen() {
                             <Text style={styles.breakdownLabel}>Tax (GST 18%)</Text>
                             <Text style={styles.breakdownValue}>₹{gst.toFixed(2)}</Text>
                         </View>
+                        {appliedCoupon && (
+                            <View style={styles.breakdownRow}>
+                                <Text style={[styles.breakdownLabel, { color: '#4CAF50' }]}>Coupon Discount</Text>
+                                <Text style={[styles.breakdownValue, { color: '#4CAF50' }]}>- ₹{couponDiscount.toFixed(2)}</Text>
+                            </View>
+                        )}
                         <View style={[styles.breakdownRow, { marginTop: 10 }]}>
                             <Text style={styles.totalLabelSmall}>Total Amount</Text>
                             <Text style={styles.totalValueSmall}>₹{finalTotal.toFixed(2)}</Text>
@@ -196,6 +273,16 @@ export default function CheckoutSummaryScreen() {
                     </View>
                 )}
             </View>
+
+            <ActionModal
+                visible={modalVisible}
+                title={modalConfig.title}
+                message={modalConfig.message}
+                icon={modalConfig.icon}
+                primaryButtonText="OK"
+                onPrimaryPress={() => setModalVisible(false)}
+                onClose={() => setModalVisible(false)}
+            />
         </View>
     );
 }
@@ -423,5 +510,85 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontWeight: '900',
         color: '#000',
+    },
+    // Coupon Styles
+    appliedCouponCard: {
+        backgroundColor: '#E8F5E9',
+        borderRadius: 12,
+        padding: 16,
+        borderWidth: 1,
+        borderColor: '#4CAF50',
+        marginTop: 10,
+    },
+    couponCodeText: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#2E7D32',
+    },
+    couponDescText: {
+        fontSize: 12,
+        color: '#4CAF50',
+    },
+    removeCouponText: {
+        fontSize: 14,
+        fontWeight: 'bold',
+        color: '#F44336',
+    },
+    couponSavingsText: {
+        marginTop: 10,
+        fontSize: 14,
+        fontWeight: 'bold',
+        color: '#2E7D32',
+        textAlign: 'right',
+    },
+    couponInputContainer: {
+        flexDirection: 'row',
+        marginTop: 10,
+        gap: 10,
+    },
+    couponInput: {
+        flex: 1,
+        backgroundColor: '#fff',
+        borderWidth: 1,
+        borderColor: '#E0E0E0',
+        borderRadius: 12,
+        paddingHorizontal: 16,
+        height: 50,
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#000',
+    },
+    applyCouponButton: {
+        backgroundColor: Colors.light.tint,
+        borderRadius: 12,
+        paddingHorizontal: 20,
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: 50,
+    },
+    applyCouponButtonText: {
+        fontSize: 14,
+        fontWeight: 'bold',
+        color: '#000',
+    },
+    // New Coupon Styles
+    couponRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    couponContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1, // Allow this to take available space
+        marginRight: 10, // Space between content and remove button
+    },
+    couponTextContainer: {
+        marginLeft: 10,
+        flex: 1, // Allow text to wrap within the available space
+    },
+    removeButton: {
+        padding: 5,
+        alignSelf: 'flex-start', // Align to top if multi-line
     },
 });
