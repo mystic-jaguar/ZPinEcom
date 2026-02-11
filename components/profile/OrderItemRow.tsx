@@ -19,7 +19,11 @@ export default function OrderItemRow({
     return (
         <View style={styles.container}>
             <View style={styles.imageContainer}>
-                <Image source={image} style={styles.image} resizeMode="contain" />
+                <Image
+                    source={typeof image === 'string' ? { uri: image } : image}
+                    style={styles.image}
+                    resizeMode="contain"
+                />
             </View>
             <View style={styles.details}>
                 <Text style={styles.name} numberOfLines={1}>{name}</Text>

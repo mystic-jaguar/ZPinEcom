@@ -262,13 +262,13 @@ export default function ProductListing() {
                 headerShown: true,
                 title: currentCategoryNode?.name || 'Products',
                 headerLeft: () => (
-                    <TouchableOpacity onPress={() => router.back()} style={{ marginRight: 10 }}>
+                    <TouchableOpacity onPress={() => router.back()} style={{ marginRight: 10, marginLeft: '10%' }}>
                         <Feather name="chevron-left" size={28} color="#000" />
                     </TouchableOpacity>
                 ),
                 headerRight: () => (
-                    <View style={{ flexDirection: 'row', gap: 15 }}>
-                        <TouchableOpacity><Feather name="search" size={24} color="#000" /></TouchableOpacity>
+                    <View style={{ flexDirection: 'row', gap: 15, marginRight: '10%' }}>
+                        <TouchableOpacity onPress={() => router.push('/product-search')}><Feather name="search" size={24} color="#000" /></TouchableOpacity>
                         <TouchableOpacity><Feather name="shopping-bag" size={24} color="#000" /></TouchableOpacity>
                     </View>
                 ),
