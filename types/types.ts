@@ -135,7 +135,7 @@ export interface ProductObject {
     price: number;
     quantity: number;
     inStock: boolean;
-    images: string[];                      // Array of Cloudinary URLs
+    images: (string | any)[];              // Array of Cloudinary URLs or local require
     sellerLocation: SellerLocation;
     distance?: number;                     // Distance in km from user's location (only in search results)
     timeStamp: string;                     // ISO 8601

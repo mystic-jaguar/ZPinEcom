@@ -56,7 +56,10 @@ export default function ProductImageCarousel({ images, isLightningFast, onBack, 
             >
                 {images.map((img, index) => (
                     <View key={index} style={styles.imageContainer}>
-                        <Image source={img} style={styles.image} />
+                        <Image
+                            source={typeof img === 'string' ? { uri: img } : img}
+                            style={styles.image}
+                        />
                     </View>
                 ))}
             </ScrollView>

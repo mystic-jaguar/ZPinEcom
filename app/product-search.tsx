@@ -25,7 +25,7 @@ export default function ProductSearchScreen() {
         >
             <View style={styles.imageContainer}>
                 {item.images?.[0] ? (
-                    <Image source={{ uri: item.images[0] }} style={styles.productImage} />
+                    <Image source={typeof item.images[0] === 'string' ? { uri: item.images[0] } : item.images[0]} style={styles.productImage} />
                 ) : (
                     <View style={[styles.productImage, { backgroundColor: '#f0f0f0', alignItems: 'center', justifyContent: 'center' }]}>
                         <Feather name="image" size={24} color="#ccc" />

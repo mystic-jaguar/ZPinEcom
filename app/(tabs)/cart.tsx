@@ -67,7 +67,7 @@ function CartItem({ item, index, onRemove, onUpdateQuantity }: CartItemProps) {
                 <Image
                     source={
                         item.product?.images?.[0]
-                            ? { uri: item.product.images[0] }
+                            ? (typeof item.product.images[0] === 'string' ? { uri: item.product.images[0] } : item.product.images[0])
                             : (typeof item.image === 'string' ? { uri: item.image } : (item.image || { uri: 'https://via.placeholder.com/80' }))
                     }
                     style={styles.itemImage}

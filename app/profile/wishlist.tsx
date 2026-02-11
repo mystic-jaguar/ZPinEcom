@@ -17,7 +17,15 @@ export default function WishlistScreen() {
                 style={styles.imageContainer}
                 onPress={() => router.push(`/product/${item.productId}`)}
             >
-                <Image source={item.images?.[0] ? { uri: item.images[0] } : { uri: 'https://via.placeholder.com/80' }} style={styles.itemImage} resizeMode="cover" />
+                <Image
+                    source={
+                        item.images?.[0]
+                            ? (typeof item.images[0] === 'string' ? { uri: item.images[0] } : item.images[0])
+                            : { uri: 'https://via.placeholder.com/80' }
+                    }
+                    style={styles.itemImage}
+                    resizeMode="cover"
+                />
             </TouchableOpacity>
 
             <View style={styles.itemDetails}>

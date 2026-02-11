@@ -25,7 +25,9 @@ const createMockProduct = (data: Partial<ProductObject> & {
         price: data.price,
         quantity: 100,
         inStock: true,
-        images: Array.isArray(data.image) ? data.image.map(img => typeof img === 'string' ? img : (img.uri || 'https://via.placeholder.com/400')) : [typeof data.image === 'object' && data.image.uri ? data.image.uri : 'https://via.placeholder.com/400'],
+        images: Array.isArray(data.image)
+            ? data.image.map(img => (typeof img === 'string' || typeof img === 'number') ? img : (img.uri || 'https://via.placeholder.com/400'))
+            : [(typeof data.image === 'number' || typeof data.image === 'string') ? data.image : (data.image?.uri || 'https://via.placeholder.com/400')],
         sellerLocation: {
             city: 'Mumbai',
             state: 'Maharashtra',
