@@ -345,9 +345,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#f9f9f9',
         borderRadius: 15,
         marginBottom: 10,
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: 10,
+        overflow: 'hidden', // Ensure image stays within bounds
         shadowColor: "#AAA",
         shadowOffset: {
             width: 0,
@@ -358,9 +356,9 @@ const styles = StyleSheet.create({
         elevation: 5,
     },
     recommendImage: {
-        width: '90%',
-        height: '90%',
-        resizeMode: 'contain'
+        width: '100%',
+        height: '100%',
+        resizeMode: 'cover'
     },
     recommendName: {
         fontWeight: '700',
