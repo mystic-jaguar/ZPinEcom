@@ -41,7 +41,7 @@ export default function AllOrdersScreen() {
                 <Feather name="chevron-left" size={28} color="#1a1a1a" />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>My Orders</Text>
-            <TouchableOpacity>
+            <TouchableOpacity onPress={() => router.push('/profile/help-center')}>
                 <Feather name="help-circle" size={24} color="#1a1a1a" />
             </TouchableOpacity>
         </View>

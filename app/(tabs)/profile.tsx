@@ -216,7 +216,7 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         height: 380, // Extended height for yellow curve
-        backgroundColor: '#FFD700', // Yellow
+        backgroundColor: '#fedd24d4', // Yellow
         borderBottomLeftRadius: 40,
         borderBottomRightRadius: 40,
     },
