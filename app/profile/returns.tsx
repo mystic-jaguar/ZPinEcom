@@ -20,7 +20,7 @@ export default function ReturnsRefundsScreen() {
         order.items.map(item => ({
             ...item,
             orderId: order.orderNumber,
-            date: order.date,
+            date: order.createdAt,
             status: order.status
         }))
     );
@@ -30,7 +30,7 @@ export default function ReturnsRefundsScreen() {
         if (!searchQuery.trim()) return true;
         const query = searchQuery.toLowerCase();
         return (
-            item.name.toLowerCase().includes(query) ||
+            item.productName.toLowerCase().includes(query) ||
             item.orderId.toLowerCase().includes(query)
         );
     });
@@ -113,18 +113,18 @@ export default function ReturnsRefundsScreen() {
                 ) : (
                     filteredItems.map((item, index) => (
                         <ReturnEligibleCard
-                            key={`${item.orderId}-${item.id}-${index}`}
+                            key={`${item.orderId}-${item.productId}-${index}`}
                             image={item.image}
-                            status={item.status === 'Delivered' ? `DELIVERED ${item.date}` : item.status.toUpperCase()}
-                            statusColor={item.status === 'Delivered' ? '#D97706' : '#F59E0B'}
-                            name={item.name}
+                            status={item.status === 'delivered' ? `DELIVERED ${item.date}` : item.status.toUpperCase()}
+                            statusColor={item.status === 'delivered' ? '#D97706' : '#F59E0B'}
+                            name={item.productName}
                             variant={item.variant || "Standard Variant"}
                             onInitiate={() => router.push({
                                 pathname: '/profile/initiate-return',
                                 params: {
-                                    productId: item.id,
+                                    productId: item.productId,
                                     orderId: item.orderId,
-                                    productName: item.name,
+                                    productName: item.productName,
                                     productImage: item.image
                                 }
                             })}

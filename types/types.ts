@@ -49,63 +49,31 @@ export interface UserObject {
     isPro?: boolean;               // Pro member status
 }
 
-/**
- * User Details Object (Enhanced with Location)
- */
 export interface UserDetailsObject {
-    _id: string;
     userId: string;
-    dob: string;
-    address: string;
-    city: string;
-    state: string;
-    pincode: string;
-    coordinates: Coordinates;
-    gender: string;
-    profileImage?: string;         // Cloudinary URL
-    createdAt: string;             // ISO 8601
-}
-
-/**
- * Seller Details Object
- */
-export interface SellerDetailsObject {
-    id: string;
-    userId: string;
-    businessName: string;
-    businessDescription: string;
-    businessType: string;
-    gstNo: string;
-    panNo: string;
-    address: string;
-    city: string;
-    state: string;
-    pincode: string;
+    dob?: string;
+    gender?: string;
+    address?: string;
+    city?: string;
+    state?: string;
+    pincode?: string;
     coordinates?: Coordinates;
+    preferences?: {
+        receivePushNotifications: boolean;
+        receiveEmailUpdates: boolean;
+        receiveOrderUpdates: boolean;
+    };
+    createdAt?: string;
 }
 
-/**
- * Bank Details Object (for sellers)
- */
-export interface BankDetailsObject {
-    id: string;
-    userId: string;
-    bankName: string;
-    accountNo: string;
-    accountHolderName: string;
-    accountType: string;
-    ifscCode: string;
-}
-
-/**
- * Complete User Profile (Aggregated from all collections)
- */
 export interface CompleteUserProfile {
     user: UserObject;
     details?: UserDetailsObject;
-    sellerDetails?: SellerDetailsObject;  // if seller
-    bankDetails?: BankDetailsObject;      // if seller
+    sellerDetails?: any; // Placeholder for now
+    bankDetails?: any;   // Placeholder for now
 }
+
+
 
 // ============================================================================
 // PRODUCT TYPES

@@ -55,7 +55,7 @@ export default function AddPaymentMethodScreen() {
                     setCardNumber(card.cardNumber);
                     setCardHolder(card.cardHolderName);
                     setExpiry(card.expiryDate);
-                    setCvv(card.cvv);
+                    setCvv(card.cvv || '');
                     setCardType(card.cardType);
                 }
             } else if (type === 'UPI') {

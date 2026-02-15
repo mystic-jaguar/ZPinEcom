@@ -10,13 +10,13 @@ import { useUser } from '../../context/UserContext';
 
 export default function EditProfileScreen() {
     const router = useRouter();
-    const { user, updateUser } = useUser();
+    const { user, updateUser, userDetails, updateUserDetails } = useUser();
 
     const [form, setForm] = useState({
         name: user.name,
-        dob: (user as any).dob || '',
-        gender: (user as any).gender || '',
-        preferences: (user as any).preferences || {
+        dob: userDetails?.dob || '',
+        gender: userDetails?.gender || '',
+        preferences: userDetails?.preferences || {
             receivePushNotifications: true,
             receiveEmailUpdates: false,
             receiveOrderUpdates: true
@@ -27,7 +27,18 @@ export default function EditProfileScreen() {
     const [showSuccessModal, setShowSuccessModal] = useState(false);
 
     const handleSave = () => {
-        updateUser(form as any);
+        // Update basic user info
+        if (form.name !== user.name) {
+            updateUser({ name: form.name });
+        }
+
+        // Update extended user details
+        updateUserDetails({
+            dob: form.dob,
+            gender: form.gender,
+            preferences: form.preferences
+        });
+
         setShowSuccessModal(true);
     };
 
