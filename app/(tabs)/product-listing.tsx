@@ -1,8 +1,9 @@
 import { Colors } from '@/constants/Colors';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
+    ActivityIndicator,
     Dimensions,
     FlatList,
     Image,
@@ -14,9 +15,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import FilterModal, { FilterState } from '../../components/product/FilterModal';
-import { CATEGORY_DATA, CategoryNode } from '../../constants/categories'; // Import categories
-import { PRODUCTS, Product } from '../../constants/products';
+import { CATEGORY_DATA, CategoryNode } from '../../constants/categories';
 import { useWishlist } from '../../context/WishlistContext';
+import { productService } from '../../services/product';
+import { ProductObject } from '../../types/types';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width / 2) - 20;
@@ -26,6 +28,11 @@ export default function ProductListing() {
     const params = useLocalSearchParams();
     const { categoryName, subCategoryName } = params;
     const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
+
+    // Products State
+    const [products, setProducts] = useState<ProductObject[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
     const [activeFilter, setActiveFilter] = useState<string>('All');
 
@@ -38,6 +45,26 @@ export default function ProductListing() {
         ratings: [],
         discounts: []
     });
+
+    // Fetch Products on Mount
+    useEffect(() => {
+        loadProducts();
+    }, []);
+
+    const loadProducts = async () => {
+        try {
+            setLoading(true);
+            setError(null);
+            // Fetching a larger limit to simulate "all" for client-side filtering for now
+            // In a real app, we would pass category params to the API
+            const response = await productService.getProducts({ limit: 100 });
+            setProducts(response.products); // Assuming response structure { products: [], ... }
+        } catch (err: any) {
+            setError(err.message || 'Failed to load products');
+        } finally {
+            setLoading(false);
+        }
+    };
 
     // 1. Find the current category node (e.g. "T-Shirts") from the deep tree
     const currentCategoryNode = useMemo(() => {
@@ -70,8 +97,6 @@ export default function ProductListing() {
     };
 
     // 2. Get all valid sub-labels (leaves) for the initial "All" view
-    // If "T-Shirts" is selected, we want products with subCategory = "Round Neck", "Polo", etc.
-    // If "Men" is selected, we want everything under Men.
     const allDescendantLabels = useMemo(() => {
         if (!currentCategoryNode) return [];
         return collectLabels(currentCategoryNode);
@@ -80,14 +105,31 @@ export default function ProductListing() {
 
     // 3. Filter Logic
     const filteredProducts = useMemo(() => {
+        if (!products.length) return [];
+
         // Base filter: Product must be in the current tree hierarchy
-        const baseMatches = PRODUCTS.filter(p => {
+        const baseMatches = products.filter(p => {
+            if (allDescendantLabels.length === 0) return true; // No category selected, show all
+
             // Match against category or subCategory
             // We search if product.subCategory is one of the descendant labels
             // OR if product.category matches currentCategoryNode (fallback)
 
-            if (allDescendantLabels.includes(p.deepestCategoryName)) return true;
-            if (allDescendantLabels.includes(p.categoryPath.split('-')[0])) return true;
+            if (p.deepestCategoryName && typeof p.deepestCategoryName === 'string' && allDescendantLabels.includes(p.deepestCategoryName)) return true;
+
+            // Handle categoryPath as Array of Objects (API response)
+            if (Array.isArray(p.categoryPath)) {
+                // Check if any category in the path is in the allowed labels
+                // The API returns [{ name: "men" }, { name: "footwear" }]
+                // We compare strictly (or case-insensitive if needed, but labels seem title-cased)
+                // Actually, labels are title-cased "Men", API is "men". We might need to normalize.
+                return p.categoryPath.some((cat: any) =>
+                    cat.name && allDescendantLabels.some(label => label.toLowerCase() === cat.name.toLowerCase())
+                );
+            }
+
+            // Handle categoryPath as String (Legacy/Fallback)
+            if (p.categoryPath && typeof p.categoryPath === 'string' && allDescendantLabels.includes(p.categoryPath.split('-')[0])) return true;
 
             return false;
         });
@@ -102,15 +144,25 @@ export default function ProductListing() {
             if (selectedChildNode) {
                 // Get all descendants for this specific child (e.g. "Men" -> "Round Neck", "Polo")
                 const childDescendants = collectLabels(selectedChildNode);
-                return baseMatches.filter(p =>
-                    childDescendants.includes(p.deepestCategoryName) || childDescendants.includes(p.categoryPath.split('-')[0])
-                );
+                return baseMatches.filter(p => {
+                    if (p.deepestCategoryName && typeof p.deepestCategoryName === 'string' && childDescendants.includes(p.deepestCategoryName)) return true;
+
+                    if (Array.isArray(p.categoryPath)) {
+                        return p.categoryPath.some((cat: any) =>
+                            cat.name && childDescendants.some(label => label.toLowerCase() === cat.name.toLowerCase())
+                        );
+                    }
+
+                    if (p.categoryPath && typeof p.categoryPath === 'string' && childDescendants.includes(p.categoryPath.split('-')[0])) return true;
+
+                    return false;
+                });
             }
 
             // Fallback (exact match)
             return baseMatches.filter(p => p.deepestCategoryName === activeFilter);
         }
-    }, [activeFilter, allDescendantLabels, currentCategoryNode]);
+    }, [products, activeFilter, allDescendantLabels, currentCategoryNode]);
 
     // 4. Advanced Filter & Sort Logic (Applied on top of Category Filter)
     const finalFilteredProducts = useMemo(() => {
@@ -168,8 +220,8 @@ export default function ProductListing() {
                 break;
             case 'new':
                 // Mock: using ID or timestamp if available. 
-                // Let's assume higher ID is newer for this mock
-                result.sort((a, b) => parseInt(b.productId) - parseInt(a.productId));
+                // Let's assume higher ID is newer for this mock - or use timeStamp if valid string
+                result.sort((a, b) => new Date(b.timeStamp).getTime() - new Date(a.timeStamp).getTime());
                 break;
             case 'rating':
                 result.sort((a, b) => (b.rating || 0) - (a.rating || 0));
@@ -179,7 +231,7 @@ export default function ProductListing() {
                 break;
             case 'relevance':
             default:
-                // Keep default order (which satisfies relevance for now)
+                // Keep default order
                 break;
         }
 
@@ -190,7 +242,8 @@ export default function ProductListing() {
     const availableBrands = useMemo(() => {
         const brands = new Set<string>();
         filteredProducts.forEach(p => {
-            if (p.subtitle) brands.add(p.subtitle.toUpperCase());
+            if (p.deepestCategoryName) brands.add(p.deepestCategoryName.toUpperCase());
+            else if (p.subtitle) brands.add(p.subtitle.toUpperCase());
             else brands.add('CLASSIC');
         });
         return Array.from(brands).sort();
@@ -198,7 +251,7 @@ export default function ProductListing() {
 
 
     // Render Item
-    const renderProductItem = ({ item }: { item: Product }) => (
+    const renderProductItem = ({ item }: { item: ProductObject }) => (
         <TouchableOpacity
             style={styles.productCard}
             onPress={() => router.push(`/product/${item.productId}`)}
@@ -229,17 +282,17 @@ export default function ProductListing() {
                 </TouchableOpacity>
 
                 {/* New Arrival Badge (Mock logic: odd IDs) */}
-                {parseInt(item.productId) % 2 !== 0 && (
+                {/* {parseInt(item.productId) % 2 !== 0 && (
                     <View style={styles.newBadge}>
                         <Text style={styles.newBadgeText}>NEW ARRIVAL</Text>
                     </View>
-                )}
+                )} */}
             </View>
 
             <View style={styles.productInfo}>
                 {/* Brand / Subtitle */}
                 <Text style={styles.productBrand}>
-                    {item.subtitle ? item.subtitle.toUpperCase() : 'CLASSIC'}
+                    {item.deepestCategoryName ? item.deepestCategoryName.toUpperCase() : (item.subtitle ? item.subtitle.toUpperCase() : 'CLASSIC')}
                 </Text>
 
                 {/* Name */}
@@ -255,6 +308,25 @@ export default function ProductListing() {
             </View>
         </TouchableOpacity>
     );
+
+    if (loading) {
+        return (
+            <SafeAreaView style={styles.centerContainer}>
+                <ActivityIndicator size="large" color={Colors.light.tint} />
+            </SafeAreaView>
+        );
+    }
+
+    if (error) {
+        return (
+            <SafeAreaView style={styles.centerContainer}>
+                <Text style={styles.errorText}>{error}</Text>
+                <TouchableOpacity onPress={loadProducts} style={styles.retryButton}>
+                    <Text style={styles.retryText}>Retry</Text>
+                </TouchableOpacity>
+            </SafeAreaView>
+        );
+    }
 
     return (
         <SafeAreaView style={styles.container}>
@@ -357,6 +429,10 @@ export default function ProductListing() {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#fff' },
+    centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' },
+    errorText: { color: 'red', fontSize: 16, marginBottom: 10 },
+    retryButton: { padding: 10, backgroundColor: Colors.light.tint, borderRadius: 5 },
+    retryText: { fontWeight: 'bold' },
 
     // Filters
     filterContainer: {

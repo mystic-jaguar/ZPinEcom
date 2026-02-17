@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
+import { authService } from '../../services/auth';
 
 export default function SignupScreen() {
     const router = useRouter();
@@ -85,16 +86,17 @@ export default function SignupScreen() {
 
         setLoading(true);
         try {
-            // TODO: Implement API call
-            // const response = await authService.signup({ name, email, mobile, password });
-
-            // Simulate API call
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            await authService.signup({
+                name,
+                email,
+                mobile,
+                password
+            });
 
             // Navigate to OTP verification
             router.push({ pathname: '/auth/verify-otp', params: { mobile } });
-        } catch (error) {
-            setErrorMessage('An error occurred. Please try again.');
+        } catch (error: any) {
+            setErrorMessage(error.message || 'An error occurred. Please try again.');
             setShowErrorModal(true);
         } finally {
             setLoading(false);

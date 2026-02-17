@@ -35,33 +35,21 @@ export default function ReturnsRefundsScreen() {
         );
     });
 
-    // Mock completed refunds for history
-    const completedRefunds = [
-        {
-            orderId: 'ZP-95432',
-            amount: '₹1,299.00',
-            statusLabel: 'COMPLETED',
-            completedDate: '15th Nov 2024',
+    // Filter for completed refunds/returns
+    const completedRefunds = orders
+        .filter(order => order.status === 'returned' || order.status === 'cancelled' || order.paymentStatus === 'refunded')
+        .map(order => ({
+            orderId: order.orderNumber,
+            amount: `₹${order.finalAmount.toFixed(2)}`,
+            statusLabel: order.status === 'cancelled' ? 'CANCELLED' : 'REFUNDED',
+            completedDate: new Date(order.updatedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
             steps: [
                 { label: 'Requested', state: 'completed' as const, icon: 'check' as const },
-                { label: 'Picked up', state: 'completed' as const, icon: 'truck' as const },
+                { label: 'Processed', state: 'completed' as const, icon: 'settings' as const },
                 { label: 'Refunded', state: 'completed' as const, icon: 'dollar-sign' as const },
             ],
-            infoText: 'Refund completed on 15th Nov. Amount credited to your account.'
-        },
-        {
-            orderId: 'ZP-94201',
-            amount: '₹899.00',
-            statusLabel: 'COMPLETED',
-            completedDate: '8th Nov 2024',
-            steps: [
-                { label: 'Requested', state: 'completed' as const, icon: 'check' as const },
-                { label: 'Picked up', state: 'completed' as const, icon: 'truck' as const },
-                { label: 'Refunded', state: 'completed' as const, icon: 'dollar-sign' as const },
-            ],
-            infoText: 'Refund completed on 8th Nov. Amount credited to your account.'
-        },
-    ];
+            infoText: `Refund of ₹${order.finalAmount.toFixed(2)} has been processed to your ${order.paymentMethod === 'wallet' ? 'wallet' : 'original payment method'}.`
+        }));
 
     return (
         <View style={styles.container}>
@@ -119,15 +107,19 @@ export default function ReturnsRefundsScreen() {
                             statusColor={item.status === 'delivered' ? '#D97706' : '#F59E0B'}
                             name={item.productName}
                             variant={item.variant || "Standard Variant"}
-                            onInitiate={() => router.push({
-                                pathname: '/profile/initiate-return',
-                                params: {
-                                    productId: item.productId,
-                                    orderId: item.orderId,
-                                    productName: item.productName,
-                                    productImage: item.image
-                                }
-                            })}
+                            onInitiate={() => {
+                                router.push({
+                                    pathname: '/profile/cancel-order',
+                                    params: {
+                                        orderId: item.orderId,
+                                        productId: item.productId,
+                                        mode: 'return',
+                                        name: item.productName,
+                                        variant: item.variant,
+                                        image: item.image
+                                    }
+                                });
+                            }}
                         />
                     ))
                 )}

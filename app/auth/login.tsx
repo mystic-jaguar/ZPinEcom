@@ -16,6 +16,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
 import { useUser } from '../../context/UserContext';
+import { userDataManager } from '../../services/api';
+import { authService } from '../../services/auth';
 
 export default function LoginScreen() {
     const router = useRouter();
@@ -26,7 +28,7 @@ export default function LoginScreen() {
     const [showErrorModal, setShowErrorModal] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
 
-    const { updateUser } = useUser();
+    const { updateUser, setUser } = useUser();
 
     const validateInputs = () => {
         if (!email.trim()) {
@@ -52,23 +54,30 @@ export default function LoginScreen() {
 
         setLoading(true);
         try {
-            // TODO: Implement API call
-            // const response = await authService.login(email, password);
+            const response = await authService.login(email, password);
 
-            // Simulate API call
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            if (response.success) {
+                // Determine user data source
+                // Prioritize response.user as it's fresh from login
+                const userData = response.user || await userDataManager.getUserData();
 
-            // Update User Context
-            updateUser({
-                id: 'user-123',
-                name: 'John Doe',
-                email: email,
-                userRole: 'customer',
-                isVerified: true
-            });
+                if (userData) {
+                    // Use setUser to replace state entirely and trigger context update immediately
+                    // This should cause _layout.tsx to see isAuthenticated=true and redirect
+                    setUser(userData);
+                } else {
+                    // Fallback: Just try to get profile if needed, or handle error
+                    // For now, if no user data, we can't really "login" fully in context
+                    // But token is set, so maybe fetch profile?
+                    // Assuming response.user is usually there as per authService
+                }
+            } else {
+                throw new Error(response.message || 'Login failed');
+            }
 
-            // Redirect is handled by RootLayout, but we can also push if needed.
-            // However, since we update state, the effect in _layout will trigger.
+            // REMOVED manual redirect to avoid race conditions with _layout.tsx
+            // The RootLayout will automatically redirect to /(tabs) when 
+            // isAuthenticated becomes true.
         } catch (error) {
             setErrorMessage('Invalid email or password');
             setShowErrorModal(true);

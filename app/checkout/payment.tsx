@@ -105,7 +105,8 @@ export default function CheckoutPaymentScreen() {
 
             // Capture category for redirect
             if (cartItems.length > 0 && cartItems[0].product) {
-                setRedirectCategory(cartItems[0].product.categoryPath || null);
+                const catPath = cartItems[0].product.categoryPath;
+                setRedirectCategory(Array.isArray(catPath) ? (catPath[0]?.name || null) : (catPath || null));
             }
         }
 

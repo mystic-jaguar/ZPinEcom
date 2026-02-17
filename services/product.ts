@@ -1,4 +1,4 @@
-import { ApiPaginatedResponse, ApiSuccessResponse, ProductObject } from '../types/types';
+import { ApiPaginatedResponse, ApiSuccessResponse, LocationInfo, PaginationObject, ProductObject } from '../types/types';
 import apiClient, { handleApiError } from './api';
 
 export interface ProductListParams {
@@ -29,8 +29,21 @@ export const productService = {
     async getProducts(params?: ProductListParams) {
         try {
             // GET :- /api/v1/products
-            const response = await apiClient.get<ApiPaginatedResponse<ProductObject>>('products', { params });
-            return response.data;
+            // The API returns { products: [], pagination: {}, locationInfo: {} } directly
+            const response = await apiClient.get<{
+                products: ProductObject[];
+                pagination: PaginationObject;
+                locationInfo: LocationInfo;
+            }>('products', { params });
+
+            // Map _id to productId if needed
+            const products = response.data.products.map((p: any) => ({
+                ...p,
+                productId: p.productId || p._id,
+                categoryPath: p.categoryPath || 'All' // Ensure categoryPath exists
+            }));
+
+            return { ...response.data, products };
         } catch (error) {
             throw new Error(handleApiError(error));
         }
@@ -42,8 +55,14 @@ export const productService = {
     async getProductById(id: string) {
         try {
             // GET :- /api/v1/products/:id
-            const response = await apiClient.get<ApiSuccessResponse<ProductObject>>(`products/${id}`);
-            return response.data;
+            // The API returns the ProductObject directly
+            const response = await apiClient.get<any>(`products/${id}`);
+            const product = response.data;
+            return {
+                ...product,
+                productId: product.productId || product._id,
+                categoryPath: product.categoryPath || 'All'
+            } as ProductObject;
         } catch (error) {
             throw new Error(handleApiError(error));
         }

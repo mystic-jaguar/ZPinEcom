@@ -10,7 +10,7 @@ import { useUser } from '../../context/UserContext';
 
 export default function EditProfileScreen() {
     const router = useRouter();
-    const { user, updateUser, userDetails, updateUserDetails } = useUser();
+    const { user, updateUser, userDetails, updateUserDetails, setUserDetails } = useUser();
 
     const [form, setForm] = useState({
         name: user.name,
@@ -26,22 +26,44 @@ export default function EditProfileScreen() {
     const [showGenderPicker, setShowGenderPicker] = useState(false);
     const [showSuccessModal, setShowSuccessModal] = useState(false);
 
-    const handleSave = () => {
-        // Update basic user info
-        if (form.name !== user.name) {
-            updateUser({ name: form.name });
+    const [isSaving, setIsSaving] = useState(false);
+
+    const handleSave = async () => {
+        if (isSaving) return;
+        setIsSaving(true);
+
+        try {
+            // Update basic user info
+            if (form.name !== user.name) {
+                await updateUser({ name: form.name });
+            }
+
+            // Update extended user details
+            const detailsUpdate = {
+                dob: form.dob,
+                gender: form.gender,
+                preferences: form.preferences
+            };
+
+            if (userDetails) {
+                await updateUserDetails(detailsUpdate);
+            } else {
+                // Create new details object if none exists
+                await setUserDetails({
+                    userId: user.id,
+                    ...detailsUpdate,
+                    createdAt: new Date().toISOString()
+                });
+            }
+
+            setShowSuccessModal(true);
+        } catch (error) {
+            // Show error feedback to user
+            console.error('Failed to update profile:', error);
+        } finally {
+            setIsSaving(false);
         }
-
-        // Update extended user details
-        updateUserDetails({
-            dob: form.dob,
-            gender: form.gender,
-            preferences: form.preferences
-        });
-
-        setShowSuccessModal(true);
     };
-
     const handleModalClose = () => {
         setShowSuccessModal(false);
         router.back();

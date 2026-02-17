@@ -13,7 +13,10 @@ export default function ProductSearchScreen() {
     const filteredProducts = searchQuery
         ? PRODUCTS.filter(product =>
             product.productName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            product.categoryPath.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            product.productName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            (Array.isArray(product.categoryPath)
+                ? product.categoryPath.some((cat: any) => cat.name && cat.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                : (typeof product.categoryPath === 'string' && product.categoryPath.toLowerCase().includes(searchQuery.toLowerCase()))) ||
             product.deepestCategoryName.toLowerCase().includes(searchQuery.toLowerCase())
         )
         : [];

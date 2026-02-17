@@ -90,6 +90,43 @@ export interface SellerLocation {
 }
 
 /**
+ * Location Info Object (returned in product search/listing)
+ */
+export interface LocationInfo {
+    city: string;
+    state: string;
+    pincode: string;
+    coordinates?: Coordinates;
+}
+
+/**
+ * Category Info Object
+ */
+export interface CategoryInfo {
+    id: string;
+    name: string;
+    description?: string;
+    parentId?: string;
+}
+
+/**
+ * Review Object
+ */
+export interface ReviewObject {
+    id: string;
+    userId: string;
+    productId: string;
+    rating: number;
+    comment: string;
+    images?: string[];
+    user: {
+        name: string;
+        profileImage?: string;
+    };
+    createdAt: string;
+}
+
+/**
  * Product Object (Enhanced with Location)
  */
 export interface ProductObject {
@@ -99,7 +136,7 @@ export interface ProductObject {
     description: string;
     categoryId: string;
     deepestCategoryName: string;           // e.g., "SweatShirt"
-    categoryPath: string;                  // e.g., "fashion-man-shirt-casual-solid"
+    categoryPath: string | { name: string; _id?: string }[]; // e.g., "fashion-man..." or [{ name: "Men" }]
     price: number;
     quantity: number;
     inStock: boolean;

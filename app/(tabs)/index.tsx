@@ -1,11 +1,12 @@
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Dimensions, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Header from '../../components/Header';
 import SearchBar from '../../components/SearchBar';
+import { productService } from '../../services/product';
 
 const { width } = Dimensions.get('window');
 
@@ -48,6 +49,52 @@ const BIG_DISCOUNTS = [
 
 export default function HomeScreen() {
     const router = useRouter();
+    const [freshArrivals, setFreshArrivals] = useState<any[]>(FRESH_ARRIVALS);
+    const [recommended, setRecommended] = useState<any[]>(RECOMMENDED);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        fetchProducts();
+    }, []);
+
+    const fetchProducts = async () => {
+        try {
+            // Fetch Fresh Arrivals
+            const freshResponse = await productService.getProducts({ limit: 5 });
+            if (freshResponse.products && freshResponse.products.length > 0) {
+                const mappedFresh = freshResponse.products.map(p => ({
+                    id: p.productId,
+                    name: p.name,
+                    offer: 'New Arrival', // Or compute from price comparison
+                    image: p.images && p.images.length > 0 ? { uri: p.images[0] } : require('../../assets/images/icon.png'),
+                    color: '#E9E3D5', // Default or random color
+                    category: p.categoryPath,
+                    subCategory: ''
+                }));
+                setFreshArrivals(mappedFresh);
+            }
+
+            // Fetch Recommended (just general list for now)
+            const recResponse = await productService.getProducts({ limit: 5, page: 2 }); // different page for variety
+            if (recResponse.products && recResponse.products.length > 0) {
+                const mappedRec = recResponse.products.map(p => ({
+                    id: p.productId,
+                    name: p.name,
+                    desc: `₹${p.price}`,
+                    image: p.images && p.images.length > 0 ? p.images[0] : 'https://via.placeholder.com/150',
+                    category: p.categoryPath,
+                    subCategory: ''
+                }));
+                setRecommended(mappedRec);
+            }
+        } catch (error) {
+            console.error('Error fetching home products:', error);
+            // Keep mock data on error? Or show empty?
+            // Keeping mock data as fallback initialization
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const handleProductNav = (category: string, subCategory?: string) => {
         router.push({
@@ -152,12 +199,12 @@ export default function HomeScreen() {
                     <Text style={styles.sectionTitle}>Recommended</Text>
                 </View>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
-                    {RECOMMENDED.map((item) => (
+                    {recommended.map((item) => (
                         <TouchableOpacity key={item.id} style={styles.recommendCard} onPress={() => handleProductNav(item.category, item.subCategory)}>
                             <View style={styles.recommendImageContainer}>
-                                <Image source={{ uri: item.image }} style={styles.recommendImage} />
+                                <Image source={typeof item.image === 'string' ? { uri: item.image } : item.image} style={styles.recommendImage} />
                             </View>
-                            <Text style={styles.recommendName}>{item.name}</Text>
+                            <Text style={styles.recommendName} numberOfLines={1}>{item.name}</Text>
                             <Text style={styles.recommendDesc}>{item.desc}</Text>
                         </TouchableOpacity>
                     ))}
@@ -168,8 +215,8 @@ export default function HomeScreen() {
                     <Text style={styles.sectionTitle}>Fresh Arrivals</Text>
                 </View>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
-                    {FRESH_ARRIVALS.map((item) => (
-                        <TouchableOpacity key={item.id} style={[styles.freshCard, { backgroundColor: item.color }]} onPress={() => handleProductNav(item.category, item.subCategory)}>
+                    {freshArrivals.map((item) => (
+                        <TouchableOpacity key={item.id} style={[styles.freshCard, { backgroundColor: item.color || '#fff' }]} onPress={() => handleProductNav(item.category, item.subCategory)}>
                             <Image
                                 source={typeof item.image === 'string' ? { uri: item.image } : item.image}
                                 style={styles.freshImage}
@@ -178,7 +225,7 @@ export default function HomeScreen() {
                                 <Feather name="heart" size={16} color="#333" />
                             </TouchableOpacity> */}
                             <View style={styles.freshInfo}>
-                                <Text style={styles.freshName}>{item.name}</Text>
+                                <Text style={styles.freshName} numberOfLines={1}>{item.name}</Text>
                                 <Text style={styles.freshOffer}>{item.offer}</Text>
                             </View>
                         </TouchableOpacity>

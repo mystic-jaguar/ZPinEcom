@@ -1,7 +1,7 @@
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import AccordionItem from '../../components/common/AccordionItem';
 import ActionModal from '../../components/common/ActionModal';
 import DeliveryOptionSelector from '../../components/product/DeliveryOptionSelector';
@@ -10,6 +10,8 @@ import VariantSelector from '../../components/product/VariantSelector';
 import { PRODUCTS } from '../../constants/products';
 import { useCart } from '../../context/CartContext';
 import { useWishlist } from '../../context/WishlistContext';
+import { productService } from '../../services/product';
+import { ProductObject } from '../../types/types';
 
 export default function ProductDetails() {
     const { id } = useLocalSearchParams();
@@ -19,15 +21,43 @@ export default function ProductDetails() {
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [showVariantWarningModal, setShowVariantWarningModal] = useState(false);
 
-    // Find product or fallback to first one for demo
-    const product = PRODUCTS.find(p => p.productId === id) || PRODUCTS[0];
+    // Product State
+    const [product, setProduct] = useState<ProductObject | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
     // State for selectors
-    const [selectedColor, setSelectedColor] = useState(product.colors?.[0] || '');
-    const [selectedSize, setSelectedSize] = useState(product.sizes?.[2] || 'M'); // Default to M
+    const [selectedColor, setSelectedColor] = useState('');
+    const [selectedSize, setSelectedSize] = useState('');
     const [deliveryOption, setDeliveryOption] = useState<'instant' | 'standard'>('instant');
 
+    useEffect(() => {
+        if (id) {
+            loadProduct(id as string);
+        }
+    }, [id]);
+
+    const loadProduct = async (productId: string) => {
+        try {
+            setLoading(true);
+            setError(null);
+            const data = await productService.getProductById(productId);
+            setProduct(data);
+
+            // Set default selections if available
+            if (data.colors && data.colors.length > 0) setSelectedColor(data.colors[0]);
+            if (data.sizes && data.sizes.length > 0) setSelectedSize(data.sizes[2] || data.sizes[0]); // Default to 3rd or 1st
+
+        } catch (err: any) {
+            setError(err.message || 'Failed to load product details');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const handleAddToCart = () => {
+        if (!product) return;
+
         // Validate variant selection if product has variants
         const requiresColor = product.colors && product.colors.length > 0;
         const requiresSize = product.sizes && product.sizes.length > 0;
@@ -41,13 +71,38 @@ export default function ProductDetails() {
         setShowSuccessModal(true);
     };
 
+    if (loading) {
+        return (
+            <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+                <ActivityIndicator size="large" color="#FBBF24" />
+            </View>
+        );
+    }
+
+    if (error || !product) {
+        return (
+            <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: 20 }]}>
+                <Feather name="alert-triangle" size={48} color="#FF3B30" />
+                <Text style={{ marginTop: 20, fontSize: 16, color: '#666', textAlign: 'center' }}>
+                    {error || 'Product not found'}
+                </Text>
+                <TouchableOpacity
+                    style={{ marginTop: 20, padding: 10, backgroundColor: '#FBBF24', borderRadius: 8 }}
+                    onPress={() => router.back()}
+                >
+                    <Text style={{ fontWeight: 'bold' }}>Go Back</Text>
+                </TouchableOpacity>
+            </View>
+        );
+    }
+
     return (
         <View style={styles.container}>
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
                 {/* Images Carousel */}
                 <View style={{ position: 'relative' }}>
                     <ProductImageCarousel
-                        images={product.images || [product.images?.[0]]}
+                        images={product.images || []}
                         isLightningFast={product.isLightningFast}
                         onBack={() => router.back()}
                         isWishlisted={isInWishlist(product.productId)}
@@ -96,10 +151,7 @@ export default function ProductDetails() {
                         </View>
                     </View>
 
-                    {/* Action Buttons (Inline Wishlist + Add to Cart) - Placed below price as per some layouts, or fixed bottom. 
-                        Ref image shows them inline? No, ref image fixed bottom usually, but here buttons are mid-page.
-                        Actually ref image has them below offer.
-                    */}
+                    {/* Action Buttons */}
                     <View style={styles.actionRow}>
                         <TouchableOpacity
                             style={styles.wishlistBtn}
@@ -120,7 +172,6 @@ export default function ProductDetails() {
                             <Text style={styles.wishlistText}>Wishlist</Text>
                         </TouchableOpacity>
 
-                        {/* Wait, the previous block had Text inside. Let's rewrite properly. */}
                         <TouchableOpacity
                             style={styles.addToCartBtn}
                             onPress={handleAddToCart}
@@ -206,8 +257,9 @@ export default function ProductDetails() {
                         {PRODUCTS.slice(1, 5).map((p, i) => (
                             <View key={i} style={styles.recCard}>
                                 <View style={styles.recImagePlaceholder}>
-                                    {/* Use generic placeholder logic if image requires loop */}
-                                    <Text style={{ fontSize: 10, color: '#aaa' }}>Img</Text>
+                                    <View style={{ alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                                        <Feather name="image" size={24} color="#ccc" />
+                                    </View>
                                 </View>
                                 <Text style={styles.recTitle} numberOfLines={1}>{p.productName}</Text>
                                 <Text style={styles.recPrice}>₹{p.price}</Text>

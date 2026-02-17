@@ -1,11 +1,13 @@
-import React, { createContext, ReactNode, useContext, useState } from 'react';
+import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
+import { tokenManager } from '../services/api';
+import { CancelOrderData, orderService } from '../services/order';
 import { AddressObject, OrderObject } from '../types/types';
 
 interface OrderContextType {
     orders: OrderObject[];
     addOrder: (order: OrderObject) => void;
     getOrderById: (id: string) => OrderObject | undefined;
-    cancelOrder: (id: string) => void;
+    cancelOrder: (id: string, data: CancelOrderData) => Promise<{ message: string; refundAmount: number; refundStatus: string }>;
     updateOrderStatus: (id: string, status: OrderObject['status']) => void;
 }
 
@@ -87,23 +89,61 @@ const DUMMY_ORDERS: OrderObject[] = [
 ];
 
 export const OrderProvider = ({ children }: { children: ReactNode }) => {
-    const [orders, setOrders] = useState<OrderObject[]>(DUMMY_ORDERS);
+    const [orders, setOrders] = useState<OrderObject[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        loadOrders();
+    }, []);
+
+    const loadOrders = async () => {
+        try {
+            const token = await tokenManager.getAccessToken();
+            if (token) {
+                const response = await orderService.getOrders();
+                if (response.success && response.data) {
+                    setOrders(response.data);
+                }
+            } else {
+                // If not logged in, maybe show empty or dummy?
+                // For now, keep empty or use DUMMY if strictly dev mode needed
+                setOrders([]);
+            }
+        } catch (error) {
+            console.error('Failed to load orders:', error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     const addOrder = (order: OrderObject) => {
         setOrders(prev => [order, ...prev]);
+        // Note: Creating an order is usually done via checkout flow directly calling service
+        // This method updates the local state to reflect the new order immediately
     };
 
     const getOrderById = (id: string) => {
         return orders.find(o => o.orderNumber === id || o.id === id);
     };
 
-    const cancelOrder = (id: string) => {
-        // API: PUT /api/v1/orders/:id/cancel
-        setOrders(prev => prev.map(order =>
-            order.id === id
-                ? { ...order, status: 'cancelled' as const, paymentStatus: 'refunded' as const }
-                : order
-        ));
+    const cancelOrder = async (id: string, data: CancelOrderData) => {
+        try {
+            // Optimistic update
+            setOrders(prev => prev.map(order =>
+                order.id === id
+                    ? { ...order, status: 'cancelled' as const, paymentStatus: 'refunded' as const }
+                    : order
+            ));
+
+            // Sync with backend
+            const response = await orderService.cancelOrder(id, data);
+            return response.data;
+        } catch (error) {
+            console.error('Failed to cancel order:', error);
+            // Revert optimistic update if needed or show error
+            loadOrders(); // Reload to get true state
+            throw error; // Re-throw to let UI handle it
+        }
     };
 
     const updateOrderStatus = (id: string, status: OrderObject['status']) => {

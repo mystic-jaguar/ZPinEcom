@@ -85,8 +85,14 @@ apiClient.interceptors.response.use(
 
 // API Error Handler
 export const handleApiError = (error: any): string => {
+    if (!error) return 'An unknown error occurred.';
     if (error.response) {
         // Server responded with error
+        console.error('API Error Response:', {
+            status: error.response.status,
+            data: error.response.data,
+            headers: error.response.headers
+        });
         const message = error.response.data?.message || error.response.data?.error;
         return message || 'An error occurred. Please try again.';
     } else if (error.request) {

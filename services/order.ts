@@ -4,7 +4,9 @@ import apiClient, { handleApiError } from './api';
 export interface CreateOrderData {
     cartItems: string[];          // Array of cart item IDs
     shippingAddressId: string;    // Address ID or full address object
-    paymentMethod: 'razorpay' | 'cod';
+    paymentMethod: 'razorpay' | 'cod' | 'wallet';
+    paymentId?: string;           // Required for razorpay
+    deliveryBoyId?: string;       // Optional
     notes?: string;
     couponCode?: string;
 }
@@ -31,8 +33,8 @@ export const orderService = {
             // POST :- /api/v1/orders
             const response = await apiClient.post<ApiSuccessResponse<{
                 order: OrderObject;
-                orderItems: any[];
-                paymentDetails: any;
+                orderItems: any[]; // Ideally should be OrderItemObject[]
+                paymentDetails?: any;
             }>>('orders', data);
             return response.data;
         } catch (error) {
@@ -75,14 +77,22 @@ export const orderService = {
      */
     async cancelOrder(id: string, data: CancelOrderData) {
         try {
-            // PUT :- /api/v1/orders/:id/cancel
-            const response = await apiClient.put<ApiSuccessResponse<{
+            console.log('Cancelling order:', id, data);
+            // PATCH :- /api/v1/orders/:id/cancel
+            const response = await apiClient.patch<ApiSuccessResponse<{
                 message: string;
                 refundAmount: number;
                 refundStatus: string;
             }>>(`orders/${id}/cancel`, data);
+            console.log('Cancel success:', response.data);
             return response.data;
-        } catch (error) {
+        } catch (error: any) {
+            console.error('Cancel API Error:', error ? (error.response?.data || error.message) : 'Unknown Error');
+            if (error.response) {
+                console.log('Error Status:', error.response.status);
+                // Log full data for debugging
+                console.log('Error Data:', JSON.stringify(error.response.data, null, 2));
+            }
             throw new Error(handleApiError(error));
         }
     },

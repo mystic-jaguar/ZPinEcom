@@ -1,6 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 import { COUPONS } from '../constants/coupons';
+import { tokenManager } from '../services/api';
+import { cartService } from '../services/cart';
 import { CartItemObject, CouponObject, ProductObject } from '../types/types';
 
 const CART_STORAGE_KEY = '@ZPinEcom:cart';
@@ -37,6 +39,22 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
 
     const loadCart = async () => {
         try {
+            // Try loading from backend first if logged in
+            const token = await tokenManager.getAccessToken();
+            if (token) {
+                try {
+                    const response = await cartService.getCart();
+                    if (response.success && response.data) {
+                        setCartItems(response.data.cart);
+                        await AsyncStorage.setItem(CART_STORAGE_KEY, JSON.stringify(response.data.cart));
+                        return; // Successfully loaded from backend
+                    }
+                } catch (apiError) {
+                    console.warn('Failed to load cart from backend:', apiError);
+                }
+            }
+
+            // Fallback to local storage
             const cartData = await AsyncStorage.getItem(CART_STORAGE_KEY);
             if (cartData) {
                 setCartItems(JSON.parse(cartData));
@@ -51,19 +69,20 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     const saveCart = async (items: CartItemObject[]) => {
         try {
             await AsyncStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
-            // API: POST /api/v1/cart - Sync with backend
         } catch (error) {
             console.error('Error saving cart:', error);
         }
     };
 
-    const addToCart = (product: ProductObject, selectedColor?: string, selectedSize?: string) => {
+    const addToCart = async (product: ProductObject, selectedColor?: string, selectedSize?: string) => {
+        // Optimistic update
         const cartItemId = `${product.productId}-${selectedColor || 'default'}-${selectedSize || 'default'}`;
+        let quantityToAdd = 1;
 
         setCartItems(prevItems => {
             const existingItem = prevItems.find(item => item.cartItemId === cartItemId);
-
             let newItems: CartItemObject[];
+
             if (existingItem) {
                 newItems = prevItems.map(item =>
                     item.cartItemId === cartItemId
@@ -84,25 +103,53 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
                 };
                 newItems = [...prevItems, newCartItem];
             }
-
             saveCart(newItems);
             return newItems;
         });
+
+        // Sync with backend
+        try {
+            const token = await tokenManager.getAccessToken();
+            if (token) {
+                await cartService.addToCart({ productId: product.productId, quantity: 1 });
+            }
+        } catch (error) {
+            console.error('Error syncing add to cart:', error);
+        }
     };
 
-    const removeFromCart = (cartItemId: string) => {
+    const removeFromCart = async (cartItemId: string) => {
+        // Find product ID from cart item (assuming cartItemId contains it or we look it up)
+        // Since cartItemId is composite, we need finding the item
+        const itemToRemove = cartItems.find(item => item.cartItemId === cartItemId);
+        const productId = itemToRemove?.productId;
+
         setCartItems(prevItems => {
             const newItems = prevItems.filter(item => item.cartItemId !== cartItemId);
             saveCart(newItems);
             return newItems;
         });
+
+        if (productId) {
+            try {
+                const token = await tokenManager.getAccessToken();
+                if (token) {
+                    await cartService.removeFromCart(productId);
+                }
+            } catch (error) {
+                console.error('Error syncing remove from cart:', error);
+            }
+        }
     };
 
-    const updateQuantity = (cartItemId: string, quantity: number) => {
+    const updateQuantity = async (cartItemId: string, quantity: number) => {
         if (quantity < 1) {
             removeFromCart(cartItemId);
             return;
         }
+
+        const itemToUpdate = cartItems.find(item => item.cartItemId === cartItemId);
+        const productId = itemToUpdate?.productId;
 
         setCartItems(prevItems => {
             const newItems = prevItems.map(item =>
@@ -113,13 +160,32 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
             saveCart(newItems);
             return newItems;
         });
+
+        if (productId) {
+            try {
+                const token = await tokenManager.getAccessToken();
+                if (token) {
+                    await cartService.updateCartItem(productId, { quantity });
+                }
+            } catch (error) {
+                console.error('Error syncing update quantity:', error);
+            }
+        }
     };
 
     const clearCart = async () => {
         setCartItems([]);
         setAppliedCoupon(null);
         await AsyncStorage.removeItem(CART_STORAGE_KEY);
-        // API: DELETE /api/v1/cart - Clear cart on backend
+
+        try {
+            const token = await tokenManager.getAccessToken();
+            if (token) {
+                await cartService.clearCart();
+            }
+        } catch (error) {
+            console.error('Error syncing clear cart:', error);
+        }
     };
 
     const [appliedCoupon, setAppliedCoupon] = useState<CouponObject | null>(null);

@@ -1,4 +1,4 @@
-import { ApiPaginatedResponse, ApiSuccessResponse, UserObject } from '../types/types';
+import { ApiPaginatedResponse, ApiSuccessResponse, OrderObject, UserDetailsObject, UserObject } from '../types/types';
 import apiClient, { handleApiError } from './api';
 
 export interface UpdateProfileData {
@@ -48,7 +48,7 @@ export const userService = {
     async getUserOrders(page?: number, limit?: number) {
         try {
             // GET :- /api/v1/users/orders
-            const response = await apiClient.get<ApiPaginatedResponse<any>>('users/orders', {
+            const response = await apiClient.get<ApiPaginatedResponse<OrderObject>>('users/orders', {
                 params: { page, limit },
             });
             return response.data;
@@ -110,7 +110,7 @@ export const userService = {
     }) {
         try {
             // POST :- /api/v1/users/shipping-address
-            const response = await apiClient.post<ApiSuccessResponse<any>>('users/shipping-address', data);
+            const response = await apiClient.post<ApiSuccessResponse<UserDetailsObject>>('users/shipping-address', data);
             return response.data;
         } catch (error) {
             throw new Error(handleApiError(error));

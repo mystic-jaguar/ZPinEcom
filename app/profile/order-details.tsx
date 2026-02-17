@@ -13,10 +13,7 @@ export default function OrderDetailsScreen() {
     const router = useRouter();
     const params = useLocalSearchParams();
     const { orderId } = params;
-    const { getOrderById, cancelOrder } = useOrder();
-    const [showCancelModal, setShowCancelModal] = useState(false);
-    const [showSuccessModal, setShowSuccessModal] = useState(false);
-    const [successMessage, setSuccessMessage] = useState('');
+    const { getOrderById } = useOrder();
     const [showInvoiceModal, setShowInvoiceModal] = useState(false);
 
     const order = getOrderById(orderId as string);
@@ -26,15 +23,6 @@ export default function OrderDetailsScreen() {
 
     // Calculate if order is eligible for return (within 5 days of delivery)
     const canReturn = order && order.status === 'delivered';
-
-    const handleCancelOrder = () => {
-        if (!order) return;
-        // API: PUT /api/v1/orders/:id/cancel
-        cancelOrder(order.id);
-        setShowCancelModal(false);
-        setSuccessMessage('Your order has been cancelled successfully.');
-        setShowSuccessModal(true);
-    };
 
     const handleDownloadInvoice = () => {
         // API: GET /api/v1/orders/:id/invoice
@@ -187,7 +175,10 @@ export default function OrderDetailsScreen() {
                 {canCancel && (
                     <TouchableOpacity
                         style={styles.cancelButton}
-                        onPress={() => setShowCancelModal(true)}
+                        onPress={() => router.push({
+                            pathname: '/profile/cancel-order',
+                            params: { orderId: order.id }
+                        })}
                     >
                         <Text style={styles.cancelButtonText}>Cancel Order</Text>
                     </TouchableOpacity>
@@ -206,35 +197,7 @@ export default function OrderDetailsScreen() {
                 <View style={{ height: 40 }} />
             </ScrollView>
 
-            {/* Cancel Confirmation Modal */}
-            <ActionModal
-                visible={showCancelModal}
-                title="Cancel Order?"
-                message="Are you sure you want to cancel this order? This action cannot be undone."
-                icon="x-circle"
-                primaryButtonText="Yes, Cancel Order"
-                onPrimaryPress={handleCancelOrder}
-                secondaryButtonText="No, Keep Order"
-                onSecondaryPress={() => setShowCancelModal(false)}
-                onClose={() => setShowCancelModal(false)}
-            />
 
-            {/* Success Modal */}
-            <ActionModal
-                visible={showSuccessModal}
-                title="Order Cancelled"
-                message={successMessage}
-                icon="check-circle"
-                primaryButtonText="OK"
-                onPrimaryPress={() => {
-                    setShowSuccessModal(false);
-                    router.back();
-                }}
-                onClose={() => {
-                    setShowSuccessModal(false);
-                    router.back();
-                }}
-            />
 
             {/* Invoice Modal */}
             <ActionModal
