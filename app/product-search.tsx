@@ -5,6 +5,7 @@ import { FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react
 import { SafeAreaView } from 'react-native-safe-area-context';
 import SearchBar from '../components/SearchBar';
 import { PRODUCTS, Product } from '../constants/products';
+import { CategoryPathItem } from '../types/types';
 
 export default function ProductSearchScreen() {
     const router = useRouter();
@@ -13,9 +14,8 @@ export default function ProductSearchScreen() {
     const filteredProducts = searchQuery
         ? PRODUCTS.filter(product =>
             product.productName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            product.productName.toLowerCase().includes(searchQuery.toLowerCase()) ||
             (Array.isArray(product.categoryPath)
-                ? product.categoryPath.some((cat: any) => cat.name && cat.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                ? product.categoryPath.some((cat: CategoryPathItem) => cat.name && cat.name.toLowerCase().includes(searchQuery.toLowerCase()))
                 : (typeof product.categoryPath === 'string' && product.categoryPath.toLowerCase().includes(searchQuery.toLowerCase()))) ||
             product.deepestCategoryName.toLowerCase().includes(searchQuery.toLowerCase())
         )

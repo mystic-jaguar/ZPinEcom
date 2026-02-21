@@ -59,17 +59,17 @@ export default function LoginScreen() {
             if (response.success) {
                 // Determine user data source
                 // Prioritize response.user as it's fresh from login
-                const userData = response.user || await userDataManager.getUserData();
+                // Also check response.data.user if the response is wrapped
+                const responseData = response.data || response;
+                const userData = response.user || responseData.user || await userDataManager.getUserData();
 
                 if (userData) {
                     // Use setUser to replace state entirely and trigger context update immediately
                     // This should cause _layout.tsx to see isAuthenticated=true and redirect
                     setUser(userData);
                 } else {
-                    // Fallback: Just try to get profile if needed, or handle error
-                    // For now, if no user data, we can't really "login" fully in context
-                    // But token is set, so maybe fetch profile?
-                    // Assuming response.user is usually there as per authService
+                    // Login succeeded but no user data available - treat as failure
+                    throw new Error('Unable to retrieve user data');
                 }
             } else {
                 throw new Error(response.message || 'Login failed');
@@ -79,10 +79,9 @@ export default function LoginScreen() {
             // The RootLayout will automatically redirect to /(tabs) when 
             // isAuthenticated becomes true.
         } catch (error) {
-            setErrorMessage('Invalid email or password');
+            const message = error instanceof Error ? error.message : 'Invalid email or password';
+            setErrorMessage(message);
             setShowErrorModal(true);
-        } finally {
-            setLoading(false);
         }
     };
 

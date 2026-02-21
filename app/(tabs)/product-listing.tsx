@@ -18,7 +18,7 @@ import FilterModal, { FilterState } from '../../components/product/FilterModal';
 import { CATEGORY_DATA, CategoryNode } from '../../constants/categories';
 import { useWishlist } from '../../context/WishlistContext';
 import { productService } from '../../services/product';
-import { ProductObject } from '../../types/types';
+import { CategoryPathItem, ProductObject } from '../../types/types';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width / 2) - 20;
@@ -123,7 +123,7 @@ export default function ProductListing() {
                 // The API returns [{ name: "men" }, { name: "footwear" }]
                 // We compare strictly (or case-insensitive if needed, but labels seem title-cased)
                 // Actually, labels are title-cased "Men", API is "men". We might need to normalize.
-                return p.categoryPath.some((cat: any) =>
+                return p.categoryPath.some((cat: CategoryPathItem) =>
                     cat.name && allDescendantLabels.some(label => label.toLowerCase() === cat.name.toLowerCase())
                 );
             }
@@ -148,7 +148,7 @@ export default function ProductListing() {
                     if (p.deepestCategoryName && typeof p.deepestCategoryName === 'string' && childDescendants.includes(p.deepestCategoryName)) return true;
 
                     if (Array.isArray(p.categoryPath)) {
-                        return p.categoryPath.some((cat: any) =>
+                        return p.categoryPath.some((cat: CategoryPathItem) =>
                             cat.name && childDescendants.some(label => label.toLowerCase() === cat.name.toLowerCase())
                         );
                     }
@@ -221,7 +221,14 @@ export default function ProductListing() {
             case 'new':
                 // Mock: using ID or timestamp if available. 
                 // Let's assume higher ID is newer for this mock - or use timeStamp if valid string
-                result.sort((a, b) => new Date(b.timeStamp).getTime() - new Date(a.timeStamp).getTime());
+                result.sort((a, b) => {
+                    const timeA = a.timeStamp ? new Date(a.timeStamp).getTime() : 0;
+                    const timeB = b.timeStamp ? new Date(b.timeStamp).getTime() : 0;
+                    // Handle invalid dates (NaN)
+                    const validA = Number.isNaN(timeA) ? 0 : timeA;
+                    const validB = Number.isNaN(timeB) ? 0 : timeB;
+                    return validB - validA;
+                });
                 break;
             case 'rating':
                 result.sort((a, b) => (b.rating || 0) - (a.rating || 0));

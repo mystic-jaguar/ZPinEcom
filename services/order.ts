@@ -77,22 +77,14 @@ export const orderService = {
      */
     async cancelOrder(id: string, data: CancelOrderData) {
         try {
-            console.log('Cancelling order:', id, data);
             // PATCH :- /api/v1/orders/:id/cancel
             const response = await apiClient.patch<ApiSuccessResponse<{
                 message: string;
                 refundAmount: number;
                 refundStatus: string;
             }>>(`orders/${id}/cancel`, data);
-            console.log('Cancel success:', response.data);
             return response.data;
         } catch (error: any) {
-            console.error('Cancel API Error:', error ? (error.response?.data || error.message) : 'Unknown Error');
-            if (error.response) {
-                console.log('Error Status:', error.response.status);
-                // Log full data for debugging
-                console.log('Error Data:', JSON.stringify(error.response.data, null, 2));
-            }
             throw new Error(handleApiError(error));
         }
     },

@@ -68,7 +68,7 @@ export default function HomeScreen() {
                     offer: 'New Arrival', // Or compute from price comparison
                     image: p.images && p.images.length > 0 ? { uri: p.images[0] } : require('../../assets/images/icon.png'),
                     color: '#E9E3D5', // Default or random color
-                    category: p.categoryPath,
+                    category: Array.isArray(p.categoryPath) ? (p.categoryPath[0]?.name || 'Fashion') : p.categoryPath,
                     subCategory: ''
                 }));
                 setFreshArrivals(mappedFresh);
@@ -82,7 +82,7 @@ export default function HomeScreen() {
                     name: p.name,
                     desc: `₹${p.price}`,
                     image: p.images && p.images.length > 0 ? p.images[0] : 'https://via.placeholder.com/150',
-                    category: p.categoryPath,
+                    category: Array.isArray(p.categoryPath) ? (p.categoryPath[0]?.name || 'Fashion') : p.categoryPath,
                     subCategory: ''
                 }));
                 setRecommended(mappedRec);

@@ -131,12 +131,24 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
             // Optimistic update
             setOrders(prev => prev.map(order =>
                 order.id === id
-                    ? { ...order, status: 'cancelled' as const, paymentStatus: 'refunded' as const }
+                    ? { ...order, status: 'cancelled' as const }
                     : order
             ));
 
             // Sync with backend
             const response = await orderService.cancelOrder(id, data);
+
+            if (!response.data) {
+                throw new Error('Invalid response from cancel order service');
+            }
+
+            // Update with actual refund status from backend
+            setOrders(prev => prev.map(order =>
+                order.id === id
+                    ? { ...order, paymentStatus: response.data.refundStatus as OrderObject['paymentStatus'] }
+                    : order
+            ));
+
             return response.data;
         } catch (error) {
             console.error('Failed to cancel order:', error);

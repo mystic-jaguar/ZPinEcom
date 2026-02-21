@@ -67,9 +67,14 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
                             setUserState(serverUser);
                             await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(serverUser));
                         }
-                    } catch (apiError) {
+                    } catch (apiError: any) {
                         console.warn('Failed to refresh user data from server:', apiError);
-                        // Continue using local data
+                        // Check if it's an auth error (e.g., 401/403)
+                        if (apiError?.response?.status === 401 || apiError?.response?.status === 403) {
+                            setIsAuthenticated(false);
+                            await tokenManager.clearTokens?.();
+                        }
+                        // Otherwise continue using local data for offline support
                     }
                 }
             } else {
@@ -94,6 +99,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     };
 
     const updateUser = async (updates: Partial<UserObject>) => {
+        const previousUser = user; // Capture for rollback
         try {
             // Optimistic update
             setUserState(prev => {
@@ -119,7 +125,10 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 
         } catch (error) {
             console.error('Error updating user profile:', error);
-            // Revert or show error (implementation depends on UI requirements)
+            // Rollback to previous state
+            setUserState(previousUser);
+            await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(previousUser));
+            throw error; // Re-throw so caller can handle (e.g., show toast)
         }
     };
 
@@ -156,6 +165,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         setUserDetailsState(undefined);
         setIsAuthenticated(false);
         await AsyncStorage.multiRemove([USER_STORAGE_KEY, USER_DETAILS_STORAGE_KEY]);
+        await tokenManager.clearTokens?.();
     };
 
     return (

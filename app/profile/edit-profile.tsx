@@ -25,6 +25,8 @@ export default function EditProfileScreen() {
 
     const [showGenderPicker, setShowGenderPicker] = useState(false);
     const [showSuccessModal, setShowSuccessModal] = useState(false);
+    const [showErrorModal, setShowErrorModal] = useState(false);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     const [isSaving, setIsSaving] = useState(false);
 
@@ -60,6 +62,8 @@ export default function EditProfileScreen() {
         } catch (error) {
             // Show error feedback to user
             console.error('Failed to update profile:', error);
+            setErrorMessage('Failed to update profile. Please try again.');
+            setShowErrorModal(true);
         } finally {
             setIsSaving(false);
         }
@@ -204,6 +208,16 @@ export default function EditProfileScreen() {
                 onPrimaryPress={handleModalClose}
                 onClose={handleModalClose}
                 icon="check-circle"
+            />
+
+            <ActionModal
+                visible={showErrorModal}
+                title="Error"
+                message={errorMessage || 'Something went wrong.'}
+                primaryButtonText="OK"
+                onPrimaryPress={() => setShowErrorModal(false)}
+                onClose={() => setShowErrorModal(false)}
+                icon="x-circle"
             />
 
             {/* Dark Mode FAB (Visual) removed as per clean UI request or can handle via preferences */}

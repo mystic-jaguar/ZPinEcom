@@ -88,11 +88,17 @@ export const handleApiError = (error: any): string => {
     if (!error) return 'An unknown error occurred.';
     if (error.response) {
         // Server responded with error
-        console.error('API Error Response:', {
-            status: error.response.status,
-            data: error.response.data,
-            headers: error.response.headers
-        });
+        if (__DEV__) {
+            console.error('API Error Response:', {
+                status: error.response.status,
+                data: error.response.data,
+            });
+        } else {
+            console.error('API Error Response:', {
+                status: error.response.status,
+                message: error.response.data?.message || 'Unknown error',
+            });
+        }
         const message = error.response.data?.message || error.response.data?.error;
         return message || 'An error occurred. Please try again.';
     } else if (error.request) {

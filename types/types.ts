@@ -127,6 +127,14 @@ export interface ReviewObject {
 }
 
 /**
+ * Category path item (used in ProductObject.categoryPath array form)
+ */
+export interface CategoryPathItem {
+    name: string;
+    _id?: string;
+}
+
+/**
  * Product Object (Enhanced with Location)
  */
 export interface ProductObject {
@@ -136,7 +144,7 @@ export interface ProductObject {
     description: string;
     categoryId: string;
     deepestCategoryName: string;           // e.g., "SweatShirt"
-    categoryPath: string | { name: string; _id?: string }[]; // e.g., "fashion-man..." or [{ name: "Men" }]
+    categoryPath: string | CategoryPathItem[]; // e.g., "fashion-man..." or [{ name: "Men" }]
     price: number;
     quantity: number;
     inStock: boolean;

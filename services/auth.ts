@@ -47,19 +47,65 @@ export const authService = {
             });
 
             // Store tokens if provided
-            if (response.data.accessToken) {
+            const data = response.data;
+            const payload = data.data || data; // Handle wrapped or unwrapped response
+
+            if (payload.accessToken) {
                 await tokenManager.setTokens(
-                    response.data.accessToken,
-                    response.data.refreshToken
+                    payload.accessToken,
+                    payload.refreshToken
                 );
             }
 
             // Store user data if provided
-            if (response.data.user) {
-                await userDataManager.setUserData(response.data.user);
+            // NEW: Cookie logic
+            if (!payload.accessToken && response.headers['set-cookie']) {
+                const cookies: string[] | string = response.headers['set-cookie'] as string[] | string;
+                let tokenCookie = '';
+
+                if (Array.isArray(cookies)) {
+                    tokenCookie = cookies.find((c: string) => c.trim().startsWith('token=')) || '';
+                } else if (typeof cookies === 'string' && cookies.trim().startsWith('token=')) {
+                    tokenCookie = cookies;
+                }
+
+                if (tokenCookie) {
+                    const token = tokenCookie.split(';')[0].split('=')[1];
+                    console.log('Extracted token from cookie:', token.substring(0, 20) + '...');
+                    await tokenManager.setTokens(token);
+
+                    // Decode token to get userId
+                    try {
+                        const base64Url = token.split('.')[1];
+                        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+                        const jsonPayload = decodeURIComponent(
+                            (global as any).atob(base64)
+                                .split('')
+                                .map(function (c: string) {
+                                    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                                })
+                                .join('')
+                        );
+
+                        const decoded = JSON.parse(jsonPayload);
+
+                        if (decoded.userId) {
+                            // Dynamically import userService to avoid circular dependency
+                            const { userService } = require('./user');
+                            const userResponse = await userService.getUserById(decoded.userId);
+                            if (userResponse.data) {
+                                await userDataManager.setUserData(userResponse.data);
+                                // Inject user into response data so login.tsx receives it
+                                data.user = userResponse.data;
+                            }
+                        }
+                    } catch (decodeError) {
+                        console.error('Error decoding token from cookie:', decodeError);
+                    }
+                }
             }
 
-            return response.data;
+            return data;
         } catch (error) {
             throw new Error(handleApiError(error));
         }
@@ -101,8 +147,6 @@ export const authService = {
      */
     async logout() {
         try {
-            // POST :- /api/v1/auth/logout
-            await apiClient.post('auth/logout');
         } catch (error: any) {
             // Ignore 401 errors - token may have expired, which is fine for logout
             // Only log other unexpected errors

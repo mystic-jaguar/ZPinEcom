@@ -5,6 +5,7 @@ import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
 import { useOrder } from '../../context/OrderContext';
+import { orderService } from '../../services/order';
 
 const CANCELLATION_REASONS = [
     "Changed my mind",
@@ -27,7 +28,9 @@ const RETURN_REASONS = [
 export default function CancelOrderScreen() {
     const router = useRouter();
     const params = useLocalSearchParams();
-    const { orderId, mode = 'cancel', productId } = params;
+    const orderId = Array.isArray(params.orderId) ? params.orderId[0] : params.orderId;
+    const mode = Array.isArray(params.mode) ? params.mode[0] : (params.mode ?? 'cancel');
+    const productId = Array.isArray(params.productId) ? params.productId[0] : params.productId;
     const { getOrderById, cancelOrder } = useOrder();
 
     // For returns, we might need to handle specific items if passed
@@ -93,12 +96,11 @@ export default function CancelOrderScreen() {
                 // But returnOrder is NOT in Context yet. I need to add it or import service directly.
                 // Let's import service directly for now to avoid context modifications unless necessary.
 
-                const { orderService } = require('../../services/order'); // Dynamic import to avoid top-level issues if any
                 response = await orderService.returnOrder(order.id, {
                     orderItemIds: productId ? [productId] : [], // Use productId as orderItemId for now
                     reason: selectedReason,
                     description: 'Return request via app'
-                });
+                }) as any;
 
             } else {
                 response = await cancelOrder(order.id, {
@@ -107,11 +109,10 @@ export default function CancelOrderScreen() {
                 });
             }
 
-            let msg = response.message || `${isReturn ? 'Return initiated' : 'Order cancelled'} successfully.`;
-            if (response.refundAmount && response.refundAmount > 0) {
+            let msg = response?.message || `${isReturn ? 'Return initiated' : 'Order cancelled'} successfully.`;
+            if (response?.refundAmount && response.refundAmount > 0) {
                 msg += `\n\nRefund of ₹${response.refundAmount.toFixed(2)} initiated (${response.refundStatus}).`;
             }
-
             setSuccessMessage(msg);
             setIsSubmitting(false);
 

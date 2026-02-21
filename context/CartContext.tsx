@@ -144,10 +144,9 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
 
     const updateQuantity = async (cartItemId: string, quantity: number) => {
         if (quantity < 1) {
-            removeFromCart(cartItemId);
+            await removeFromCart(cartItemId);
             return;
         }
-
         const itemToUpdate = cartItems.find(item => item.cartItemId === cartItemId);
         const productId = itemToUpdate?.productId;
 
