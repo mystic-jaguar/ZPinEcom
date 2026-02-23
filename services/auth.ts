@@ -40,26 +40,37 @@ export const authService = {
      */
     async login(email: string, password: string) {
         try {
+            if (__DEV__) {
+                console.log('[Auth] Login attempt with email:', email);
+            }
             // POST :- /api/v1/auth/login
             const response = await apiClient.post('auth/login', {
                 email, // Can be email or username
                 password,
             });
 
-            // Store tokens if provided
-            const data = response.data;
-            const payload = data.data || data; // Handle wrapped or unwrapped response
-
-            if (payload.accessToken) {
-                await tokenManager.setTokens(
-                    payload.accessToken,
-                    payload.refreshToken
-                );
+            // Log full response to diagnose token structure
+            if (__DEV__) {
+                console.log('Login response status:', response.status);
+                console.log('Login response data:', JSON.stringify(response.data, null, 2));
+                console.log('Login response headers:', JSON.stringify(response.headers, null, 2));
             }
 
-            // Store user data if provided
-            // NEW: Cookie logic
-            if (!payload.accessToken && response.headers['set-cookie']) {
+            const data = response.data;
+            // Handle multiple wrapping patterns: { data: { accessToken } } or { accessToken } or { token }
+            const payload = data.data || data;
+
+            // Try all common token field names
+            const accessToken = payload.accessToken || payload.token || payload.jwt || data.token;
+            const refreshToken = payload.refreshToken || payload.refresh_token;
+
+            if (accessToken) {
+                console.log('Token found in response body, storing...');
+                await tokenManager.setTokens(accessToken, refreshToken);
+            }
+
+            // Also check set-cookie header for HttpOnly token
+            if (!accessToken && response.headers['set-cookie']) {
                 const cookies: string[] | string = response.headers['set-cookie'] as string[] | string;
                 let tokenCookie = '';
 
@@ -103,6 +114,18 @@ export const authService = {
                         console.error('Error decoding token from cookie:', decodeError);
                     }
                 }
+            }
+
+            // Store user data if returned in response
+            const rawUserData = payload.user || data.user;
+            if (rawUserData) {
+                // Normalize _id to id (backend MongoDB returns _id)
+                const userData = {
+                    ...rawUserData,
+                    id: rawUserData.id || rawUserData._id || '',
+                };
+                await userDataManager.setUserData(userData);
+                data.user = userData;
             }
 
             return data;

@@ -2,6 +2,7 @@ import React, { createContext, ReactNode, useContext, useEffect, useState } from
 import { tokenManager } from '../services/api';
 import { CancelOrderData, orderService } from '../services/order';
 import { AddressObject, OrderObject } from '../types/types';
+import { useUser } from './UserContext';
 
 interface OrderContextType {
     orders: OrderObject[];
@@ -92,25 +93,39 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
     const [orders, setOrders] = useState<OrderObject[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
+    const { isAuthenticated, isLoading: isUserLoading } = useUser();
+
     useEffect(() => {
-        loadOrders();
-    }, []);
+        if (!isUserLoading) {
+            loadOrders();
+        }
+    }, [isAuthenticated, isUserLoading]);
 
     const loadOrders = async () => {
         try {
-            const token = await tokenManager.getAccessToken();
-            if (token) {
-                const response = await orderService.getOrders();
-                if (response.success && response.data) {
-                    setOrders(response.data);
+            if (isAuthenticated) {
+                const token = await tokenManager.getAccessToken();
+                if (token && token !== 'null' && token !== 'undefined') {
+                    const response = await orderService.getOrders();
+                    // API contract: { orders: [...], pagination: {} }
+                    // Fallback: { data: [...] } or { success, data: [] }
+                    const ordersData = (response as any).orders || (response as any).data || [];
+                    if (ordersData && Array.isArray(ordersData)) {
+                        setOrders(ordersData);
+                    }
                 }
             } else {
-                // If not logged in, maybe show empty or dummy?
-                // For now, keep empty or use DUMMY if strictly dev mode needed
+                // If not logged in, clear orders
                 setOrders([]);
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('Failed to load orders:', error);
+            // If token is expired or invalid (401/500), clear stale token
+            const status = error?.response?.status;
+            if (status === 401 || status === 500) {
+                await tokenManager.clearTokens?.();
+            }
+            setOrders([]); // Show empty on error
         } finally {
             setIsLoading(false);
         }

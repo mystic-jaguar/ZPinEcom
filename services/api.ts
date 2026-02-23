@@ -18,18 +18,48 @@ export const STORAGE_KEYS = {
 // Create axios instance
 const apiClient: AxiosInstance = axios.create({
     baseURL: BASE_URL,
-    timeout: 30000,
+    timeout: 60000, // Increased timeout to 60s to handle Render backend cold starts
     headers: {
         'Content-Type': 'application/json',
     },
 });
 
+// Public endpoints that should NOT receive auth headers
+const PUBLIC_ENDPOINTS = [
+    'auth/login',
+    'auth/signup',
+    'auth/forgetPassword',
+    'auth/verification',
+    'public/',
+    // Note: products listing is public but not reviews (products/:id/reviews need auth)
+    // So we only exclude the base listing endpoints specifically
+];
+
 // Request interceptor - Add auth token to requests
+// This backend uses HttpOnly cookie-based auth: token is sent as Cookie header
 apiClient.interceptors.request.use(
     async (config) => {
-        const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-        if (token) {
-            config.headers.Authorization = `Bearer ${token}`;
+        const url = config.url || '';
+        const isPublicEndpoint = PUBLIC_ENDPOINTS.some(endpoint => url.startsWith(endpoint));
+
+        if (__DEV__) {
+            console.log(`[API] ${config.method?.toUpperCase()} ${url} | public=${isPublicEndpoint}`);
+        }
+
+        if (isPublicEndpoint) {
+            // Explicitly remove any auth headers for public endpoints
+            config.headers.delete('Cookie');
+            config.headers.delete('Authorization');
+            config.headers.delete('x-auth-token');
+        } else {
+            const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+            if (token && token !== 'null' && token !== 'undefined') {
+                // Primary: Send as Cookie header (backend uses HttpOnly cookie auth)
+                config.headers.set('Cookie', `token=${token}`);
+                // Fallbacks for compatibility
+                config.headers.set('Authorization', `Bearer ${token}`);
+                config.headers.set('x-auth-token', token);
+            }
         }
         return config;
     },
@@ -64,7 +94,9 @@ apiClient.interceptors.response.use(
                     await AsyncStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, newRefreshToken);
 
                     // Retry original request with new token
-                    originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+                    originalRequest.headers.set('Cookie', `token=${accessToken}`);
+                    originalRequest.headers.set('Authorization', `Bearer ${accessToken}`);
+                    originalRequest.headers.set('x-auth-token', accessToken);
                     return apiClient(originalRequest);
                 }
             } catch (refreshError) {

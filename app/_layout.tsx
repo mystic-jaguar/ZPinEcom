@@ -56,10 +56,10 @@ export default function RootLayout() {
   return (
     <ErrorBoundary>
       <SearchProvider>
-        <CartProvider>
-          <WishlistProvider>
-            <CheckoutProvider>
-              <UserProvider>
+        <UserProvider>
+          <CartProvider>
+            <WishlistProvider>
+              <CheckoutProvider>
                 <PaymentProvider>
                   <AddressProvider>
                     <OrderProvider>
@@ -67,10 +67,10 @@ export default function RootLayout() {
                     </OrderProvider>
                   </AddressProvider>
                 </PaymentProvider>
-              </UserProvider>
-            </CheckoutProvider>
-          </WishlistProvider>
-        </CartProvider>
+              </CheckoutProvider>
+            </WishlistProvider>
+          </CartProvider>
+        </UserProvider>
       </SearchProvider>
     </ErrorBoundary>
   );

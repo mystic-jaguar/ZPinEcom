@@ -4,6 +4,7 @@ import { COUPONS } from '../constants/coupons';
 import { tokenManager } from '../services/api';
 import { cartService } from '../services/cart';
 import { CartItemObject, CouponObject, ProductObject } from '../types/types';
+import { useUser } from './UserContext';
 
 const CART_STORAGE_KEY = '@ZPinEcom:cart';
 
@@ -31,30 +32,35 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     const [cartItems, setCartItems] = useState<CartItemObject[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
-    // Load cart from AsyncStorage on mount
-    // API: GET /api/v1/cart - For server-side cart persistence
+    const { isAuthenticated, isLoading: isUserLoading } = useUser();
+
+    // Load cart from AsyncStorage on mount and sync if auth changes
     useEffect(() => {
-        loadCart();
-    }, []);
+        if (!isUserLoading) {
+            loadCart();
+        }
+    }, [isAuthenticated, isUserLoading]);
 
     const loadCart = async () => {
         try {
             // Try loading from backend first if logged in
-            const token = await tokenManager.getAccessToken();
-            if (token) {
-                try {
-                    const response = await cartService.getCart();
-                    if (response.success && response.data) {
-                        setCartItems(response.data.cart);
-                        await AsyncStorage.setItem(CART_STORAGE_KEY, JSON.stringify(response.data.cart));
-                        return; // Successfully loaded from backend
+            if (isAuthenticated) {
+                const token = await tokenManager.getAccessToken();
+                if (token && token !== 'null' && token !== 'undefined') {
+                    try {
+                        const response = await cartService.getCart();
+                        if (response.success && response.data) {
+                            setCartItems(response.data.cart);
+                            await AsyncStorage.setItem(CART_STORAGE_KEY, JSON.stringify(response.data.cart));
+                            return; // Successfully loaded from backend
+                        }
+                    } catch (apiError) {
+                        console.warn('Failed to load cart from backend:', apiError);
                     }
-                } catch (apiError) {
-                    console.warn('Failed to load cart from backend:', apiError);
                 }
             }
 
-            // Fallback to local storage
+            // Fallback to local storage (for guests or failed backend load)
             const cartData = await AsyncStorage.getItem(CART_STORAGE_KEY);
             if (cartData) {
                 setCartItems(JSON.parse(cartData));

@@ -3,6 +3,7 @@ import React, { createContext, ReactNode, useContext, useEffect, useState } from
 import { tokenManager } from '../services/api';
 import { wishlistService } from '../services/wishlist';
 import { ProductObject } from '../types/types';
+import { useUser } from './UserContext';
 
 const WISHLIST_STORAGE_KEY = '@ZPinEcom:wishlist';
 
@@ -21,31 +22,37 @@ export const WishlistProvider = ({ children }: { children: ReactNode }) => {
     const [wishlistItems, setWishlistItems] = useState<ProductObject[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
-    // Load wishlist from AsyncStorage on mount
-    // API: GET /api/v1/wishlist - For server-side wishlist sync
+    const { isAuthenticated, isLoading: isUserLoading } = useUser();
+
+    // Load wishlist from AsyncStorage on mount and sync if auth changes
     useEffect(() => {
-        loadWishlist();
-    }, []);
+        if (!isUserLoading) {
+            loadWishlist();
+        }
+    }, [isAuthenticated, isUserLoading]);
 
     const loadWishlist = async () => {
         try {
-            const token = await tokenManager.getAccessToken();
-            if (token) {
-                try {
-                    const response = await wishlistService.getWishlist();
-                    if (response.success && response.data) {
-                        setWishlistItems(response.data); // Assuming response.data is ProductObject[] based on service
-                        // Specifically, service returns response.data which is { wishlist: ..., pagination: ... }?
-                        // Let's check service/wishlist.ts
+            if (isAuthenticated) {
+                const token = await tokenManager.getAccessToken();
+                if (token && token !== 'null' && token !== 'undefined') {
+                    try {
+                        const response = await wishlistService.getWishlist();
+                        // API contract: { wishlist: [...], pagination: {} }
+                        const items = (response as any).wishlist || (response as any).data;
+                        if (items && Array.isArray(items)) {
+                            setWishlistItems(items);
+                            return; // Don't fall through to local storage
+                        }
+                    } catch (apiError) {
+                        console.warn('Failed to load wishlist from server:', apiError);
                     }
-                } catch (apiError) {
-                    console.warn('Failed to load wishlist from server:', apiError);
                 }
             }
 
             // Fallback / Merge logic could be complex. For now, trust server if logged in, else local
             const wishlistData = await AsyncStorage.getItem(WISHLIST_STORAGE_KEY);
-            if (!token && wishlistData) {
+            if (!isAuthenticated && wishlistData) {
                 setWishlistItems(JSON.parse(wishlistData));
             }
             // If logged in, we might want to merge local into server on first load? 

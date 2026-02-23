@@ -52,8 +52,13 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
             const userDetailsData = await AsyncStorage.getItem(USER_DETAILS_STORAGE_KEY);
             const token = await tokenManager.getAccessToken();
 
-            if (token && userData) {
-                const parsedUser = JSON.parse(userData);
+            if (token && token !== 'null' && userData) {
+                const rawUser = JSON.parse(userData);
+                // Normalize _id to id (backend returns MongoDB _id)
+                const parsedUser: UserObject = {
+                    ...rawUser,
+                    id: rawUser.id || rawUser._id || '',
+                };
                 setUserState(parsedUser);
                 setIsAuthenticated(true);
 
@@ -63,16 +68,22 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
                         const response = await userService.getUserById(parsedUser.id);
                         if (response.success && response.data) {
                             // Update local state with fresh data
-                            const serverUser = response.data;
+                            const raw = response.data as any;
+                            const serverUser: UserObject = {
+                                ...raw,
+                                id: raw.id || raw._id || '',
+                            };
                             setUserState(serverUser);
                             await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(serverUser));
                         }
                     } catch (apiError: any) {
                         console.warn('Failed to refresh user data from server:', apiError);
-                        // Check if it's an auth error (e.g., 401/403)
-                        if (apiError?.response?.status === 401 || apiError?.response?.status === 403) {
+                        // Check if it's an auth error (e.g., 401/403) - clear stale token
+                        const status = apiError?.response?.status;
+                        if (status === 401 || status === 403) {
                             setIsAuthenticated(false);
                             await tokenManager.clearTokens?.();
+                            await AsyncStorage.removeItem(USER_STORAGE_KEY);
                         }
                         // Otherwise continue using local data for offline support
                     }
@@ -92,7 +103,12 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         }
     };
 
-    const setUser = (user: UserObject) => {
+    const setUser = (rawUser: any) => {
+        // Normalize _id to id (backend returns MongoDB _id)
+        const user: UserObject = {
+            ...rawUser,
+            id: rawUser.id || rawUser._id || '',
+        };
         setUserState(user);
         setIsAuthenticated(true);
         AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user)).catch(console.error);

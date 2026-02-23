@@ -35,8 +35,15 @@ export const userService = {
     async getUserById(id: string) {
         try {
             // GET :- /api/v1/users/:id
-            const response = await apiClient.get<ApiSuccessResponse<UserObject>>(`users/${id}`);
-            return response.data;
+            const response = await apiClient.get<any>(`users/${id}`);
+            const raw = response.data?.data || response.data;
+            // Normalize _id to id (backend MongoDB returns _id)
+            return {
+                success: true,
+                data: raw
+                    ? { ...raw, id: raw.id || raw._id || '' } as any
+                    : null,
+            };
         } catch (error) {
             throw new Error(handleApiError(error));
         }

@@ -55,6 +55,9 @@ export default function LoginScreen() {
         setLoading(true);
         try {
             const response = await authService.login(email, password);
+            if (__DEV__) {
+                console.log('Login response (login.tsx):', JSON.stringify(response, null, 2));
+            }
 
             if (response.success) {
                 // Determine user data source

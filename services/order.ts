@@ -47,8 +47,8 @@ export const orderService = {
      */
     async getOrders(params?: OrderListParams) {
         try {
-            // GET :- /api/v1/orders
-            const response = await apiClient.get<ApiPaginatedResponse<OrderObject>>('orders', { params });
+            // GET :- /api/v1/users/orders (GET /api/v1/orders is 404 on deployed backend)
+            const response = await apiClient.get<ApiPaginatedResponse<OrderObject>>('users/orders', { params });
             return response.data;
         } catch (error) {
             throw new Error(handleApiError(error));
