@@ -318,7 +318,7 @@ export default function ProductListing() {
 
     if (loading) {
         return (
-            <SafeAreaView style={styles.centerContainer}>
+            <SafeAreaView style={styles.centerContainer} edges={['bottom', 'left', 'right']}>
                 <ActivityIndicator size="large" color={Colors.light.tint} />
             </SafeAreaView>
         );
@@ -326,7 +326,7 @@ export default function ProductListing() {
 
     if (error) {
         return (
-            <SafeAreaView style={styles.centerContainer}>
+            <SafeAreaView style={styles.centerContainer} edges={['bottom', 'left', 'right']}>
                 <Text style={styles.errorText}>{error}</Text>
                 <TouchableOpacity onPress={loadProducts} style={styles.retryButton}>
                     <Text style={styles.retryText}>Retry</Text>
@@ -336,7 +336,7 @@ export default function ProductListing() {
     }
 
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={styles.container} edges={['bottom', 'left', 'right']}>
             <Stack.Screen options={{
                 headerShown: true,
                 title: currentCategoryNode?.name || 'Products',
@@ -443,7 +443,8 @@ const styles = StyleSheet.create({
 
     // Filters
     filterContainer: {
-        paddingVertical: 10,
+        paddingTop: 5,
+        paddingBottom: 10,
         backgroundColor: '#fff',
     },
     filterScroll: {
