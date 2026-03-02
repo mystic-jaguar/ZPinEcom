@@ -20,7 +20,7 @@ export default function ReturnsRefundsScreen() {
         order.items.map(item => ({
             ...item,
             orderId: order.orderNumber,
-            date: order.createdAt,
+            date: order.date,
             status: order.status
         }))
     );
@@ -30,7 +30,7 @@ export default function ReturnsRefundsScreen() {
         if (!searchQuery.trim()) return true;
         const query = searchQuery.toLowerCase();
         return (
-            item.productName.toLowerCase().includes(query) ||
+            item.name.toLowerCase().includes(query) ||
             item.orderId.toLowerCase().includes(query)
         );
     });
@@ -101,12 +101,13 @@ export default function ReturnsRefundsScreen() {
                 ) : (
                     filteredItems.map((item, index) => (
                         <ReturnEligibleCard
-                            key={`${item.orderId}-${item.productId}-${index}`}
+                            key={`${item.orderId}-${item.id}-${index}`}
                             image={item.image}
-                            status={item.status === 'delivered' ? `DELIVERED ${item.date}` : item.status.toUpperCase()}
-                            statusColor={item.status === 'delivered' ? '#D97706' : '#F59E0B'}
-                            name={item.productName}
+                            status={item.status === 'Delivered' ? `DELIVERED ${item.date}` : item.status.toUpperCase()}
+                            statusColor={item.status === 'Delivered' ? '#D97706' : '#F59E0B'}
+                            name={item.name}
                             variant={item.variant || "Standard Variant"}
+<<<<<<< HEAD
                             onInitiate={() => {
                                 router.push({
                                     pathname: '/profile/cancel-order',
@@ -120,6 +121,17 @@ export default function ReturnsRefundsScreen() {
                                     }
                                 });
                             }}
+=======
+                            onInitiate={() => router.push({
+                                pathname: '/profile/initiate-return',
+                                params: {
+                                    productId: item.id,
+                                    orderId: item.orderId,
+                                    productName: item.name,
+                                    productImage: item.image
+                                }
+                            })}
+>>>>>>> parent of e49af4a (Integrating API's commit 1)
                         />
                     ))
                 )}

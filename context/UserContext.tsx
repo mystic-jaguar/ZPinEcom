@@ -10,10 +10,8 @@ const USER_DETAILS_STORAGE_KEY = '@ZPinEcom:userDetails';
 interface UserContextType {
     user: UserObject;
     userDetails?: UserDetailsObject;
-    setUser: (user: UserObject) => void;
     updateUser: (updates: Partial<UserObject>) => void;
-    setUserDetails: (details: UserDetailsObject) => void;
-    updateUserDetails: (updates: Partial<UserDetailsObject>) => void;
+    updateUserDetails: (details: UserDetailsObject) => void;
     setCompleteProfile: (profile: CompleteUserProfile) => void;
     resetUser: () => void;
     isAuthenticated: boolean;
@@ -22,8 +20,8 @@ interface UserContextType {
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
-// Initial Empty User
-const INITIAL_USER: UserObject = {
+// Initial Empty User with extended fields for app functionality
+const INITIAL_USER: any = {
     id: '',
     name: '',
     email: '',
@@ -32,13 +30,31 @@ const INITIAL_USER: UserObject = {
     userRole: 'customer',
     isVerified: false,
     profileImage: require('../assets/images/profile_icon.jpg'),
-    timeStamp: new Date().toISOString()
+    timeStamp: new Date().toISOString(),
+    // Extended fields for app functionality
+    dob: '',
+    gender: '',
+    phoneNumber: '',
+    address: '',
+    city: '',
+    state: '',
+    pincode: '',
+    preferences: {
+        receivePushNotifications: true,
+        receiveEmailUpdates: false,
+        receiveOrderUpdates: true
+    }
 };
 
 export const UserProvider = ({ children }: { children: ReactNode }) => {
+<<<<<<< HEAD
     const [user, setUserState] = useState<UserObject>(INITIAL_USER);
     const [userDetails, setUserDetailsState] = useState<UserDetailsObject | undefined>(undefined);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
+=======
+    const [user, setUser] = useState<UserObject>(INITIAL_USER);
+    const [userDetails, setUserDetails] = useState<UserDetailsObject | undefined>(undefined);
+>>>>>>> parent of e49af4a (Integrating API's commit 1)
     const [isLoading, setIsLoading] = useState(true);
 
     // Load User from Storage
@@ -52,6 +68,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
             const userDetailsData = await AsyncStorage.getItem(USER_DETAILS_STORAGE_KEY);
             const token = await tokenManager.getAccessToken();
 
+<<<<<<< HEAD
             if (token && token !== 'null' && userData) {
                 const rawUser = JSON.parse(userData);
                 // Normalize _id to id (backend returns MongoDB _id)
@@ -90,10 +107,14 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
                 }
             } else {
                 setIsAuthenticated(false);
+=======
+            if (userData) {
+                setUser(JSON.parse(userData));
+>>>>>>> parent of e49af4a (Integrating API's commit 1)
             }
 
             if (userDetailsData) {
-                setUserDetailsState(JSON.parse(userDetailsData));
+                setUserDetails(JSON.parse(userDetailsData));
             }
         } catch (error) {
             console.error('Error loading user:', error);
@@ -103,6 +124,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         }
     };
 
+<<<<<<< HEAD
     const setUser = (rawUser: any) => {
         // Normalize _id to id (backend returns MongoDB _id)
         const user: UserObject = {
@@ -168,18 +190,40 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     const setCompleteProfile = async (profile: CompleteUserProfile) => {
         setUserState(profile.user);
         setIsAuthenticated(true);
+=======
+    const updateUser = async (updates: Partial<UserObject>) => {
+        setUser(prev => {
+            const newUser = { ...prev, ...updates };
+            AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(newUser)).catch(console.error);
+            return newUser;
+        });
+    };
+
+    const updateUserDetails = async (details: UserDetailsObject) => {
+        setUserDetails(details);
+        await AsyncStorage.setItem(USER_DETAILS_STORAGE_KEY, JSON.stringify(details));
+    };
+
+    const setCompleteProfile = async (profile: CompleteUserProfile) => {
+        setUser(profile.user);
+>>>>>>> parent of e49af4a (Integrating API's commit 1)
         await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(profile.user));
 
         if (profile.details) {
-            setUserDetailsState(profile.details);
+            setUserDetails(profile.details);
             await AsyncStorage.setItem(USER_DETAILS_STORAGE_KEY, JSON.stringify(profile.details));
         }
     };
 
     const resetUser = async () => {
+<<<<<<< HEAD
         setUserState(INITIAL_USER);
         setUserDetailsState(undefined);
         setIsAuthenticated(false);
+=======
+        setUser(INITIAL_USER);
+        setUserDetails(undefined);
+>>>>>>> parent of e49af4a (Integrating API's commit 1)
         await AsyncStorage.multiRemove([USER_STORAGE_KEY, USER_DETAILS_STORAGE_KEY]);
         await tokenManager.clearTokens?.();
     };
@@ -188,9 +232,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         <UserContext.Provider value={{
             user,
             userDetails,
-            setUser,
             updateUser,
-            setUserDetails,
             updateUserDetails,
             setCompleteProfile,
             resetUser,

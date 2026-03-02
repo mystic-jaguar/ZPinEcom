@@ -1,11 +1,10 @@
 import ActionModal from '@/components/common/ActionModal';
 import { Colors } from '@/constants/Colors';
-import { usePayment } from '@/context/PaymentContext';
+import { PaymentCard, PaymentUPI, usePayment } from '@/context/PaymentContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { PaymentCardObject, PaymentUPIObject } from '../../types/types';
 
 export default function ProfilePaymentMethodsScreen() {
     const router = useRouter();
@@ -38,7 +37,7 @@ export default function ProfilePaymentMethodsScreen() {
         });
     };
 
-    const renderSavedCard = (card: PaymentCardObject) => {
+    const renderSavedCard = (card: PaymentCard) => {
         return (
             <TouchableOpacity
                 key={card.id}
@@ -49,7 +48,7 @@ export default function ProfilePaymentMethodsScreen() {
                 <View style={styles.cardHeader}>
                     <View style={styles.bankInfo}>
                         <View style={styles.bankIcon}>
-                            <Ionicons name={card.iconName as any} size={24} color={card.iconColor} />
+                            <Ionicons name={card.iconName} size={24} color={card.iconColor} />
                         </View>
                         <View>
                             <Text style={styles.bankName}>{card.bankName}</Text>
@@ -81,7 +80,7 @@ export default function ProfilePaymentMethodsScreen() {
         );
     };
 
-    const renderUpiOption = (upi: PaymentUPIObject) => {
+    const renderUpiOption = (upi: PaymentUPI) => {
         return (
             <TouchableOpacity
                 key={upi.id}

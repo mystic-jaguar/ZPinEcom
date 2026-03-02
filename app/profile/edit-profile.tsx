@@ -10,13 +10,17 @@ import { useUser } from '../../context/UserContext';
 
 export default function EditProfileScreen() {
     const router = useRouter();
+<<<<<<< HEAD
     const { user, updateUser, userDetails, updateUserDetails, setUserDetails } = useUser();
+=======
+    const { user, updateUser } = useUser();
+>>>>>>> parent of e49af4a (Integrating API's commit 1)
 
     const [form, setForm] = useState({
         name: user.name,
-        dob: userDetails?.dob || '',
-        gender: userDetails?.gender || '',
-        preferences: userDetails?.preferences || {
+        dob: (user as any).dob || '',
+        gender: (user as any).gender || '',
+        preferences: (user as any).preferences || {
             receivePushNotifications: true,
             receiveEmailUpdates: false,
             receiveOrderUpdates: true
@@ -28,6 +32,7 @@ export default function EditProfileScreen() {
     const [showErrorModal, setShowErrorModal] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+<<<<<<< HEAD
     const [isSaving, setIsSaving] = useState(false);
 
     const handleSave = async () => {
@@ -67,6 +72,11 @@ export default function EditProfileScreen() {
         } finally {
             setIsSaving(false);
         }
+=======
+    const handleSave = () => {
+        updateUser(form as any);
+        setShowSuccessModal(true);
+>>>>>>> parent of e49af4a (Integrating API's commit 1)
     };
     const handleModalClose = () => {
         setShowSuccessModal(false);
