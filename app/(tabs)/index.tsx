@@ -156,12 +156,6 @@ export default function HomeScreen() {
                         </View>
 
                         {/* Connected Button */}
-                        {/* 
-                            API: 34. GET :- /api/v1/products
-                            Description: Returns all products with location-based filtering and pagination.
-                            URL Params: page=[number], limit=[number], lat=[number], lng=[number], city=[string], state=[string], pincode=[string]
-                            Success Response: { products: [{...}], pagination: {...}, locationInfo: {...} }
-                        */}
                         <TouchableOpacity style={styles.heroButton} onPress={() => router.push('/product-listing')}>
                             <Text style={styles.heroButtonText}>Shop Latest Looks</Text>
                             <Feather name="arrow-right" size={16} color="#333" />
@@ -506,7 +500,9 @@ const styles = StyleSheet.create({
         backgroundColor: '#f9f9f9',
         borderRadius: 15,
         marginBottom: 10,
-        overflow: 'hidden', // Ensure image stays within bounds
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 10,
         shadowColor: "#AAA",
         shadowOffset: {
             width: 0,
@@ -517,9 +513,9 @@ const styles = StyleSheet.create({
         elevation: 5,
     },
     recommendImage: {
-        width: '100%',
-        height: '100%',
-        resizeMode: 'cover'
+        width: '90%',
+        height: '90%',
+        resizeMode: 'contain'
     },
     recommendName: {
         fontWeight: '700',
