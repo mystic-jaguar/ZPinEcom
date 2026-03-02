@@ -48,9 +48,14 @@ const INITIAL_USER: any = {
 
 export const UserProvider = ({ children }: { children: ReactNode }) => {
 <<<<<<< HEAD
+<<<<<<< HEAD
     const [user, setUserState] = useState<UserObject>(INITIAL_USER);
     const [userDetails, setUserDetailsState] = useState<UserDetailsObject | undefined>(undefined);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
+=======
+    const [user, setUser] = useState<UserObject>(INITIAL_USER);
+    const [userDetails, setUserDetails] = useState<UserDetailsObject | undefined>(undefined);
+>>>>>>> parent of e49af4a (Integrating API's commit 1)
 =======
     const [user, setUser] = useState<UserObject>(INITIAL_USER);
     const [userDetails, setUserDetails] = useState<UserDetailsObject | undefined>(undefined);
@@ -110,6 +115,9 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 =======
             if (userData) {
                 setUser(JSON.parse(userData));
+<<<<<<< HEAD
+>>>>>>> parent of e49af4a (Integrating API's commit 1)
+=======
 >>>>>>> parent of e49af4a (Integrating API's commit 1)
             }
 
@@ -124,6 +132,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         }
     };
 
+<<<<<<< HEAD
 <<<<<<< HEAD
     const setUser = (rawUser: any) => {
         // Normalize _id to id (backend returns MongoDB _id)
@@ -207,6 +216,23 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     const setCompleteProfile = async (profile: CompleteUserProfile) => {
         setUser(profile.user);
 >>>>>>> parent of e49af4a (Integrating API's commit 1)
+=======
+    const updateUser = async (updates: Partial<UserObject>) => {
+        setUser(prev => {
+            const newUser = { ...prev, ...updates };
+            AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(newUser)).catch(console.error);
+            return newUser;
+        });
+    };
+
+    const updateUserDetails = async (details: UserDetailsObject) => {
+        setUserDetails(details);
+        await AsyncStorage.setItem(USER_DETAILS_STORAGE_KEY, JSON.stringify(details));
+    };
+
+    const setCompleteProfile = async (profile: CompleteUserProfile) => {
+        setUser(profile.user);
+>>>>>>> parent of e49af4a (Integrating API's commit 1)
         await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(profile.user));
 
         if (profile.details) {
@@ -217,9 +243,14 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 
     const resetUser = async () => {
 <<<<<<< HEAD
+<<<<<<< HEAD
         setUserState(INITIAL_USER);
         setUserDetailsState(undefined);
         setIsAuthenticated(false);
+=======
+        setUser(INITIAL_USER);
+        setUserDetails(undefined);
+>>>>>>> parent of e49af4a (Integrating API's commit 1)
 =======
         setUser(INITIAL_USER);
         setUserDetails(undefined);

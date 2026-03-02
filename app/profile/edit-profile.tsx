@@ -11,7 +11,11 @@ import { useUser } from '../../context/UserContext';
 export default function EditProfileScreen() {
     const router = useRouter();
 <<<<<<< HEAD
+<<<<<<< HEAD
     const { user, updateUser, userDetails, updateUserDetails, setUserDetails } = useUser();
+=======
+    const { user, updateUser } = useUser();
+>>>>>>> parent of e49af4a (Integrating API's commit 1)
 =======
     const { user, updateUser } = useUser();
 >>>>>>> parent of e49af4a (Integrating API's commit 1)
@@ -32,6 +36,7 @@ export default function EditProfileScreen() {
     const [showErrorModal, setShowErrorModal] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+<<<<<<< HEAD
 <<<<<<< HEAD
     const [isSaving, setIsSaving] = useState(false);
 
@@ -73,6 +78,8 @@ export default function EditProfileScreen() {
             setIsSaving(false);
         }
 =======
+=======
+>>>>>>> parent of e49af4a (Integrating API's commit 1)
     const handleSave = () => {
         updateUser(form as any);
         setShowSuccessModal(true);
