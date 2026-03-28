@@ -6,12 +6,13 @@ import { useCart } from '@/context/CartContext';
 import { useCheckout } from '@/context/CheckoutContext';
 import { useOrder } from '@/context/OrderContext';
 import { usePayment } from '@/context/PaymentContext';
-import { OrderObject } from '@/types/types';
+import { useUser } from '@/context/UserContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { orderService } from '../../services/order';
 
 export default function CheckoutPaymentScreen() {
     const router = useRouter();
@@ -20,7 +21,9 @@ export default function CheckoutPaymentScreen() {
     const { addresses } = useAddress();
     const { addOrder } = useOrder();
     const { cards, upis } = usePayment();
+    const { user } = useUser();
     const [showSuccessModal, setShowSuccessModal] = useState(false);
+    const [orderError, setOrderError] = useState<string | null>(null);
 
     const [redirectCategory, setRedirectCategory] = useState<string | null>(null);
 
@@ -45,72 +48,38 @@ export default function CheckoutPaymentScreen() {
         setSelectedPaymentMethod(method);
     };
 
-    const handleConfirm = () => {
-        if (cartItems.length === 0) return;
+    const handleConfirm = async () => {
+        if (cartItems.length === 0 || !selectedAddressId) return;
 
-        // Create Order Immediately
-        const address = addresses.find(a => a.id === selectedAddressId);
+        // Map UI payment method to backend value
+        const paymentMethodMap: Record<string, 'cod' | 'razorpay' | 'wallet'> = {
+            'net_banking': 'razorpay',
+            'google_pay': 'razorpay',
+            'phone_pe': 'razorpay',
+        };
+        const backendMethod: 'cod' | 'razorpay' | 'wallet' =
+            paymentMethodMap[selectedPaymentMethod || ''] || 'cod';
 
-        if (address) {
-            // Determine payment method display name
-            let paymentMethodName = 'Other';
+        try {
+            const response = await orderService.createOrder({
+                shippingAddressId: selectedAddressId,
+                paymentMethod: backendMethod,
+                cartItems: [],
+            });
 
-            // Check if it's a saved UPI
-            const savedUPI = upis.find(u => u.id === selectedPaymentMethod);
-            if (savedUPI) {
-                paymentMethodName = savedUPI.label;
-            } else {
-                // Check if it's a saved card
-                const savedCard = cards.find(c => c.id === selectedPaymentMethod);
-                if (savedCard) {
-                    paymentMethodName = `${savedCard.cardType} (${savedCard.cardNumber.slice(-4)})`;
-                } else {
-                    // Fallback to old logic for hardcoded methods
-                    paymentMethodName = selectedPaymentMethod === 'google_pay' ? 'Google Pay' :
-                        selectedPaymentMethod === 'phone_pe' ? 'PhonePe' :
-                            selectedPaymentMethod === 'card_4242' ? 'Credit Card' :
-                                selectedPaymentMethod === 'net_banking' ? 'Net Banking' : 'Other';
-                }
+            if (response.success && response.data) {
+                addOrder(response.data.order as any);
             }
 
-            const newOrder: OrderObject = {
-                id: Math.random().toString(36).substr(2, 9),
-                userId: 'user-current',
-                sellerId: 'seller-123',
-                orderNumber: `ZP-${Math.floor(10000 + Math.random() * 90000)}`,
-                status: 'processing',
-                paymentStatus: 'paid',
-                totalAmount: totalPrice,
-                shippingAmount: shippingFee,
-                taxAmount: gst,
-                finalAmount: finalTotal,
-                shippingAddress: address,
-                paymentMethod: 'razorpay',
-                paymentId: `pay_${Date.now()}`,
-                items: cartItems.map(item => ({
-                    productId: item.productId,
-                    productName: item.product.productName,
-                    image: item.product.images?.[0] || '',
-                    price: item.product.price,
-                    quantity: item.quantity
-                })),
-                estimatedDelivery: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-                subtotal: totalPrice,
-                savings: totalSavings + couponDiscount,
-                isInstant: isInstant
-            };
-            addOrder(newOrder);
-
-            // Capture category for redirect
             if (cartItems.length > 0 && cartItems[0].product) {
                 const catPath = cartItems[0].product.categoryPath;
                 setRedirectCategory(Array.isArray(catPath) ? (catPath[0]?.name || null) : (catPath || null));
             }
-        }
 
-        setShowSuccessModal(true);
+            setShowSuccessModal(true);
+        } catch (error: any) {
+            setOrderError(error.message || 'Failed to place order. Please try again.');
+        }
     };
 
     const handleModalPrimary = () => {
@@ -254,14 +223,24 @@ export default function CheckoutPaymentScreen() {
 
             <ActionModal
                 visible={showSuccessModal}
-                title="Payment Successful"
-                message="Your payment has been processed successfully."
+                title="Order Placed!"
+                message="Your order has been placed successfully."
                 primaryButtonText="Continue"
                 onPrimaryPress={handleModalPrimary}
                 secondaryButtonText="Close"
                 onSecondaryPress={handleModalClose}
                 onClose={handleModalClose}
                 icon="check-circle"
+            />
+
+            <ActionModal
+                visible={!!orderError}
+                title="Order Failed"
+                message={orderError || 'Something went wrong.'}
+                primaryButtonText="Try Again"
+                onPrimaryPress={() => setOrderError(null)}
+                onClose={() => setOrderError(null)}
+                icon="x-circle"
             />
         </View>
     );

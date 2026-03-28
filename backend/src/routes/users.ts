@@ -19,7 +19,7 @@ function normalizeUser(row: any) {
   };
 }
 
-// ── IMPORTANT: specific paths must come BEFORE /:id ──────────────────────────
+// ── specific paths BEFORE /:id ────────────────────────────────────────────────
 
 // GET /api/v1/users/orders
 router.get('/orders', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
@@ -29,7 +29,7 @@ router.get('/orders', authenticate, async (req: AuthRequest, res: Response): Pro
 
   try {
     const countResult = await pool.query(
-      'SELECT COUNT(*) FROM orders WHERE user_id = $1', [req.userId]
+      'SELECT COUNT(*) FROM customer_orders WHERE user_id = $1', [req.userId]
     );
     const total = Number(countResult.rows[0].count);
 
@@ -42,8 +42,8 @@ router.get('/orders', authenticate, async (req: AuthRequest, res: Response): Pro
           'price', oi.price,
           'image', oi.image
         )) FILTER (WHERE oi.id IS NOT NULL), '[]') as items
-       FROM orders o
-       LEFT JOIN order_items oi ON oi.order_id = o.id
+       FROM customer_orders o
+       LEFT JOIN customer_order_items oi ON oi.order_id = o.id
        WHERE o.user_id = $1
        GROUP BY o.id
        ORDER BY o.created_at DESC
@@ -73,7 +73,7 @@ router.get('/orders', authenticate, async (req: AuthRequest, res: Response): Pro
 router.get('/shipping-addresses', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const result = await pool.query(
-      'SELECT * FROM shipping_addresses WHERE user_id = $1 ORDER BY is_default DESC, created_at DESC',
+      'SELECT * FROM customer_shipping_addresses WHERE user_id = $1 ORDER BY is_default DESC, created_at DESC',
       [req.userId]
     );
     res.json({ success: true, data: result.rows });
@@ -83,10 +83,67 @@ router.get('/shipping-addresses', authenticate, async (req: AuthRequest, res: Re
   }
 });
 
+// PUT /api/v1/users/profileDetails
+router.put('/profileDetails', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+  const { name, userName, dob, gender, receivePushNotifications, receiveEmailUpdates, receiveOrderUpdates } = req.body;
+
+  if (!name && !userName && !dob && !gender && receivePushNotifications === undefined && receiveEmailUpdates === undefined && receiveOrderUpdates === undefined) {
+    res.status(400).json({ success: false, message: 'No fields to update' });
+    return;
+  }
+
+  try {
+    // Update name/userName in customer_users
+    if (name || userName) {
+      const setClauses: string[] = [];
+      const values: any[] = [];
+
+      if (name) { values.push(name); setClauses.push('name = $' + values.length); }
+      if (userName) { values.push(userName); setClauses.push('user_name = $' + values.length); }
+      values.push(req.userId);
+
+      await pool.query(
+        'UPDATE ' + TABLE + ' SET ' + setClauses.join(', ') + ', updated_at = NOW() WHERE id = $' + values.length,
+        values
+      );
+    }
+
+    // Upsert dob/gender/preferences into customer_profile_details
+    const hasProfileFields = dob || gender || receivePushNotifications !== undefined || receiveEmailUpdates !== undefined || receiveOrderUpdates !== undefined;
+    if (hasProfileFields) {
+      // Use INSERT ... ON CONFLICT DO UPDATE (upsert)
+      await pool.query(
+        `INSERT INTO customer_profile_details (id, user_id, dob, gender, receive_push_notifications, receive_email_updates, receive_order_updates, created_at, updated_at)
+         VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, NOW(), NOW())
+         ON CONFLICT (user_id) DO UPDATE SET
+           dob = COALESCE($2, customer_profile_details.dob),
+           gender = COALESCE($3, customer_profile_details.gender),
+           receive_push_notifications = COALESCE($4, customer_profile_details.receive_push_notifications),
+           receive_email_updates = COALESCE($5, customer_profile_details.receive_email_updates),
+           receive_order_updates = COALESCE($6, customer_profile_details.receive_order_updates),
+           updated_at = NOW()`,
+        [
+          req.userId,
+          dob || null,
+          gender || null,
+          receivePushNotifications !== undefined ? receivePushNotifications : null,
+          receiveEmailUpdates !== undefined ? receiveEmailUpdates : null,
+          receiveOrderUpdates !== undefined ? receiveOrderUpdates : null,
+        ]
+      );
+    }
+
+    res.json({ success: true, message: 'Profile updated successfully' });
+  } catch (err) {
+    console.error('updateProfile error:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 // GET /api/v1/users/:id
 router.get('/:id', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const result = await pool.query(`SELECT * FROM ${TABLE} WHERE id = $1`, [req.params.id]);
+    const result = await pool.query('SELECT * FROM ' + TABLE + ' WHERE id = $1', [req.params.id]);
     if (result.rows.length === 0) {
       res.status(404).json({ success: false, message: 'User not found' });
       return;
@@ -98,60 +155,20 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response): Promis
   }
 });
 
-// PUT /api/v1/users/profileDetails
-router.put('/profileDetails', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
-  const { name, userName, dob, gender } = req.body;
-  try {
-    const updates: string[] = [];
-    const values: any[] = [];
-    let idx = 1;
-
-    if (name) { updates.push(`name = $${idx++}`); values.push(name); }
-    if (userName) { updates.push(`user_name = $${idx++}`); values.push(userName); }
-    updates.push(`updated_at = NOW()`);
-    values.push(req.userId);
-
-    if (updates.length === 1) {
-      res.status(400).json({ success: false, message: 'No fields to update' });
-      return;
-    }
-
-    await pool.query(
-      `UPDATE ${TABLE} SET ${updates.join(', ')} WHERE id = $${idx}`,
-      values
-    );
-
-    if (dob || gender) {
-      const existing = await pool.query('SELECT id FROM customer_profiles WHERE user_id = $1', [req.userId]);
-      if (existing.rows.length > 0) {
-        const cpUpdates: string[] = [];
-        const cpValues: any[] = [];
-        let ci = 1;
-        if (dob) { cpUpdates.push(`date_of_birth = $${ci++}`); cpValues.push(dob); }
-        if (gender) { cpUpdates.push(`gender = $${ci++}`); cpValues.push(gender); }
-        cpValues.push(req.userId);
-        await pool.query(`UPDATE customer_profiles SET ${cpUpdates.join(', ')} WHERE user_id = $${ci}`, cpValues);
-      }
-    }
-
-    res.json({ success: true, message: 'Profile updated successfully' });
-  } catch (err) {
-    console.error('updateProfile error:', err);
-    res.status(500).json({ success: false, message: 'Server error' });
-  }
-});
-
 // POST /api/v1/users/shipping-address
 router.post('/shipping-address', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
   const { name, phone, addressLine1, addressLine2, city, state, pincode, country, landmark, label, isDefault } = req.body;
 
   try {
     if (isDefault) {
-      await pool.query('UPDATE shipping_addresses SET is_default = false WHERE user_id = $1', [req.userId]);
+      await pool.query(
+        'UPDATE customer_shipping_addresses SET is_default = false WHERE user_id = $1',
+        [req.userId]
+      );
     }
 
     const result = await pool.query(
-      `INSERT INTO shipping_addresses
+      `INSERT INTO customer_shipping_addresses
         (id, user_id, name, phone, address_line1, address_line2, city, state, pincode, country, landmark, label, is_default, created_at, updated_at)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,NOW(),NOW()) RETURNING *`,
       [uuidv4(), req.userId, name, phone, addressLine1, addressLine2 || '', city, state, pincode, country || 'India', landmark || '', label || 'Home', isDefault || false]

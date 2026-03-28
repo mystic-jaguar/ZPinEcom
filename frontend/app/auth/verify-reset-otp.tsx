@@ -2,7 +2,7 @@ import ActionModal from '@/components/common/ActionModal';
 import { Colors } from '@/constants/Colors';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     KeyboardAvoidingView,
     Platform,
@@ -29,7 +29,7 @@ export default function VerifyResetOTPScreen() {
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
 
-    const inputRefs = useRef<(TextInput | null)[]>([]);
+    const [resetToken, setResetToken] = useState('');
 
     useEffect(() => {
         // Start timer countdown
@@ -75,32 +75,16 @@ export default function VerifyResetOTPScreen() {
 
         setLoading(true);
         try {
-            const requestData = {
-                mobile: isEmail ? '' : emailOrPhone,
-                email: isEmail ? emailOrPhone : '',
-                otp: otpString,
-            };
-
-            // TODO: Replace with actual API endpoint
-            // const response = await fetch('YOUR_BASE_URL/api/v1/auth/forgetPassword/verifyOTP', {
-            //     method: 'POST',
-            //     headers: {
-            //         'Content-Type': 'application/json',
-            //     },
-            //     body: JSON.stringify(requestData),
-            // });
-            // const data = await response.json();
-
-            // Simulate API call
-            await new Promise(resolve => setTimeout(resolve, 1000));
-
-            // Mock reset token - in real implementation, get this from API response
-            const resetToken = 'mock_reset_token_' + Date.now();
-
-            // Show success modal
+            const response = await authService.verifyPasswordResetOTP(
+                isEmail ? '' : emailOrPhone,
+                isEmail ? emailOrPhone : '',
+                otpString
+            );
+            const token = response.resetToken || otpString;
+            setResetToken(token);
             setShowSuccessModal(true);
-        } catch (error) {
-            setErrorMessage('Invalid OTP. Please try again.');
+        } catch (error: any) {
+            setErrorMessage(error.message || 'Invalid OTP. Please try again.');
             setShowErrorModal(true);
         } finally {
             setLoading(false);
@@ -112,27 +96,15 @@ export default function VerifyResetOTPScreen() {
 
         setLoading(true);
         try {
-            const requestData = isEmail
-                ? { email: emailOrPhone, mobile: '' }
-                : { mobile: emailOrPhone, email: '' };
-
-            // TODO: Replace with actual API endpoint
-            // await fetch('YOUR_BASE_URL/api/v1/auth/forgetPassword/sendOTP', {
-            //     method: 'POST',
-            //     headers: {
-            //         'Content-Type': 'application/json',
-            //     },
-            //     body: JSON.stringify(requestData),
-            // });
-
-            // Simulate API call
-            await new Promise(resolve => setTimeout(resolve, 1000));
-
+            await authService.sendPasswordResetOTP(
+                isEmail ? '' : emailOrPhone,
+                isEmail ? emailOrPhone : ''
+            );
             setResendTimer(60);
             setCanResend(false);
             setOtp(['', '', '', '', '', '']);
-        } catch (error) {
-            setErrorMessage('Failed to resend OTP. Please try again.');
+        } catch (error: any) {
+            setErrorMessage(error.message || 'Failed to resend OTP. Please try again.');
             setShowErrorModal(true);
         } finally {
             setLoading(false);
@@ -234,7 +206,6 @@ export default function VerifyResetOTPScreen() {
                 primaryButtonText="Continue"
                 onPrimaryPress={() => {
                     setShowSuccessModal(false);
-                    const resetToken = 'mock_reset_token_' + Date.now();
                     router.push({
                         pathname: '/auth/reset-password',
                         params: { resetToken }

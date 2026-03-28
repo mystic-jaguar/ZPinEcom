@@ -65,7 +65,19 @@ export const userService = {
     },
 
     /**
-     * Update user profile
+     * Update user profile (JSON body)
+     */
+    async updateProfileJson(data: { name?: string; userName?: string; dob?: string; gender?: string }) {
+        try {
+            const response = await apiClient.put('users/profileDetails', data);
+            return response.data;
+        } catch (error) {
+            throw new Error(handleApiError(error));
+        }
+    },
+
+    /**
+     * Update user profile (multipart/form-data)
      */
     async updateProfile(data: FormData) {
         try {

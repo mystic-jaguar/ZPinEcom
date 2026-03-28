@@ -30,7 +30,7 @@ export default function ReturnsRefundsScreen() {
         if (!searchQuery.trim()) return true;
         const query = searchQuery.toLowerCase();
         return (
-            item.name.toLowerCase().includes(query) ||
+            item.productName.toLowerCase().includes(query) ||
             item.orderId.toLowerCase().includes(query)
         );
     });
@@ -101,12 +101,12 @@ export default function ReturnsRefundsScreen() {
                 ) : (
                     filteredItems.map((item, index) => (
                         <ReturnEligibleCard
-                            key={`${item.orderId}-${item.id}-${index}`}
+                            key={`${item.orderId}-${item.productId}-${index}`}
                             image={item.image}
-                            status={item.status === 'Delivered' ? `DELIVERED ${item.date}` : item.status.toUpperCase()}
-                            statusColor={item.status === 'Delivered' ? '#D97706' : '#F59E0B'}
-                            name={item.name}
-                            variant={item.variant || "Standard Variant"}
+                            status={item.status === 'delivered' ? `DELIVERED` : item.status.toUpperCase()}
+                            statusColor={item.status === 'delivered' ? '#D97706' : '#F59E0B'}
+                            name={item.productName}
+                            variant={item.variant || 'Standard Variant'}
                             onInitiate={() => {
                                 router.push({
                                     pathname: '/profile/cancel-order',
@@ -124,27 +124,34 @@ export default function ReturnsRefundsScreen() {
                     ))
                 )}
 
-                {/* Refund Status Section */}
-                <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Refund Status</Text>
-                    <TouchableOpacity onPress={() => setShowHistory(!showHistory)}>
-                        <Text style={styles.viewHistoryText}>
-                            {showHistory ? 'Hide History' : 'View History'}
-                        </Text>
-                    </TouchableOpacity>
-                </View>
+                {/* Refund Status Section — in-progress orders from real data */}
+                {orders.filter(o => o.status === 'processing' || o.status === 'shipped').length > 0 && (
+                    <>
+                        <View style={styles.sectionHeader}>
+                            <Text style={styles.sectionTitle}>Refund Status</Text>
+                            <TouchableOpacity onPress={() => setShowHistory(!showHistory)}>
+                                <Text style={styles.viewHistoryText}>
+                                    {showHistory ? 'Hide History' : 'View History'}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
 
-                <RefundStatusCard
-                    orderId="ZP-98231"
-                    amount="₹2,499.00"
-                    statusLabel="IN PROGRESS"
-                    steps={[
-                        { label: 'Requested', state: 'completed', icon: 'check' },
-                        { label: 'Picked up', state: 'active', icon: 'truck' },
-                        { label: 'Refunded', state: 'pending', icon: 'dollar-sign' },
-                    ]}
-                    infoText="The item was picked up on 24th Oct. Your refund will be processed within 3-5 business days."
-                />
+                        {orders.filter(o => o.status === 'processing' || o.status === 'shipped').map(order => (
+                            <RefundStatusCard
+                                key={order.id}
+                                orderId={order.orderNumber}
+                                amount={`₹${order.finalAmount.toFixed(2)}`}
+                                statusLabel="IN PROGRESS"
+                                steps={[
+                                    { label: 'Requested', state: 'completed', icon: 'check' },
+                                    { label: 'Picked up', state: order.status === 'shipped' ? 'completed' : 'active', icon: 'truck' },
+                                    { label: 'Refunded', state: 'pending', icon: 'dollar-sign' },
+                                ]}
+                                infoText={`Your order ${order.orderNumber} is ${order.status}. Refund will be processed if returned.`}
+                            />
+                        ))}
+                    </>
+                )}
 
                 {/* Completed Refunds History */}
                 {showHistory && (
@@ -169,14 +176,7 @@ export default function ReturnsRefundsScreen() {
                     onPress={() => router.push('/profile/help-center')}
                 >
                     <View style={styles.supportIconContainer}>
-                        {/* Simple face icon representation */}
-                        <View style={styles.supportFace}>
-                            <View style={styles.eyeRow}>
-                                <View style={styles.eye} />
-                                <View style={styles.eye} />
-                            </View>
-                            <View style={styles.mouth} />
-                        </View>
+                        <Feather name="headphones" size={24} color="#1a1a1a" />
                     </View>
                     <View style={styles.supportTextContainer}>
                         <Text style={styles.supportTitle}>Need more help?</Text>
@@ -282,33 +282,6 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: 16
-    },
-    // Custom face icon styles for "support"
-    supportFace: {
-        width: 24,
-        height: 24,
-        justifyContent: 'center',
-        alignItems: 'center'
-    },
-    eyeRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        width: 14,
-        marginBottom: 2
-    },
-    eye: {
-        width: 3,
-        height: 3,
-        borderRadius: 1.5,
-        backgroundColor: '#000'
-    },
-    mouth: {
-        width: 10,
-        height: 10,
-        borderRadius: 5,
-        borderTopWidth: 2,
-        borderTopColor: '#000',
-        marginTop: -4 // overlap to look like smile
     },
     supportTextContainer: {
         flex: 1

@@ -12,7 +12,8 @@ interface UserContextType {
     userDetails?: UserDetailsObject;
     setUser: (rawUser: any) => void;
     updateUser: (updates: Partial<UserObject>) => void;
-    updateUserDetails: (details: UserDetailsObject) => void;
+    updateUserDetails: (details: Partial<UserDetailsObject>) => void;
+    setUserDetails: (details: UserDetailsObject) => void;
     setCompleteProfile: (profile: CompleteUserProfile) => void;
     resetUser: () => void;
     isAuthenticated: boolean;
@@ -129,11 +130,12 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
                 return newUser;
             });
 
-            const formData = new FormData();
-            if (updates.name) formData.append('name', updates.name);
-            if (updates.userName) formData.append('userName', updates.userName);
-
-            await userService.updateProfile(formData);
+            // Only call API if there are actual fields the backend understands
+            const apiFields = ['name', 'userName', 'dob', 'gender', 'receivePushNotifications', 'receiveEmailUpdates', 'receiveOrderUpdates'] as const;
+            const hasApiFields = apiFields.some(f => (updates as any)[f] !== undefined);
+            if (hasApiFields) {
+                await userService.updateProfileJson(updates as any);
+            }
         } catch (error) {
             console.error('Error updating user profile:', error);
             setUserState(previousUser);
@@ -185,6 +187,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
             setUser,
             updateUser,
             updateUserDetails,
+            setUserDetails,
             setCompleteProfile,
             resetUser,
             isAuthenticated,

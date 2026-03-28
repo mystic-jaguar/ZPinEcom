@@ -4,6 +4,17 @@ import { pool } from '../db';
 import { authenticate, AuthRequest } from '../middleware/auth';
 
 const router = Router();
+const T = 'customer_cart_items';
+
+// GET /api/v1/cart/count  — must be before /:productId
+router.get('/count', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const result = await pool.query(`SELECT COUNT(*) FROM ${T} WHERE user_id = $1`, [req.userId]);
+    res.json({ success: true, data: { count: Number(result.rows[0].count) } });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
 
 // GET /api/v1/cart
 router.get('/', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
@@ -11,7 +22,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response): Promise<v
     const result = await pool.query(
       `SELECT ci.*, p.product_name, p.price as current_price, p.in_stock, p.quantity as stock_qty,
         COALESCE(json_agg(pi.image_url) FILTER (WHERE pi.image_url IS NOT NULL), '[]') as images
-       FROM cart_items ci
+       FROM ${T} ci
        JOIN products p ON p.id = ci.product_id
        LEFT JOIN product_images pi ON pi.product_id = p.id
        WHERE ci.user_id = $1
@@ -72,20 +83,19 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response): Promise<
       return;
     }
 
-    // Upsert: if already in cart, increment quantity
     const existing = await pool.query(
-      'SELECT id, quantity FROM cart_items WHERE user_id = $1 AND product_id = $2',
+      `SELECT id FROM ${T} WHERE user_id = $1 AND product_id = $2`,
       [req.userId, productId]
     );
 
     if (existing.rows.length > 0) {
       await pool.query(
-        'UPDATE cart_items SET quantity = quantity + $1, updated_at = NOW() WHERE id = $2',
+        `UPDATE ${T} SET quantity = quantity + $1, updated_at = NOW() WHERE id = $2`,
         [quantity, existing.rows[0].id]
       );
     } else {
       await pool.query(
-        `INSERT INTO cart_items (id, user_id, product_id, quantity, price_at_add, created_at, updated_at)
+        `INSERT INTO ${T} (id, user_id, product_id, quantity, price_at_add, created_at, updated_at)
          VALUES ($1,$2,$3,$4,$5,NOW(),NOW())`,
         [uuidv4(), req.userId, productId, quantity, product.rows[0].price]
       );
@@ -108,15 +118,13 @@ router.put('/:productId', authenticate, async (req: AuthRequest, res: Response):
 
   try {
     const result = await pool.query(
-      'UPDATE cart_items SET quantity = $1, updated_at = NOW() WHERE user_id = $2 AND product_id = $3 RETURNING id',
+      `UPDATE ${T} SET quantity = $1, updated_at = NOW() WHERE user_id = $2 AND product_id = $3 RETURNING id`,
       [quantity, req.userId, req.params.productId]
     );
-
     if (result.rows.length === 0) {
       res.status(404).json({ success: false, message: 'Cart item not found' });
       return;
     }
-
     res.json({ success: true, message: 'Cart updated' });
   } catch (err) {
     console.error('updateCart error:', err);
@@ -127,10 +135,9 @@ router.put('/:productId', authenticate, async (req: AuthRequest, res: Response):
 // DELETE /api/v1/cart/:productId
 router.delete('/:productId', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    await pool.query('DELETE FROM cart_items WHERE user_id = $1 AND product_id = $2', [req.userId, req.params.productId]);
+    await pool.query(`DELETE FROM ${T} WHERE user_id = $1 AND product_id = $2`, [req.userId, req.params.productId]);
     res.json({ success: true, message: 'Item removed from cart' });
   } catch (err) {
-    console.error('removeFromCart error:', err);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
@@ -138,19 +145,8 @@ router.delete('/:productId', authenticate, async (req: AuthRequest, res: Respons
 // DELETE /api/v1/cart
 router.delete('/', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    await pool.query('DELETE FROM cart_items WHERE user_id = $1', [req.userId]);
+    await pool.query(`DELETE FROM ${T} WHERE user_id = $1`, [req.userId]);
     res.json({ success: true, message: 'Cart cleared' });
-  } catch (err) {
-    console.error('clearCart error:', err);
-    res.status(500).json({ success: false, message: 'Server error' });
-  }
-});
-
-// GET /api/v1/cart/count
-router.get('/count', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
-    const result = await pool.query('SELECT COUNT(*) FROM cart_items WHERE user_id = $1', [req.userId]);
-    res.json({ success: true, data: { count: Number(result.rows[0].count) } });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Server error' });
   }

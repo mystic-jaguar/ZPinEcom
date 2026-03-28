@@ -21,41 +21,8 @@ interface PaymentContextType {
 const PaymentContext = createContext<PaymentContextType | undefined>(undefined);
 
 export const PaymentProvider = ({ children }: { children: ReactNode }) => {
-    // Initial Mock Data
-    const [cards, setCards] = useState<PaymentCardObject[]>([
-        {
-            id: 'card_1',
-            cardNumber: '1234567812341234',
-            cardHolderName: 'Jay Warale',
-            expiryDate: '09/28',
-            cvv: '123',
-            bankName: 'HDFC Bank',
-            cardType: 'Credit Card',
-            iconName: 'business',
-            iconColor: '#1565C0'
-        },
-        {
-            id: 'card_2',
-            cardNumber: '8765432187655678',
-            cardHolderName: 'Jay Warale',
-            expiryDate: '12/26',
-            cvv: '456',
-            bankName: 'ICICI Bank',
-            cardType: 'Debit Card',
-            iconName: 'home',
-            iconColor: '#E65100'
-        }
-    ]);
-
-    const [upis, setUpis] = useState<PaymentUPIObject[]>([
-        {
-            id: 'upi_1',
-            upiId: 'jaywarale@okaxis',
-            label: 'Google Pay',
-            subLabel: 'jaywarale@okaxis',
-            upiApp: 'Google Pay'
-        }
-    ]);
+    const [cards, setCards] = useState<PaymentCardObject[]>([]);
+    const [upis, setUpis] = useState<PaymentUPIObject[]>([]);
 
     // Load payment methods from AsyncStorage
     // API: GET /api/v1/users/payment-methods

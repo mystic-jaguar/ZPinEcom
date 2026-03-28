@@ -10,7 +10,7 @@ import { useUser } from '../../context/UserContext';
 
 export default function EditProfileScreen() {
     const router = useRouter();
-    const { user, updateUser, userDetails, updateUserDetails, setUserDetails } = useUser();
+    const { user, updateUser } = useUser();
 
     const [form, setForm] = useState({
         name: user.name,
@@ -35,26 +35,15 @@ export default function EditProfileScreen() {
         setIsSaving(true);
 
         try {
-            if (form.name !== user.name) {
-                await updateUser({ name: form.name });
-            }
+            const updates: Record<string, any> = {};
+            if (form.name && form.name !== user.name) updates.name = form.name;
+            if (form.dob) updates.dob = form.dob;
+            if (form.gender) updates.gender = form.gender;
+            updates.receivePushNotifications = form.preferences.receivePushNotifications;
+            updates.receiveEmailUpdates = form.preferences.receiveEmailUpdates;
+            updates.receiveOrderUpdates = form.preferences.receiveOrderUpdates;
 
-            const detailsUpdate = {
-                dob: form.dob,
-                gender: form.gender,
-                preferences: form.preferences
-            };
-
-            if (userDetails) {
-                await updateUserDetails(detailsUpdate);
-            } else {
-                await setUserDetails({
-                    userId: user.id,
-                    ...detailsUpdate,
-                    createdAt: new Date().toISOString()
-                });
-            }
-
+            await updateUser(updates as any);
             setShowSuccessModal(true);
         } catch (error) {
             console.error('Failed to update profile:', error);

@@ -49,33 +49,18 @@ export default function ForgotPasswordScreen() {
 
         setLoading(true);
         try {
-            // Determine if input is email or phone
             const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            const isEmail = emailRegex.test(emailOrPhone);
+            const isEmailInput = emailRegex.test(emailOrPhone);
+            setIsEmail(isEmailInput);
 
-            const requestData = isEmail
-                ? { email: emailOrPhone, mobile: '' }
-                : { mobile: emailOrPhone, email: '' };
+            await authService.sendPasswordResetOTP(
+                isEmailInput ? '' : emailOrPhone,
+                isEmailInput ? emailOrPhone : ''
+            );
 
-            // TODO: Replace with actual API endpoint
-            // const response = await fetch('YOUR_BASE_URL/api/v1/auth/forgetPassword/sendOTP', {
-            //     method: 'POST',
-            //     headers: {
-            //         'Content-Type': 'application/json',
-            //     },
-            //     body: JSON.stringify(requestData),
-            // });
-
-            // Simulate API call
-            await new Promise(resolve => setTimeout(resolve, 1000));
-
-            // Store isEmail for navigation
-            setIsEmail(isEmail);
-
-            // Show success modal first
             setShowSuccessModal(true);
-        } catch (error) {
-            setErrorMessage('Failed to send OTP. Please try again.');
+        } catch (error: any) {
+            setErrorMessage(error.message || 'Failed to send OTP. Please try again.');
             setShowErrorModal(true);
         } finally {
             setLoading(false);

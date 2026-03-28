@@ -1,13 +1,12 @@
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import AccordionItem from '../../components/common/AccordionItem';
 import ActionModal from '../../components/common/ActionModal';
 import DeliveryOptionSelector from '../../components/product/DeliveryOptionSelector';
 import ProductImageCarousel from '../../components/product/ProductImageCarousel';
 import VariantSelector from '../../components/product/VariantSelector';
-import { PRODUCTS } from '../../constants/products';
 import { useCart } from '../../context/CartContext';
 import { useWishlist } from '../../context/WishlistContext';
 import { productService } from '../../services/product';
@@ -23,6 +22,7 @@ export default function ProductDetails() {
 
     // Product State
     const [product, setProduct] = useState<ProductObject | null>(null);
+    const [relatedProducts, setRelatedProducts] = useState<ProductObject[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -41,13 +41,14 @@ export default function ProductDetails() {
         try {
             setLoading(true);
             setError(null);
-            const data = await productService.getProductById(productId);
+            const [data, related] = await Promise.all([
+                productService.getProductById(productId),
+                productService.getProducts({ limit: 6 }).then(r => r.products.filter(p => p.productId !== productId).slice(0, 4)).catch(() => []),
+            ]);
             setProduct(data);
-
-            // Set default selections if available
+            setRelatedProducts(related);
             if (data.colors && data.colors.length > 0) setSelectedColor(data.colors[0]);
-            if (data.sizes && data.sizes.length > 0) setSelectedSize(data.sizes[2] || data.sizes[0]); // Default to 3rd or 1st
-
+            if (data.sizes && data.sizes.length > 0) setSelectedSize(data.sizes[2] || data.sizes[0]);
         } catch (err: any) {
             setError(err.message || 'Failed to load product details');
         } finally {
@@ -251,22 +252,36 @@ export default function ProductDetails() {
                 </View>
 
                 {/* You might also like Section */}
+                {relatedProducts.length > 0 && (
                 <View style={styles.recommendationSection}>
                     <Text style={styles.sectionTitle}>You might also like</Text>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20 }}>
-                        {PRODUCTS.slice(1, 5).map((p, i) => (
-                            <View key={i} style={styles.recCard}>
+                        {relatedProducts.map((p) => (
+                            <TouchableOpacity
+                                key={p.productId}
+                                style={styles.recCard}
+                                onPress={() => router.push(`/product/${p.productId}`)}
+                            >
                                 <View style={styles.recImagePlaceholder}>
-                                    <View style={{ alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-                                        <Feather name="image" size={24} color="#ccc" />
-                                    </View>
+                                    {p.images?.[0] ? (
+                                        <Image
+                                            source={{ uri: p.images[0] as string }}
+                                            style={{ width: '100%', height: '100%', borderRadius: 12 }}
+                                            resizeMode="cover"
+                                        />
+                                    ) : (
+                                        <View style={{ alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                                            <Feather name="image" size={24} color="#ccc" />
+                                        </View>
+                                    )}
                                 </View>
                                 <Text style={styles.recTitle} numberOfLines={1}>{p.productName}</Text>
                                 <Text style={styles.recPrice}>₹{p.price}</Text>
-                            </View>
+                            </TouchableOpacity>
                         ))}
                     </ScrollView>
                 </View>
+                )}
 
             </ScrollView>
 

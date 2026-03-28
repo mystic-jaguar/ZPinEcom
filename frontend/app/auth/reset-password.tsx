@@ -69,28 +69,10 @@ export default function ResetPasswordScreen() {
 
         setLoading(true);
         try {
-            const requestData = {
-                resetToken: resetToken,
-                newPassword: newPassword,
-            };
-
-            // TODO: Replace with actual API endpoint
-            // const response = await fetch('YOUR_BASE_URL/api/v1/auth/forgetPassword/resetPassword', {
-            //     method: 'POST',
-            //     headers: {
-            //         'Content-Type': 'application/json',
-            //     },
-            //     body: JSON.stringify(requestData),
-            // });
-            // const data = await response.json();
-
-            // Simulate API call
-            await new Promise(resolve => setTimeout(resolve, 1000));
-
-            // Show success modal
+            await authService.resetPassword(resetToken, newPassword);
             setShowSuccessModal(true);
-        } catch (error) {
-            setErrorMessage('Failed to reset password. Please try again.');
+        } catch (error: any) {
+            setErrorMessage(error.message || 'Failed to reset password. Please try again.');
             setShowErrorModal(true);
         } finally {
             setLoading(false);

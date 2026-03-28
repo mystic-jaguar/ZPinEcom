@@ -4,7 +4,7 @@ import { useAddress } from '@/context/AddressContext';
 import { useCheckout } from '@/context/CheckoutContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React from 'react';
+import React, { useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function CheckoutAddressScreen() {
