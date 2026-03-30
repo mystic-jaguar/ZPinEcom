@@ -31,8 +31,6 @@ const PUBLIC_ENDPOINTS = [
     'auth/forgetPassword',
     'auth/verification',
     'public/',
-    // Note: products listing is public but not reviews (products/:id/reviews need auth)
-    // So we only exclude the base listing endpoints specifically
 ];
 
 // Request interceptor - Add auth token to requests

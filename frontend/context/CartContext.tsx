@@ -1,8 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
-import { COUPONS } from '../constants/coupons';
 import { tokenManager } from '../services/api';
 import { cartService } from '../services/cart';
+import { couponService } from '../services/coupon';
 import { CartItemObject, CouponObject, ProductObject } from '../types/types';
 import { useUser } from './UserContext';
 
@@ -22,7 +22,8 @@ interface CartContextType {
     isLoading: boolean;
     appliedCoupon: CouponObject | null;
     couponDiscount: number;
-    applyCoupon: (code: string) => { success: boolean; message: string };
+    availableCoupons: CouponObject[];
+    applyCoupon: (code: string) => Promise<{ success: boolean; message: string }>;
     removeCoupon: () => void;
 }
 
@@ -211,11 +212,14 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     };
 
     const [appliedCoupon, setAppliedCoupon] = useState<CouponObject | null>(null);
+    const [availableCoupons, setAvailableCoupons] = useState<CouponObject[]>([]);
 
-    // Mock Coupons
-    // Mock Coupons
-    // Replaced with imported COUPONS constant
-    const AVAILABLE_COUPONS: CouponObject[] = COUPONS;
+    // Fetch available coupons from backend on mount
+    useEffect(() => {
+        couponService.getCoupons()
+            .then(setAvailableCoupons)
+            .catch(() => {}); // fail silently — coupons are non-critical
+    }, []);
 
     const totalPrice = cartItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
     const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0);
@@ -242,19 +246,14 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
         return discount;
     }, [totalPrice, appliedCoupon]);
 
-    const applyCoupon = (code: string) => {
-        const coupon = AVAILABLE_COUPONS.find(c => c.code.toUpperCase() === code.toUpperCase());
-
-        if (!coupon) {
-            return { success: false, message: 'Invalid coupon code' };
+    const applyCoupon = async (code: string): Promise<{ success: boolean; message: string }> => {
+        try {
+            const result = await couponService.validateCoupon(code, totalPrice);
+            setAppliedCoupon(result);
+            return { success: true, message: 'Coupon applied successfully' };
+        } catch (error: any) {
+            return { success: false, message: error.message || 'Invalid coupon code' };
         }
-
-        if (totalPrice < coupon.minOrderValue) {
-            return { success: false, message: `Minimum order value of ₹${coupon.minOrderValue} required` };
-        }
-
-        setAppliedCoupon(coupon);
-        return { success: true, message: 'Coupon applied successfully' };
     };
 
     const removeCoupon = () => {
@@ -279,6 +278,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
             isLoading,
             appliedCoupon,
             couponDiscount,
+            availableCoupons,
             applyCoupon,
             removeCoupon
         }}>

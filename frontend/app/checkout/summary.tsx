@@ -31,9 +31,9 @@ export default function CheckoutSummaryScreen() {
     const finalTotal = totalPrice + shippingFee + deliveryFee + gst - couponDiscount;
     // Use totalSavings from CartContext instead of mock
 
-    const handleApplyCoupon = () => {
+    const handleApplyCoupon = async () => {
         if (!couponCode.trim()) return;
-        const result = applyCoupon(couponCode);
+        const result = await applyCoupon(couponCode);
         if (result.success) {
             setModalConfig({
                 title: 'Coupon Applied!',
@@ -60,15 +60,23 @@ export default function CheckoutSummaryScreen() {
     };
 
     const getImageSource = (item: any) => {
-        const img = item.images?.[0] || item.image;
-        if (!img) return { uri: 'https://via.placeholder.com/80' };
+        const img = item.product?.images?.[0] || item.images?.[0] || item.image;
+        if (!img) return { uri: 'https://placehold.co/80x80/F5F5F5/999?text=No+Image' };
         if (typeof img === 'string') return { uri: img };
-        return img; // It's a number (require)
+        return img;
     };
 
     const renderOrderItem = ({ item }: { item: any }) => (
         <View style={styles.orderItem}>
-            <Image source={getImageSource(item)} style={styles.itemImage} />
+            <Image
+                source={getImageSource(item)}
+                style={styles.itemImage}
+                resizeMode="cover"
+            />
+            <Text style={styles.itemName} numberOfLines={2}>
+                {item.product?.productName || item.productName || ''}
+            </Text>
+            <Text style={styles.itemQty}>Qty: {item.quantity}</Text>
         </View>
     );
 
@@ -418,19 +426,36 @@ const styles = StyleSheet.create({
         lineHeight: 16,
     },
     orderItem: {
-        width: 80,
-        height: 80,
+        width: 100,
         borderRadius: 12,
         backgroundColor: '#fff',
         marginRight: 10,
-        padding: 5,
-        justifyContent: 'center',
+        padding: 8,
         alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.06,
+        shadowRadius: 4,
+        elevation: 2,
     },
     itemImage: {
-        width: 60,
-        height: 70,
-        resizeMode: 'contain',
+        width: 80,
+        height: 80,
+        borderRadius: 8,
+        backgroundColor: '#F5F5F5',
+    },
+    itemName: {
+        fontSize: 11,
+        color: '#333',
+        fontWeight: '500',
+        marginTop: 6,
+        textAlign: 'center',
+        width: '100%',
+    },
+    itemQty: {
+        fontSize: 11,
+        color: '#9E9E9E',
+        marginTop: 2,
     },
     footer: {
         backgroundColor: '#fff',

@@ -4,6 +4,7 @@ import express from 'express';
 
 import authRoutes from './routes/auth';
 import cartRoutes from './routes/cart';
+import couponRoutes from './routes/coupons';
 import orderRoutes from './routes/orders';
 import productRoutes from './routes/products';
 import userRoutes from './routes/users';
@@ -26,6 +27,7 @@ app.use('/api/v1/products', productRoutes);
 app.use('/api/v1/cart', cartRoutes);
 app.use('/api/v1/wishlist', wishlistRoutes);
 app.use('/api/v1/orders', orderRoutes);
+app.use('/api/v1/coupons', couponRoutes);
 
 // Health check
 app.get('/health', (_, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));

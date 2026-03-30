@@ -1,24 +1,29 @@
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
-import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import CouponCard, { CouponStatus, CouponType } from '../../components/Coupons/CouponCard';
+import { useCart } from '../../context/CartContext';
 
-import { COUPONS } from '../../constants/coupons';
-
-// Use imported COUPONS
-const couponsData = COUPONS;
-
-const TABS = ['All', 'Fashion', 'Footwear', 'Beauty'];
+const TABS = ['All', 'Active', 'Expired'];
 
 export default function CouponsScreen() {
     const router = useRouter();
+    const { availableCoupons } = useCart();
     const [selectedTab, setSelectedTab] = useState('All');
+    const [isLoading, setIsLoading] = useState(true);
 
-    const filteredCoupons = couponsData.filter(coupon =>
-        selectedTab === 'All' || coupon.type === selectedTab
-    );
+    useEffect(() => {
+        if (availableCoupons !== undefined) setIsLoading(false);
+    }, [availableCoupons]);
+
+    const filteredCoupons = availableCoupons.filter(coupon => {
+        if (selectedTab === 'All') return true;
+        if (selectedTab === 'Active') return coupon.status === 'active' || !coupon.status;
+        if (selectedTab === 'Expired') return coupon.status === 'expired';
+        return true;
+    });
 
     const renderHeader = () => (
         <View style={styles.header}>
@@ -32,7 +37,6 @@ export default function CouponsScreen() {
 
     return (
         <View style={styles.container}>
-            {/* Yellow Background for Header Area */}
             <View style={styles.headerBackground}>
                 <SafeAreaView edges={['top']}>
                     {renderHeader()}
@@ -40,7 +44,6 @@ export default function CouponsScreen() {
             </View>
 
             <View style={styles.contentContainer}>
-                {/* Tabs */}
                 <View style={styles.tabsContainer}>
                     <FlatList
                         horizontal
@@ -50,39 +53,47 @@ export default function CouponsScreen() {
                         keyExtractor={(item) => item}
                         renderItem={({ item }) => (
                             <TouchableOpacity
-                                style={[
-                                    styles.tab,
-                                    selectedTab === item && styles.activeTab
-                                ]}
+                                style={[styles.tab, selectedTab === item && styles.activeTab]}
                                 onPress={() => setSelectedTab(item)}
                             >
-                                <Text style={[
-                                    styles.tabText,
-                                    selectedTab === item && styles.activeTabText
-                                ]}>{item}</Text>
+                                <Text style={[styles.tabText, selectedTab === item && styles.activeTabText]}>
+                                    {item}
+                                </Text>
                             </TouchableOpacity>
                         )}
                     />
                 </View>
 
-                {/* Coupon List */}
-                <FlatList
-                    data={filteredCoupons}
-                    keyExtractor={(item) => item.id}
-                    contentContainerStyle={styles.listContent}
-                    renderItem={({ item }) => (
-                        <CouponCard
-                            title={item.title}
-                            discount={item.discountType === 'percentage' ? `${item.discountValue}%` : `₹${item.discountValue}`} // Derive display string
-                            description={item.description}
-                            code={item.code}
-                            expiry={item.expiryDate || ''}
-                            type={item.type as CouponType}
-                            status={item.status as CouponStatus}
-                        />
-                    )}
-                    showsVerticalScrollIndicator={false}
-                />
+                {isLoading ? (
+                    <ActivityIndicator style={{ marginTop: 40 }} color="#FFD700" />
+                ) : filteredCoupons.length === 0 ? (
+                    <View style={styles.emptyContainer}>
+                        <Feather name="tag" size={48} color="#E0E0E0" />
+                        <Text style={styles.emptyText}>No coupons available</Text>
+                    </View>
+                ) : (
+                    <FlatList
+                        data={filteredCoupons}
+                        keyExtractor={(item) => item.id}
+                        contentContainerStyle={styles.listContent}
+                        renderItem={({ item }) => (
+                            <CouponCard
+                                title={item.title || item.code}
+                                discount={item.discountType === 'percentage'
+                                    ? `${item.discountValue}%`
+                                    : `₹${item.discountValue}`}
+                                description={item.description}
+                                code={item.code}
+                                expiry={item.expiryDate
+                                    ? new Date(item.expiryDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+                                    : ''}
+                                type={(item.type || 'General') as CouponType}
+                                status={(item.status || 'active') as CouponStatus}
+                            />
+                        )}
+                        showsVerticalScrollIndicator={false}
+                    />
+                )}
             </View>
         </View>
     );
@@ -151,5 +162,17 @@ const styles = StyleSheet.create({
     listContent: {
         paddingBottom: 40,
         paddingTop: 0,
+    },
+    emptyContainer: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingTop: 80,
+    },
+    emptyText: {
+        marginTop: 16,
+        fontSize: 16,
+        color: '#9E9E9E',
+        fontWeight: '500',
     },
 });
