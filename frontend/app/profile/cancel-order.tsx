@@ -247,12 +247,11 @@ export default function CancelOrderScreen() {
                 primaryButtonText="Go to Orders"
                 onPrimaryPress={() => {
                     setShowSuccessModal(false);
-                    router.dismissAll();
-                    router.replace('/profile/orders'); // Or back to order details, but orders list is safer
+                    router.replace('/profile/orders');
                 }}
                 onClose={() => {
                     setShowSuccessModal(false);
-                    router.back();
+                    router.replace('/profile/orders');
                 }}
             />
 

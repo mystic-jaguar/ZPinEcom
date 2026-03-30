@@ -201,6 +201,63 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response): Promise<
   }
 });
 
+// POST /api/v1/orders/:id/return
+router.post('/:id/return', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+  const { orderItemIds, reason, description } = req.body;
+
+  if (!reason) {
+    res.status(400).json({ success: false, message: 'reason is required' });
+    return;
+  }
+
+  try {
+    // Verify the order belongs to this user and is delivered
+    const orderResult = await pool.query(
+      `SELECT id, status, final_amount FROM ${ORDERS} WHERE id = $1 AND user_id = $2`,
+      [req.params.id, req.userId]
+    );
+
+    if (orderResult.rows.length === 0) {
+      res.status(404).json({ success: false, message: 'Order not found' });
+      return;
+    }
+
+    const order = orderResult.rows[0];
+    if (order.status !== 'delivered') {
+      res.status(400).json({ success: false, message: 'Only delivered orders can be returned' });
+      return;
+    }
+
+    // Insert into return_requests table
+    const returnId = uuidv4();
+    await pool.query(
+      `INSERT INTO return_requests (id, order_id, user_id, order_item_ids, reason, description, status, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, 'requested', NOW(), NOW())`,
+      [returnId, req.params.id, req.userId, JSON.stringify(orderItemIds || []), reason, description || '']
+    );
+
+    // Update order status to 'return_requested'
+    await pool.query(
+      `UPDATE ${ORDERS} SET status = 'return_requested', updated_at = NOW() WHERE id = $1`,
+      [req.params.id]
+    );
+
+    res.json({
+      success: true,
+      data: {
+        returnId,
+        status: 'requested',
+        message: 'Return request initiated successfully',
+        refundAmount: Number(order.final_amount),
+        refundStatus: 'initiated',
+      },
+    });
+  } catch (err) {
+    console.error('returnOrder error:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 // PATCH /api/v1/orders/:id/cancel
 router.patch('/:id/cancel', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
   try {

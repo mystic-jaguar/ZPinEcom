@@ -51,7 +51,6 @@ export default function CheckoutPaymentScreen() {
     const handleConfirm = async () => {
         if (cartItems.length === 0 || !selectedAddressId) return;
 
-        // Map UI payment method to backend value
         const paymentMethodMap: Record<string, 'cod' | 'razorpay' | 'wallet'> = {
             'net_banking': 'razorpay',
             'google_pay': 'razorpay',
@@ -65,15 +64,11 @@ export default function CheckoutPaymentScreen() {
                 shippingAddressId: selectedAddressId,
                 paymentMethod: backendMethod,
                 cartItems: [],
+                notes: isInstant ? 'instant_delivery' : 'standard_delivery',
             });
 
             if (response.success && response.data) {
                 addOrder(response.data.order as any);
-            }
-
-            if (cartItems.length > 0 && cartItems[0].product) {
-                const catPath = cartItems[0].product.categoryPath;
-                setRedirectCategory(Array.isArray(catPath) ? (catPath[0]?.name || null) : (catPath || null));
             }
 
             setShowSuccessModal(true);

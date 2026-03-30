@@ -27,7 +27,7 @@ export default function AllOrdersScreen() {
             if (searchQuery) {
                 const query = searchQuery.toLowerCase();
                 const matchesId = order.orderNumber.toLowerCase().includes(query);
-                const matchesItem = order.items.some((item) => item.productName.toLowerCase().includes(query));
+                const matchesItem = (order.items || []).some((item) => item.productName.toLowerCase().includes(query));
                 return matchesId || matchesItem;
             }
 
@@ -76,7 +76,7 @@ export default function AllOrdersScreen() {
                             date: new Date(item.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
                             total: `₹${item.finalAmount.toFixed(2)}`,
                             status: (item.status === 'processing' || item.status === 'shipped' ? 'In Progress' : item.status.charAt(0).toUpperCase() + item.status.slice(1)) as OrderStatus,
-                            items: item.items.map(i => ({ id: i.productId, name: i.productName, image: i.image }))
+                            items: (item.items || []).map(i => ({ id: i.productId, name: i.productName, image: i.image }))
                         }}
                         onPress={() => router.push({
                             pathname: '/profile/order-details',

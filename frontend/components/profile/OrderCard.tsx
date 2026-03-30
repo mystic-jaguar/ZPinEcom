@@ -42,13 +42,21 @@ export default function OrderCard({ order, onPress, onTrack, onBuyAgain }: Order
     };
 
     const statusColors = getStatusColor(order.status);
-    const firstItem = order.items[0];
+    const firstItem = order.items?.[0];
 
     return (
         <View style={styles.card}>
             <View style={styles.header}>
                 <View style={styles.imageContainer}>
-                    <Image source={firstItem.image} style={styles.image} resizeMode="cover" />
+                    {firstItem?.image ? (
+                        <Image
+                            source={typeof firstItem.image === 'string' ? { uri: firstItem.image } : firstItem.image}
+                            style={styles.image}
+                            resizeMode="cover"
+                        />
+                    ) : (
+                        <View style={[styles.image, { backgroundColor: '#F3F4F6' }]} />
+                    )}
                 </View>
                 <View style={styles.infoContainer}>
                     <View style={styles.topRow}>

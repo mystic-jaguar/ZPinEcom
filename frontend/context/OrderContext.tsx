@@ -84,7 +84,8 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
     };
 
     const addOrder = (order: OrderObject) => {
-        setOrders(prev => [order, ...prev]);
+        const safe = { ...order, items: Array.isArray(order.items) ? order.items : [] };
+        setOrders(prev => [safe, ...prev]);
     };
 
     const getOrderById = (id: string) => {

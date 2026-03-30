@@ -17,9 +17,10 @@ export default function ReturnsRefundsScreen() {
     // Flatten all items from orders to show in returns list
     // In a real app, you might filter by 'Delivered' status and within return window
     const returnableItems = orders.flatMap(order =>
-        order.items.map(item => ({
+        (order.items || []).map(item => ({
             ...item,
-            orderId: order.orderNumber,
+            orderId: order.id,          // UUID for API calls
+            orderNumber: order.orderNumber,
             date: order.date,
             status: order.status
         }))
@@ -31,7 +32,7 @@ export default function ReturnsRefundsScreen() {
         const query = searchQuery.toLowerCase();
         return (
             item.productName.toLowerCase().includes(query) ||
-            item.orderId.toLowerCase().includes(query)
+            item.orderNumber.toLowerCase().includes(query)
         );
     });
 
@@ -40,15 +41,15 @@ export default function ReturnsRefundsScreen() {
         .filter(order => order.status === 'returned' || order.status === 'cancelled' || order.paymentStatus === 'refunded')
         .map(order => ({
             orderId: order.orderNumber,
-            amount: `₹${order.finalAmount.toFixed(2)}`,
+            amount: `₹${(order.finalAmount || 0).toFixed(2)}`,
             statusLabel: order.status === 'cancelled' ? 'CANCELLED' : 'REFUNDED',
-            completedDate: new Date(order.updatedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+            completedDate: order.updatedAt ? new Date(order.updatedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '',
             steps: [
                 { label: 'Requested', state: 'completed' as const, icon: 'check' as const },
                 { label: 'Processed', state: 'completed' as const, icon: 'settings' as const },
                 { label: 'Refunded', state: 'completed' as const, icon: 'dollar-sign' as const },
             ],
-            infoText: `Refund of ₹${order.finalAmount.toFixed(2)} has been processed to your ${order.paymentMethod === 'wallet' ? 'wallet' : 'original payment method'}.`
+            infoText: `Refund of ₹${(order.finalAmount || 0).toFixed(2)} has been processed to your ${order.paymentMethod === 'wallet' ? 'wallet' : 'original payment method'}.`
         }));
 
     return (

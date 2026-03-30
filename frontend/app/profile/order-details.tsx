@@ -17,6 +17,7 @@ export default function OrderDetailsScreen() {
     const [showInvoiceModal, setShowInvoiceModal] = useState(false);
 
     const order = getOrderById(orderId as string);
+    const isInstantDelivery = order?.notes === 'instant_delivery';
 
     // Calculate if order can be cancelled (within 24 hours of placement)
     const canCancel = order && ['processing', 'pending'].includes(order.status);
@@ -66,8 +67,9 @@ export default function OrderDetailsScreen() {
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                 {/* Delivery Status */}
                 <DeliveryStatusCard
-                    status={order.status === 'pending' ? 'processing' : order.status}
-                    subtext={`By ${order.estimatedDelivery}`}
+                    status={order.status === 'pending' ? 'Processing' : order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                    subtext={`${isInstantDelivery ? '⚡ Instant Trial Delivery' : '🚚 Standard Delivery'}${order.estimatedDelivery ? ` · By ${order.estimatedDelivery}` : ''}`}
+                    icon={isInstantDelivery ? 'zap' : 'truck'}
                 />
 
                 {/* Delivery Address */}
@@ -78,9 +80,9 @@ export default function OrderDetailsScreen() {
                             <Feather name="map-pin" size={16} color="#6B7280" />
                         </View>
                         <View style={styles.addressContent}>
-                            <Text style={styles.addressName}>{order.shippingAddress.name}</Text>
-                            <Text style={styles.addressDetails}>{order.shippingAddress.address}, {order.shippingAddress.city}, {order.shippingAddress.state} - {order.shippingAddress.pincode}</Text>
-                            <Text style={styles.addressPhone}>+91 {order.shippingAddress.phone}</Text>
+                            <Text style={styles.addressName}>{order.shippingAddress?.name || '—'}</Text>
+                            <Text style={styles.addressDetails}>{order.shippingAddress?.address || ''}{order.shippingAddress?.city ? `, ${order.shippingAddress.city}` : ''}{order.shippingAddress?.state ? `, ${order.shippingAddress.state}` : ''}{order.shippingAddress?.pincode ? ` - ${order.shippingAddress.pincode}` : ''}</Text>
+                            <Text style={styles.addressPhone}>{order.shippingAddress?.phone ? `+91 ${order.shippingAddress.phone}` : ''}</Text>
                         </View>
                     </View>
                 </View>
@@ -103,7 +105,7 @@ export default function OrderDetailsScreen() {
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>ITEMS</Text>
                     <View style={styles.itemsCard}>
-                        {order.items.map((item, index) => (
+                        {(order.items || []).map((item, index) => (
                             <OrderItemRow
                                 key={index}
                                 image={item.image}
@@ -122,7 +124,7 @@ export default function OrderDetailsScreen() {
                     <View style={styles.priceCard}>
                         <PriceBreakdown
                             itemsTotal={order.totalAmount}
-                            instantTrialFee={order.deliveryFee ?? 0}
+                            instantTrialFee={isInstantDelivery ? 50 : 0}
                             deliveryCharges={0}
                             grandTotal={order.finalAmount}
                         />

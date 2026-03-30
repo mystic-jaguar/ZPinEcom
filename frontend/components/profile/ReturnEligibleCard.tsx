@@ -22,7 +22,11 @@ export default function ReturnEligibleCard({
         <View style={styles.card}>
             <View style={styles.contentRow}>
                 <View style={styles.imageContainer}>
-                    <Image source={image} style={styles.image} resizeMode="contain" />
+                    <Image
+                        source={typeof image === 'string' ? { uri: image } : image}
+                        style={styles.image}
+                        resizeMode="cover"
+                    />
                 </View>
                 <View style={styles.details}>
                     <Text style={[styles.status, { color: statusColor }]}>{status}</Text>
