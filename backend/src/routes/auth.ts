@@ -6,14 +6,11 @@ import { pool } from '../db';
 
 const router = Router();
 
-// All customer auth uses the customer_users table.
-// The shared `users` table is used by delivery partners / sellers (other apps).
+const USERS = 'users';
+const REFRESH_TOKENS = 'refresh_tokens';
+const AUTH_TOKENS = 'auth_tokens';
 
-const TABLE = 'customer_users';
-const TOKEN_TABLE = 'customer_refresh_tokens';
-const PWD_RESET_TABLE = 'customer_password_reset_tokens';
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function generateTokens(userId: string, userRole: string) {
   const accessToken = jwt.sign(
@@ -54,7 +51,7 @@ router.post('/signup', async (req: Request, res: Response): Promise<void> => {
 
   try {
     const existing = await pool.query(
-      `SELECT id FROM ${TABLE} WHERE email = $1`, [email.toLowerCase()]
+      `SELECT id FROM ${USERS} WHERE email = $1`, [email.toLowerCase()]
     );
     if (existing.rows.length > 0) {
       res.status(409).json({ success: false, message: 'Email already registered' });
@@ -65,7 +62,7 @@ router.post('/signup', async (req: Request, res: Response): Promise<void> => {
     const generatedUserName = userName || `${email.split('@')[0]}_${Date.now()}`;
 
     const result = await pool.query(
-      `INSERT INTO ${TABLE} (user_name, name, email, mobile, password_hash, user_role, is_verified, is_active, created_at, updated_at)
+      `INSERT INTO ${USERS} (user_name, name, email, mobile, password_hash, user_role, is_verified, is_active, created_at, updated_at)
        VALUES ($1,$2,$3,$4,$5,'customer',false,true,NOW(),NOW()) RETURNING *`,
       [generatedUserName, name, email.toLowerCase(), mobile || null, passwordHash]
     );
@@ -74,7 +71,7 @@ router.post('/signup', async (req: Request, res: Response): Promise<void> => {
     const { accessToken, refreshToken } = generateTokens(user.id, user.userRole);
 
     await pool.query(
-      `INSERT INTO ${TOKEN_TABLE} (id, user_id, token, expires_at, created_at)
+      `INSERT INTO ${REFRESH_TOKENS} (id, user_id, token, expires_at, created_at)
        VALUES ($1,$2,$3,NOW() + INTERVAL '30 days',NOW())`,
       [uuidv4(), user.id, refreshToken]
     );
@@ -83,7 +80,6 @@ router.post('/signup', async (req: Request, res: Response): Promise<void> => {
   } catch (err: any) {
     console.error('Signup error:', err);
     if (err.code === '23505') {
-      // unique violation — could be mobile or username
       const detail: string = err.detail || '';
       if (detail.includes('mobile')) {
         res.status(409).json({ success: false, message: 'Mobile number already registered' });
@@ -108,7 +104,7 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
 
   try {
     const result = await pool.query(
-      `SELECT * FROM ${TABLE} WHERE email = $1 OR user_name = $1`,
+      `SELECT * FROM ${USERS} WHERE email = $1 OR user_name = $1`,
       [email.toLowerCase()]
     );
 
@@ -138,9 +134,9 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
     const user = normalizeUser(row);
     const { accessToken, refreshToken } = generateTokens(user.id, user.userRole);
 
-    await pool.query(`DELETE FROM ${TOKEN_TABLE} WHERE user_id = $1`, [user.id]);
+    await pool.query(`DELETE FROM ${REFRESH_TOKENS} WHERE user_id = $1`, [user.id]);
     await pool.query(
-      `INSERT INTO ${TOKEN_TABLE} (id, user_id, token, expires_at, created_at)
+      `INSERT INTO ${REFRESH_TOKENS} (id, user_id, token, expires_at, created_at)
        VALUES ($1,$2,$3,NOW() + INTERVAL '30 days',NOW())`,
       [uuidv4(), user.id, refreshToken]
     );
@@ -165,7 +161,7 @@ router.post('/refresh-token', async (req: Request, res: Response): Promise<void>
     const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET!) as { userId: string };
 
     const stored = await pool.query(
-      `SELECT * FROM ${TOKEN_TABLE} WHERE user_id = $1 AND token = $2 AND expires_at > NOW()`,
+      `SELECT * FROM ${REFRESH_TOKENS} WHERE user_id = $1 AND token = $2 AND expires_at > NOW()`,
       [decoded.userId, refreshToken]
     );
     if (stored.rows.length === 0) {
@@ -173,7 +169,7 @@ router.post('/refresh-token', async (req: Request, res: Response): Promise<void>
       return;
     }
 
-    const userResult = await pool.query(`SELECT * FROM ${TABLE} WHERE id = $1`, [decoded.userId]);
+    const userResult = await pool.query(`SELECT * FROM ${USERS} WHERE id = $1`, [decoded.userId]);
     if (userResult.rows.length === 0) {
       res.status(401).json({ success: false, message: 'User not found' });
       return;
@@ -182,9 +178,9 @@ router.post('/refresh-token', async (req: Request, res: Response): Promise<void>
     const user = normalizeUser(userResult.rows[0]);
     const tokens = generateTokens(user.id, user.userRole);
 
-    await pool.query(`DELETE FROM ${TOKEN_TABLE} WHERE user_id = $1`, [user.id]);
+    await pool.query(`DELETE FROM ${REFRESH_TOKENS} WHERE user_id = $1`, [user.id]);
     await pool.query(
-      `INSERT INTO ${TOKEN_TABLE} (id, user_id, token, expires_at, created_at)
+      `INSERT INTO ${REFRESH_TOKENS} (id, user_id, token, expires_at, created_at)
        VALUES ($1,$2,$3,NOW() + INTERVAL '30 days',NOW())`,
       [uuidv4(), user.id, tokens.refreshToken]
     );
@@ -205,7 +201,9 @@ router.post('/forgetPassword/sendOTP', async (req: Request, res: Response): Prom
   }
 
   try {
-    const userResult = await pool.query(`SELECT id FROM ${TABLE} WHERE email = $1`, [email.toLowerCase()]);
+    const userResult = await pool.query(
+      `SELECT id FROM ${USERS} WHERE email = $1`, [email.toLowerCase()]
+    );
     if (userResult.rows.length === 0) {
       res.json({ success: true, message: 'If that email exists, an OTP has been sent' });
       return;
@@ -214,10 +212,13 @@ router.post('/forgetPassword/sendOTP', async (req: Request, res: Response): Prom
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const userId = userResult.rows[0].id;
 
-    await pool.query(`DELETE FROM ${PWD_RESET_TABLE} WHERE user_id = $1`, [userId]);
     await pool.query(
-      `INSERT INTO ${PWD_RESET_TABLE} (id, user_id, reset_token, expires_at, is_used, created_at)
-       VALUES ($1,$2,$3,NOW() + INTERVAL '15 minutes',false,NOW())`,
+      `DELETE FROM ${AUTH_TOKENS} WHERE user_id = $1 AND token_type = 'password_reset'`,
+      [userId]
+    );
+    await pool.query(
+      `INSERT INTO ${AUTH_TOKENS} (id, user_id, token, token_type, is_used, expires_at, created_at)
+       VALUES ($1,$2,$3,'password_reset',false,NOW() + INTERVAL '15 minutes',NOW())`,
       [uuidv4(), userId, otp]
     );
 
@@ -240,9 +241,13 @@ router.post('/forgetPassword/verifyOTP', async (req: Request, res: Response): Pr
 
   try {
     const result = await pool.query(
-      `SELECT prt.* FROM ${PWD_RESET_TABLE} prt
-       JOIN ${TABLE} u ON u.id = prt.user_id
-       WHERE u.email = $1 AND prt.reset_token = $2 AND prt.expires_at > NOW() AND prt.is_used = false`,
+      `SELECT at.* FROM ${AUTH_TOKENS} at
+       JOIN ${USERS} u ON u.id = at.user_id
+       WHERE u.email = $1
+         AND at.token = $2
+         AND at.token_type = 'password_reset'
+         AND at.expires_at > NOW()
+         AND at.is_used = false`,
       [email.toLowerCase(), otp]
     );
 
@@ -269,7 +274,8 @@ router.post('/forgetPassword/resetPassword', async (req: Request, res: Response)
 
   try {
     const result = await pool.query(
-      `SELECT * FROM ${PWD_RESET_TABLE} WHERE reset_token = $1 AND expires_at > NOW() AND is_used = false`,
+      `SELECT * FROM ${AUTH_TOKENS}
+       WHERE token = $1 AND token_type = 'password_reset' AND expires_at > NOW() AND is_used = false`,
       [resetToken]
     );
     if (result.rows.length === 0) {
@@ -280,8 +286,14 @@ router.post('/forgetPassword/resetPassword', async (req: Request, res: Response)
     const userId = result.rows[0].user_id;
     const passwordHash = await bcrypt.hash(newPassword, 12);
 
-    await pool.query(`UPDATE ${TABLE} SET password_hash = $1, updated_at = NOW() WHERE id = $2`, [passwordHash, userId]);
-    await pool.query(`UPDATE ${PWD_RESET_TABLE} SET is_used = true WHERE reset_token = $1`, [resetToken]);
+    await pool.query(
+      `UPDATE ${USERS} SET password_hash = $1, updated_at = NOW() WHERE id = $2`,
+      [passwordHash, userId]
+    );
+    await pool.query(
+      `UPDATE ${AUTH_TOKENS} SET is_used = true WHERE token = $1 AND token_type = 'password_reset'`,
+      [resetToken]
+    );
 
     res.json({ success: true, message: 'Password reset successfully' });
   } catch (err) {
@@ -297,10 +309,14 @@ router.post('/verification/sendOTP', async (req: Request, res: Response): Promis
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
   try {
-    await pool.query('DELETE FROM otp_verifications WHERE mobile = $1 OR email = $2', [mobile || '', email || '']);
     await pool.query(
-      `INSERT INTO otp_verifications (id, mobile, email, otp, otp_type, is_verified, expires_at, created_at)
-       VALUES ($1,$2,$3,$4,'signup',false,NOW() + INTERVAL '10 minutes',NOW())`,
+      `DELETE FROM ${AUTH_TOKENS}
+       WHERE token_type = 'signup_verification' AND (mobile = $1 OR email = $2)`,
+      [mobile || '', email || '']
+    );
+    await pool.query(
+      `INSERT INTO ${AUTH_TOKENS} (id, mobile, email, token, token_type, is_used, expires_at, created_at)
+       VALUES ($1,$2,$3,$4,'signup_verification',false,NOW() + INTERVAL '10 minutes',NOW())`,
       [uuidv4(), mobile || '', email || '', otp]
     );
 
@@ -319,8 +335,12 @@ router.post('/verification/verifyOTP', async (req: Request, res: Response): Prom
 
   try {
     const result = await pool.query(
-      `SELECT * FROM otp_verifications
-       WHERE (mobile = $1 OR email = $2) AND otp = $3 AND expires_at > NOW() AND is_verified = false`,
+      `SELECT * FROM ${AUTH_TOKENS}
+       WHERE token_type = 'signup_verification'
+         AND (mobile = $1 OR email = $2)
+         AND token = $3
+         AND expires_at > NOW()
+         AND is_used = false`,
       [mobile || '', email || '', otp]
     );
 
@@ -329,10 +349,16 @@ router.post('/verification/verifyOTP', async (req: Request, res: Response): Prom
       return;
     }
 
-    await pool.query('UPDATE otp_verifications SET is_verified = true WHERE id = $1', [result.rows[0].id]);
+    await pool.query(
+      `UPDATE ${AUTH_TOKENS} SET is_used = true WHERE id = $1`,
+      [result.rows[0].id]
+    );
 
     if (email) {
-      await pool.query(`UPDATE ${TABLE} SET is_verified = true, updated_at = NOW() WHERE email = $1`, [email.toLowerCase()]);
+      await pool.query(
+        `UPDATE ${USERS} SET is_verified = true, updated_at = NOW() WHERE email = $1`,
+        [email.toLowerCase()]
+      );
     }
 
     res.json({ success: true, message: 'OTP verified successfully' });

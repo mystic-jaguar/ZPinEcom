@@ -4,9 +4,9 @@ import { pool } from '../db';
 import { authenticate, AuthRequest } from '../middleware/auth';
 
 const router = Router();
-const T = 'customer_cart_items';
+const T = 'cart_items';
 
-// GET /api/v1/cart/count  — must be before /:productId
+// GET /api/v1/cart/count
 router.get('/count', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const result = await pool.query(`SELECT COUNT(*) FROM ${T} WHERE user_id = $1`, [req.userId]);

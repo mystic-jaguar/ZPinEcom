@@ -4,9 +4,9 @@ import { pool } from '../db';
 import { authenticate, AuthRequest } from '../middleware/auth';
 
 const router = Router();
-const T = 'customer_wishlists';
+const T = 'wishlists';
 
-// GET /api/v1/wishlist/count — before /:productId
+// GET /api/v1/wishlist/count
 router.get('/count', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const result = await pool.query(`SELECT COUNT(*) FROM ${T} WHERE user_id = $1`, [req.userId]);
@@ -16,7 +16,7 @@ router.get('/count', authenticate, async (req: AuthRequest, res: Response): Prom
   }
 });
 
-// DELETE /api/v1/wishlist/clear — before /:productId
+// DELETE /api/v1/wishlist/clear
 router.delete('/clear', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     await pool.query(`DELETE FROM ${T} WHERE user_id = $1`, [req.userId]);
@@ -83,7 +83,10 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response): Promise<
   }
 
   try {
-    const existing = await pool.query(`SELECT id FROM ${T} WHERE user_id = $1 AND product_id = $2`, [req.userId, productId]);
+    const existing = await pool.query(
+      `SELECT id FROM ${T} WHERE user_id = $1 AND product_id = $2`,
+      [req.userId, productId]
+    );
     if (existing.rows.length > 0) {
       res.status(409).json({ success: false, message: 'Already in wishlist' });
       return;
@@ -102,7 +105,10 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response): Promise<
 // DELETE /api/v1/wishlist/:productId
 router.delete('/:productId', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    await pool.query(`DELETE FROM ${T} WHERE user_id = $1 AND product_id = $2`, [req.userId, req.params.productId]);
+    await pool.query(
+      `DELETE FROM ${T} WHERE user_id = $1 AND product_id = $2`,
+      [req.userId, req.params.productId]
+    );
     res.json({ success: true, message: 'Removed from wishlist' });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Server error' });

@@ -67,8 +67,6 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
 // GET /api/v1/products/:id
 router.get('/:id', async (req: Request, res: Response): Promise<void> => {
   const { id } = req.params;
-
-  // Validate UUID format before hitting DB
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   if (!uuidRegex.test(id)) {
     res.status(404).json({ success: false, message: 'Product not found' });
@@ -85,7 +83,7 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
        LEFT JOIN product_reviews pr ON pr.product_id = p.id
        WHERE p.id = $1
        GROUP BY p.id`,
-      [req.params.id]
+      [id]
     );
 
     if (result.rows.length === 0) {
@@ -117,7 +115,9 @@ router.get('/:id/reviews', async (req: Request, res: Response): Promise<void> =>
       [req.params.id, limit, offset]
     );
 
-    const countResult = await pool.query('SELECT COUNT(*) FROM product_reviews WHERE product_id = $1', [req.params.id]);
+    const countResult = await pool.query(
+      'SELECT COUNT(*) FROM product_reviews WHERE product_id = $1', [req.params.id]
+    );
     const total = Number(countResult.rows[0].count);
 
     res.json({

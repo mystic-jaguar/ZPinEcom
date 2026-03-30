@@ -4,16 +4,16 @@ import { pool } from '../db';
 import { authenticate, AuthRequest } from '../middleware/auth';
 
 const router = Router();
-const ORDER_T = 'customer_orders';
-const ITEM_T = 'customer_order_items';
-const CART_T = 'customer_cart_items';
+const ORDERS = 'orders';
+const ORDER_ITEMS = 'order_items';
+const CART = 'cart_items';
+const ADDRESSES = 'addresses';
 
 function normalizeOrder(row: any) {
   return {
     id: row.id,
     orderNumber: row.order_number,
     userId: row.user_id,
-    sellerId: row.seller_id,
     status: row.status,
     paymentStatus: row.payment_status,
     totalAmount: Number(row.total_amount),
@@ -40,7 +40,9 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response): Promise<v
   const offset = (page - 1) * limit;
 
   try {
-    const countResult = await pool.query(`SELECT COUNT(*) FROM ${ORDER_T} WHERE user_id = $1`, [req.userId]);
+    const countResult = await pool.query(
+      `SELECT COUNT(*) FROM ${ORDERS} WHERE user_id = $1`, [req.userId]
+    );
     const total = Number(countResult.rows[0].count);
 
     const result = await pool.query(
@@ -53,8 +55,8 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response): Promise<v
           'image', oi.image,
           'variant', oi.variant
         )) FILTER (WHERE oi.id IS NOT NULL), '[]') as items
-       FROM ${ORDER_T} o
-       LEFT JOIN ${ITEM_T} oi ON oi.order_id = o.id
+       FROM ${ORDERS} o
+       LEFT JOIN ${ORDER_ITEMS} oi ON oi.order_id = o.id
        WHERE o.user_id = $1
        GROUP BY o.id
        ORDER BY o.created_at DESC
@@ -92,8 +94,8 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response): Promis
           'price', oi.price,
           'image', oi.image
         )) FILTER (WHERE oi.id IS NOT NULL), '[]') as items
-       FROM ${ORDER_T} o
-       LEFT JOIN ${ITEM_T} oi ON oi.order_id = o.id
+       FROM ${ORDERS} o
+       LEFT JOIN ${ORDER_ITEMS} oi ON oi.order_id = o.id
        WHERE o.id = $1 AND o.user_id = $2
        GROUP BY o.id`,
       [req.params.id, req.userId]
@@ -124,11 +126,10 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response): Promise<
   try {
     await client.query('BEGIN');
 
-    // Get cart items from customer cart
     const cartResult = await client.query(
       `SELECT ci.*, p.price, p.product_name,
         (SELECT image_url FROM product_images WHERE product_id = p.id LIMIT 1) as image
-       FROM ${CART_T} ci
+       FROM ${CART} ci
        JOIN products p ON p.id = ci.product_id
        WHERE ci.user_id = $1`,
       [req.userId]
@@ -140,9 +141,8 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response): Promise<
       return;
     }
 
-    // Get shipping address from customer addresses
     const addrResult = await client.query(
-      'SELECT * FROM customer_shipping_addresses WHERE id = $1 AND user_id = $2',
+      `SELECT * FROM ${ADDRESSES} WHERE id = $1 AND user_id = $2`,
       [shippingAddressId, req.userId]
     );
     if (addrResult.rows.length === 0) {
@@ -158,7 +158,9 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response): Promise<
       state: addr.state, pincode: addr.pincode, country: addr.country,
     };
 
-    const totalAmount = cartResult.rows.reduce((sum: number, item: any) => sum + Number(item.price) * item.quantity, 0);
+    const totalAmount = cartResult.rows.reduce(
+      (sum: number, item: any) => sum + Number(item.price) * item.quantity, 0
+    );
     const shippingAmount = totalAmount > 500 ? 0 : 49;
     const taxAmount = Math.round(totalAmount * 0.18);
     const finalAmount = totalAmount + shippingAmount + taxAmount;
@@ -166,22 +168,23 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response): Promise<
     const orderId = uuidv4();
 
     await client.query(
-      `INSERT INTO ${ORDER_T} (id, order_number, user_id, status, payment_status, total_amount, shipping_amount, tax_amount, final_amount, shipping_address, payment_method, notes, estimated_delivery, created_at, updated_at)
+      `INSERT INTO ${ORDERS}
+        (id, order_number, user_id, status, payment_status, total_amount, shipping_amount,
+         tax_amount, final_amount, shipping_address, payment_method, notes, estimated_delivery, created_at, updated_at)
        VALUES ($1,$2,$3,'pending','pending',$4,$5,$6,$7,$8,$9,$10,NOW() + INTERVAL '5 days',NOW(),NOW())`,
-      [orderId, orderNumber, req.userId, totalAmount, shippingAmount, taxAmount, finalAmount, JSON.stringify(shippingAddress), paymentMethod, notes || '']
+      [orderId, orderNumber, req.userId, totalAmount, shippingAmount, taxAmount, finalAmount,
+       JSON.stringify(shippingAddress), paymentMethod, notes || '']
     );
 
     for (const item of cartResult.rows) {
       await client.query(
-        `INSERT INTO ${ITEM_T} (id, order_id, product_id, product_name, quantity, price, image, created_at)
+        `INSERT INTO ${ORDER_ITEMS} (id, order_id, product_id, product_name, quantity, price, image, created_at)
          VALUES ($1,$2,$3,$4,$5,$6,$7,NOW())`,
         [uuidv4(), orderId, item.product_id, item.product_name, item.quantity, item.price, item.image || '']
       );
     }
 
-    // Clear customer cart
-    await client.query(`DELETE FROM ${CART_T} WHERE user_id = $1`, [req.userId]);
-
+    await client.query(`DELETE FROM ${CART} WHERE user_id = $1`, [req.userId]);
     await client.query('COMMIT');
 
     res.status(201).json({
@@ -202,7 +205,8 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response): Promise<
 router.patch('/:id/cancel', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const result = await pool.query(
-      `UPDATE ${ORDER_T} SET status = 'cancelled', payment_status = 'refunded', updated_at = NOW()
+      `UPDATE ${ORDERS}
+       SET status = 'cancelled', payment_status = 'refunded', updated_at = NOW()
        WHERE id = $1 AND user_id = $2 AND status IN ('pending','confirmed')
        RETURNING final_amount`,
       [req.params.id, req.userId]
@@ -215,7 +219,11 @@ router.patch('/:id/cancel', authenticate, async (req: AuthRequest, res: Response
 
     res.json({
       success: true,
-      data: { message: 'Order cancelled', refundAmount: Number(result.rows[0].final_amount), refundStatus: 'initiated' },
+      data: {
+        message: 'Order cancelled',
+        refundAmount: Number(result.rows[0].final_amount),
+        refundStatus: 'initiated',
+      },
     });
   } catch (err) {
     console.error('cancelOrder error:', err);
