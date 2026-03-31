@@ -81,8 +81,21 @@ export default function OrderDetailsScreen() {
                         </View>
                         <View style={styles.addressContent}>
                             <Text style={styles.addressName}>{order.shippingAddress?.name || '—'}</Text>
-                            <Text style={styles.addressDetails}>{order.shippingAddress?.address || ''}{order.shippingAddress?.city ? `, ${order.shippingAddress.city}` : ''}{order.shippingAddress?.state ? `, ${order.shippingAddress.state}` : ''}{order.shippingAddress?.pincode ? ` - ${order.shippingAddress.pincode}` : ''}</Text>
-                            <Text style={styles.addressPhone}>{order.shippingAddress?.phone ? `+91 ${order.shippingAddress.phone}` : ''}</Text>
+                            {(order.shippingAddress?.address || order.shippingAddress?.city) ? (
+                                <Text style={styles.addressDetails}>
+                                    {[
+                                        order.shippingAddress?.address,
+                                        order.shippingAddress?.city,
+                                        order.shippingAddress?.state,
+                                        order.shippingAddress?.pincode ? `- ${order.shippingAddress.pincode}` : null,
+                                    ].filter(Boolean).join(', ')}
+                                </Text>
+                            ) : (
+                                <Text style={styles.addressDetails}>Address details not available</Text>
+                            )}
+                            {order.shippingAddress?.phone ? (
+                                <Text style={styles.addressPhone}>+91 {order.shippingAddress.phone}</Text>
+                            ) : null}
                         </View>
                     </View>
                 </View>
@@ -93,10 +106,20 @@ export default function OrderDetailsScreen() {
                     <View style={styles.paymentCard}>
                         <View style={styles.paymentRow}>
                             <MaterialIcons name="account-balance-wallet" size={24} color="#6B7280" />
-                            <Text style={styles.paymentMethodText}>{order.paymentMethod}</Text>
+                            <Text style={styles.paymentMethodText}>
+                                {order.paymentMethod === 'cod' ? 'Cash on Delivery'
+                                    : order.paymentMethod === 'razorpay' ? 'Online Payment'
+                                    : order.paymentMethod === 'wallet' ? 'Wallet'
+                                    : order.paymentMethod}
+                            </Text>
                         </View>
                         <View style={styles.paidBadge}>
-                            <Text style={styles.paidText}>PAID</Text>
+                            <Text style={styles.paidText}>
+                                {order.paymentStatus === 'paid' ? 'PAID'
+                                    : order.paymentStatus === 'refunded' ? 'REFUNDED'
+                                    : order.paymentMethod === 'cod' ? 'COD'
+                                    : 'PENDING'}
+                            </Text>
                         </View>
                     </View>
                 </View>
@@ -108,11 +131,11 @@ export default function OrderDetailsScreen() {
                         {(order.items || []).map((item, index) => (
                             <OrderItemRow
                                 key={index}
-                                image={item.image}
-                                name={item.productName}
+                                image={item.image || null}
+                                name={item.productName || 'Product'}
                                 variant={item.variant || ''}
-                                quantity={item.quantity}
-                                price={item.price}
+                                quantity={item.quantity || 1}
+                                price={Number(item.price) || 0}
                             />
                         ))}
                     </View>
@@ -123,9 +146,9 @@ export default function OrderDetailsScreen() {
                     <Text style={styles.sectionTitle}>PRICE DETAILS</Text>
                     <View style={styles.priceCard}>
                         <PriceBreakdown
-                            itemsTotal={order.totalAmount}
+                            itemsTotal={order.totalAmount || order.finalAmount}
                             instantTrialFee={isInstantDelivery ? 50 : 0}
-                            deliveryCharges={0}
+                            deliveryCharges={Number(order.shippingAmount) || 0}
                             grandTotal={order.finalAmount}
                         />
                     </View>

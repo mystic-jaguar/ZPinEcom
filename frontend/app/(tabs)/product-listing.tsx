@@ -3,7 +3,6 @@ import { Feather, Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-    ActivityIndicator,
     Dimensions,
     FlatList,
     Image,
@@ -11,10 +10,11 @@ import {
     StyleSheet,
     Text,
     TouchableOpacity,
-    View,
+    View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import FilterModal, { FilterState } from '../../components/product/FilterModal';
+import SkeletonCard from '../../components/product/SkeletonCard';
 import { CATEGORY_DATA, CategoryNode } from '../../constants/categories';
 import { useWishlist } from '../../context/WishlistContext';
 import { productService } from '../../services/product';
@@ -302,8 +302,24 @@ export default function ProductListing() {
 
     if (loading) {
         return (
-            <SafeAreaView style={styles.centerContainer} edges={['bottom', 'left', 'right']}>
-                <ActivityIndicator size="large" color={Colors.light.tint} />
+            <SafeAreaView style={styles.container} edges={['bottom', 'left', 'right']}>
+                <Stack.Screen options={{
+                    headerShown: true,
+                    title: (subCategoryName as string) || (categoryName as string) || 'Products',
+                    headerLeft: () => (
+                        <TouchableOpacity onPress={() => router.back()} style={{ marginRight: 10, marginLeft: '10%' }}>
+                            <Feather name="chevron-left" size={28} color="#000" />
+                        </TouchableOpacity>
+                    ),
+                    headerShadowVisible: false,
+                    headerTitleStyle: { fontWeight: '700', fontSize: 20 },
+                    headerTitleAlign: 'center',
+                }} />
+                <View style={styles.skeletonGrid}>
+                    {Array.from({ length: 6 }).map((_, i) => (
+                        <SkeletonCard key={i} />
+                    ))}
+                </View>
             </SafeAreaView>
         );
     }
@@ -421,6 +437,13 @@ export default function ProductListing() {
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#fff' },
     centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' },
+    skeletonGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
+        paddingHorizontal: 15,
+        paddingTop: 20,
+    },
     errorText: { color: 'red', fontSize: 16, marginBottom: 10 },
     retryButton: { padding: 10, backgroundColor: Colors.light.tint, borderRadius: 5 },
     retryText: { fontWeight: 'bold' },

@@ -16,7 +16,7 @@ export default function TrackOrderScreen() {
 
     // Retrieve Order
     const order = getOrderById(orderId as string);
-    const isInstant = order?.isInstant ?? false;
+    const isInstant = order?.notes === 'instant_delivery';
     const isStandard = !isInstant;
 
     return (
@@ -72,7 +72,10 @@ export default function TrackOrderScreen() {
                     <View style={styles.overlapContainer}>
                         {/* Conditional Info Card (Overlapping) */}
                         {isInstant ? (
-                            <InstantTrialCard />
+                            <InstantTrialCard
+                                isDelivered={order?.status === 'delivered'}
+                                deliveredAt={order?.updatedAt}
+                            />
                         ) : (
                             <StandardDeliveryCard />
                         )}
@@ -81,7 +84,7 @@ export default function TrackOrderScreen() {
                     <View style={styles.sheetContent}>
                         {/* Timeline Card */}
                         <View style={styles.sectionContainer}>
-                            <OrderTimeline />
+                            <OrderTimeline status={order?.status} />
                         </View>
 
                         {/* Delivery Partner */}

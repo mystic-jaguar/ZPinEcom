@@ -11,7 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { orderService } from '../../services/order';
 
 export default function CheckoutPaymentScreen() {
@@ -24,6 +24,7 @@ export default function CheckoutPaymentScreen() {
     const { user } = useUser();
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [orderError, setOrderError] = useState<string | null>(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const [redirectCategory, setRedirectCategory] = useState<string | null>(null);
 
@@ -49,12 +50,14 @@ export default function CheckoutPaymentScreen() {
     };
 
     const handleConfirm = async () => {
-        if (cartItems.length === 0 || !selectedAddressId) return;
+        if (cartItems.length === 0 || !selectedAddressId || isSubmitting) return;
 
+        setIsSubmitting(true);
         const paymentMethodMap: Record<string, 'cod' | 'razorpay' | 'wallet'> = {
             'net_banking': 'razorpay',
             'google_pay': 'razorpay',
             'phone_pe': 'razorpay',
+            'cod': 'cod',
         };
         const backendMethod: 'cod' | 'razorpay' | 'wallet' =
             paymentMethodMap[selectedPaymentMethod || ''] || 'cod';
@@ -74,6 +77,8 @@ export default function CheckoutPaymentScreen() {
             setShowSuccessModal(true);
         } catch (error: any) {
             setOrderError(error.message || 'Failed to place order. Please try again.');
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -196,6 +201,8 @@ export default function CheckoutPaymentScreen() {
                 <Text style={styles.sectionTitle}>OTHER OPTIONS</Text>
                 <View style={styles.sectionContainer}>
                     {renderOption('net_banking', 'Net Banking', 'business-outline')}
+                    <View style={styles.divider} />
+                    {renderOption('cod', 'COD (Cash on Delivery)', 'cash-outline')}
                 </View>
 
             </ScrollView>
@@ -208,11 +215,18 @@ export default function CheckoutPaymentScreen() {
                 <Text style={styles.totalAmount}>₹{finalTotal.toFixed(2)}</Text>
 
                 <TouchableOpacity
-                    style={styles.confirmButton}
+                    style={[styles.confirmButton, isSubmitting && styles.confirmButtonDisabled]}
                     onPress={handleConfirm}
+                    disabled={isSubmitting}
                 >
-                    <Text style={styles.confirmButtonText}>Proceed to Pay</Text>
-                    <Ionicons name="chevron-forward" size={20} color="#000" />
+                    {isSubmitting ? (
+                        <ActivityIndicator color="#000" size="small" />
+                    ) : (
+                        <>
+                            <Text style={styles.confirmButtonText}>Proceed to Pay</Text>
+                            <Ionicons name="chevron-forward" size={20} color="#000" />
+                        </>
+                    )}
                 </TouchableOpacity>
             </View>
 
@@ -395,6 +409,11 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.3,
         shadowRadius: 8,
         elevation: 5,
+    },
+    confirmButtonDisabled: {
+        opacity: 0.6,
+        shadowOpacity: 0,
+        elevation: 0,
     },
     confirmButtonText: {
         fontSize: 16,

@@ -53,7 +53,7 @@ export const AddressProvider = ({ children }: { children: ReactNode }) => {
                 try {
                     const response = await userService.getShippingAddresses();
                     const raw = (response as any).data || [];
-                    if (Array.isArray(raw) && raw.length > 0) {
+                    if (Array.isArray(raw)) {
                         const normalized = raw.map(normalizeAddress);
                         setAddresses(normalized);
                         await AsyncStorage.setItem(ADDRESS_STORAGE_KEY, JSON.stringify(normalized));

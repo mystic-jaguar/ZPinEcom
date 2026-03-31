@@ -1,7 +1,7 @@
 import { Response, Router } from 'express';
-import { generateId } from '../utils/id';
 import { pool } from '../db';
 import { authenticate, AuthRequest } from '../middleware/auth';
+import { generateId } from '../utils/id';
 
 const router = Router();
 const ORDERS = 'orders';
@@ -164,14 +164,17 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response): Promise<
     const shippingAmount = totalAmount > 500 ? 0 : 49;
     const taxAmount = Math.round(totalAmount * 0.18);
     const finalAmount = totalAmount + shippingAmount + taxAmount;
-    const orderNumber = `ZP-${Date.now()}`;
     const orderId = generateId();
+    const orderNumber = `ZP-${orderId}`;
 
     await client.query(
       `INSERT INTO ${ORDERS}
         (id, order_number, user_id, status, payment_status, total_amount, shipping_amount,
          tax_amount, final_amount, shipping_address, payment_method, notes, estimated_delivery, created_at, updated_at)
-       VALUES ($1,$2,$3,'pending','pending',$4,$5,$6,$7,$8,$9,$10,NOW() + INTERVAL '5 days',NOW(),NOW())`,
+       VALUES ($1,$2,$3,'pending','pending',$4,$5,$6,$7,$8,$9,$10,
+         (NOW() AT TIME ZONE 'Asia/Kolkata') + INTERVAL '5 days',
+         (NOW() AT TIME ZONE 'Asia/Kolkata'),
+         (NOW() AT TIME ZONE 'Asia/Kolkata'))`,
       [orderId, orderNumber, req.userId, totalAmount, shippingAmount, taxAmount, finalAmount,
        JSON.stringify(shippingAddress), paymentMethod, notes || '']
     );
@@ -179,7 +182,7 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response): Promise<
     for (const item of cartResult.rows) {
       await client.query(
         `INSERT INTO ${ORDER_ITEMS} (id, order_id, product_id, product_name, quantity, price, image, created_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,NOW())`,
+         VALUES ($1,$2,$3,$4,$5,$6,$7,(NOW() AT TIME ZONE 'Asia/Kolkata'))`,
         [generateId(), orderId, item.product_id, item.product_name, item.quantity, item.price, item.image || '']
       );
     }

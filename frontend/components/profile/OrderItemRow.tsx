@@ -19,11 +19,17 @@ export default function OrderItemRow({
     return (
         <View style={styles.container}>
             <View style={styles.imageContainer}>
-                <Image
-                    source={typeof image === 'string' ? { uri: image } : image}
-                    style={styles.image}
-                    resizeMode="contain"
-                />
+                {image ? (
+                    <Image
+                        source={typeof image === 'string' ? { uri: image } : image}
+                        style={styles.image}
+                        resizeMode="contain"
+                    />
+                ) : (
+                    <View style={[styles.image, { backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center' }]}>
+                        <Text style={{ fontSize: 20 }}>📦</Text>
+                    </View>
+                )}
             </View>
             <View style={styles.details}>
                 <Text style={styles.name} numberOfLines={1}>{name}</Text>

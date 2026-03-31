@@ -14,24 +14,29 @@ export default function PriceBreakdown({
     deliveryCharges,
     grandTotal
 }: PriceBreakdownProps) {
+    const safeTotal = Number(itemsTotal) || 0;
+    const safeFee = Number(instantTrialFee) || 0;
+    const safeDelivery = Number(deliveryCharges) || 0;
+    const safeGrand = Number(grandTotal) || 0;
+
     return (
         <View style={styles.container}>
             <View style={styles.row}>
                 <Text style={styles.label}>Items Total</Text>
-                <Text style={styles.value}>₹{itemsTotal.toLocaleString('en-IN')}.00</Text>
+                <Text style={styles.value}>₹{safeTotal.toLocaleString('en-IN')}.00</Text>
             </View>
 
-            {instantTrialFee > 0 && (
+            {safeFee > 0 && (
                 <View style={styles.row}>
                     <Text style={styles.label}>Instant Trial Fee</Text>
-                    <Text style={[styles.value, styles.warningValue]}>+ ₹{instantTrialFee.toLocaleString('en-IN')}.00</Text>
+                    <Text style={[styles.value, styles.warningValue]}>+ ₹{safeFee.toLocaleString('en-IN')}.00</Text>
                 </View>
             )}
 
             <View style={styles.row}>
                 <Text style={styles.label}>Delivery Charges</Text>
                 <Text style={[styles.value, styles.successValue]}>
-                    {deliveryCharges === 0 ? 'FREE' : `₹${deliveryCharges.toLocaleString('en-IN')}`}
+                    {safeDelivery === 0 ? 'FREE' : `₹${safeDelivery.toLocaleString('en-IN')}`}
                 </Text>
             </View>
 
@@ -39,7 +44,7 @@ export default function PriceBreakdown({
 
             <View style={styles.row}>
                 <Text style={styles.grandTotalLabel}>Grand Total</Text>
-                <Text style={styles.grandTotalValue}>₹{grandTotal.toLocaleString('en-IN')}.00</Text>
+                <Text style={styles.grandTotalValue}>₹{safeGrand.toLocaleString('en-IN')}.00</Text>
             </View>
         </View>
     );

@@ -1,9 +1,10 @@
 import { Feather } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import SearchBar from '../components/SearchBar';
+import SkeletonCard from '../components/product/SkeletonCard';
 import { productService } from '../services/product';
 import { ProductObject } from '../types/types';
 
@@ -79,8 +80,10 @@ export default function ProductSearchScreen() {
 
             <View style={styles.content}>
                 {loading ? (
-                    <View style={styles.emptyState}>
-                        <ActivityIndicator size="large" color="#FBBF24" />
+                    <View style={styles.skeletonGrid}>
+                        {Array.from({ length: 6 }).map((_, i) => (
+                            <SkeletonCard key={i} />
+                        ))}
                     </View>
                 ) : searchQuery.length > 0 ? (
                     filteredProducts.length > 0 ? (
@@ -207,6 +210,13 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         marginTop: 50,
+    },
+    skeletonGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
+        paddingHorizontal: 10,
+        paddingTop: 15,
     },
     emptyText: {
         marginTop: 15,

@@ -10,6 +10,10 @@ import { PaymentProvider } from '../context/PaymentContext';
 import { SearchProvider } from "../context/SearchContext";
 import { UserProvider, useUser } from "../context/UserContext";
 import { WishlistProvider } from "../context/WishlistContext";
+import { startKeepAlive } from "../services/keepAlive";
+
+// Start keep-alive immediately when the app loads
+startKeepAlive();
 
 function RootLayoutNav() {
   const { isAuthenticated, isLoading } = useUser();

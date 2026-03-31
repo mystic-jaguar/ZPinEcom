@@ -1,7 +1,7 @@
 import { Response, Router } from 'express';
-import { generateId } from '../utils/id';
 import { pool } from '../db';
 import { authenticate, AuthRequest } from '../middleware/auth';
+import { generateId } from '../utils/id';
 
 const router = Router();
 
@@ -26,6 +26,30 @@ function normalizeUser(row: any) {
     receiveEmailUpdates: row.receive_email_updates,
     receiveOrderUpdates: row.receive_order_updates,
     timeStamp: row.created_at,
+  };
+}
+
+function normalizeOrder(row: any) {
+  return {
+    id: row.id,
+    orderNumber: row.order_number,
+    userId: row.user_id,
+    status: row.status,
+    paymentStatus: row.payment_status,
+    totalAmount: Number(row.total_amount || 0),
+    shippingAmount: Number(row.shipping_amount || 0),
+    taxAmount: Number(row.tax_amount || 0),
+    finalAmount: Number(row.final_amount || 0),
+    shippingAddress: row.shipping_address || {},
+    paymentMethod: row.payment_method || 'cod',
+    paymentId: row.payment_id,
+    estimatedDelivery: row.estimated_delivery,
+    trackingNumber: row.tracking_number,
+    notes: row.notes,
+    items: Array.isArray(row.items) ? row.items : [],
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    date: row.created_at,
   };
 }
 
@@ -62,7 +86,7 @@ router.get('/orders', authenticate, async (req: AuthRequest, res: Response): Pro
 
     res.json({
       success: true,
-      data: result.rows,
+      data: result.rows.map(normalizeOrder),
       pagination: {
         currentPage: page,
         totalPages: Math.ceil(total / limit),
