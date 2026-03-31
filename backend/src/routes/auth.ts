@@ -73,7 +73,7 @@ router.post('/signup', async (req: Request, res: Response): Promise<void> => {
     await pool.query(
       `INSERT INTO ${REFRESH_TOKENS} (id, user_id, token, expires_at, created_at)
        VALUES ($1,$2,$3,NOW() + INTERVAL '30 days',NOW())`,
-      [uuidv4(), user.id, refreshToken]
+      [generateId(), user.id, refreshToken]
     );
 
     res.status(201).json({ success: true, message: 'Account created successfully', accessToken, refreshToken, user });
@@ -138,7 +138,7 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
     await pool.query(
       `INSERT INTO ${REFRESH_TOKENS} (id, user_id, token, expires_at, created_at)
        VALUES ($1,$2,$3,NOW() + INTERVAL '30 days',NOW())`,
-      [uuidv4(), user.id, refreshToken]
+      [generateId(), user.id, refreshToken]
     );
 
     res.json({ success: true, message: 'Login successful', accessToken, refreshToken, user });
@@ -182,7 +182,7 @@ router.post('/refresh-token', async (req: Request, res: Response): Promise<void>
     await pool.query(
       `INSERT INTO ${REFRESH_TOKENS} (id, user_id, token, expires_at, created_at)
        VALUES ($1,$2,$3,NOW() + INTERVAL '30 days',NOW())`,
-      [uuidv4(), user.id, tokens.refreshToken]
+      [generateId(), user.id, tokens.refreshToken]
     );
 
     res.json({ success: true, accessToken: tokens.accessToken, refreshToken: tokens.refreshToken });
@@ -219,7 +219,7 @@ router.post('/forgetPassword/sendOTP', async (req: Request, res: Response): Prom
     await pool.query(
       `INSERT INTO ${AUTH_TOKENS} (id, user_id, token, token_type, is_used, expires_at, created_at)
        VALUES ($1,$2,$3,'password_reset',false,NOW() + INTERVAL '15 minutes',NOW())`,
-      [uuidv4(), userId, otp]
+      [generateId(), userId, otp]
     );
 
     console.log(`[OTP] Password reset OTP for ${email}: ${otp}`);
@@ -317,7 +317,7 @@ router.post('/verification/sendOTP', async (req: Request, res: Response): Promis
     await pool.query(
       `INSERT INTO ${AUTH_TOKENS} (id, mobile, email, token, token_type, is_used, expires_at, created_at)
        VALUES ($1,$2,$3,$4,'signup_verification',false,NOW() + INTERVAL '10 minutes',NOW())`,
-      [uuidv4(), mobile || '', email || '', otp]
+      [generateId(), mobile || '', email || '', otp]
     );
 
     console.log(`[OTP] Verification OTP: ${otp}`);

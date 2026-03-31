@@ -300,7 +300,7 @@ router.post('/:id/reviews', authenticate, async (req: AuthRequest, res: Response
     await pool.query(
       `INSERT INTO product_reviews (id, product_id, user_id, rating, comment, created_at, updated_at)
        VALUES ($1,$2,$3,$4,$5,NOW(),NOW())`,
-      [uuidv4(), req.params.id, req.userId, rating, comment]
+      [generateId(), req.params.id, req.userId, rating, comment]
     );
     res.status(201).json({ success: true, message: 'Review added' });
   } catch (err) {

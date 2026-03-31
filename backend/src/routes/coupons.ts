@@ -115,3 +115,4 @@ router.post('/validate', authenticate, async (req: AuthRequest, res: Response): 
 });
 
 export default router;
+

@@ -1,5 +1,5 @@
 import { Response, Router } from 'express';
-import { v4 as uuidv4 } from 'uuid';
+import { generateId } from '../utils/id';
 import { pool } from '../db';
 import { authenticate, AuthRequest } from '../middleware/auth';
 
@@ -93,7 +93,7 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response): Promise<
     }
     await pool.query(
       `INSERT INTO ${T} (id, user_id, product_id, created_at) VALUES ($1,$2,$3,NOW())`,
-      [uuidv4(), req.userId, productId]
+      [generateId(), req.userId, productId]
     );
     res.status(201).json({ success: true, message: 'Added to wishlist' });
   } catch (err) {
@@ -116,3 +116,4 @@ router.delete('/:productId', authenticate, async (req: AuthRequest, res: Respons
 });
 
 export default router;
+

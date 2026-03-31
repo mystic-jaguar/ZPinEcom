@@ -1,5 +1,5 @@
 import { Response, Router } from 'express';
-import { v4 as uuidv4 } from 'uuid';
+import { generateId } from '../utils/id';
 import { pool } from '../db';
 import { authenticate, AuthRequest } from '../middleware/auth';
 
@@ -165,7 +165,7 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response): Promise<
     const taxAmount = Math.round(totalAmount * 0.18);
     const finalAmount = totalAmount + shippingAmount + taxAmount;
     const orderNumber = `ZP-${Date.now()}`;
-    const orderId = uuidv4();
+    const orderId = generateId();
 
     await client.query(
       `INSERT INTO ${ORDERS}
@@ -180,7 +180,7 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response): Promise<
       await client.query(
         `INSERT INTO ${ORDER_ITEMS} (id, order_id, product_id, product_name, quantity, price, image, created_at)
          VALUES ($1,$2,$3,$4,$5,$6,$7,NOW())`,
-        [uuidv4(), orderId, item.product_id, item.product_name, item.quantity, item.price, item.image || '']
+        [generateId(), orderId, item.product_id, item.product_name, item.quantity, item.price, item.image || '']
       );
     }
 
@@ -229,7 +229,7 @@ router.post('/:id/return', authenticate, async (req: AuthRequest, res: Response)
     }
 
     // Insert into return_requests table
-    const returnId = uuidv4();
+    const returnId = generateId();
     await pool.query(
       `INSERT INTO return_requests (id, order_id, user_id, order_item_ids, reason, description, status, created_at, updated_at)
        VALUES ($1, $2, $3, $4, $5, $6, 'requested', NOW(), NOW())`,
@@ -289,3 +289,4 @@ router.patch('/:id/cancel', authenticate, async (req: AuthRequest, res: Response
 });
 
 export default router;
+

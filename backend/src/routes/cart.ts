@@ -1,5 +1,5 @@
 import { Response, Router } from 'express';
-import { v4 as uuidv4 } from 'uuid';
+import { generateId } from '../utils/id';
 import { pool } from '../db';
 import { authenticate, AuthRequest } from '../middleware/auth';
 
@@ -97,7 +97,7 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response): Promise<
       await pool.query(
         `INSERT INTO ${T} (id, user_id, product_id, quantity, price_at_add, created_at, updated_at)
          VALUES ($1,$2,$3,$4,$5,NOW(),NOW())`,
-        [uuidv4(), req.userId, productId, quantity, product.rows[0].price]
+        [generateId(), req.userId, productId, quantity, product.rows[0].price]
       );
     }
 
@@ -153,3 +153,4 @@ router.delete('/', authenticate, async (req: AuthRequest, res: Response): Promis
 });
 
 export default router;
+

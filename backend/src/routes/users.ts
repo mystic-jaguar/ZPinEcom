@@ -1,5 +1,5 @@
 import { Response, Router } from 'express';
-import { v4 as uuidv4 } from 'uuid';
+import { generateId } from '../utils/id';
 import { pool } from '../db';
 import { authenticate, AuthRequest } from '../middleware/auth';
 
@@ -180,7 +180,7 @@ router.post('/shipping-address', authenticate, async (req: AuthRequest, res: Res
       `INSERT INTO ${ADDRESSES}
         (id, user_id, name, phone, address_line1, address_line2, city, state, pincode, country, landmark, label, is_default, created_at, updated_at)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,NOW(),NOW()) RETURNING *`,
-      [uuidv4(), req.userId, name, phone, addressLine1, addressLine2 || '', city, state, pincode, country || 'India', landmark || '', label || 'Home', isDefault || false]
+      [generateId(), req.userId, name, phone, addressLine1, addressLine2 || '', city, state, pincode, country || 'India', landmark || '', label || 'Home', isDefault || false]
     );
 
     res.status(201).json({ success: true, data: result.rows[0] });
@@ -191,3 +191,4 @@ router.post('/shipping-address', authenticate, async (req: AuthRequest, res: Res
 });
 
 export default router;
+
