@@ -22,6 +22,92 @@ function normalizeProduct(row: any) {
   };
 }
 
+// GET /api/v1/products/nearby — product counts per nearby category based on location context
+// Since products don't have coordinates, we return counts per category
+// filtered by the 4 nearby categories: Men, Women, Kids, Makeup
+router.get('/nearby', async (req: Request, res: Response): Promise<void> => {
+  // lat/lng accepted for future geo-filtering; currently returns category counts
+  const NEARBY_CATEGORIES = [
+    { name: 'Men',    keywords: ['men', 'man', 'male'],          rootCategory: 'Fashion', subCategory: 'Men'    },
+    { name: 'Women',  keywords: ['women', 'woman', 'female'],    rootCategory: 'Fashion', subCategory: 'Women'  },
+    { name: 'Kids',   keywords: ['kids', 'kid', 'children', 'child', 'boy', 'girl'], rootCategory: 'Fashion', subCategory: 'Men' },
+    { name: 'Makeup', keywords: ['makeup', 'make-up', 'cosmetic', 'beauty', 'skincare', 'haircare'], rootCategory: 'Beauty', subCategory: 'Makeup' },
+  ];
+
+  try {
+    const results = await Promise.all(
+      NEARBY_CATEGORIES.map(async (cat) => {
+        const likeConditions = cat.keywords
+          .map((_, i) => `LOWER(p.category_path::text) LIKE $${i + 1}`)
+          .join(' OR ');
+        const params = cat.keywords.map(k => `%${k}%`);
+
+        const countResult = await pool.query(
+          `SELECT COUNT(*) FROM products p WHERE p.in_stock = true AND (${likeConditions})`,
+          params
+        );
+
+        // Get one representative image
+        const imgResult = await pool.query(
+          `SELECT pi.image_url FROM products p
+           JOIN product_images pi ON pi.product_id = p.id
+           WHERE p.in_stock = true AND (${likeConditions})
+           LIMIT 1`,
+          params
+        );
+
+        return {
+          name: cat.name,
+          rootCategory: cat.rootCategory,
+          subCategory: cat.subCategory,
+          count: Number(countResult.rows[0].count),
+          imageUrl: imgResult.rows[0]?.image_url || null,
+        };
+      })
+    );
+
+    res.json({ success: true, data: results });
+  } catch (err) {
+    console.error('nearby error:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// GET /api/v1/products/fresh-categories — top 5 categories with the most recently added product
+router.get('/fresh-categories', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const result = await pool.query(`
+      SELECT DISTINCT ON (deepest_category_name)
+        deepest_category_name,
+        category_path,
+        MAX(created_at) OVER (PARTITION BY deepest_category_name) AS latest_at,
+        (SELECT image_url FROM product_images WHERE product_id = p.id LIMIT 1) AS image_url
+      FROM products p
+      WHERE in_stock = true
+        AND deepest_category_name IS NOT NULL
+        AND deepest_category_name != ''
+      ORDER BY deepest_category_name, created_at DESC
+    `);
+
+    // Sort by latest_at desc, take top 5
+    const sorted = result.rows
+      .sort((a, b) => new Date(b.latest_at).getTime() - new Date(a.latest_at).getTime())
+      .slice(0, 5);
+
+    const categories = sorted.map(r => ({
+      name: r.deepest_category_name,
+      categoryPath: r.category_path,
+      imageUrl: r.image_url || null,
+      latestAt: r.latest_at,
+    }));
+
+    res.json({ success: true, data: categories });
+  } catch (err) {
+    console.error('freshCategories error:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 // GET /api/v1/products/category/:categoryName — filter by category name
 router.get('/category/:categoryName', async (req: Request, res: Response): Promise<void> => {
   const page = Number(req.query.page) || 1;

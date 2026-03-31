@@ -127,6 +127,30 @@ export const productService = {
     },
 
     /**
+     * Get nearby category availability counts (for Nearby Availabilities section)
+     */
+    async getNearbyCategories(lat?: number, lng?: number): Promise<{ name: string; rootCategory: string; subCategory: string; count: number; imageUrl: string | null }[]> {
+        try {
+            const response = await apiClient.get('products/nearby', { params: { lat, lng } });
+            return response.data.data || [];
+        } catch (error) {
+            throw new Error(handleApiError(error));
+        }
+    },
+
+    /**
+     * Get top 5 categories with the most recently added product (for Fresh Arrivals)
+     */
+    async getFreshCategories(): Promise<{ name: string; categoryPath: any; imageUrl: string | null; latestAt: string }[]> {
+        try {
+            const response = await apiClient.get('products/fresh-categories');
+            return response.data.data || [];
+        } catch (error) {
+            throw new Error(handleApiError(error));
+        }
+    },
+
+    /**
      * Get products by category
      */
     async getProductsByCategory(categoryId: string, params?: ProductListParams) {

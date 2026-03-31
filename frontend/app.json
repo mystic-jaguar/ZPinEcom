@@ -29,6 +29,14 @@
     "plugins": [
       "expo-router",
       [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "ZPin uses your location to show nearby product availability.",
+          "locationWhenInUsePermission": "ZPin uses your location to show nearby product availability.",
+          "isIosBackgroundLocationEnabled": false
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "image": "./assets/images/splash-icon.png",
