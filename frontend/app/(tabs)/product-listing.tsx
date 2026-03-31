@@ -46,19 +46,51 @@ export default function ProductListing() {
         discounts: []
     });
 
-    // Fetch Products on Mount
+    // Fetch Products — use all descendant category names for server-side filtering
     useEffect(() => {
         loadProducts();
-    }, []);
+    }, [categoryName, subCategoryName]);
 
     const loadProducts = async () => {
         try {
             setLoading(true);
             setError(null);
-            // Fetching a larger limit to simulate "all" for client-side filtering for now
-            // In a real app, we would pass category params to the API
-            const response = await productService.getProducts({ limit: 100 });
-            setProducts(response.products); // Assuming response structure { products: [], ... }
+
+            const targetName = (subCategoryName as string) || (categoryName as string);
+
+            if (targetName) {
+                // Collect all descendant names from the category tree
+                const node = findNode(CATEGORY_DATA, targetName);
+                const labels = node ? collectLabels(node) : [targetName];
+
+                // Fetch products for each leaf label and merge (deduplicated by productId)
+                const seen = new Set<string>();
+                const allProducts: ProductObject[] = [];
+
+                await Promise.all(
+                    labels.map(async (label) => {
+                        try {
+                            const response = await productService.getProductsByCategory(label, { limit: 100 });
+                            const items = (response as any).products || (response as any).data || [];
+                            items.forEach((p: ProductObject) => {
+                                const id = p.productId || (p as any).id;
+                                if (!seen.has(id)) {
+                                    seen.add(id);
+                                    allProducts.push({ ...p, productId: id });
+                                }
+                            });
+                        } catch {
+                            // individual label may return 0 results — that's fine
+                        }
+                    })
+                );
+
+                setProducts(allProducts);
+            } else {
+                // No category — show all
+                const response = await productService.getProducts({ limit: 100 });
+                setProducts(response.products);
+            }
         } catch (err: any) {
             setError(err.message || 'Failed to load products');
         } finally {
@@ -66,26 +98,26 @@ export default function ProductListing() {
         }
     };
 
-    // 1. Find the current category node (e.g. "T-Shirts") from the deep tree
+    // Helper to find a node by name in the tree
+    const findNode = (nodes: CategoryNode[], name: string): CategoryNode | null => {
+        for (const node of nodes) {
+            if (node.name === name) return node;
+            if (node.children) {
+                const found = findNode(node.children, name);
+                if (found) return found;
+            }
+        }
+        return null;
+    };
+
+    // Find the current category node from the tree
     const currentCategoryNode = useMemo(() => {
         const targetName = (subCategoryName as string) || (categoryName as string);
         if (!targetName) return null;
-
-        const findNode = (nodes: CategoryNode[]): CategoryNode | null => {
-            for (const node of nodes) {
-                if (node.name === targetName) return node;
-                if (node.children) {
-                    const found = findNode(node.children);
-                    if (found) return found;
-                }
-            }
-            return null;
-        };
-
-        return findNode(CATEGORY_DATA);
+        return findNode(CATEGORY_DATA, targetName);
     }, [categoryName, subCategoryName]);
 
-    // Helper to get all descendant names from a node
+    // Get all descendant names from a node (used for sub-filter tabs)
     const collectLabels = (node: CategoryNode): string[] => {
         const labels: string[] = [node.name];
         if (node.children) {
@@ -96,73 +128,25 @@ export default function ProductListing() {
         return labels;
     };
 
-    // 2. Get all valid sub-labels (leaves) for the initial "All" view
-    const allDescendantLabels = useMemo(() => {
-        if (!currentCategoryNode) return [];
-        return collectLabels(currentCategoryNode);
-    }, [currentCategoryNode]);
-
-
-    // 3. Filter Logic
+    // 4. Advanced Filter & Sort Logic
     const filteredProducts = useMemo(() => {
         if (!products.length) return [];
+        if (activeFilter === 'All') return products;
 
-        // Base filter: Product must be in the current tree hierarchy
-        const baseMatches = products.filter(p => {
-            if (allDescendantLabels.length === 0) return true; // No category selected, show all
+        const selectedChildNode = currentCategoryNode?.children?.find(c => c.name === activeFilter);
+        if (!selectedChildNode) return products;
 
-            // Match against category or subCategory
-            // We search if product.subCategory is one of the descendant labels
-            // OR if product.category matches currentCategoryNode (fallback)
-
-            if (p.deepestCategoryName && typeof p.deepestCategoryName === 'string' && allDescendantLabels.includes(p.deepestCategoryName)) return true;
-
-            // Handle categoryPath as Array of Objects (API response)
+        const childLabels = collectLabels(selectedChildNode);
+        return products.filter(p => {
+            if (p.deepestCategoryName && childLabels.some(l => l.toLowerCase() === p.deepestCategoryName!.toLowerCase())) return true;
             if (Array.isArray(p.categoryPath)) {
-                // Check if any category in the path is in the allowed labels
-                // The API returns [{ name: "men" }, { name: "footwear" }]
-                // We compare strictly (or case-insensitive if needed, but labels seem title-cased)
-                // Actually, labels are title-cased "Men", API is "men". We might need to normalize.
                 return p.categoryPath.some((cat: CategoryPathItem) =>
-                    cat.name && allDescendantLabels.some(label => label.toLowerCase() === cat.name.toLowerCase())
+                    cat.name && childLabels.some(l => l.toLowerCase() === cat.name.toLowerCase())
                 );
             }
-
-            // Handle categoryPath as String (Legacy/Fallback)
-            if (p.categoryPath && typeof p.categoryPath === 'string' && allDescendantLabels.includes(p.categoryPath.split('-')[0])) return true;
-
             return false;
         });
-
-        // Active Filter (Horizontal Tabs)
-        if (activeFilter === 'All') {
-            return baseMatches;
-        } else {
-            // Find the selected child node (e.g. "Men")
-            const selectedChildNode = currentCategoryNode?.children?.find(c => c.name === activeFilter);
-
-            if (selectedChildNode) {
-                // Get all descendants for this specific child (e.g. "Men" -> "Round Neck", "Polo")
-                const childDescendants = collectLabels(selectedChildNode);
-                return baseMatches.filter(p => {
-                    if (p.deepestCategoryName && typeof p.deepestCategoryName === 'string' && childDescendants.includes(p.deepestCategoryName)) return true;
-
-                    if (Array.isArray(p.categoryPath)) {
-                        return p.categoryPath.some((cat: CategoryPathItem) =>
-                            cat.name && childDescendants.some(label => label.toLowerCase() === cat.name.toLowerCase())
-                        );
-                    }
-
-                    if (p.categoryPath && typeof p.categoryPath === 'string' && childDescendants.includes(p.categoryPath.split('-')[0])) return true;
-
-                    return false;
-                });
-            }
-
-            // Fallback (exact match)
-            return baseMatches.filter(p => p.deepestCategoryName === activeFilter);
-        }
-    }, [products, activeFilter, allDescendantLabels, currentCategoryNode]);
+    }, [products, activeFilter, currentCategoryNode]);
 
     // 4. Advanced Filter & Sort Logic (Applied on top of Category Filter)
     const finalFilteredProducts = useMemo(() => {

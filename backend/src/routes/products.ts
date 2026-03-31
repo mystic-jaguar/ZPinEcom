@@ -22,7 +22,62 @@ function normalizeProduct(row: any) {
   };
 }
 
-// GET /api/v1/products
+// GET /api/v1/products/category/:categoryName — filter by category name
+router.get('/category/:categoryName', async (req: Request, res: Response): Promise<void> => {
+  const page = Number(req.query.page) || 1;
+  const limit = Number(req.query.limit) || 50;
+  const offset = (page - 1) * limit;
+  const { categoryName } = req.params;
+
+  try {
+    const countResult = await pool.query(
+      `SELECT COUNT(*) FROM products
+       WHERE in_stock = true
+         AND (
+           LOWER(deepest_category_name) = LOWER($1)
+           OR category_path::text ILIKE $2
+         )`,
+      [categoryName, `%${categoryName}%`]
+    );
+    const total = Number(countResult.rows[0].count);
+
+    const result = await pool.query(
+      `SELECT p.*,
+        COALESCE(json_agg(pi.image_url) FILTER (WHERE pi.image_url IS NOT NULL), '[]') as images,
+        COALESCE(AVG(pr.rating), 0) as average_rating
+       FROM products p
+       LEFT JOIN product_images pi ON pi.product_id = p.id
+       LEFT JOIN product_reviews pr ON pr.product_id = p.id
+       WHERE p.in_stock = true
+         AND (
+           LOWER(p.deepest_category_name) = LOWER($1)
+           OR p.category_path::text ILIKE $2
+         )
+       GROUP BY p.id
+       ORDER BY p.created_at DESC
+       LIMIT $3 OFFSET $4`,
+      [categoryName, `%${categoryName}%`, limit, offset]
+    );
+
+    res.json({
+      success: true,
+      products: result.rows.map(normalizeProduct),
+      pagination: {
+        currentPage: page,
+        totalPages: Math.ceil(total / limit),
+        totalItems: total,
+        itemsPerPage: limit,
+        hasNextPage: page * limit < total,
+        hasPrevPage: page > 1,
+      },
+    });
+  } catch (err) {
+    console.error('getProductsByCategory error:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// GET /api/v1/products — all products (paginated)
 router.get('/', async (req: Request, res: Response): Promise<void> => {
   const page = Number(req.query.page) || 1;
   const limit = Number(req.query.limit) || 20;
