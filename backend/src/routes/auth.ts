@@ -1,8 +1,8 @@
 import bcrypt from 'bcryptjs';
 import { Request, Response, Router } from 'express';
 import jwt from 'jsonwebtoken';
-import { v4 as uuidv4 } from 'uuid';
 import { pool } from '../db';
+import { generateId } from '../utils/id';
 
 const router = Router();
 
@@ -62,9 +62,9 @@ router.post('/signup', async (req: Request, res: Response): Promise<void> => {
     const generatedUserName = userName || `${email.split('@')[0]}_${Date.now()}`;
 
     const result = await pool.query(
-      `INSERT INTO ${USERS} (user_name, name, email, mobile, password_hash, user_role, is_verified, is_active, created_at, updated_at)
-       VALUES ($1,$2,$3,$4,$5,'customer',false,true,NOW(),NOW()) RETURNING *`,
-      [generatedUserName, name, email.toLowerCase(), mobile || null, passwordHash]
+      `INSERT INTO ${USERS} (id, user_name, name, email, mobile, password_hash, user_role, is_verified, is_active, created_at, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,'customer',false,true,NOW(),NOW()) RETURNING *`,
+      [generateId(), generatedUserName, name, email.toLowerCase(), mobile || null, passwordHash]
     );
 
     const user = normalizeUser(result.rows[0]);
