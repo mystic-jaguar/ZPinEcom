@@ -1,5 +1,7 @@
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import { Request, Response, Router } from 'express';
+import rateLimit from 'express-rate-limit';
 import jwt from 'jsonwebtoken';
 import { pool } from '../db';
 import { generateId } from '../utils/id';
@@ -10,13 +12,42 @@ const USERS = 'users';
 const REFRESH_TOKENS = 'refresh_tokens';
 const AUTH_TOKENS = 'auth_tokens';
 
+// ─── Rate Limiters ────────────────────────────────────────────────────────────
+
+// 10 login attempts per 15 minutes per IP
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { success: false, message: 'Too many login attempts. Please try again in 15 minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// 5 OTP requests per 15 minutes per IP
+const otpLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: { success: false, message: 'Too many OTP requests. Please try again in 15 minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// 3 signup attempts per hour per IP
+const signupLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 3,
+  message: { success: false, message: 'Too many signup attempts. Please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function generateTokens(userId: string, userRole: string) {
   const accessToken = jwt.sign(
     { userId, userRole },
     process.env.JWT_SECRET!,
-    { expiresIn: '7d' }
+    { expiresIn: '15m' }   // Short-lived access token
   );
   const refreshToken = jwt.sign(
     { userId },
@@ -24,6 +55,16 @@ function generateTokens(userId: string, userRole: string) {
     { expiresIn: '30d' }
   );
   return { accessToken, refreshToken };
+}
+
+// Cryptographically secure 6-digit OTP
+function generateOTP(): string {
+  return (crypto.randomInt(100000, 999999)).toString();
+}
+
+// Password strength: min 8 chars, at least one letter and one number
+function isStrongPassword(password: string): boolean {
+  return password.length >= 8 && /[a-zA-Z]/.test(password) && /[0-9]/.test(password);
 }
 
 function normalizeUser(row: any) {
@@ -41,11 +82,25 @@ function normalizeUser(row: any) {
 
 // ─── POST /api/v1/auth/signup ─────────────────────────────────────────────────
 
-router.post('/signup', async (req: Request, res: Response): Promise<void> => {
+router.post('/signup', signupLimiter, async (req: Request, res: Response): Promise<void> => {
   const { name, email, password, mobile, userName } = req.body;
 
   if (!name || !email || !password) {
     res.status(400).json({ success: false, message: 'Name, email and password are required' });
+    return;
+  }
+
+  if (!isStrongPassword(password)) {
+    res.status(400).json({
+      success: false,
+      message: 'Password must be at least 8 characters and contain at least one letter and one number',
+    });
+    return;
+  }
+
+  // Basic email format check
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    res.status(400).json({ success: false, message: 'Invalid email format' });
     return;
   }
 
@@ -78,7 +133,7 @@ router.post('/signup', async (req: Request, res: Response): Promise<void> => {
 
     res.status(201).json({ success: true, message: 'Account created successfully', accessToken, refreshToken, user });
   } catch (err: any) {
-    console.error('Signup error:', err);
+    console.error('Signup error:', err.code);
     if (err.code === '23505') {
       const detail: string = err.detail || '';
       if (detail.includes('mobile')) {
@@ -94,7 +149,7 @@ router.post('/signup', async (req: Request, res: Response): Promise<void> => {
 
 // ─── POST /api/v1/auth/login ──────────────────────────────────────────────────
 
-router.post('/login', async (req: Request, res: Response): Promise<void> => {
+router.post('/login', loginLimiter, async (req: Request, res: Response): Promise<void> => {
   const { email, password } = req.body;
 
   if (!email || !password) {
@@ -108,7 +163,9 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
       [email.toLowerCase()]
     );
 
+    // Constant-time response to prevent user enumeration
     if (result.rows.length === 0) {
+      await bcrypt.hash('dummy_prevent_timing_attack', 12); // prevent timing attack
       res.status(401).json({ success: false, message: 'Invalid email or password' });
       return;
     }
@@ -143,7 +200,7 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
 
     res.json({ success: true, message: 'Login successful', accessToken, refreshToken, user });
   } catch (err) {
-    console.error('Login error:', err);
+    console.error('Login error');
     res.status(500).json({ success: false, message: 'Server error during login' });
   }
 });
@@ -178,6 +235,7 @@ router.post('/refresh-token', async (req: Request, res: Response): Promise<void>
     const user = normalizeUser(userResult.rows[0]);
     const tokens = generateTokens(user.id, user.userRole);
 
+    // Rotate refresh token
     await pool.query(`DELETE FROM ${REFRESH_TOKENS} WHERE user_id = $1`, [user.id]);
     await pool.query(
       `INSERT INTO ${REFRESH_TOKENS} (id, user_id, token, expires_at, created_at)
@@ -191,9 +249,24 @@ router.post('/refresh-token', async (req: Request, res: Response): Promise<void>
   }
 });
 
+// ─── POST /api/v1/auth/logout ─────────────────────────────────────────────────
+
+router.post('/logout', async (req: Request, res: Response): Promise<void> => {
+  const { refreshToken } = req.body;
+  if (refreshToken) {
+    try {
+      const decoded = jwt.decode(refreshToken) as { userId?: string } | null;
+      if (decoded?.userId) {
+        await pool.query(`DELETE FROM ${REFRESH_TOKENS} WHERE user_id = $1`, [decoded.userId]);
+      }
+    } catch { /* ignore */ }
+  }
+  res.json({ success: true, message: 'Logged out' });
+});
+
 // ─── POST /api/v1/auth/forgetPassword/sendOTP ────────────────────────────────
 
-router.post('/forgetPassword/sendOTP', async (req: Request, res: Response): Promise<void> => {
+router.post('/forgetPassword/sendOTP', otpLimiter, async (req: Request, res: Response): Promise<void> => {
   const { email } = req.body;
   if (!email) {
     res.status(400).json({ success: false, message: 'Email is required' });
@@ -204,12 +277,14 @@ router.post('/forgetPassword/sendOTP', async (req: Request, res: Response): Prom
     const userResult = await pool.query(
       `SELECT id FROM ${USERS} WHERE email = $1`, [email.toLowerCase()]
     );
+
+    // Always return the same response to prevent email enumeration
     if (userResult.rows.length === 0) {
       res.json({ success: true, message: 'If that email exists, an OTP has been sent' });
       return;
     }
 
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otp = generateOTP(); // cryptographically secure
     const userId = userResult.rows[0].id;
 
     await pool.query(
@@ -222,17 +297,23 @@ router.post('/forgetPassword/sendOTP', async (req: Request, res: Response): Prom
       [generateId(), userId, otp]
     );
 
-    console.log(`[OTP] Password reset OTP for ${email}: ${otp}`);
-    res.json({ success: true, message: 'OTP sent successfully', otp });
+    // TODO: Send OTP via email service (e.g. SendGrid, AWS SES)
+    // For development only — remove in production:
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`[DEV ONLY] Password reset OTP: ${otp}`);
+    }
+
+    // Never return OTP in response
+    res.json({ success: true, message: 'If that email exists, an OTP has been sent' });
   } catch (err) {
-    console.error('sendOTP error:', err);
+    console.error('sendOTP error');
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 
 // ─── POST /api/v1/auth/forgetPassword/verifyOTP ──────────────────────────────
 
-router.post('/forgetPassword/verifyOTP', async (req: Request, res: Response): Promise<void> => {
+router.post('/forgetPassword/verifyOTP', otpLimiter, async (req: Request, res: Response): Promise<void> => {
   const { email, otp } = req.body;
   if (!email || !otp) {
     res.status(400).json({ success: false, message: 'Email and OTP are required' });
@@ -256,9 +337,16 @@ router.post('/forgetPassword/verifyOTP', async (req: Request, res: Response): Pr
       return;
     }
 
-    res.json({ success: true, message: 'OTP verified', resetToken: otp });
+    // Return a signed short-lived reset token instead of the raw OTP
+    const resetToken = jwt.sign(
+      { tokenId: result.rows[0].id, purpose: 'password_reset' },
+      process.env.JWT_SECRET!,
+      { expiresIn: '10m' }
+    );
+
+    res.json({ success: true, message: 'OTP verified', resetToken });
   } catch (err) {
-    console.error('verifyOTP error:', err);
+    console.error('verifyOTP error');
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
@@ -272,11 +360,25 @@ router.post('/forgetPassword/resetPassword', async (req: Request, res: Response)
     return;
   }
 
+  if (!isStrongPassword(newPassword)) {
+    res.status(400).json({
+      success: false,
+      message: 'Password must be at least 8 characters and contain at least one letter and one number',
+    });
+    return;
+  }
+
   try {
+    // Verify the signed reset token
+    const decoded = jwt.verify(resetToken, process.env.JWT_SECRET!) as { tokenId: string; purpose: string };
+    if (decoded.purpose !== 'password_reset') {
+      res.status(400).json({ success: false, message: 'Invalid reset token' });
+      return;
+    }
+
     const result = await pool.query(
-      `SELECT * FROM ${AUTH_TOKENS}
-       WHERE token = $1 AND token_type = 'password_reset' AND expires_at > NOW() AND is_used = false`,
-      [resetToken]
+      `SELECT * FROM ${AUTH_TOKENS} WHERE id = $1 AND token_type = 'password_reset' AND is_used = false AND expires_at > NOW()`,
+      [decoded.tokenId]
     );
     if (result.rows.length === 0) {
       res.status(400).json({ success: false, message: 'Invalid or expired reset token' });
@@ -290,23 +392,25 @@ router.post('/forgetPassword/resetPassword', async (req: Request, res: Response)
       `UPDATE ${USERS} SET password_hash = $1, updated_at = NOW() WHERE id = $2`,
       [passwordHash, userId]
     );
+    // Mark token used AND invalidate all refresh tokens (force re-login)
     await pool.query(
-      `UPDATE ${AUTH_TOKENS} SET is_used = true WHERE token = $1 AND token_type = 'password_reset'`,
-      [resetToken]
+      `UPDATE ${AUTH_TOKENS} SET is_used = true WHERE id = $1`,
+      [decoded.tokenId]
     );
+    await pool.query(`DELETE FROM ${REFRESH_TOKENS} WHERE user_id = $1`, [userId]);
 
-    res.json({ success: true, message: 'Password reset successfully' });
+    res.json({ success: true, message: 'Password reset successfully. Please log in again.' });
   } catch (err) {
-    console.error('resetPassword error:', err);
-    res.status(500).json({ success: false, message: 'Server error' });
+    console.error('resetPassword error');
+    res.status(400).json({ success: false, message: 'Invalid or expired reset token' });
   }
 });
 
 // ─── POST /api/v1/auth/verification/sendOTP ──────────────────────────────────
 
-router.post('/verification/sendOTP', async (req: Request, res: Response): Promise<void> => {
+router.post('/verification/sendOTP', otpLimiter, async (req: Request, res: Response): Promise<void> => {
   const { mobile, email } = req.body;
-  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  const otp = generateOTP(); // cryptographically secure
 
   try {
     await pool.query(
@@ -320,17 +424,22 @@ router.post('/verification/sendOTP', async (req: Request, res: Response): Promis
       [generateId(), mobile || '', email || '', otp]
     );
 
-    console.log(`[OTP] Verification OTP: ${otp}`);
-    res.json({ success: true, message: 'OTP sent', otp });
+    // TODO: Send OTP via SMS/email service
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`[DEV ONLY] Verification OTP: ${otp}`);
+    }
+
+    // Never return OTP in response
+    res.json({ success: true, message: 'OTP sent' });
   } catch (err) {
-    console.error('sendOTP error:', err);
+    console.error('sendOTP error');
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 
 // ─── POST /api/v1/auth/verification/verifyOTP ────────────────────────────────
 
-router.post('/verification/verifyOTP', async (req: Request, res: Response): Promise<void> => {
+router.post('/verification/verifyOTP', otpLimiter, async (req: Request, res: Response): Promise<void> => {
   const { mobile, email, otp } = req.body;
 
   try {
@@ -363,7 +472,7 @@ router.post('/verification/verifyOTP', async (req: Request, res: Response): Prom
 
     res.json({ success: true, message: 'OTP verified successfully' });
   } catch (err) {
-    console.error('verifyOTP error:', err);
+    console.error('verifyOTP error');
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });

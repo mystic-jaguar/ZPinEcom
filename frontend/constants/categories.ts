@@ -1,4 +1,3 @@
-
 export interface CategoryNode {
     id: string;
     name: string;
@@ -7,390 +6,175 @@ export interface CategoryNode {
     children?: CategoryNode[];
 }
 
+// Helper to build a leaf node
+const leaf = (id: string, name: string): CategoryNode => ({ id, name });
+// Helper to build a node with children
+const node = (id: string, name: string, children: CategoryNode[], image?: any): CategoryNode =>
+    ({ id, name, children, ...(image ? { image } : {}) });
+
+// ── FASHION ──────────────────────────────────────────────────────────────────
+
+const menCasual = node('men-casual', 'Casual', [
+    node('sweatshirts', 'Sweatshirts', ['zip up','hooded','oversized','round neck','printed','shirt collar','sleeveless','typography','embroidered'].map(n=>leaf('sw-'+n.replace(/\s/g,'-'),n))),
+    node('t-shirts', 'T-Shirts', ['round neck','cotton','regular','solid','printed','striped','full sleeves','polar collar','oversized','brand logo','sleeveless','floral','slim fit','varsity'].map(n=>leaf('ts-'+n.replace(/\s/g,'-'),n))),
+    node('shirts', 'Shirts', ['check','denim','linen','half sleeve','textured','solid','utility','cotton','oversized','striped','long sleeve','cuban collar','schiffli'].map(n=>leaf('sh-'+n.replace(/\s/g,'-'),n))),
+    node('jackets', 'Jackets', ['solid','printed','embroidered','denim','bomber','oversized','lightweight','varsity jacket','sports','graphic jacket','typography','tailored','abstract'].map(n=>leaf('jk-'+n.replace(/\s/g,'-'),n))),
+    node('sweaters', 'Sweaters', ['mock neck','v-neck','high neck','solid','cardigan','pullover','vest','shirt collar','striped','printed','sleeveless','turtle neck'].map(n=>leaf('sw2-'+n.replace(/\s/g,'-'),n))),
+    node('co-ords', 'Co-Ords', ['casual','partywear','comfortable','formal','traditional','travel','cotton','night out'].map(n=>leaf('co-'+n.replace(/\s/g,'-'),n))),
+    node('shorts', 'Shorts', ['cargo','baggy','denim','linen','chino','beach','sports','basics','jorts','distressed','bermuda','drawstring','inner elastic','cotton','slip on','printed','checked'].map(n=>leaf('sho-'+n.replace(/\s/g,'-'),n))),
+    node('jeans', 'Jeans', ['baggy','straight fit','cargo','slim fit','bootcut','wide leg','distressed','low rise','high rise','printed'].map(n=>leaf('jn-'+n.replace(/\s/g,'-'),n))),
+    node('trousers', 'Trousers', ['cargo','chinos','linen','korean','loose fit','parachute','slim fit','regular fit','cotton','striped','printed','high rise','low rise'].map(n=>leaf('tr-'+n.replace(/\s/g,'-'),n))),
+]);
+
+const menEthnic = node('men-ethnic', 'Ethnic', [
+    node('kurtas', 'Kurtas', ['puja special','chikankari','floral','sequinned','mirror work','pastel','solid','printed','cotton','daily wear','fusion','festive','embellished','embroidered','yoke design','haldi','sangeet'].map(n=>leaf('ku-'+n.replace(/\s/g,'-'),n))),
+    node('fusion-shirts', 'Fusion Shirts', ['tunic shirt','cape style shirt','high-low shirt','wrap style shirt','embroidered shirt','printed shirt','denim fusion shirt','drape attached shirt'].map(n=>leaf('fs-'+n.replace(/\s/g,'-'),n))),
+    node('sherwani', 'Sherwani', ['achkan sherwani','indo-western sherwani','jodhpuri sherwani','angrakha sherwani','anarkali sherwani','jacket style sherwani','printed sherwani','embroidered sherwani','velvet sherwani','designer sherwani'].map(n=>leaf('sher-'+n.replace(/\s/g,'-'),n))),
+    node('short-kurtas', 'Short Kurtas', ['casual','pathani','nehru collar','angrakha','printed','embroidered','denim/fusion','festive','linen/cotton','office wear'].map(n=>leaf('sk-'+n.replace(/\s/g,'-'),n))),
+    leaf('kurta-set', 'Kurta Set'),
+    node('blazers', 'Blazers', ['nehru jacket','bandhgala','achkan','angrakha','indo-western','printed','festive','partywear','longline'].map(n=>leaf('bl-'+n.replace(/\s/g,'-'),n))),
+    node('nehru-jackets', 'Nehru Jackets', ['partywear','festive','printed','embroidered','cotton','velvet','silk','indo western','longline','designer'].map(n=>leaf('nj-'+n.replace(/\s/g,'-'),n))),
+    node('dhoti', 'Dhoti', ['cotton','silk','festive','partywear','printed','patterned','designer','dhoti with kurta set','ready to wear','handloom'].map(n=>leaf('dh-'+n.replace(/\s/g,'-'),n))),
+    node('3-piece-set', '3 Piece Set', ['partywear','formal','indo western','printed','embroidered','cotton','designer'].map(n=>leaf('3p-'+n.replace(/\s/g,'-'),n))),
+]);
+
+const menSportswear = node('men-sportswear', 'Sportswear', [
+    'T-Shirts','Track Pants','Shorts','Jackets','Sweatshirts','Tracksuits','Trunk','Trousers','Innerwear Vests','Swim Bottoms','Shirts','Tights','Briefs','Co-Ords','Rain Jacket','Sports Jacket','Sweaters','Thermal Tops','Lounge T-Shirts','Boxers'
+].map(n=>leaf('msp-'+n.toLowerCase().replace(/\s/g,'-'),n)));
+
+const menWorkwear = node('men-workwear', 'Workwear', [
+    'Shirts','Blazers','T-Shirts','Trousers','Jeans','Sweatshirts','Sweaters','Jackets','Kurtas','Clothing Fabric','Formal Shoes'
+].map(n=>leaf('mww-'+n.toLowerCase().replace(/\s/g,'-'),n)));
+
+const menEssentials = node('men-essentials', 'Essentials', [
+    node('boxers', 'Boxers', ['pure cotton','machine wash','inner elastic','outer elastic','printed','checked','solid','woven','knitted'].map(n=>leaf('bx-'+n.replace(/\s/g,'-'),n))),
+    node('innerwear-vests', 'Innerwear Vests', ['cotton','sleeveless','ribbed','thermal','moisture-wicking','seamless vest','stretch vests','designer vest'].map(n=>leaf('iv-'+n.replace(/\s/g,'-'),n))),
+    node('loungewear', 'Loungewear', ['lounge pants','lounge t-shirts','lounge shorts','night suits','robe'].map(n=>leaf('lw-'+n.replace(/\s/g,'-'),n))),
+    node('trunks', 'Trunks', ['outer elastic','inner elastic','knitted','woven','knitted and woven','printed','solid','checked','cotton','elastane'].map(n=>leaf('tk-'+n.replace(/\s/g,'-'),n))),
+    node('briefs', 'Briefs', ['innerwear vests','trunk','boxers','thermal tops','thermal bottoms','thermal set','shapewear'].map(n=>leaf('br-'+n.replace(/\s/g,'-'),n))),
+]);
+
+const womenWestern = node('w-western', 'Western', [
+    node('dresses', 'Dresses', ['bodycon','a-line','sheath','wrap dress','maxi','midi','mini','shirt dress','skater','asymmetrical','off-shoulder','halter neck','tunic','pinafore','camisole'].map(n=>leaf('dr-'+n.replace(/\s/g,'-'),n))),
+    node('tops', 'Tops', ['t-shirt','crop top','tank top','camisole top','tube top','shirt top','blouse','peplum top','wrap top','off shoulder top','one shoulder top','smocked top','asymmetrical top','v neck top','tankini top','halter neck top','high neck/turtle neck','corset top','blazers'].map(n=>leaf('tp-'+n.replace(/\s/g,'-'),n))),
+    node('jumpsuits', 'Jumpsuits', ['casual','formal/workwear','wide-leg','bodycon','strapless','halter neck','off-shoulder','one shoulder','cape jumpsuit','wrap jumpsuit','denim jumpsuit','party jumpsuit'].map(n=>leaf('js-'+n.replace(/\s/g,'-'),n))),
+    node('w-shirts', 'Shirts', ['basic button','casual','denim','linen','checkered','tunic','oversized','dress shirt','crop shirt','sheer/transparent','printed shirt','shrug','jackets','blazers'].map(n=>leaf('ws-'+n.replace(/\s/g,'-'),n))),
+    node('w-jeans', 'Jeans', ['skinny jeans','slim-fit jeans','straight leg jeans','bootcut jeans','flared jeans','wide leg jeans','high waist jeans','mid rise jeans','cargo','ripped','trousers','leggings','shorts','skirts','capris','trackpants','tights','jeggings','tracksuits'].map(n=>leaf('wj-'+n.replace(/\s/g,'-'),n))),
+    node('tees', 'Tees', ['v neck','sleeveless','round neck','boat neck','polo tee','henley tee','graphics','striped','crop','oversized','longline','cold shoulder','cap sleeve'].map(n=>leaf('wt-'+n.replace(/\s/g,'-'),n))),
+    node('l-and-l', 'L&L', ['bra','briefs','night suits','leggings','nightdress','baby dolls','lingerie set','shorts','t shirts','shapewear','lounge pants','swimwear','camisoles','capris','tights','socks','palazzos','stockings'].map(n=>leaf('ll-'+n.replace(/\s/g,'-'),n))),
+]);
+
+const womenEthnic = node('w-ethnic', 'Ethnic', [
+    node('kurta-sets', 'Kurta Sets', ['straight','anarkali','a-line','angrakha','sharara-gharara','palazzo','chikankari','cape style','jacket style','peplum','floor length','layered','printed','embroidered','floral','dupatta','tunics','shawls','dress material'].map(n=>leaf('wku-'+n.replace(/\s/g,'-'),n))),
+    node('sarees', 'Sarees', ['pujo special','silk','tissue','bandhani','leheriya','ready to wear','banarasi','organza','embellished','satin','cotton','sequin','embroidered','zari','lehenga saree','handloom','pastel','kasavu','floral','color blocked'].map(n=>leaf('sar-'+n.replace(/\s/g,'-'),n))),
+    node('lehengas', 'Lehengas', ['a-line','flared','panelled','mermaid/fishtail','straight cut','sharara cut','jacket style','cape style','ruffle','layered','printed','embroidered','zari','banarasi','velvet','indo western','shawl','dupatta','dress material'].map(n=>leaf('leh-'+n.replace(/\s/g,'-'),n))),
+    node('w-co-ords', 'Co-Ords', ['kurta and pant','kurta and palazzo','crop top and skirt','peplum top and sharara','shirt and pant','cape/kaftan and pant','jacket style co-ords','layered','printed daily','embroidered/festive','indo-western'].map(n=>leaf('wco-'+n.replace(/\s/g,'-'),n))),
+    node('indie-work', 'Indie Work', ['block print','handloom cotton','indigo work','kalamkari','ajrakh prints','ikat weaves','chikankari','bagru print','khadi cotton','ethnic tunics and tops','fusion indie dresses','minimal embroidered workwear'].map(n=>leaf('iw-'+n.replace(/\s/g,'-'),n))),
+    node('designer-wear', 'Designer Wear', ['designer saree','designer lehengas','designer kurta sets','designer anarkali','designer gowns','cape style','bridal couture','fusion designer wear','jacket style','ruffle & layered','pre-draped','high-slit designer kurtas','handcrafted designer pieces'].map(n=>leaf('dw-'+n.replace(/\s/g,'-'),n))),
+    node('indie-fusion', 'Indie Fusion', ['kurta with jeans/joggers','crop top & dhoti pants','saree with belt/jacket','indie skirt with crop top/shirt','kaftan fusion dress','shirt style kurta/dress','indie jumpsuit','fusion co-ord set','cape/shrug layered outfit','peplum top with sharara/gharara','asymmetrical/high-low dress','indo-western gown','boho fusion wear'].map(n=>leaf('if-'+n.replace(/\s/g,'-'),n))),
+    node('gowns', 'Gowns', ['anarkali gown','a-line gown','flared gown','straight cut gown','indo-western gown','layered gown','ruffle gown','cape style gown','jacket style gown','high-low gown','asymmetrical gown','embroidered/zari gown','printed gown','bridal gown','evening/party gown'].map(n=>leaf('gw-'+n.replace(/\s/g,'-'),n))),
+]);
+
+const womenFusion = node('w-fusion', 'Fusion', [
+    node('indie-fusion-w', 'Indie Fusion', ['indo western dresses','kurta with jeans','saree with shirt/crop top','palazzo–crop top','ethnic jacket dress','dhoti pants–kurti','fusion gown','anarkali with belt','lehenga–shirt style','skirt–dupatta wrap','tunic with trouser','sharara–top fusion','cape over saree'].map(n=>leaf('wif-'+n.replace(/\s/g,'-'),n))),
+    node('boho-fusion', 'Boho Fusion', ['tie-dye maxi','crochet top','fringe jacket','tassel shrug','layered skirt','kaftan dress','printed jumpsuit','embroidered co-ord','boho tunic','wrap dress','gypsy skirt','mirror work shrug'].map(n=>leaf('bf-'+n.replace(/\s/g,'-'),n))),
+    node('street-fusion', 'Street Fusion', ['tee–lehenga','hoodie–palazzo','denim kurta','saree–sneakers','crop hoodie–dhoti','cargo–kurti','graphic tunic','street shrug','baggy pants kurta','funky jacket saree','varsity kurti','skater dress fusion'].map(n=>leaf('sf-'+n.replace(/\s/g,'-'),n))),
+    node('festive-fusion', 'Festive Fusion', ['gown–dupatta','peplum–lehenga','saree–cape','jacket anarkali','crop–sharara','drape skirt–top','lehenga–blazer','trail gown fusion','belted saree','heavy kurta set','festive co-ord','dupatta shrug style'].map(n=>leaf('ff-'+n.replace(/\s/g,'-'),n))),
+    node('contemporary-fusion', 'Contemporary Fusion', ['draped gown saree','one-shoulder kurta','fusion jumpsuit','slit tunic skirt','cape lehenga','asym kurta','wrap fusion dress','cowl pant kurta','peplum saree','drape skirt top','overlay anarkali','jacket gown'].map(n=>leaf('cf-'+n.replace(/\s/g,'-'),n))),
+    node('luxury-fusion', 'Luxury Fusion', ['sequin saree–blazer','corset–lehenga','embro jacket dress','ruffle gown','crystal kurta set','metallic saree','designer sharara','luxury co-ord','cape gown','velvet fusion wear','glam tunic set','heavy drape saree'].map(n=>leaf('lf-'+n.replace(/\s/g,'-'),n))),
+]);
+
+const womenEssentials = node('w-essentials', 'Essentials', [
+    'Shapewear','Bras','Panties','Night Suits','Stockings','Thermals','Maternity Wear','Swimwear','Babydolls','Lingerie Accessories','Saree Shapewear','Night Dress'
+].map(n=>leaf('we-'+n.toLowerCase().replace(/\s/g,'-'),n)));
+
+const womenSportswear = node('w-sportswear', 'Sportswear', [
+    node('activewear', 'Activewear', ['sports bras','leggings','joggers','shorts','tank tops','crop tops','tracksuits','sports jackets','hoodies','co-ord sets'].map(n=>leaf('act-'+n.replace(/\s/g,'-'),n))),
+    node('training-gym', 'Training & Gym', ['gym t-shirts','compression wear','workout leggings','training shorts','sweatproof tops','gym vests','track pants','stretch joggers','base layers','training shoes'].map(n=>leaf('tg-'+n.replace(/\s/g,'-'),n))),
+    node('running-wear', 'Running Wear', ['running tees','running shorts','track leggings','windcheaters','lightweight jackets','running sports bra','reflective gear','arm bands','headbands & caps'].map(n=>leaf('rw-'+n.replace(/\s/g,'-'),n))),
+]);
+
+// ── FOOTWEAR ─────────────────────────────────────────────────────────────────
+
+const footwearWomen = node('ft-women', 'Women', [
+    'Heels','Flats','Casual Shoes','Flip Flops','Sports Shoes','Boots','Sandals','Formal Shoes','Partywear','Crocs'
+].map(n=>leaf('ftw-'+n.toLowerCase().replace(/\s/g,'-'),n)));
+
+const footwearMen = node('ft-men', 'Men', [
+    'Casual Shoes','Sports Shoes','Flip Flops','Sandals','Formal Shoes','Boots','Flats','Crocs'
+].map(n=>leaf('ftm-'+n.toLowerCase().replace(/\s/g,'-'),n)));
+
+// ── ACCESSORIES ───────────────────────────────────────────────────────────────
+
+const accessories = [
+    node('bags', 'Bags & Backpacks', ['Handbags','Backpacks','Laptop Bags','School Bags','Travel/Gym Bags','Sling & Clutch Bags'].map(n=>leaf('bag-'+n.toLowerCase().replace(/\s/g,'-'),n))),
+    node('wallets', 'Wallets & Belts', ['Wallets','Belts','Card Holders','Coin Pouches'].map(n=>leaf('wal-'+n.toLowerCase().replace(/\s/g,'-'),n))),
+    node('watches', 'Watches', ['Analog','Digital','Smart Watches','Sports Watches'].map(n=>leaf('wat-'+n.toLowerCase().replace(/\s/g,'-'),n))),
+    node('sunglasses', 'Sunglasses & Eyewear', ['Sunglasses','Blue Light Glasses','Reading Glasses','Frames'].map(n=>leaf('sun-'+n.toLowerCase().replace(/\s/g,'-'),n))),
+    node('jewellery', 'Jewellery', ['Earrings','Necklaces','Bangles & Bracelets','Rings','Jewellery Sets'].map(n=>leaf('jew-'+n.toLowerCase().replace(/\s/g,'-'),n))),
+    node('hair-acc', 'Hair Accessories', ['Clips & Pins','Hair Bands & Scrunchies','Headbands','Bridal Accessories'].map(n=>leaf('ha-'+n.toLowerCase().replace(/\s/g,'-'),n))),
+    node('caps', 'Caps & Hats', ['Caps','Hats','Winter Caps'].map(n=>leaf('cap-'+n.toLowerCase().replace(/\s/g,'-'),n))),
+    node('scarves', 'Scarves & Stoles', ['Scarves','Stoles','Winter Wear'].map(n=>leaf('sca-'+n.toLowerCase().replace(/\s/g,'-'),n))),
+];
+
+// ── BEAUTY ────────────────────────────────────────────────────────────────────
+
+const beauty = [
+    node('skincare', 'Skincare', ['Face Wash & Cleanser','Moisturizers & Creams','Sunscreen','Serums & Masks'].map(n=>leaf('sk-'+n.toLowerCase().replace(/\s/g,'-'),n))),
+    node('haircare', 'Haircare', ['Shampoo & Conditioner','Hair Oil & Serum','Hair Color','Styling Products'].map(n=>leaf('hc-'+n.toLowerCase().replace(/\s/g,'-'),n))),
+    node('makeup', 'Makeup', ['Face Makeup','Eye Makeup','Lip Makeup','Makeup Kits'].map(n=>leaf('mu-'+n.toLowerCase().replace(/\s/g,'-'),n))),
+    node('personal-care', 'Personal Care', ['Soaps & Body Wash','Deodorants','Oral Care','Feminine Hygiene'].map(n=>leaf('pc-'+n.toLowerCase().replace(/\s/g,'-'),n))),
+    node('grooming', 'Grooming', ['Shaving & Trimming','Hair Removal','Grooming Kits','Beard & Styling Products'].map(n=>leaf('gr-'+n.toLowerCase().replace(/\s/g,'-'),n))),
+    node('fragrances', 'Fragrances & Deodorants', ['Perfumes','Body Sprays','Roll-Ons','Gift Sets'].map(n=>leaf('fr-'+n.toLowerCase().replace(/\s/g,'-'),n))),
+    node('beauty-tools', 'Beauty Tools & Appliances', ['Hair Dryers','Straighteners & Curlers','Trimmers & Shavers','Face & Skin Tools'].map(n=>leaf('bt-'+n.toLowerCase().replace(/\s/g,'-'),n))),
+];
+
+// ── HOME & LIVING ─────────────────────────────────────────────────────────────
+
+const homeLiving = [
+    node('kitchenware', 'Kitchenware', ['Cookware','Utensils','Storage Containers','Kitchen Tools'].map(n=>leaf('kw-'+n.toLowerCase().replace(/\s/g,'-'),n))),
+    node('dining', 'Dining Essentials', ['Dinner Sets','Plates & Bowls','Glasses & Mugs','Serving Items'].map(n=>leaf('din-'+n.toLowerCase().replace(/\s/g,'-'),n))),
+    node('storage', 'Storage & Organizers', ['Storage Boxes','Wardrobe Organizers','Kitchen Organizers','Multipurpose Racks'].map(n=>leaf('sto-'+n.toLowerCase().replace(/\s/g,'-'),n))),
+    node('cleaning', 'Cleaning & Utility', ['Cleaning Tools','Cleaning Supplies','Laundry Items','Utility Accessories'].map(n=>leaf('cln-'+n.toLowerCase().replace(/\s/g,'-'),n))),
+    node('bedding', 'Bedding & Linen', ['Bedsheets','Blankets & Quilts','Pillow Covers','Towels'].map(n=>leaf('bed-'+n.toLowerCase().replace(/\s/g,'-'),n))),
+    node('bathroom', 'Bathroom Accessories', ['Soap Dispensers & Holders','Bathroom Racks','Mirrors','Bath Essentials'].map(n=>leaf('bat-'+n.toLowerCase().replace(/\s/g,'-'),n))),
+    node('home-improvement', 'Home Improvement', ['Tools & Hardware','Electrical Fittings','Plumbing Essentials','Repair & Maintenance'].map(n=>leaf('hi-'+n.toLowerCase().replace(/\s/g,'-'),n))),
+];
+
+// ── EXPORT ────────────────────────────────────────────────────────────────────
+
 export const CATEGORY_DATA: CategoryNode[] = [
     {
         id: 'fashion',
         name: 'Fashion',
-        icon: 'shopping-bag', // Feather
+        icon: 'shopping-bag',
         children: [
-            {
-                id: 'men',
-                name: 'Men',
-                children: [
-                    {
-                        id: 'men-casual',
-                        name: 'Casual Essentials',
-                        children: [
-                            {
-                                id: 'men-casual-tshirts',
-                                name: 'T-Shirts',
-                                image: { uri: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=400' },
-                                children: [
-                                    { id: 'rn', name: 'Round Neck', image: { uri: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=200' } },
-                                    { id: 'polo', name: 'Polo', image: { uri: 'https://images.unsplash.com/photo-1626557981101-aae6f84aa6ff?w=200' } },
-                                    { id: 'over', name: 'Oversized', image: { uri: 'https://images.unsplash.com/photo-1576566588028-4147f3842f27?w=200' } },
-                                    { id: 'slim', name: 'Slim Fit', image: { uri: 'https://images.unsplash.com/photo-1581655353564-df123a1eb820?w=200' } },
-                                    { id: 'var', name: 'Varsity', image: { uri: 'https://images.unsplash.com/photo-1551488852-d814c8c6ecc7?w=200' } },
-                                    { id: 'print', name: 'Printed', image: { uri: 'https://images.unsplash.com/photo-1503342217505-b0815a0de799?w=200' } },
-                                    { id: 'solid', name: 'Solid', image: { uri: 'https://images.unsplash.com/photo-1618354691373-d851c5c3a990?w=200' } },
-                                    { id: 'stripe', name: 'Striped', image: { uri: 'https://images.unsplash.com/photo-1618354691438-25bc04584c23?w=200' } }
-                                ]
-                            },
-                            {
-                                id: 'men-casual-shirts',
-                                name: 'Shirts',
-                                image: { uri: 'https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=400' },
-                                children: [
-                                    { id: 'cas-shirt', name: 'Casual' },
-                                    { id: 'den-shirt', name: 'Denim' },
-                                    { id: 'lin-shirt', name: 'Linen' },
-                                    { id: 'cot-shirt', name: 'Cotton' },
-                                    { id: 'chk-shirt', name: 'Checkered' },
-                                    { id: 'str-shirt', name: 'Striped' },
-                                    { id: 'ovr-shirt', name: 'Oversized' },
-                                    { id: 'cub-shirt', name: 'Cuban Collar' }
-                                ]
-                            },
-                            {
-                                id: 'men-casual-sweatshirts',
-                                name: 'Sweatshirts',
-                                image: { uri: 'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?w=400' },
-                                children: [
-                                    { id: 'hood', name: 'Hooded' },
-                                    { id: 'zip', name: 'Zip-Up' },
-                                    { id: 'ovr-sweat', name: 'Oversized' },
-                                    { id: 'prt-sweat', name: 'Printed' },
-                                    { id: 'typ-sweat', name: 'Typography' }
-                                ]
-                            },
-                            {
-                                id: 'men-casual-jackets',
-                                name: 'Jackets',
-                                image: { uri: 'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=400' },
-                                children: [
-                                    { id: 'bomb', name: 'Bomber' },
-                                    { id: 'den-jack', name: 'Denim' },
-                                    { id: 'var-jack', name: 'Varsity' },
-                                    { id: 'spt-jack', name: 'Sports' },
-                                    { id: 'grp-jack', name: 'Graphic' }
-                                ]
-                            },
-                            {
-                                id: 'men-casual-sweaters',
-                                name: 'Sweaters',
-                                image: { uri: 'https://images.unsplash.com/photo-1620799140408-ed5341cdb4f3?w=400' },
-                                children: [
-                                    { id: 'pull', name: 'Pullover' },
-                                    { id: 'card', name: 'Cardigan' },
-                                    { id: 'vest', name: 'Vest' },
-                                    { id: 'vnk', name: 'V-Neck' },
-                                    { id: 'tnk', name: 'Turtle Neck' }
-                                ]
-                            },
-                            {
-                                id: 'men-casual-coords',
-                                name: 'Co-Ords',
-                                image: { uri: 'https://images.unsplash.com/photo-1617137968427-85924c809a10?w=400' },
-                                children: [
-                                    { id: 'cas-coord', name: 'Casual' },
-                                    { id: 'pty-coord', name: 'Partywear' },
-                                    { id: 'for-coord', name: 'Formal' },
-                                    { id: 'tvl-coord', name: 'Travel' }
-                                ]
-                            },
-                            {
-                                id: 'jeans',
-                                name: 'Jeans',
-                                image: { uri: 'https://images.unsplash.com/photo-1542272454315-4c01d7abdf4a?w=400' },
-                                children: [
-                                    { id: 'slim-jn', name: 'Slim Fit' },
-                                    { id: 'str-jn', name: 'Straight Fit' },
-                                    { id: 'bag-jn', name: 'Baggy' },
-                                    { id: 'boot-jn', name: 'Bootcut' }
-                                ]
-                            },
-                            {
-                                id: 'trousers',
-                                name: 'Trousers',
-                                image: { uri: 'https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?w=400' },
-                                children: [
-                                    { id: 'cargo-tr', name: 'Cargo' },
-                                    { id: 'chino', name: 'Chinos' },
-                                    { id: 'para', name: 'Parachute' },
-                                    { id: 'lin-tr', name: 'Linen' }
-                                ]
-                            },
-                            {
-                                id: 'shorts',
-                                name: 'Shorts',
-                                image: { uri: 'https://images.unsplash.com/photo-1591195853828-11db59a44f6b?w=400' },
-                                children: [
-                                    { id: 'cargo-sh', name: 'Cargo' },
-                                    { id: 'denim-sh', name: 'Denim' },
-                                    { id: 'berm', name: 'Bermuda' },
-                                    { id: 'spt-sh', name: 'Sports' }
-                                ]
-                            }
-                        ]
-                    },
-                    {
-                        id: 'men-ethnic',
-                        name: 'Ethnic',
-                        children: [
-                            {
-                                id: 'kurtas',
-                                name: 'Kurtas',
-                                image: { uri: 'https://images.unsplash.com/photo-1583391733956-6c78276477e2?w=400' },
-                                children: [
-                                    { id: 'cot-kur', name: 'Cotton' },
-                                    { id: 'prt-kur', name: 'Printed' },
-                                    { id: 'chk-kur', name: 'Chikankari' },
-                                    { id: 'fst-kur', name: 'Festive' }
-                                ]
-                            },
-                            {
-                                id: 'short-kurtas',
-                                name: 'Short Kurtas',
-                                image: { uri: 'https://images.unsplash.com/photo-1609357912429-1a856333c5e8?w=400' },
-                                children: [
-                                    { id: 'path', name: 'Pathani' },
-                                    { id: 'nehru', name: 'Nehru Collar' },
-                                    { id: 'cas-sk', name: 'Casual' }
-                                ]
-                            },
-                            { id: 'kurta-sets', name: 'Kurta Sets', image: { uri: 'https://images.unsplash.com/photo-1610189012906-4c0aa9b29c59?w=400' } },
-                            {
-                                id: 'sherwani',
-                                name: 'Sherwani',
-                                image: { uri: 'https://media.istockphoto.com/id/1158623408/photo/indian-groom.jpg?s=612x612&w=0&k=20&c=N5iKk5tQ5B1_0pDk4q6rF4J8yT4uJ6v0-6_0b3-0_0=' },
-                                children: [
-                                    { id: 'ach', name: 'Achkan' },
-                                    { id: 'indo', name: 'Indo-Western' },
-                                    { id: 'vel', name: 'Velvet' },
-                                    { id: 'des-sh', name: 'Designer' }
-                                ]
-                            },
-                            {
-                                id: 'eth-jackets',
-                                name: 'Jackets & Blazers',
-                                image: { uri: 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=400' },
-                                children: [
-                                    { id: 'nehru-j', name: 'Nehru Jacket' },
-                                    { id: 'bandh', name: 'Bandhgala' },
-                                    { id: 'fst-j', name: 'Festive' }
-                                ]
-                            },
-                            {
-                                id: 'dhoti',
-                                name: 'Dhoti',
-                                image: { uri: 'https://images.unsplash.com/photo-1597983073493-88cd35cf93b0?w=400' },
-                                children: [
-                                    { id: 'cot-dho', name: 'Cotton' },
-                                    { id: 'slk-dho', name: 'Silk' },
-                                    { id: 'rtw-dho', name: 'Ready-to-Wear' }
-                                ]
-                            },
-                            { id: '3-pcs', name: '3-Piece Sets', image: { uri: 'https://images.unsplash.com/photo-1598033129183-c4f50c736f10?w=400' } }
-                        ]
-                    },
-                    {
-                        id: 'men-sportswear',
-                        name: 'Sportswear',
-                        children: [
-                            { id: 'sp-ts', name: 'T-Shirts', image: { uri: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=400' } },
-                            { id: 'sp-sh', name: 'Shorts', image: { uri: 'https://images.unsplash.com/photo-1591195853828-11db59a44f6b?w=400' } },
-                            { id: 'sp-tp', name: 'Track Pants', image: { uri: 'https://images.unsplash.com/photo-1552160753-117159d28e72?w=400' } },
-                            { id: 'sp-tr', name: 'Tracksuits', image: { uri: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=400' } },
-                            { id: 'sp-swim', name: 'Swimwear', image: { uri: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=400' } }
-                        ]
-                    },
-                    {
-                        id: 'men-workwear',
-                        name: 'Workwear',
-                        children: [
-                            { id: 'wk-sh', name: 'Shirts', image: { uri: 'https://images.unsplash.com/photo-1480455624313-e29b44bbfde1?w=400' } },
-                            { id: 'wk-tr', name: 'Trousers', image: { uri: 'https://images.unsplash.com/photo-1473966968600-fa801b869a1a?w=400' } },
-                            { id: 'wk-bl', name: 'Blazers', image: { uri: 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=400' } },
-                            { id: 'wk-fs', name: 'Formal Shoes', image: { uri: 'https://images.unsplash.com/photo-1478146896981-b80fe4634330?w=400' } }
-                        ]
-                    },
-                    {
-                        id: 'men-essentials',
-                        name: 'Essentials',
-                        children: [
-                            {
-                                id: 'ess-in',
-                                name: 'Innerwear',
-                                image: { uri: 'https://images.unsplash.com/photo-1560243563-062bfc001d68?w=400' },
-                                children: [
-                                    { id: 'box', name: 'Boxers' },
-                                    { id: 'brief', name: 'Briefs' },
-                                    { id: 'trunk', name: 'Trunks' }
-                                ]
-                            },
-                            { id: 'ess-vest', name: 'Vests', image: { uri: 'https://images.unsplash.com/photo-1616150240974-bc5dc4f71a39?w=400' } },
-                            { id: 'ess-lng', name: 'Loungewear', image: { uri: 'https://images.unsplash.com/photo-1582234032279-8d6974751762?w=400' } }
-                        ]
-                    }
-                ]
-            },
-            {
-                id: 'women',
-                name: 'Women',
-                children: [
-                    {
-                        id: 'w-western',
-                        name: 'Western',
-                        children: [
-                            { id: 'drs', name: 'Dresses', image: { uri: 'https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?w=400' } },
-                            { id: 'tops', name: 'Tops', image: { uri: 'https://images.unsplash.com/photo-1585487000160-6ebcfceb0d03?w=400' } },
-                            { id: 'jns-bot', name: 'Jeans & Bottoms', image: { uri: 'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=400' } },
-                            { id: 'tees', name: 'Tees', image: { uri: 'https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?w=400' } },
-                            { id: 'jump', name: 'Jumpsuits', image: { uri: 'https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=400' } }
-                        ]
-                    },
-                    {
-                        id: 'w-ethnic',
-                        name: 'Ethnic',
-                        children: [
-                            { id: 'ks', name: 'Kurta Sets', image: { uri: 'https://images.unsplash.com/photo-1610189012906-4c0aa9b29c59?w=400' } },
-                            { id: 'sar', name: 'Sarees', image: { uri: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=400' } },
-                            { id: 'lah', name: 'Lehengas', image: { uri: 'https://images.unsplash.com/photo-1595981267035-7b04ca84a82d?w=400' } },
-                            { id: 'coo', name: 'Co-Ords', image: { uri: 'https://images.unsplash.com/photo-1617137968427-85924c809a7a?w=400' } },
-                            { id: 'ind', name: 'Indie Wear', image: { uri: 'https://images.unsplash.com/photo-1606166325683-e6deb697d301?w=400' } },
-                            { id: 'des', name: 'Designer Wear', image: { uri: 'https://images.unsplash.com/photo-1566174053879-31528523f8ae?w=400' } },
-                            { id: 'gwn', name: 'Gowns', image: { uri: 'https://images.unsplash.com/photo-1566174053879-31528523f8ae?w=400' } }
-                        ]
-                    },
-                    {
-                        id: 'w-fusion',
-                        name: 'Fusion',
-                        children: [
-                            { id: 'fus-ind', name: 'Indie Fusion', image: { uri: 'https://images.unsplash.com/photo-1583391733956-6c78276477e2?w=400' } },
-                            { id: 'fus-boho', name: 'Boho Fusion', image: { uri: 'https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=400' } },
-                            { id: 'fus-str', name: 'Street Fusion', image: { uri: 'https://images.unsplash.com/photo-1552374196-1ab2a1c593e8?w=400' } },
-                            { id: 'fus-fest', name: 'Festive Fusion', image: { uri: 'https://images.unsplash.com/photo-1515934751635-c81c6bc9a2d8?w=400' } },
-                            { id: 'fus-cont', name: 'Contemporary', image: { uri: 'https://images.unsplash.com/photo-1596783439305-d8b5c46d2a83?w=400' } },
-                            { id: 'fus-lux', name: 'Luxury Fusion', image: { uri: 'https://images.unsplash.com/photo-1619983081563-430f63602796?w=400' } }
-                        ]
-                    },
-                    {
-                        id: 'w-sport',
-                        name: 'Sportswear',
-                        children: [
-                            { id: 'act', name: 'Activewear', image: { uri: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400' } },
-                            { id: 'gym', name: 'Gym Wear', image: { uri: 'https://images.unsplash.com/photo-1574680096145-d05b474e2155?w=400' } },
-                            { id: 'run', name: 'Running Wear', image: { uri: 'https://images.unsplash.com/photo-1518310383802-640c2de311b2?w=400' } },
-                            { id: 'yoga', name: 'Yoga & Athleisure', image: { uri: 'https://images.unsplash.com/photo-1552196563-55cd4e45efb3?w=400' } }
-                        ]
-                    },
-                    {
-                        id: 'w-ess',
-                        name: 'Essentials',
-                        children: [
-                            { id: 'bra', name: 'Bras', image: { uri: 'https://images.unsplash.com/photo-1620331317312-74b88bf40907?w=400' } },
-                            { id: 'pnty', name: 'Panties', image: { uri: 'https://images.unsplash.com/photo-1596561289126-17b186b5c32c?w=400' } },
-                            { id: 'shpw', name: 'Shapewear', image: { uri: 'https://images.unsplash.com/photo-1563178406-4f4693259543?w=400' } },
-                            { id: 'night', name: 'Nightwear', image: { uri: 'https://images.unsplash.com/photo-1620799139652-715e4d56d34e?w=400' } },
-                            { id: 'mat', name: 'Maternity Wear', image: { uri: 'https://images.unsplash.com/photo-1553531384-cc64ac80f9dd?w=400' } }
-                        ]
-                    }
-                ]
-            },
-            {
-                id: 'footwear',
-                name: 'Footwear',
-                children: [
-                    {
-                        id: 'ft-men',
-                        name: 'Men',
-                        children: [
-                            { id: 'ft-m-cas', name: 'Casual Shoes', image: { uri: 'https://images.unsplash.com/photo-1560769629-975e127161e2?w=400' } },
-                            { id: 'ft-m-spt', name: 'Sports Shoes', image: { uri: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400' } },
-                            { id: 'ft-m-form', name: 'Formal Shoes', image: { uri: 'https://images.unsplash.com/photo-1614252369475-531eba835eb1?w=400' } },
-                            { id: 'ft-m-sand', name: 'Sandals & Flip-Flops', image: { uri: 'https://images.unsplash.com/photo-1607522370275-f14206abe5d3?w=400' } }
-                        ]
-                    },
-                    {
-                        id: 'ft-women',
-                        name: 'Women',
-                        children: [
-                            { id: 'ft-w-heel', name: 'Heels', image: { uri: 'https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=400' } },
-                            { id: 'ft-w-flat', name: 'Flats', image: { uri: 'https://images.unsplash.com/photo-1537832816519-689ad163238b?w=400' } },
-                            { id: 'ft-w-sand', name: 'Sandals', image: { uri: 'https://images.unsplash.com/photo-1562273138-f46be4ebdf6e?w=400' } },
-                            { id: 'ft-w-spt', name: 'Sports Shoes', image: { uri: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400' } }
-                        ]
-                    }
-                ]
-            }
-        ]
+            node('men', 'Men', [menCasual, menEthnic, menSportswear, menWorkwear, menEssentials]),
+            node('women', 'Women', [womenWestern, womenEthnic, womenFusion, womenEssentials, womenSportswear]),
+        ],
+    },
+    {
+        id: 'footwear',
+        name: 'Footwear',
+        icon: 'package',
+        children: [footwearWomen, footwearMen],
     },
     {
         id: 'accessories',
         name: 'Accessories',
         icon: 'briefcase',
-        children: [
-            { id: 'acc-bags', name: 'Bags & Backpacks', image: require('../assets/images/backpacks.jpg') },
-            { id: 'acc-wallets', name: 'Wallets & Belts', image: require('../assets/images/wallets.jpg') },
-            { id: 'acc-watches', name: 'Watches', image: require('../assets/images/analog.jpg') },
-            { id: 'acc-sun', name: 'Sunglasses & Eyewear', image: require('../assets/images/sunglasses.jpg') },
-            { id: 'acc-jewel', name: 'Jewellery', image: require('../assets/images/earrings.jpg') },
-            { id: 'acc-hair', name: 'Hair Accessories', image: { uri: 'https://images.unsplash.com/photo-1596462502278-27bfdd403cc2?w=400' } },
-            { id: 'acc-caps', name: 'Caps & Hats', image: { uri: 'https://images.unsplash.com/photo-1588850561407-ed78c282e89b?w=400' } },
-            { id: 'acc-scarf', name: 'Scarves & Stoles', image: { uri: 'https://images.unsplash.com/photo-1601342630311-665e77b63713?w=400' } }
-        ]
+        children: accessories,
     },
     {
         id: 'beauty',
         name: 'Beauty',
         icon: 'smile',
-        children: [
-            { id: 'bt-skin', name: 'Skincare', image: require('../assets/images/facewash.jpg') },
-            { id: 'bt-hair', name: 'Haircare', image: require('../assets/images/shampoo.jpg') },
-            { id: 'bt-mkup', name: 'Makeup', image: require('../assets/images/facemakeup.jpg') },
-            { id: 'bt-frag', name: 'Fragrances', image: require('../assets/images/perfumes.jpg') },
-            { id: 'bt-pc', name: 'Personal Care', image: { uri: 'https://images.unsplash.com/photo-1573875196207-6bcfac3f9b0e?w=400' } },
-            { id: 'bt-groom', name: 'Grooming', image: { uri: 'https://images.unsplash.com/photo-1621607512214-68297480165e?w=400' } },
-            { id: 'bt-tools', name: 'Beauty Tools', image: { uri: 'https://images.unsplash.com/photo-1596462502278-27bfdd403cc2?w=400' } }
-        ]
+        children: beauty,
     },
     {
         id: 'home',
         name: 'Home & Living',
         icon: 'home',
-        children: [
-            { id: 'hm-kitch', name: 'Kitchenware', image: { uri: 'https://images.unsplash.com/photo-1556910103-1c02745a30bf?w=400' } },
-            { id: 'hm-dine', name: 'Dining Essentials', image: { uri: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400' } },
-            { id: 'hm-stor', name: 'Storage & Organizers', image: { uri: 'https://images.unsplash.com/photo-1595246140590-5c487c9bb984?w=400' } },
-            { id: 'hm-clean', name: 'Cleaning & Utility', image: { uri: 'https://images.unsplash.com/photo-1528740561666-dc24705f08a7?w=400' } },
-            { id: 'hm-bed', name: 'Bedding & Linen', image: { uri: 'https://images.unsplash.com/photo-1616486338812-3dadae4b4f9d?w=400' } },
-            { id: 'hm-bath', name: 'Bathroom Accessories', image: { uri: 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=400' } },
-            { id: 'hm-imp', name: 'Home Improvement', image: { uri: 'https://images.unsplash.com/photo-1505798577917-a651a5d40320?w=400' } }
-        ]
+        children: homeLiving,
     },
-    {
-        id: 'gadgets',
-        name: 'Gadgets',
-        icon: 'smartphone',
-        children: [
-            { id: 'gd-mob', name: 'Mobile Accessories', image: { uri: 'https://images.unsplash.com/photo-1601784551446-20c9e07cdbdb?w=400' } },
-            { id: 'gd-aud', name: 'Audio Devices', image: { uri: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400' } },
-            { id: 'gd-smt', name: 'Smart Devices', image: { uri: 'https://images.unsplash.com/photo-1558089687-f282ffcbc126?w=400' } },
-            { id: 'gd-comp', name: 'Computer Accessories', image: { uri: 'https://images.unsplash.com/photo-1527814050087-3793815479db?w=400' } },
-            { id: 'gd-game', name: 'Gaming Accessories', image: { uri: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=400' } },
-            { id: 'gd-chrg', name: 'Chargers & Power Banks', image: { uri: 'https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=400' } }
-        ]
-    },
-    {
-        id: 'appliances',
-        name: 'Electrical Appliances',
-        icon: 'zap',
-        children: [
-            { id: 'ap-large', name: 'Large Appliances', image: { uri: 'https://images.unsplash.com/photo-1581622558668-b2d9cf047520?w=400' } },
-            { id: 'ap-small', name: 'Small Appliances', image: { uri: 'https://images.unsplash.com/photo-1585659722983-3a675bad5c05?w=400' } },
-            { id: 'ap-kit', name: 'Kitchen Appliances', image: { uri: 'https://images.unsplash.com/photo-1593586058097-606f09372d61?w=400' } },
-            { id: 'ap-heat', name: 'Heating & Cooling', image: { uri: 'https://images.unsplash.com/photo-1613274554329-70f997f5789f?w=400' } },
-            { id: 'ap-pers', name: 'Personal Appliances', image: { uri: 'https://images.unsplash.com/photo-1522338140262-f46f5913618a?w=400' } }
-        ]
-    }
 ];

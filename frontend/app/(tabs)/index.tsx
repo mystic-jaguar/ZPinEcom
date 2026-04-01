@@ -14,11 +14,10 @@ const { width } = Dimensions.get('window');
 
 const CATEGORIES = [
     { id: 'fashion', name: 'Fashion', image: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=200&q=80' },
+    { id: 'footwear', name: 'Footwear', image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=200&q=80' },
     { id: 'accessories', name: 'Accessories', image: 'https://images.unsplash.com/photo-1549298916-b41d501d3772?auto=format&fit=crop&w=200&q=80' },
     { id: 'beauty', name: 'Beauty', image: require('../../assets/images/beauty_icon.jpg') },
-    { id: 'home', name: 'Home', image: 'https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=200&q=80' },
-    { id: 'gadgets', name: 'Gadgets', image: 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=200&q=80' },
-    { id: 'appliances', name: 'Appliances', image: 'https://images.unsplash.com/photo-1581622558668-b2d9cf047520?auto=format&fit=crop&w=200&q=80' },
+    { id: 'home', name: 'Home & Living', image: 'https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=200&q=80' },
 ];
 
 const RECOMMENDED = [

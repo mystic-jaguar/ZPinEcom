@@ -2,11 +2,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios, { AxiosError, AxiosInstance } from 'axios';
 
 // API Configuration
-const BASE_URL_DEV = 'http://10.41.146.237:5000/api/v1/';  // Your machine's local IP
-const BASE_URL_PROD = 'http://10.41.146.237:5000/api/v1/'; // Update to deployed URL when hosted
-
-// Use local backend
-const BASE_URL = __DEV__ ? BASE_URL_DEV : BASE_URL_PROD;
+// URL is set via EXPO_PUBLIC_API_URL environment variable in .env
+// Never hardcode IPs or credentials here — use .env (gitignored)
+const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api/v1/';
 
 // Storage keys
 export const STORAGE_KEYS = {
@@ -74,7 +72,7 @@ apiClient.interceptors.response.use(
     async (error: AxiosError) => {
         const originalRequest = error.config as any;
 
-        // Handle 401 Unauthorized - Token expired
+        // Handle 401 Unauthorized - Token expired (access token is now 15min)
         if (error.response?.status === 401 && !originalRequest._retry) {
             originalRequest._retry = true;
 
@@ -98,14 +96,14 @@ apiClient.interceptors.response.use(
                     return apiClient(originalRequest);
                 }
             } catch (refreshError) {
-                // Refresh failed - logout user
+                // Refresh failed — clear all auth state and force re-login
                 await AsyncStorage.multiRemove([
                     STORAGE_KEYS.ACCESS_TOKEN,
                     STORAGE_KEYS.REFRESH_TOKEN,
                     STORAGE_KEYS.USER_DATA,
                 ]);
-                // Redirect to login - handle this in the calling component
-                return Promise.reject(refreshError);
+                // Signal to the app that auth is gone — UserContext will redirect to login
+                return Promise.reject(new Error('SESSION_EXPIRED'));
             }
         }
 

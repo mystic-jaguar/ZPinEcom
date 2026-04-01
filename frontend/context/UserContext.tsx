@@ -82,17 +82,25 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
                             const serverUser: UserObject = {
                                 ...raw,
                                 id: raw.id || raw._id || '',
-                            };
+                                // Explicitly map profile fields so they're never lost
+                                dob: raw.dob || '',
+                                gender: raw.gender || '',
+                                profileImage: raw.profileImage || raw.profile_image || null,
+                                receivePushNotifications: raw.receivePushNotifications ?? raw.receive_push_notifications ?? true,
+                                receiveEmailUpdates: raw.receiveEmailUpdates ?? raw.receive_email_updates ?? false,
+                                receiveOrderUpdates: raw.receiveOrderUpdates ?? raw.receive_order_updates ?? true,
+                            } as any;
                             setUserState(serverUser);
                             await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(serverUser));
                         }
                     } catch (apiError: any) {
                         console.warn('Failed to refresh user data from server:', apiError);
                         const status = apiError?.response?.status;
-                        if (status === 401 || status === 403) {
+                        const isSessionExpired = apiError?.message === 'SESSION_EXPIRED';
+                        if (status === 401 || status === 403 || isSessionExpired) {
                             setIsAuthenticated(false);
                             await tokenManager.clearTokens?.();
-                            await AsyncStorage.removeItem(USER_STORAGE_KEY);
+                            await AsyncStorage.multiRemove([USER_STORAGE_KEY, USER_DETAILS_STORAGE_KEY]);
                         }
                     }
                 }

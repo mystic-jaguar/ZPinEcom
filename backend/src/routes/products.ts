@@ -1,6 +1,7 @@
 import { Request, Response, Router } from 'express';
 import { pool } from '../db';
 import { authenticate, AuthRequest } from '../middleware/auth';
+import { generateId } from '../utils/id';
 
 const router = Router();
 
@@ -208,8 +209,10 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
 // GET /api/v1/products/:id
 router.get('/:id', async (req: Request, res: Response): Promise<void> => {
   const { id } = req.params;
+  // Accept both UUID format (legacy) and 7-char alphanumeric IDs
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  if (!uuidRegex.test(id)) {
+  const shortIdRegex = /^[A-Z0-9]{7}$/;
+  if (!uuidRegex.test(id) && !shortIdRegex.test(id)) {
     res.status(404).json({ success: false, message: 'Product not found' });
     return;
   }
@@ -294,8 +297,29 @@ router.post('/:id/reviews', authenticate, async (req: AuthRequest, res: Response
     res.status(400).json({ success: false, message: 'Rating and comment are required' });
     return;
   }
+  if (rating < 1 || rating > 5) {
+    res.status(400).json({ success: false, message: 'Rating must be between 1 and 5' });
+    return;
+  }
 
   try {
+    // Verify product exists
+    const product = await pool.query('SELECT id FROM products WHERE id = $1', [req.params.id]);
+    if (product.rows.length === 0) {
+      res.status(404).json({ success: false, message: 'Product not found' });
+      return;
+    }
+
+    // Prevent duplicate reviews from the same user
+    const existing = await pool.query(
+      'SELECT id FROM product_reviews WHERE product_id = $1 AND user_id = $2',
+      [req.params.id, req.userId]
+    );
+    if (existing.rows.length > 0) {
+      res.status(409).json({ success: false, message: 'You have already reviewed this product' });
+      return;
+    }
+
     await pool.query(
       `INSERT INTO product_reviews (id, product_id, user_id, rating, comment, created_at, updated_at)
        VALUES ($1,$2,$3,$4,$5,NOW(),NOW())`,

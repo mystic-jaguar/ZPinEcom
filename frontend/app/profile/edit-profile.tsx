@@ -1,27 +1,51 @@
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
-import { Image, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Image, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
 import Input from '../../components/common/Input';
 import { useUser } from '../../context/UserContext';
-// import DateTimePicker from '@react-native-community/datetimepicker'; // Assuming we might want a date picker later
+import { userService } from '../../services/user';
 
 export default function EditProfileScreen() {
     const router = useRouter();
     const { user, updateUser } = useUser();
 
     const [form, setForm] = useState({
-        name: user.name,
+        name: user.name || '',
         dob: (user as any).dob || '',
         gender: (user as any).gender || '',
-        preferences: (user as any).preferences || {
-            receivePushNotifications: true,
-            receiveEmailUpdates: false,
-            receiveOrderUpdates: true
+        preferences: {
+            receivePushNotifications: (user as any).receivePushNotifications ?? true,
+            receiveEmailUpdates: (user as any).receiveEmailUpdates ?? false,
+            receiveOrderUpdates: (user as any).receiveOrderUpdates ?? true,
         },
     });
+    const [isFetching, setIsFetching] = useState(true);
+
+    // Always fetch fresh data from the server on mount
+    useEffect(() => {
+        if (!user.id) { setIsFetching(false); return; }
+        userService.getUserById(user.id)
+            .then(response => {
+                if (response.success && response.data) {
+                    const raw = response.data as any;
+                    setForm({
+                        name: raw.name || '',
+                        dob: raw.dob || '',
+                        gender: raw.gender || '',
+                        preferences: {
+                            receivePushNotifications: raw.receivePushNotifications ?? raw.receive_push_notifications ?? true,
+                            receiveEmailUpdates: raw.receiveEmailUpdates ?? raw.receive_email_updates ?? false,
+                            receiveOrderUpdates: raw.receiveOrderUpdates ?? raw.receive_order_updates ?? true,
+                        },
+                    });
+                }
+            })
+            .catch(() => { /* keep form pre-filled from context on error */ })
+            .finally(() => setIsFetching(false));
+    }, [user.id]);
 
     const [showGenderPicker, setShowGenderPicker] = useState(false);
     const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -53,10 +77,28 @@ export default function EditProfileScreen() {
             setIsSaving(false);
         }
     };
+
     const handleModalClose = () => {
         setShowSuccessModal(false);
         router.back();
     };
+
+    if (isFetching) {
+        return (
+            <SafeAreaView style={styles.container}>
+                <View style={styles.header}>
+                    <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+                        <Feather name="chevron-left" size={28} color="#1a1a1a" />
+                    </TouchableOpacity>
+                    <Text style={styles.headerTitle}>Edit Profile</Text>
+                    <View style={{ width: 28 }} />
+                </View>
+                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                    <ActivityIndicator size="large" color="#FBBF24" />
+                </View>
+            </SafeAreaView>
+        );
+    }
 
     const togglePreference = (key: 'receivePushNotifications' | 'receiveEmailUpdates' | 'receiveOrderUpdates') => {
         setForm(prev => ({

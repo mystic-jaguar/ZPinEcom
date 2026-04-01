@@ -170,11 +170,17 @@ router.put('/profileDetails', authenticate, async (req: AuthRequest, res: Respon
 });
 
 // ── GET /api/v1/users/:id ─────────────────────────────────────────────────────
+// Users can only read their own profile
 
 router.get('/:id', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+  // Enforce ownership — a user can only fetch their own profile
+  if (req.params.id !== req.userId) {
+    res.status(403).json({ success: false, message: 'Forbidden' });
+    return;
+  }
   try {
     const result = await pool.query(
-      `SELECT * FROM ${USERS} WHERE id = $1`, [req.params.id]
+      `SELECT * FROM ${USERS} WHERE id = $1`, [req.userId]
     );
     if (result.rows.length === 0) {
       res.status(404).json({ success: false, message: 'User not found' });

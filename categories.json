@@ -1,0 +1,2905 @@
+[
+  {
+    "name": "fashion",
+    "subcategories": [
+      {
+        "name": "men",
+        "subcategories": [
+          {
+            "name": "casual",
+            "subcategories": [
+              {
+                "name": "sweatshirts",
+                "subcategories": [
+                  {
+                    "name": "zip up"
+                  },
+                  {
+                    "name": "hooded"
+                  },
+                  {
+                    "name": "oversized"
+                  },
+                  {
+                    "name": "round neck"
+                  },
+                  {
+                    "name": "printed"
+                  },
+                  {
+                    "name": "shirt collar"
+                  },
+                  {
+                    "name": "sleeveless"
+                  },
+                  {
+                    "name": "typography"
+                  },
+                  {
+                    "name": "embroidered"
+                  }
+                ]
+              },
+              {
+                "name": "t-shirts",
+                "subcategories": [
+                  {
+                    "name": "round neck"
+                  },
+                  {
+                    "name": "cotton"
+                  },
+                  {
+                    "name": "regular"
+                  },
+                  {
+                    "name": "solid"
+                  },
+                  {
+                    "name": "printed"
+                  },
+                  {
+                    "name": "striped"
+                  },
+                  {
+                    "name": "full sleeves"
+                  },
+                  {
+                    "name": "polar collar"
+                  },
+                  {
+                    "name": "oversized"
+                  },
+                  {
+                    "name": "brand logo"
+                  },
+                  {
+                    "name": "sleeveless"
+                  },
+                  {
+                    "name": "floral"
+                  },
+                  {
+                    "name": "slimt fit"
+                  },
+                  {
+                    "name": "varsity"
+                  }
+                ]
+              },
+              {
+                "name": "shirts",
+                "subcategories": [
+                  {
+                    "name": "check"
+                  },
+                  {
+                    "name": "denim"
+                  },
+                  {
+                    "name": "linen"
+                  },
+                  {
+                    "name": "half sleeve"
+                  },
+                  {
+                    "name": "textured"
+                  },
+                  {
+                    "name": "solid"
+                  },
+                  {
+                    "name": "utility"
+                  },
+                  {
+                    "name": "cotton"
+                  },
+                  {
+                    "name": "oversized"
+                  },
+                  {
+                    "name": "striped"
+                  },
+                  {
+                    "name": "long sleeve"
+                  },
+                  {
+                    "name": "cuban collar"
+                  },
+                  {
+                    "name": "schiffli"
+                  }
+                ]
+              },
+              {
+                "name": "jackets",
+                "subcategories": [
+                  {
+                    "name": "solid"
+                  },
+                  {
+                    "name": "printed"
+                  },
+                  {
+                    "name": "embroidered"
+                  },
+                  {
+                    "name": "denim"
+                  },
+                  {
+                    "name": "bomber"
+                  },
+                  {
+                    "name": "oversized"
+                  },
+                  {
+                    "name": "lightweight"
+                  },
+                  {
+                    "name": "varsity jacket"
+                  },
+                  {
+                    "name": "sports"
+                  },
+                  {
+                    "name": "graphic jacket"
+                  },
+                  {
+                    "name": "typography"
+                  },
+                  {
+                    "name": "tailored"
+                  },
+                  {
+                    "name": "abstract"
+                  }
+                ]
+              },
+              {
+                "name": "sweaters",
+                "subcategories": [
+                  {
+                    "name": "mock neck"
+                  },
+                  {
+                    "name": "v-neck"
+                  },
+                  {
+                    "name": "high neck"
+                  },
+                  {
+                    "name": "solid"
+                  },
+                  {
+                    "name": "cardigan"
+                  },
+                  {
+                    "name": "pullover"
+                  },
+                  {
+                    "name": "vest"
+                  },
+                  {
+                    "name": "shirt collar"
+                  },
+                  {
+                    "name": "striped"
+                  },
+                  {
+                    "name": "printed"
+                  },
+                  {
+                    "name": "sleeveless"
+                  },
+                  {
+                    "name": "turtle neck"
+                  }
+                ]
+              },
+              {
+                "name": "co-ords",
+                "subcategories": [
+                  {
+                    "name": "casual"
+                  },
+                  {
+                    "name": "partywear"
+                  },
+                  {
+                    "name": "comfortable"
+                  },
+                  {
+                    "name": "formal"
+                  },
+                  {
+                    "name": "traditional"
+                  },
+                  {
+                    "name": "travel"
+                  },
+                  {
+                    "name": "cotten"
+                  },
+                  {
+                    "name": "night out"
+                  }
+                ]
+              },
+              {
+                "name": "shorts",
+                "subcategories": [
+                  {
+                    "name": "cargo"
+                  },
+                  {
+                    "name": "baggy"
+                  },
+                  {
+                    "name": "denim"
+                  },
+                  {
+                    "name": "linen"
+                  },
+                  {
+                    "name": "chino"
+                  },
+                  {
+                    "name": "beach"
+                  },
+                  {
+                    "name": "sports"
+                  },
+                  {
+                    "name": "basics"
+                  },
+                  {
+                    "name": "jorts"
+                  },
+                  {
+                    "name": "distressed"
+                  },
+                  {
+                    "name": "bermuda"
+                  },
+                  {
+                    "name": "drawstring"
+                  },
+                  {
+                    "name": "inner elastic"
+                  },
+                  {
+                    "name": "cotton"
+                  },
+                  {
+                    "name": "slip on"
+                  },
+                  {
+                    "name": "printed"
+                  },
+                  {
+                    "name": "checked"
+                  }
+                ]
+              },
+              {
+                "name": "jeans",
+                "subcategories": [
+                  {
+                    "name": "baggy"
+                  },
+                  {
+                    "name": "straight fit"
+                  },
+                  {
+                    "name": "cargo"
+                  },
+                  {
+                    "name": "slim fit"
+                  },
+                  {
+                    "name": "bootcut"
+                  },
+                  {
+                    "name": "wide leg"
+                  },
+                  {
+                    "name": "distressed"
+                  },
+                  {
+                    "name": "low rise"
+                  },
+                  {
+                    "name": "high rise"
+                  },
+                  {
+                    "name": "printed"
+                  }
+                ]
+              },
+              {
+                "name": "trousers",
+                "subcategories": [
+                  {
+                    "name": "cargo"
+                  },
+                  {
+                    "name": "chinos"
+                  },
+                  {
+                    "name": "linen"
+                  },
+                  {
+                    "name": "korean"
+                  },
+                  {
+                    "name": "loose fit"
+                  },
+                  {
+                    "name": "parachute"
+                  },
+                  {
+                    "name": "slim fit"
+                  },
+                  {
+                    "name": "regular fit"
+                  },
+                  {
+                    "name": "cotton"
+                  },
+                  {
+                    "name": "striped"
+                  },
+                  {
+                    "name": "printed"
+                  },
+                  {
+                    "name": "high rise"
+                  },
+                  {
+                    "name": "low rise"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "ethnic",
+            "subcategories": [
+              {
+                "name": "kurtas",
+                "subcategories": [
+                  {
+                    "name": "puja special"
+                  },
+                  {
+                    "name": "chikankari"
+                  },
+                  {
+                    "name": "floral"
+                  },
+                  {
+                    "name": "sequinned"
+                  },
+                  {
+                    "name": "mirror work"
+                  },
+                  {
+                    "name": "pastel"
+                  },
+                  {
+                    "name": "solid"
+                  },
+                  {
+                    "name": "printed"
+                  },
+                  {
+                    "name": "cotton"
+                  },
+                  {
+                    "name": "daily wear"
+                  },
+                  {
+                    "name": "fusion"
+                  },
+                  {
+                    "name": "festive"
+                  },
+                  {
+                    "name": "embellished"
+                  },
+                  {
+                    "name": "embroidered"
+                  },
+                  {
+                    "name": "yoke design"
+                  },
+                  {
+                    "name": "haldi"
+                  },
+                  {
+                    "name": "sangeet"
+                  }
+                ]
+              },
+              {
+                "name": "fusion shirts",
+                "subcategories": [
+                  {
+                    "name": "tunic shirt"
+                  },
+                  {
+                    "name": "cape style shirt"
+                  },
+                  {
+                    "name": "high-low shirt"
+                  },
+                  {
+                    "name": "wrap style shirt"
+                  },
+                  {
+                    "name": "embroidered shirt"
+                  },
+                  {
+                    "name": "printed shirt"
+                  },
+                  {
+                    "name": "denim fusion shirt"
+                  },
+                  {
+                    "name": "drape attached shirt"
+                  }
+                ]
+              },
+              {
+                "name": "sherwani",
+                "subcategories": [
+                  {
+                    "name": "achkan sherwani"
+                  },
+                  {
+                    "name": "indo-western shervani"
+                  },
+                  {
+                    "name": "jodhpuri shervani"
+                  },
+                  {
+                    "name": "angrakha shervani"
+                  },
+                  {
+                    "name": "anarkali shervani"
+                  },
+                  {
+                    "name": "jacket style sherwani"
+                  },
+                  {
+                    "name": "printed sherwani"
+                  },
+                  {
+                    "name": "embroidered shervani"
+                  },
+                  {
+                    "name": "velvet shervani"
+                  },
+                  {
+                    "name": "designer sherwani"
+                  }
+                ]
+              },
+              {
+                "name": "short kurtas",
+                "subcategories": [
+                  {
+                    "name": "casual"
+                  },
+                  {
+                    "name": "pathani"
+                  },
+                  {
+                    "name": "nehru collar"
+                  },
+                  {
+                    "name": "angrakha"
+                  },
+                  {
+                    "name": "printed"
+                  },
+                  {
+                    "name": "embroidered"
+                  },
+                  {
+                    "name": "denim/fusion"
+                  },
+                  {
+                    "name": "festive"
+                  },
+                  {
+                    "name": "linen/cotton"
+                  },
+                  {
+                    "name": "office wear"
+                  }
+                ]
+              },
+              {
+                "name": "kurta set"
+              },
+              {
+                "name": "blazers",
+                "subcategories": [
+                  {
+                    "name": "nehru jacket"
+                  },
+                  {
+                    "name": "bandhgala"
+                  },
+                  {
+                    "name": "achkan"
+                  },
+                  {
+                    "name": "angrakha"
+                  },
+                  {
+                    "name": "indo-western"
+                  },
+                  {
+                    "name": "printed"
+                  },
+                  {
+                    "name": "festive"
+                  },
+                  {
+                    "name": "partywear"
+                  },
+                  {
+                    "name": "longline"
+                  }
+                ]
+              },
+              {
+                "name": "nehru jackets",
+                "subcategories": [
+                  {
+                    "name": "partywear"
+                  },
+                  {
+                    "name": "festive"
+                  },
+                  {
+                    "name": "printed"
+                  },
+                  {
+                    "name": "embroidered"
+                  },
+                  {
+                    "name": "cotton"
+                  },
+                  {
+                    "name": "velvet"
+                  },
+                  {
+                    "name": "silk"
+                  },
+                  {
+                    "name": "indo western"
+                  },
+                  {
+                    "name": "longline"
+                  },
+                  {
+                    "name": "designer"
+                  }
+                ]
+              },
+              {
+                "name": "dhoti",
+                "subcategories": [
+                  {
+                    "name": "cotton"
+                  },
+                  {
+                    "name": "silk"
+                  },
+                  {
+                    "name": "festive"
+                  },
+                  {
+                    "name": "partywear"
+                  },
+                  {
+                    "name": "printed"
+                  },
+                  {
+                    "name": "patterned"
+                  },
+                  {
+                    "name": "designer"
+                  },
+                  {
+                    "name": "dhoti with kurta set"
+                  },
+                  {
+                    "name": "ready to wear/draped style"
+                  },
+                  {
+                    "name": "handloom/traditional dhoti"
+                  }
+                ]
+              },
+              {
+                "name": "3 piece set",
+                "subcategories": [
+                  {
+                    "name": "partywear"
+                  },
+                  {
+                    "name": "formal"
+                  },
+                  {
+                    "name": "indo western"
+                  },
+                  {
+                    "name": "printed"
+                  },
+                  {
+                    "name": "embroidered"
+                  },
+                  {
+                    "name": "cotton"
+                  },
+                  {
+                    "name": "designer"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "sportswear",
+            "subcategories": [
+              {
+                "name": "t-shirts"
+              },
+              {
+                "name": "track pants"
+              },
+              {
+                "name": "shorts"
+              },
+              {
+                "name": "jackets"
+              },
+              {
+                "name": "sweatshirts"
+              },
+              {
+                "name": "tracksuits"
+              },
+              {
+                "name": "trunk"
+              },
+              {
+                "name": "trousers"
+              },
+              {
+                "name": "innerwear vests"
+              },
+              {
+                "name": "swim bottoms"
+              },
+              {
+                "name": "shirts"
+              },
+              {
+                "name": "tights"
+              },
+              {
+                "name": "briefs"
+              },
+              {
+                "name": "co-ords"
+              },
+              {
+                "name": "rain jacket"
+              },
+              {
+                "name": "sports jacket"
+              },
+              {
+                "name": "sweaters"
+              },
+              {
+                "name": "thermal tops"
+              },
+              {
+                "name": "lounge t shirts"
+              },
+              {
+                "name": "boxers"
+              }
+            ]
+          },
+          {
+            "name": "workwear",
+            "subcategories": [
+              {
+                "name": "shirts"
+              },
+              {
+                "name": "blazers"
+              },
+              {
+                "name": "t shirts"
+              },
+              {
+                "name": "trousers"
+              },
+              {
+                "name": "jeans"
+              },
+              {
+                "name": "sweatshirts"
+              },
+              {
+                "name": "sweaters"
+              },
+              {
+                "name": "jackets"
+              },
+              {
+                "name": "kurtas"
+              },
+              {
+                "name": "clothing fabric"
+              },
+              {
+                "name": "formal shoes"
+              }
+            ]
+          },
+          {
+            "name": "essentials",
+            "subcategories": [
+              {
+                "name": "boxers",
+                "subcategories": [
+                  {
+                    "name": "pure cotton"
+                  },
+                  {
+                    "name": "machine wash"
+                  },
+                  {
+                    "name": "inner elastic"
+                  },
+                  {
+                    "name": "outer elastic"
+                  },
+                  {
+                    "name": "printed"
+                  },
+                  {
+                    "name": "checked"
+                  },
+                  {
+                    "name": "solid"
+                  },
+                  {
+                    "name": "woven"
+                  },
+                  {
+                    "name": "knitted"
+                  }
+                ]
+              },
+              {
+                "name": "innerwear vests",
+                "subcategories": [
+                  {
+                    "name": "cotton"
+                  },
+                  {
+                    "name": "sleeveless"
+                  },
+                  {
+                    "name": "ribbed"
+                  },
+                  {
+                    "name": "thermal"
+                  },
+                  {
+                    "name": "moisture-wicking"
+                  },
+                  {
+                    "name": "seamless vest"
+                  },
+                  {
+                    "name": "strech vests"
+                  },
+                  {
+                    "name": "designer vest"
+                  }
+                ]
+              },
+              {
+                "name": "loungewear",
+                "subcategories": [
+                  {
+                    "name": "lounge pants"
+                  },
+                  {
+                    "name": "lounge t-shirts"
+                  },
+                  {
+                    "name": "lounge shorts"
+                  },
+                  {
+                    "name": "night suits"
+                  },
+                  {
+                    "name": "robe"
+                  }
+                ]
+              },
+              {
+                "name": "trunks",
+                "subcategories": [
+                  {
+                    "name": "outer elastic"
+                  },
+                  {
+                    "name": "inner elastic"
+                  },
+                  {
+                    "name": "knitted"
+                  },
+                  {
+                    "name": "woven"
+                  },
+                  {
+                    "name": "knitted and woven"
+                  },
+                  {
+                    "name": "printed"
+                  },
+                  {
+                    "name": "solid"
+                  },
+                  {
+                    "name": "checked"
+                  },
+                  {
+                    "name": "cotton"
+                  },
+                  {
+                    "name": "elastane"
+                  }
+                ]
+              },
+              {
+                "name": "briefs",
+                "subcategories": [
+                  {
+                    "name": "innerwear vests"
+                  },
+                  {
+                    "name": "trunk"
+                  },
+                  {
+                    "name": "boxers"
+                  },
+                  {
+                    "name": "thermal tops"
+                  },
+                  {
+                    "name": "thermal bottoms"
+                  },
+                  {
+                    "name": "thermal set"
+                  },
+                  {
+                    "name": "shapewear"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "women",
+        "subcategories": [
+          {
+            "name": "western",
+            "subcategories": [
+              {
+                "name": "dresses",
+                "subcategories": [
+                  {
+                    "name": "bodycon"
+                  },
+                  {
+                    "name": "a-line"
+                  },
+                  {
+                    "name": "sheath"
+                  },
+                  {
+                    "name": "wrap dress"
+                  },
+                  {
+                    "name": "maxi"
+                  },
+                  {
+                    "name": "midi"
+                  },
+                  {
+                    "name": "mini"
+                  },
+                  {
+                    "name": "shirt dress"
+                  },
+                  {
+                    "name": "skater"
+                  },
+                  {
+                    "name": "asymmetrical"
+                  },
+                  {
+                    "name": "off-shoulder"
+                  },
+                  {
+                    "name": "halter neck"
+                  },
+                  {
+                    "name": "tunic"
+                  },
+                  {
+                    "name": "pinafore"
+                  },
+                  {
+                    "name": "camisole"
+                  }
+                ]
+              },
+              {
+                "name": "tops",
+                "subcategories": [
+                  {
+                    "name": "t-shirt"
+                  },
+                  {
+                    "name": "crop top"
+                  },
+                  {
+                    "name": "tank top"
+                  },
+                  {
+                    "name": "camisole top"
+                  },
+                  {
+                    "name": "tube top"
+                  },
+                  {
+                    "name": "shirt top"
+                  },
+                  {
+                    "name": "blouse"
+                  },
+                  {
+                    "name": "peplum top"
+                  },
+                  {
+                    "name": "wrap top"
+                  },
+                  {
+                    "name": "off shoulder top"
+                  },
+                  {
+                    "name": "one shoulder top"
+                  },
+                  {
+                    "name": "smocked top"
+                  },
+                  {
+                    "name": "assymetrical top"
+                  },
+                  {
+                    "name": "v neck top"
+                  },
+                  {
+                    "name": "tankini top"
+                  },
+                  {
+                    "name": "halter neck top"
+                  },
+                  {
+                    "name": "high neck/turtle neck"
+                  },
+                  {
+                    "name": "corset top"
+                  },
+                  {
+                    "name": "blazers"
+                  }
+                ]
+              },
+              {
+                "name": "jumpsuits",
+                "subcategories": [
+                  {
+                    "name": "casual"
+                  },
+                  {
+                    "name": "formal/workwear"
+                  },
+                  {
+                    "name": "wide-leg"
+                  },
+                  {
+                    "name": "bodycon"
+                  },
+                  {
+                    "name": "strapless"
+                  },
+                  {
+                    "name": "halter neck"
+                  },
+                  {
+                    "name": "off-shoulder"
+                  },
+                  {
+                    "name": "one shoulder"
+                  },
+                  {
+                    "name": "cape jumpsuit"
+                  },
+                  {
+                    "name": "wrap jumpsuit"
+                  },
+                  {
+                    "name": "denim jumpsuit"
+                  },
+                  {
+                    "name": "party jumpsuit"
+                  }
+                ]
+              },
+              {
+                "name": "shirts",
+                "subcategories": [
+                  {
+                    "name": "basic button"
+                  },
+                  {
+                    "name": "casual"
+                  },
+                  {
+                    "name": "denim"
+                  },
+                  {
+                    "name": "linen"
+                  },
+                  {
+                    "name": "checkered"
+                  },
+                  {
+                    "name": "tunic"
+                  },
+                  {
+                    "name": "oversized"
+                  },
+                  {
+                    "name": "dress shirt"
+                  },
+                  {
+                    "name": "crop shirt"
+                  },
+                  {
+                    "name": "sheer/transparent"
+                  },
+                  {
+                    "name": "printed shirt"
+                  },
+                  {
+                    "name": "shrug"
+                  },
+                  {
+                    "name": "jackets"
+                  },
+                  {
+                    "name": "blazers"
+                  }
+                ]
+              },
+              {
+                "name": "jeans",
+                "subcategories": [
+                  {
+                    "name": "skinny jeans"
+                  },
+                  {
+                    "name": "slim-fit jeans"
+                  },
+                  {
+                    "name": "straight leg jeans"
+                  },
+                  {
+                    "name": "bootcut jeans"
+                  },
+                  {
+                    "name": "flared jeans"
+                  },
+                  {
+                    "name": "wide leg jeans"
+                  },
+                  {
+                    "name": "high waist jeans"
+                  },
+                  {
+                    "name": "mid rise jeans"
+                  },
+                  {
+                    "name": "cargo"
+                  },
+                  {
+                    "name": "ripped"
+                  },
+                  {
+                    "name": "trousers"
+                  },
+                  {
+                    "name": "leggings"
+                  },
+                  {
+                    "name": "shorts"
+                  },
+                  {
+                    "name": "skirts"
+                  },
+                  {
+                    "name": "capris"
+                  },
+                  {
+                    "name": "trackpants"
+                  },
+                  {
+                    "name": "tights"
+                  },
+                  {
+                    "name": "jeggings"
+                  },
+                  {
+                    "name": "tracksuits"
+                  }
+                ]
+              },
+              {
+                "name": "tees",
+                "subcategories": [
+                  {
+                    "name": "v neck"
+                  },
+                  {
+                    "name": "sleeveless"
+                  },
+                  {
+                    "name": "round neck"
+                  },
+                  {
+                    "name": "boat neck"
+                  },
+                  {
+                    "name": "polo tee"
+                  },
+                  {
+                    "name": "henley tee"
+                  },
+                  {
+                    "name": "graphics"
+                  },
+                  {
+                    "name": "striped"
+                  },
+                  {
+                    "name": "crop"
+                  },
+                  {
+                    "name": "oversized"
+                  },
+                  {
+                    "name": "longline"
+                  },
+                  {
+                    "name": "cold shoulder"
+                  },
+                  {
+                    "name": "cap sleeve"
+                  }
+                ]
+              },
+              {
+                "name": "l&l",
+                "subcategories": [
+                  {
+                    "name": "bra"
+                  },
+                  {
+                    "name": "briefs"
+                  },
+                  {
+                    "name": "night suits"
+                  },
+                  {
+                    "name": "leggings"
+                  },
+                  {
+                    "name": "nightdress"
+                  },
+                  {
+                    "name": "baby dolls"
+                  },
+                  {
+                    "name": "lingerie set"
+                  },
+                  {
+                    "name": "shorts"
+                  },
+                  {
+                    "name": "t shirts"
+                  },
+                  {
+                    "name": "shapewear"
+                  },
+                  {
+                    "name": "lounge pants"
+                  },
+                  {
+                    "name": "swimwear"
+                  },
+                  {
+                    "name": "camisoles"
+                  },
+                  {
+                    "name": "capris"
+                  },
+                  {
+                    "name": "tights"
+                  },
+                  {
+                    "name": "socks"
+                  },
+                  {
+                    "name": "palazzos"
+                  },
+                  {
+                    "name": "stockings"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "ethnic",
+            "subcategories": [
+              {
+                "name": "kurtas sets",
+                "subcategories": [
+                  {
+                    "name": "straight"
+                  },
+                  {
+                    "name": "anarkali"
+                  },
+                  {
+                    "name": "a-line"
+                  },
+                  {
+                    "name": "angrakha"
+                  },
+                  {
+                    "name": "sharara-gharara"
+                  },
+                  {
+                    "name": "palazzo"
+                  },
+                  {
+                    "name": "chikankari"
+                  },
+                  {
+                    "name": "cape style"
+                  },
+                  {
+                    "name": "jacket style"
+                  },
+                  {
+                    "name": "peplum"
+                  },
+                  {
+                    "name": "floor length"
+                  },
+                  {
+                    "name": "layered"
+                  },
+                  {
+                    "name": "printed"
+                  },
+                  {
+                    "name": "embroidered"
+                  },
+                  {
+                    "name": "floral"
+                  },
+                  {
+                    "name": "dupatta"
+                  },
+                  {
+                    "name": "tunics"
+                  },
+                  {
+                    "name": "shawls"
+                  },
+                  {
+                    "name": "dress material"
+                  }
+                ]
+              },
+              {
+                "name": "sarees",
+                "subcategories": [
+                  {
+                    "name": "pujo special"
+                  },
+                  {
+                    "name": "silk"
+                  },
+                  {
+                    "name": "tissue"
+                  },
+                  {
+                    "name": "bandhani"
+                  },
+                  {
+                    "name": "leheriya"
+                  },
+                  {
+                    "name": "ready to wear"
+                  },
+                  {
+                    "name": "banarasi"
+                  },
+                  {
+                    "name": "organza"
+                  },
+                  {
+                    "name": "embellished"
+                  },
+                  {
+                    "name": "satin"
+                  },
+                  {
+                    "name": "cotton"
+                  },
+                  {
+                    "name": "sequin"
+                  },
+                  {
+                    "name": "embroidered"
+                  },
+                  {
+                    "name": "zari"
+                  },
+                  {
+                    "name": "lehenga saree"
+                  },
+                  {
+                    "name": "handloom"
+                  },
+                  {
+                    "name": "pastel"
+                  },
+                  {
+                    "name": "kasavu"
+                  },
+                  {
+                    "name": "floral"
+                  },
+                  {
+                    "name": "color blocked"
+                  }
+                ]
+              },
+              {
+                "name": "lehengas",
+                "subcategories": [
+                  {
+                    "name": "a-line"
+                  },
+                  {
+                    "name": "flared"
+                  },
+                  {
+                    "name": "panelled"
+                  },
+                  {
+                    "name": "mermaid/fishtail"
+                  },
+                  {
+                    "name": "straight cut"
+                  },
+                  {
+                    "name": "sharara cut"
+                  },
+                  {
+                    "name": "jacket style"
+                  },
+                  {
+                    "name": "cape style"
+                  },
+                  {
+                    "name": "ruffle"
+                  },
+                  {
+                    "name": "layered"
+                  },
+                  {
+                    "name": "printed"
+                  },
+                  {
+                    "name": "embroidered"
+                  },
+                  {
+                    "name": "zari"
+                  },
+                  {
+                    "name": "banarasi"
+                  },
+                  {
+                    "name": "velvet"
+                  },
+                  {
+                    "name": "indo western"
+                  },
+                  {
+                    "name": "shawl"
+                  },
+                  {
+                    "name": "dupatta"
+                  },
+                  {
+                    "name": "dress material"
+                  }
+                ]
+              },
+              {
+                "name": "co-ords",
+                "subcategories": [
+                  {
+                    "name": "kurta and pant"
+                  },
+                  {
+                    "name": "kurta and palazzo"
+                  },
+                  {
+                    "name": "crop top and skirt"
+                  },
+                  {
+                    "name": "peplum top and sharara"
+                  },
+                  {
+                    "name": "shirt and pant"
+                  },
+                  {
+                    "name": "cape/kaftan and pant"
+                  },
+                  {
+                    "name": "jacket style co-ords"
+                  },
+                  {
+                    "name": "layered"
+                  },
+                  {
+                    "name": "printed daily"
+                  },
+                  {
+                    "name": "embroidered/festive"
+                  },
+                  {
+                    "name": "indo-western"
+                  }
+                ]
+              },
+              {
+                "name": "indie work",
+                "subcategories": [
+                  {
+                    "name": "block print"
+                  },
+                  {
+                    "name": "handloom cotton"
+                  },
+                  {
+                    "name": "indigo work"
+                  },
+                  {
+                    "name": "kalamkari"
+                  },
+                  {
+                    "name": "ajrakh prints"
+                  },
+                  {
+                    "name": "ikat weaves"
+                  },
+                  {
+                    "name": "chikankari"
+                  },
+                  {
+                    "name": "bagru print"
+                  },
+                  {
+                    "name": "khadi cotton"
+                  },
+                  {
+                    "name": "ethnic tunics and tops"
+                  },
+                  {
+                    "name": "fusion indie dresses"
+                  },
+                  {
+                    "name": "minimal embroidered workwear"
+                  }
+                ]
+              },
+              {
+                "name": "designer wear",
+                "subcategories": [
+                  {
+                    "name": "designer saree"
+                  },
+                  {
+                    "name": "designer lehengas"
+                  },
+                  {
+                    "name": "designer kurta sets"
+                  },
+                  {
+                    "name": "designer anarkali"
+                  },
+                  {
+                    "name": "designer gowns(ethnic)"
+                  },
+                  {
+                    "name": "cape style"
+                  },
+                  {
+                    "name": "bridal couture"
+                  },
+                  {
+                    "name": "fusion designer wear"
+                  },
+                  {
+                    "name": "jacket style"
+                  },
+                  {
+                    "name": "ruffle & layered"
+                  },
+                  {
+                    "name": "pre-draped"
+                  },
+                  {
+                    "name": "high-slit designer kurtas"
+                  },
+                  {
+                    "name": "handcrafted designer pieces"
+                  }
+                ]
+              },
+              {
+                "name": "indie fusion",
+                "subcategories": [
+                  {
+                    "name": "kurta with jeans/joggers"
+                  },
+                  {
+                    "name": "crop top & dhoti pants"
+                  },
+                  {
+                    "name": "saree with belt/jacket"
+                  },
+                  {
+                    "name": "indie skirt with crop top/shirt"
+                  },
+                  {
+                    "name": "kaftan fusion dress"
+                  },
+                  {
+                    "name": "shirt style kurta/dress"
+                  },
+                  {
+                    "name": "indie jumpsuit"
+                  },
+                  {
+                    "name": "fusion co-ord set"
+                  },
+                  {
+                    "name": "cape/shrug layered outfit"
+                  },
+                  {
+                    "name": "peplum top with sharara/gharara"
+                  },
+                  {
+                    "name": "asymmetrical/high-low dress"
+                  },
+                  {
+                    "name": "indo-western gown"
+                  },
+                  {
+                    "name": "boho fusion wear"
+                  }
+                ]
+              },
+              {
+                "name": "gowns",
+                "subcategories": [
+                  {
+                    "name": "anarkali gown"
+                  },
+                  {
+                    "name": "a-line gown"
+                  },
+                  {
+                    "name": "flared gown"
+                  },
+                  {
+                    "name": "straight cut gown"
+                  },
+                  {
+                    "name": "indo-western gown"
+                  },
+                  {
+                    "name": "layered gown"
+                  },
+                  {
+                    "name": "ruffle gown"
+                  },
+                  {
+                    "name": "cape style gown"
+                  },
+                  {
+                    "name": "jacket style gown"
+                  },
+                  {
+                    "name": "high-low gown"
+                  },
+                  {
+                    "name": "asymmetrical gown"
+                  },
+                  {
+                    "name": "embroidered/zari gown"
+                  },
+                  {
+                    "name": "printed gown"
+                  },
+                  {
+                    "name": "bridal gown"
+                  },
+                  {
+                    "name": "evening/party gown"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "fusion",
+            "subcategories": [
+              {
+                "name": "indie fusion",
+                "subcategories": [
+                  {
+                    "name": "indo western dresses"
+                  },
+                  {
+                    "name": "kurta with jeans"
+                  },
+                  {
+                    "name": "saree with shirt/crop top"
+                  },
+                  {
+                    "name": "palazzo–crop top"
+                  },
+                  {
+                    "name": "ethnic jacket dress"
+                  },
+                  {
+                    "name": "dhoti pants–kurti"
+                  },
+                  {
+                    "name": "fusion gown"
+                  },
+                  {
+                    "name": "anarkali with belt"
+                  },
+                  {
+                    "name": "lehenga–shirt style"
+                  },
+                  {
+                    "name": "skirt–dupatta wrap"
+                  },
+                  {
+                    "name": "tunic with trouser"
+                  },
+                  {
+                    "name": "sharara–top fusio"
+                  },
+                  {
+                    "name": "cape over saree"
+                  }
+                ]
+              },
+              {
+                "name": "boho fusion",
+                "subcategories": [
+                  {
+                    "name": "tie-dye maxi"
+                  },
+                  {
+                    "name": "crochet top"
+                  },
+                  {
+                    "name": "fringe jacket"
+                  },
+                  {
+                    "name": "tassel shrug"
+                  },
+                  {
+                    "name": "layered skirt"
+                  },
+                  {
+                    "name": "kaftan dress"
+                  },
+                  {
+                    "name": "printed jumpsuit"
+                  },
+                  {
+                    "name": "embroidered co-ord"
+                  },
+                  {
+                    "name": "boho tunic"
+                  },
+                  {
+                    "name": "wrap dress"
+                  },
+                  {
+                    "name": "gypsy skirt"
+                  },
+                  {
+                    "name": "mirror work shrug"
+                  }
+                ]
+              },
+              {
+                "name": "indie work",
+                "subcategories": [
+                  {
+                    "name": "handloom kurta"
+                  },
+                  {
+                    "name": "ikat shirt"
+                  },
+                  {
+                    "name": "block print dress"
+                  },
+                  {
+                    "name": "linen saree"
+                  },
+                  {
+                    "name": "khadi tunic"
+                  },
+                  {
+                    "name": "ajrakh kurti"
+                  },
+                  {
+                    "name": "straight-fit suit"
+                  },
+                  {
+                    "name": "cotton co-ord"
+                  },
+                  {
+                    "name": "minimal embroidery top"
+                  },
+                  {
+                    "name": "office ethnic set"
+                  },
+                  {
+                    "name": "formal kurti–pants"
+                  },
+                  {
+                    "name": "subtle printed dupatta"
+                  }
+                ]
+              },
+              {
+                "name": "street fusion",
+                "subcategories": [
+                  {
+                    "name": "tee–lehenga"
+                  },
+                  {
+                    "name": "hoodie–palazzo"
+                  },
+                  {
+                    "name": "denim kurta"
+                  },
+                  {
+                    "name": "saree–sneakers"
+                  },
+                  {
+                    "name": "crop hoodie–dhoti"
+                  },
+                  {
+                    "name": "cargo–kurti"
+                  },
+                  {
+                    "name": "graphic tunic"
+                  },
+                  {
+                    "name": "street shrug"
+                  },
+                  {
+                    "name": "baggy pants kurta"
+                  },
+                  {
+                    "name": "funky jacket saree"
+                  },
+                  {
+                    "name": "varsity kurti"
+                  },
+                  {
+                    "name": "skater dress fusion"
+                  }
+                ]
+              },
+              {
+                "name": "festive fusion",
+                "subcategories": [
+                  {
+                    "name": "gown–dupatta"
+                  },
+                  {
+                    "name": "peplum–lehenga"
+                  },
+                  {
+                    "name": "saree–cape"
+                  },
+                  {
+                    "name": "jacket anarkali"
+                  },
+                  {
+                    "name": "crop–sharara"
+                  },
+                  {
+                    "name": "drape skirt–top"
+                  },
+                  {
+                    "name": "lehenga–blazer"
+                  },
+                  {
+                    "name": "trail gown fusion"
+                  },
+                  {
+                    "name": "belted saree"
+                  },
+                  {
+                    "name": "heavy kurta set"
+                  },
+                  {
+                    "name": "festive co-ord"
+                  },
+                  {
+                    "name": "dupatta shrug style"
+                  }
+                ]
+              },
+              {
+                "name": "contemporary fusion",
+                "subcategories": [
+                  {
+                    "name": "draped gown saree"
+                  },
+                  {
+                    "name": "one-shoulder kurta"
+                  },
+                  {
+                    "name": "fusion jumpsuit"
+                  },
+                  {
+                    "name": "slit tunic skirt"
+                  },
+                  {
+                    "name": "cape lehenga"
+                  },
+                  {
+                    "name": "asym kurta"
+                  },
+                  {
+                    "name": "wrap fusion dress"
+                  },
+                  {
+                    "name": "cowl pant kurta"
+                  },
+                  {
+                    "name": "peplum saree"
+                  },
+                  {
+                    "name": "drape skirt top"
+                  },
+                  {
+                    "name": "overlay anarkali"
+                  },
+                  {
+                    "name": "jacket gown"
+                  }
+                ]
+              },
+              {
+                "name": "luxury fusion",
+                "subcategories": [
+                  {
+                    "name": "sequin saree–blazer"
+                  },
+                  {
+                    "name": "corset–lehenga"
+                  },
+                  {
+                    "name": "embro jacket dress"
+                  },
+                  {
+                    "name": "ruffle gown"
+                  },
+                  {
+                    "name": "crystal kurta set"
+                  },
+                  {
+                    "name": "metallic saree"
+                  },
+                  {
+                    "name": "designer sharara"
+                  },
+                  {
+                    "name": "luxury co-ord"
+                  },
+                  {
+                    "name": "cape gown"
+                  },
+                  {
+                    "name": "velvet fusion wear"
+                  },
+                  {
+                    "name": "glam tunic set"
+                  },
+                  {
+                    "name": "heavy drape saree"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "essentials",
+            "subcategories": [
+              {
+                "name": "shapewear"
+              },
+              {
+                "name": "bras"
+              },
+              {
+                "name": "panties"
+              },
+              {
+                "name": "night suits"
+              },
+              {
+                "name": "stockings"
+              },
+              {
+                "name": "thermals"
+              },
+              {
+                "name": "maternity wear"
+              },
+              {
+                "name": "swimwear"
+              },
+              {
+                "name": "babydolls"
+              },
+              {
+                "name": "lingerie accessories"
+              },
+              {
+                "name": "saree shapewear"
+              },
+              {
+                "name": "night dress"
+              }
+            ]
+          },
+          {
+            "name": "sportswear",
+            "subcategories": [
+              {
+                "name": "activewear",
+                "subcategories": [
+                  {
+                    "name": "sports bras"
+                  },
+                  {
+                    "name": "leggings"
+                  },
+                  {
+                    "name": "joggers"
+                  },
+                  {
+                    "name": "shorts"
+                  },
+                  {
+                    "name": "tank tops"
+                  },
+                  {
+                    "name": "crop tops"
+                  },
+                  {
+                    "name": "tracksuits"
+                  },
+                  {
+                    "name": "sports jackets"
+                  },
+                  {
+                    "name": "hoodies"
+                  },
+                  {
+                    "name": "co-ord sets"
+                  }
+                ]
+              },
+              {
+                "name": "training & gym",
+                "subcategories": [
+                  {
+                    "name": "gym t-shirts"
+                  },
+                  {
+                    "name": "compression wear"
+                  },
+                  {
+                    "name": "workout leggings"
+                  },
+                  {
+                    "name": "training shorts"
+                  },
+                  {
+                    "name": "sweatproof tops"
+                  },
+                  {
+                    "name": "gym vests"
+                  },
+                  {
+                    "name": "track pants"
+                  },
+                  {
+                    "name": "stretch joggers"
+                  },
+                  {
+                    "name": "base layers"
+                  },
+                  {
+                    "name": "training shoes"
+                  }
+                ]
+              },
+              {
+                "name": "running wear",
+                "subcategories": [
+                  {
+                    "name": "running tees"
+                  },
+                  {
+                    "name": "running shorts"
+                  },
+                  {
+                    "name": "track leggings"
+                  },
+                  {
+                    "name": "windcheaters"
+                  },
+                  {
+                    "name": "lightweight jackets"
+                  },
+                  {
+                    "name": "running sports bra"
+                  },
+                  {
+                    "name": "reflective gear"
+                  },
+                  {
+                    "name": "arm bands"
+                  },
+                  {
+                    "name": "headbands & caps"
+                  },
+                  {
+                    "name": "running shoes"
+                  }
+                ]
+              },
+              {
+                "name": "yoga & studio",
+                "subcategories": [
+                  {
+                    "name": "yoga pants"
+                  },
+                  {
+                    "name": "yoga bras"
+                  },
+                  {
+                    "name": "crop tees"
+                  },
+                  {
+                    "name": "studio co-ords"
+                  },
+                  {
+                    "name": "wide-leg pants"
+                  },
+                  {
+                    "name": "relax fit tees"
+                  },
+                  {
+                    "name": "wrap tops"
+                  },
+                  {
+                    "name": "stretch tanks"
+                  },
+                  {
+                    "name": "sleeveless hoodies"
+                  },
+                  {
+                    "name": "grip socks"
+                  }
+                ]
+              },
+              {
+                "name": "outdoor & athleisure",
+                "subcategories": [
+                  {
+                    "name": "sports jackets"
+                  },
+                  {
+                    "name": "rain jackets"
+                  },
+                  {
+                    "name": "track suits"
+                  },
+                  {
+                    "name": "cargo joggers"
+                  },
+                  {
+                    "name": "polo tees"
+                  },
+                  {
+                    "name": "sleeveless jackets"
+                  },
+                  {
+                    "name": "athleisure dresses"
+                  },
+                  {
+                    "name": "hooded sweatshirts"
+                  },
+                  {
+                    "name": "outdoor leggings"
+                  },
+                  {
+                    "name": "sneakers"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "footwear",
+    "subcategories": [
+      {
+        "name": "women",
+        "subcategories": [
+          {
+            "name": "heels"
+          },
+          {
+            "name": "flats"
+          },
+          {
+            "name": "casual shoes"
+          },
+          {
+            "name": "flip flops"
+          },
+          {
+            "name": "sports shoes"
+          },
+          {
+            "name": "boots"
+          },
+          {
+            "name": "sandals"
+          },
+          {
+            "name": "formal shoes"
+          },
+          {
+            "name": "partywear"
+          },
+          {
+            "name": "crocs"
+          }
+        ]
+      },
+      {
+        "name": "men",
+        "subcategories": [
+          {
+            "name": "casual shoes"
+          },
+          {
+            "name": "sports shoes"
+          },
+          {
+            "name": "flip flops"
+          },
+          {
+            "name": "sandals"
+          },
+          {
+            "name": "formal shoes"
+          },
+          {
+            "name": "boots"
+          },
+          {
+            "name": "flats"
+          },
+          {
+            "name": "crocs"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "accessories",
+    "subcategories": [
+      {
+        "name": "bags & backpacks",
+        "subcategories": [
+          {
+            "name": "handbags"
+          },
+          {
+            "name": "backpacks"
+          },
+          {
+            "name": "laptop bags"
+          },
+          {
+            "name": "school bags"
+          },
+          {
+            "name": "travel/gym bags"
+          },
+          {
+            "name": "sling & clutch bags"
+          }
+        ]
+      },
+      {
+        "name": "wallets & belts",
+        "subcategories": [
+          {
+            "name": "wallets"
+          },
+          {
+            "name": "belts"
+          },
+          {
+            "name": "card holders"
+          },
+          {
+            "name": "coin pouches"
+          }
+        ]
+      },
+      {
+        "name": "watches",
+        "subcategories": [
+          {
+            "name": "analog"
+          },
+          {
+            "name": "digital"
+          },
+          {
+            "name": "smart watches"
+          },
+          {
+            "name": "sports watches"
+          }
+        ]
+      },
+      {
+        "name": "sunglasses & eyewear",
+        "subcategories": [
+          {
+            "name": "sunglasses"
+          },
+          {
+            "name": "blue light glasses"
+          },
+          {
+            "name": "reading glasses"
+          },
+          {
+            "name": "frames"
+          }
+        ]
+      },
+      {
+        "name": "jewellery",
+        "subcategories": [
+          {
+            "name": "earrings"
+          },
+          {
+            "name": "necklaces"
+          },
+          {
+            "name": "bangles & bracelets"
+          },
+          {
+            "name": "rings"
+          },
+          {
+            "name": "jewellery sets"
+          }
+        ]
+      },
+      {
+        "name": "hair accessories",
+        "subcategories": [
+          {
+            "name": "clips & pins"
+          },
+          {
+            "name": "hair bands & scrunchies"
+          },
+          {
+            "name": "headbands"
+          },
+          {
+            "name": "bridal accessories"
+          }
+        ]
+      },
+      {
+        "name": "caps & hats",
+        "subcategories": [
+          {
+            "name": "caps"
+          },
+          {
+            "name": "hats"
+          },
+          {
+            "name": "winter caps"
+          }
+        ]
+      },
+      {
+        "name": "scarves & stoles",
+        "subcategories": [
+          {
+            "name": "scarves"
+          },
+          {
+            "name": "stoles"
+          },
+          {
+            "name": "winter wear"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "beauty",
+    "subcategories": [
+      {
+        "name": "skincare",
+        "subcategories": [
+          {
+            "name": "face wash & cleanser"
+          },
+          {
+            "name": "moisturizers & creams"
+          },
+          {
+            "name": "sunscreen"
+          },
+          {
+            "name": "serums & masks"
+          }
+        ]
+      },
+      {
+        "name": "haircare",
+        "subcategories": [
+          {
+            "name": "shampoo & conditioner"
+          },
+          {
+            "name": "hair oil & serum"
+          },
+          {
+            "name": "hair color"
+          },
+          {
+            "name": "styling products"
+          }
+        ]
+      },
+      {
+        "name": "makeup",
+        "subcategories": [
+          {
+            "name": "face makeup"
+          },
+          {
+            "name": "eye makeup"
+          },
+          {
+            "name": "lip makeup"
+          },
+          {
+            "name": "makeup kits"
+          }
+        ]
+      },
+      {
+        "name": "personal care",
+        "subcategories": [
+          {
+            "name": "soaps & body wash"
+          },
+          {
+            "name": "deodorants"
+          },
+          {
+            "name": "oral care"
+          },
+          {
+            "name": "feminine hygiene"
+          }
+        ]
+      },
+      {
+        "name": "grooming",
+        "subcategories": [
+          {
+            "name": "shaving & trimming"
+          },
+          {
+            "name": "hair removal"
+          },
+          {
+            "name": "grooming kits"
+          },
+          {
+            "name": "beard & styling products"
+          }
+        ]
+      },
+      {
+        "name": "fragrances & deodorants",
+        "subcategories": [
+          {
+            "name": "perfumes"
+          },
+          {
+            "name": "body sprays"
+          },
+          {
+            "name": "roll-ons"
+          },
+          {
+            "name": "gift sets"
+          }
+        ]
+      },
+      {
+        "name": "beauty tools & appliances",
+        "subcategories": [
+          {
+            "name": "hair dryers"
+          },
+          {
+            "name": "straighteners & curlers"
+          },
+          {
+            "name": "trimmers & shavers"
+          },
+          {
+            "name": "face & skin tools"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "home&living",
+    "subcategories": [
+      {
+        "name": "kitchenware",
+        "subcategories": [
+          {
+            "name": "cookware"
+          },
+          {
+            "name": "utensils"
+          },
+          {
+            "name": "storage containers"
+          },
+          {
+            "name": "kitchen tools"
+          }
+        ]
+      },
+      {
+        "name": "dining essentials",
+        "subcategories": [
+          {
+            "name": "dinner sets"
+          },
+          {
+            "name": "plates & bowls"
+          },
+          {
+            "name": "glasses & mugs"
+          },
+          {
+            "name": "serving items"
+          }
+        ]
+      },
+      {
+        "name": "storage & organizers",
+        "subcategories": [
+          {
+            "name": "storage boxes"
+          },
+          {
+            "name": "wardrobe organizers"
+          },
+          {
+            "name": "kitchen organizers"
+          },
+          {
+            "name": "multipurpose racks"
+          }
+        ]
+      },
+      {
+        "name": "cleaning & utility",
+        "subcategories": [
+          {
+            "name": "cleaning tools"
+          },
+          {
+            "name": "cleaning supplies"
+          },
+          {
+            "name": "laundry items"
+          },
+          {
+            "name": "utility accessories"
+          }
+        ]
+      },
+      {
+        "name": "bedding & linen",
+        "subcategories": [
+          {
+            "name": "bedsheets"
+          },
+          {
+            "name": "blankets & quilts"
+          },
+          {
+            "name": "pillow covers"
+          },
+          {
+            "name": "towels"
+          }
+        ]
+      },
+      {
+        "name": "bathroom accessories",
+        "subcategories": [
+          {
+            "name": "soap dispensers & holders"
+          },
+          {
+            "name": "bathroom racks"
+          },
+          {
+            "name": "mirrors"
+          },
+          {
+            "name": "bath essentials"
+          }
+        ]
+      },
+      {
+        "name": "home improvement items",
+        "subcategories": [
+          {
+            "name": "tools & hardware"
+          },
+          {
+            "name": "electrical fittings"
+          },
+          {
+            "name": "plumbing essentials"
+          },
+          {
+            "name": "repair & maintenance"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "furniture"
+  },
+  {
+    "name": "gadgets",
+    "subcategories": [
+      {
+        "name": "mobile accessories",
+        "subcategories": [
+          {
+            "name": "mobile covers"
+          },
+          {
+            "name": "screen guards"
+          },
+          {
+            "name": "mobile holders"
+          },
+          {
+            "name": "cables"
+          }
+        ]
+      },
+      {
+        "name": "audio devices",
+        "subcategories": [
+          {
+            "name": "earphones"
+          },
+          {
+            "name": "headphones"
+          },
+          {
+            "name": "bluetooth speakers"
+          }
+        ]
+      },
+      {
+        "name": "smart devices",
+        "subcategories": [
+          {
+            "name": "smart watches"
+          },
+          {
+            "name": "fitness bands"
+          },
+          {
+            "name": "smart accessories"
+          }
+        ]
+      },
+      {
+        "name": "computer accessories",
+        "subcategories": [
+          {
+            "name": "keyboards & mouse"
+          },
+          {
+            "name": "laptop bags"
+          },
+          {
+            "name": "webcam & mic"
+          },
+          {
+            "name": "usb & storage devices"
+          }
+        ]
+      },
+      {
+        "name": "gaming accessories",
+        "subcategories": [
+          {
+            "name": "controllers"
+          },
+          {
+            "name": "gaming mouse & keyboard"
+          },
+          {
+            "name": "headsets"
+          },
+          {
+            "name": "gaming chairs"
+          }
+        ]
+      },
+      {
+        "name": "chargers & power banks",
+        "subcategories": [
+          {
+            "name": "mobile chargers"
+          },
+          {
+            "name": "fast chargers"
+          },
+          {
+            "name": "power banks"
+          },
+          {
+            "name": "multi-port chargers"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "electrical appliances",
+    "subcategories": [
+      {
+        "name": "large appliances",
+        "subcategories": [
+          {
+            "name": "refrigerator"
+          },
+          {
+            "name": "washing machine"
+          },
+          {
+            "name": "air conditioner"
+          },
+          {
+            "name": "television"
+          }
+        ]
+      },
+      {
+        "name": "small appliances",
+        "subcategories": [
+          {
+            "name": "mixer grinder"
+          },
+          {
+            "name": "toaster"
+          },
+          {
+            "name": "electric kettle"
+          },
+          {
+            "name": "juicer"
+          }
+        ]
+      },
+      {
+        "name": "kitchen appliances",
+        "subcategories": [
+          {
+            "name": "microwave oven"
+          },
+          {
+            "name": "induction cooktop"
+          },
+          {
+            "name": "gas stove"
+          },
+          {
+            "name": "rice cooker"
+          }
+        ]
+      },
+      {
+        "name": "heating & cooling appliances",
+        "subcategories": [
+          {
+            "name": "room heater"
+          },
+          {
+            "name": "geyser"
+          },
+          {
+            "name": "fans"
+          },
+          {
+            "name": "air coolers"
+          }
+        ]
+      },
+      {
+        "name": "personal appliances",
+        "subcategories": [
+          {
+            "name": "iron"
+          },
+          {
+            "name": "trimmer & shaver"
+          },
+          {
+            "name": "hair dryer"
+          },
+          {
+            "name": "straightener"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "hardware & sanitary"
+  },
+  {
+    "name": "pharmacy"
+  },
+  {
+    "name": "decoratives"
+  },
+  {
+    "name": "gifts"
+  },
+  {
+    "name": "sports"
+  },
+  {
+    "name": "books"
+  }
+]

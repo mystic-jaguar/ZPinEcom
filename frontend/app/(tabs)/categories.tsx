@@ -58,12 +58,10 @@ const CategoryGridSection = ({
     sectionTitle,
     items,
     onItemPress,
-    styleVariant = 'circle' // 'circle' | 'card'
 }: {
     sectionTitle?: string;
     items: CategoryNode[];
     onItemPress: (item: CategoryNode) => void;
-    styleVariant?: 'circle' | 'card';
 }) => {
     if (!items || items.length === 0) return null;
 
@@ -75,28 +73,35 @@ const CategoryGridSection = ({
                 </View>
             )}
             <View style={styles.gridContainer}>
-                {items.map((item, index) => (
-                    <TouchableOpacity
-                        key={item.id}
-                        style={styles.gridItemContainer}
-                        onPress={() => onItemPress(item)}
-                    >
-                        <View style={[
-                            styles.gridImageContainer,
-                            styleVariant === 'circle' ? styles.circleImage : styles.rectImage,
-                            styleVariant === 'circle' && styles.highlightedBorder
-                        ]}>
-                            {item.image ? (
-                                <Image source={item.image} style={styles.gridImage} />
-                            ) : (
-                                <View style={[styles.gridImage, { backgroundColor: '#eee', alignItems: 'center', justifyContent: 'center' }]}>
-                                    <Feather name="image" size={20} color="#ccc" />
-                                </View>
-                            )}
-                        </View>
-                        <Text style={styles.gridItemText} numberOfLines={1}>{item.name}</Text>
-                    </TouchableOpacity>
-                ))}
+                {items.map((item) => {
+                    // Always circle — rectangle only if item has an explicit image AND children
+                    const hasChildren = item.children && item.children.length > 0;
+                    const useRect = hasChildren && !!item.image;
+                    return (
+                        <TouchableOpacity
+                            key={item.id}
+                            style={styles.gridItemContainer}
+                            onPress={() => onItemPress(item)}
+                        >
+                            <View style={[
+                                styles.gridImageContainer,
+                                useRect ? styles.rectImage : styles.circleImage,
+                                !useRect && styles.highlightedBorder,
+                            ]}>
+                                {item.image ? (
+                                    <Image source={item.image} style={styles.gridImage} />
+                                ) : (
+                                    <View style={[styles.gridImage, { backgroundColor: '#f0f0f0', alignItems: 'center', justifyContent: 'center' }]}>
+                                        <Text style={{ fontSize: 13, fontWeight: '700', color: '#888', textAlign: 'center', paddingHorizontal: 4 }} numberOfLines={2}>
+                                            {item.name.charAt(0).toUpperCase()}
+                                        </Text>
+                                    </View>
+                                )}
+                            </View>
+                            <Text style={styles.gridItemText} numberOfLines={2}>{item.name}</Text>
+                        </TouchableOpacity>
+                    );
+                })}
             </View>
         </View>
     );
@@ -110,39 +115,27 @@ const MainCategoryView = ({
     category: CategoryNode;
     onLeafPress: (name: string, rootCategory: string) => void;
 }) => {
-    // We expect the structure: Men (Level 2) -> Casual (Level 3) -> T-Shirts (Level 4/Leaf)    
-    // OR: Men -> Casual -> T-Shirts -> Leaf. The grid should show the "Items" with images.
-
-    // Flatten logic: 
-    // If category has children, we iterate them.
-    // If Child has children, we render Child.Name as Section Logic, and Grandchildren as Grid.
-
-    // Example: Men (category) -> Casual (child) -> T-Shirts, Shirts (grandchild)
-
     const [expandedSection, setExpandedSection] = useState<string | null>(category.children?.[0]?.id || null);
 
-    // Check if we shoud render accordions (Level 2) or just a direct grid (Level 1)
-    // If any child has children, we assume it's a deep hierarchy (Fashion -> Men -> ...).
-    // If no child has children, it's a flat hierarchy (Accessories -> Bags, Wallets...).
+    // Deep hierarchy = any direct child has children of its own
     const isDeepHierarchy = category.children?.some(child => child.children && child.children.length > 0);
+
+    // Handle press on any node — if it has children, drill into them; otherwise navigate
+    const handleNodePress = (item: CategoryNode) => {
+        onLeafPress(item.name, category.name);
+    };
 
     return (
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.rightScroll}>
-            {/* Header */}
             <View style={styles.categoryHeader}>
                 <Text style={styles.categoryTitle}>{category.name}</Text>
-                {category.id === 'fashion' && (
-                    <Text style={styles.categorySubtitle}>Explore Collections</Text>
-                )}
             </View>
 
             {isDeepHierarchy ? (
-                // Deep Hierarchy: Render Level 2 Accordions (e.g. Men, Women)
                 category.children?.map((child) => {
                     const isExpanded = expandedSection === child.id;
                     return (
                         <View key={child.id} style={styles.level2Container}>
-                            {/* Level 2 Header (Collapsible) */}
                             <TouchableOpacity
                                 style={styles.level2Header}
                                 onPress={() => {
@@ -151,29 +144,41 @@ const MainCategoryView = ({
                                 }}
                             >
                                 <Text style={styles.level2Title}>{child.name}</Text>
-                                <Feather name={isExpanded ? "chevron-down" : "chevron-right"} size={20} color={Colors.light.tint} />
+                                <Feather name={isExpanded ? 'chevron-down' : 'chevron-right'} size={20} color={Colors.light.tint} />
                             </TouchableOpacity>
 
                             {isExpanded && child.children && (
                                 <View style={styles.level3Container}>
                                     {child.children.map((grandChild) => {
-                                        // Level 3 Node (e.g. Casual Essentials)
-                                        // Check if this node has children to display as grid
                                         if (grandChild.children && grandChild.children.length > 0) {
-                                            // Determined Style Variant based on name/context
-                                            const variant = grandChild.name.toLowerCase().includes('ethnic') ? 'card' : 'circle';
-
+                                            // Has children → show as a titled grid section
                                             return (
                                                 <CategoryGridSection
                                                     key={grandChild.id}
                                                     sectionTitle={grandChild.name}
-                                                    items={grandChild.children || []} // T-Shirts, Shirts...
-                                                    styleVariant={variant}
-                                                    onItemPress={(item) => onLeafPress(item.name, category.name)}
+                                                    items={grandChild.children}
+                                                    onItemPress={handleNodePress}
                                                 />
                                             );
                                         } else {
-                                            return null;
+                                            // Leaf node — render inline as a single circle item
+                                            return (
+                                                <TouchableOpacity
+                                                    key={grandChild.id}
+                                                    style={styles.leafRow}
+                                                    onPress={() => handleNodePress(grandChild)}
+                                                >
+                                                    <View style={[styles.circleImage, styles.highlightedBorder, styles.leafCircle]}>
+                                                        <View style={{ backgroundColor: '#f0f0f0', flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 35 }}>
+                                                            <Text style={{ fontSize: 12, fontWeight: '700', color: '#888' }}>
+                                                                {grandChild.name.charAt(0).toUpperCase()}
+                                                            </Text>
+                                                        </View>
+                                                    </View>
+                                                    <Text style={styles.leafRowText}>{grandChild.name}</Text>
+                                                    <Feather name="chevron-right" size={14} color="#ccc" />
+                                                </TouchableOpacity>
+                                            );
                                         }
                                     })}
                                 </View>
@@ -182,12 +187,10 @@ const MainCategoryView = ({
                     );
                 })
             ) : (
-                // Flat Hierarchy: Render direct Grid (e.g. Accessories -> Bags, Wallets)
+                // Flat hierarchy (Accessories, Beauty, Home) — direct grid
                 <CategoryGridSection
-                    // sectionTitle omitted to hide header
                     items={category.children || []}
-                    onItemPress={(item) => onLeafPress(item.name, category.name)}
-                    styleVariant="circle"
+                    onItemPress={handleNodePress}
                 />
             )}
 
@@ -221,34 +224,37 @@ export default function CategoriesScreen() {
         });
     };
 
-    // Helper to flatten for search (same as before)
-    const getAllLeaves = (nodes: CategoryNode[], parentName: string = ''): { name: string, category: string }[] => {
-        let leaves: { name: string, category: string }[] = [];
-        nodes.forEach(node => {
-            if (!node.children || node.children.length === 0) {
-                // If it has image, likely a visual leaf.
-                leaves.push({ name: node.name, category: parentName });
-            } else {
-                leaves = [...leaves, ...getAllLeaves(node.children, node.name)];
+    // Collect ALL nodes at every level for search (not just leaves)
+    const getAllNodes = (nodes: CategoryNode[], parentName: string = ''): { name: string; category: string }[] => {
+        let results: { name: string; category: string }[] = [];
+        nodes.forEach(n => {
+            results.push({ name: n.name, category: parentName });
+            if (n.children) {
+                results = [...results, ...getAllNodes(n.children, n.name)];
             }
         });
-        return leaves;
+        return results;
     };
 
     const searchResults = React.useMemo(() => {
         if (!searchQuery) return [];
-        let allLeaves: { name: string, category: string, root: string }[] = [];
+        const q = searchQuery.toLowerCase();
+        let all: { name: string; category: string; root: string }[] = [];
         CATEGORY_DATA.forEach(root => {
             if (root.children) {
-                const rootLeaves = getAllLeaves(root.children, root.name);
-                rootLeaves.forEach(l => allLeaves.push({ ...l, root: root.name }));
+                getAllNodes(root.children, root.name).forEach(l =>
+                    all.push({ ...l, root: root.name })
+                );
             }
         });
-
-        return allLeaves.filter(l =>
-            l.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            l.category.toLowerCase().includes(searchQuery.toLowerCase())
-        );
+        // Deduplicate by name+root, filter by query
+        const seen = new Set<string>();
+        return all.filter(l => {
+            const key = `${l.name}|${l.root}`;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return l.name.toLowerCase().includes(q) || l.category.toLowerCase().includes(q);
+        });
     }, [searchQuery]);
 
     return (
@@ -499,5 +505,27 @@ const styles = StyleSheet.create({
     searchItemName: { fontSize: 14, fontWeight: '600', color: '#333' },
     searchItemContext: { fontSize: 10, color: '#999', marginTop: 2 },
     noResults: { alignItems: 'center', marginTop: 50 },
-    noResultsText: { color: '#999' }
+    noResultsText: { color: '#999' },
+    // Leaf row (for grandchildren without children)
+    leafRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 10,
+        paddingHorizontal: 5,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f5f5f5',
+    },
+    leafCircle: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        marginRight: 12,
+        overflow: 'hidden',
+    },
+    leafRowText: {
+        flex: 1,
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#333',
+    },
 });

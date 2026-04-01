@@ -16,6 +16,7 @@ const app = express();
 const PORT = Number(process.env.PORT) || 5000;
 
 // ─── Middleware ──────────────────────────────────────────────────────────────
+app.set('trust proxy', 1); // trust Render's reverse proxy for accurate IP rate limiting
 app.use(cors({ origin: '*', credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
