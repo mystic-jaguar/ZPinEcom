@@ -5,6 +5,7 @@ import rateLimit from 'express-rate-limit';
 import jwt from 'jsonwebtoken';
 import { pool } from '../db';
 import { generateId } from '../utils/id';
+import { logger } from '../utils/logger';
 
 const router = Router();
 
@@ -132,6 +133,7 @@ router.post('/signup', signupLimiter, async (req: Request, res: Response): Promi
     );
 
     res.status(201).json({ success: true, message: 'Account created successfully', accessToken, refreshToken, user });
+    logger.authSuccess(user.id, req.ip || '', 'signup');
   } catch (err: any) {
     console.error('Signup error:', err.code);
     if (err.code === '23505') {
@@ -166,6 +168,7 @@ router.post('/login', loginLimiter, async (req: Request, res: Response): Promise
     // Constant-time response to prevent user enumeration
     if (result.rows.length === 0) {
       await bcrypt.hash('dummy_prevent_timing_attack', 12); // prevent timing attack
+      logger.authFailure(req.ip || '', 'login', 'user_not_found', email.toLowerCase());
       res.status(401).json({ success: false, message: 'Invalid email or password' });
       return;
     }
@@ -173,17 +176,20 @@ router.post('/login', loginLimiter, async (req: Request, res: Response): Promise
     const row = result.rows[0];
 
     if (!row.is_active) {
+      logger.authFailure(req.ip || '', 'login', 'account_deactivated', row.id);
       res.status(403).json({ success: false, message: 'Account is deactivated' });
       return;
     }
 
     if (!row.password_hash) {
+      logger.authFailure(req.ip || '', 'login', 'social_login_account', row.id);
       res.status(401).json({ success: false, message: 'This account uses social login. Please sign in with Google.' });
       return;
     }
 
     const passwordMatch = await bcrypt.compare(password, row.password_hash);
     if (!passwordMatch) {
+      logger.authFailure(req.ip || '', 'login', 'wrong_password', row.id);
       res.status(401).json({ success: false, message: 'Invalid email or password' });
       return;
     }
@@ -199,6 +205,7 @@ router.post('/login', loginLimiter, async (req: Request, res: Response): Promise
     );
 
     res.json({ success: true, message: 'Login successful', accessToken, refreshToken, user });
+    logger.authSuccess(user.id, req.ip || '', 'login');
   } catch (err) {
     console.error('Login error');
     res.status(500).json({ success: false, message: 'Server error during login' });
@@ -400,6 +407,7 @@ router.post('/forgetPassword/resetPassword', async (req: Request, res: Response)
     await pool.query(`DELETE FROM ${REFRESH_TOKENS} WHERE user_id = $1`, [userId]);
 
     res.json({ success: true, message: 'Password reset successfully. Please log in again.' });
+    logger.security('auth.password_reset', { userId, ip: req.ip || '' });
   } catch (err) {
     console.error('resetPassword error');
     res.status(400).json({ success: false, message: 'Invalid or expired reset token' });

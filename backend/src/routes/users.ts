@@ -1,6 +1,7 @@
 import { Response, Router } from 'express';
 import { pool } from '../db';
 import { authenticate, AuthRequest } from '../middleware/auth';
+import { addressLimiter } from '../middleware/rateLimits';
 import { generateId } from '../utils/id';
 
 const router = Router();
@@ -195,7 +196,7 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response): Promis
 
 // ── POST /api/v1/users/shipping-address ──────────────────────────────────────
 
-router.post('/shipping-address', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+router.post('/shipping-address', authenticate, addressLimiter, async (req: AuthRequest, res: Response): Promise<void> => {
   const { name, phone, addressLine1, addressLine2, city, state, pincode, country, landmark, label, isDefault } = req.body;
 
   try {

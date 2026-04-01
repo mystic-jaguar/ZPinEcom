@@ -1,6 +1,7 @@
 import { Response, Router } from 'express';
 import { pool } from '../db';
 import { authenticate, AuthRequest } from '../middleware/auth';
+import { orderCreateLimiter } from '../middleware/rateLimits';
 import { generateId } from '../utils/id';
 
 const router = Router();
@@ -114,7 +115,7 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response): Promis
 });
 
 // POST /api/v1/orders
-router.post('/', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res: Response): Promise<void> => {
   const { shippingAddressId, paymentMethod, notes } = req.body;
 
   if (!shippingAddressId || !paymentMethod) {

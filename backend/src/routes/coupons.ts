@@ -1,6 +1,7 @@
 import { Request, Response, Router } from 'express';
 import { pool } from '../db';
 import { authenticate, AuthRequest } from '../middleware/auth';
+import { couponLimiter } from '../middleware/rateLimits';
 
 const router = Router();
 
@@ -48,7 +49,7 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
 });
 
 // POST /api/v1/coupons/validate — validate a coupon code against an order total (auth required)
-router.post('/validate', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+router.post('/validate', authenticate, couponLimiter, async (req: AuthRequest, res: Response): Promise<void> => {
   const { code, orderTotal } = req.body;
 
   if (!code || orderTotal === undefined) {

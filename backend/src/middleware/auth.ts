@@ -1,5 +1,6 @@
 import { NextFunction, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
+import { logger } from '../utils/logger';
 
 export interface AuthRequest extends Request {
   userId?: string;
@@ -7,7 +8,6 @@ export interface AuthRequest extends Request {
 }
 
 export function authenticate(req: AuthRequest, res: Response, next: NextFunction): void {
-  // Accept token from Authorization header, x-auth-token, or Cookie
   const authHeader = req.headers['authorization'];
   const headerToken = req.headers['x-auth-token'] as string;
   const cookieToken = req.cookies?.token;
@@ -32,7 +32,9 @@ export function authenticate(req: AuthRequest, res: Response, next: NextFunction
     req.userId = decoded.userId;
     req.userRole = decoded.userRole;
     next();
-  } catch {
+  } catch (err: any) {
+    const reason = err?.name === 'TokenExpiredError' ? 'token_expired' : 'token_invalid';
+    logger.authFailure(req.ip || '', 'token_verify', reason);
     res.status(401).json({ success: false, message: 'Invalid or expired token' });
   }
 }

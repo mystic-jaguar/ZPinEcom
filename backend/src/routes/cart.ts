@@ -1,7 +1,8 @@
 import { Response, Router } from 'express';
-import { generateId } from '../utils/id';
 import { pool } from '../db';
 import { authenticate, AuthRequest } from '../middleware/auth';
+import { cartWriteLimiter } from '../middleware/rateLimits';
+import { generateId } from '../utils/id';
 
 const router = Router();
 const T = 'cart_items';
@@ -65,7 +66,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response): Promise<v
 });
 
 // POST /api/v1/cart
-router.post('/', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+router.post('/', authenticate, cartWriteLimiter, async (req: AuthRequest, res: Response): Promise<void> => {
   const { productId, quantity = 1 } = req.body;
   if (!productId) {
     res.status(400).json({ success: false, message: 'productId is required' });

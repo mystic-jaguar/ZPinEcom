@@ -1,6 +1,7 @@
 import { Request, Response, Router } from 'express';
 import { pool } from '../db';
 import { authenticate, AuthRequest } from '../middleware/auth';
+import { productListLimiter, reviewLimiter } from '../middleware/rateLimits';
 import { generateId } from '../utils/id';
 
 const router = Router();
@@ -110,7 +111,7 @@ router.get('/fresh-categories', async (req: Request, res: Response): Promise<voi
 });
 
 // GET /api/v1/products/category/:categoryName — filter by category name
-router.get('/category/:categoryName', async (req: Request, res: Response): Promise<void> => {
+router.get('/category/:categoryName', productListLimiter, async (req: Request, res: Response): Promise<void> => {
   const page = Number(req.query.page) || 1;
   const limit = Number(req.query.limit) || 50;
   const offset = (page - 1) * limit;
@@ -165,7 +166,7 @@ router.get('/category/:categoryName', async (req: Request, res: Response): Promi
 });
 
 // GET /api/v1/products — all products (paginated)
-router.get('/', async (req: Request, res: Response): Promise<void> => {
+router.get('/', productListLimiter, async (req: Request, res: Response): Promise<void> => {
   const page = Number(req.query.page) || 1;
   const limit = Number(req.query.limit) || 20;
   const offset = (page - 1) * limit;
@@ -291,7 +292,7 @@ router.get('/:id/reviews', async (req: Request, res: Response): Promise<void> =>
 });
 
 // POST /api/v1/products/:id/reviews
-router.post('/:id/reviews', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+router.post('/:id/reviews', authenticate, reviewLimiter, async (req: AuthRequest, res: Response): Promise<void> => {
   const { rating, comment } = req.body;
   if (!rating || !comment) {
     res.status(400).json({ success: false, message: 'Rating and comment are required' });
