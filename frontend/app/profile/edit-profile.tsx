@@ -1,9 +1,10 @@
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
+import AvatarInitials from '../../components/common/AvatarInitials';
 import Input from '../../components/common/Input';
 import { useUser } from '../../context/UserContext';
 import { userService } from '../../services/user';
@@ -123,21 +124,14 @@ export default function EditProfileScreen() {
 
             <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
-                {/* Profile Image Section */}
+                {/* Profile Avatar */}
                 <View style={styles.imageSection}>
-                    <View style={styles.imageContainer}>
-                        <Image
-                            source={typeof user.profileImage === 'string'
-                                ? { uri: user.profileImage }
-                                : user.profileImage || require('../../assets/images/profile_icon.jpg')
-                            }
-                            style={styles.image}
-                        />
-                        <TouchableOpacity style={styles.cameraIcon}>
-                            <Feather name="camera" size={16} color="#000" />
-                        </TouchableOpacity>
-                    </View>
-                    <Text style={styles.changePhotoText}>CHANGE PHOTO</Text>
+                    <AvatarInitials
+                        name={form.name || user.name || 'User'}
+                        size={100}
+                        borderWidth={3}
+                        borderColor="#F3F4F6"
+                    />
                 </View>
 
                 {/* Personal Details */}

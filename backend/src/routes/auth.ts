@@ -15,28 +15,30 @@ const AUTH_TOKENS = 'auth_tokens';
 
 // ─── Rate Limiters ────────────────────────────────────────────────────────────
 
-// 10 login attempts per 15 minutes per IP
+const isProd = process.env.NODE_ENV === 'production';
+
+// 10 login attempts per 15 minutes per IP (dev: relaxed)
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10,
+  max: isProd ? 10 : 1000,
   message: { success: false, message: 'Too many login attempts. Please try again in 15 minutes.' },
   standardHeaders: true,
   legacyHeaders: false,
 });
 
-// 5 OTP requests per 15 minutes per IP
+// 5 OTP requests per 15 minutes per IP (dev: relaxed)
 const otpLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 5,
+  max: isProd ? 5 : 1000,
   message: { success: false, message: 'Too many OTP requests. Please try again in 15 minutes.' },
   standardHeaders: true,
   legacyHeaders: false,
 });
 
-// 3 signup attempts per hour per IP
+// 3 signup attempts per hour per IP (dev: relaxed)
 const signupLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
-  max: 3,
+  max: isProd ? 3 : 1000,
   message: { success: false, message: 'Too many signup attempts. Please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,

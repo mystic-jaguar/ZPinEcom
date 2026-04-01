@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
 import Header from '../../components/Header';
 import SearchBar from '../../components/SearchBar';
+import { useSearch } from '../../context/SearchContext';
 import { productService } from '../../services/product';
 
 const { width } = Dimensions.get('window');
@@ -48,6 +49,7 @@ const BIG_DISCOUNTS = [
 
 export default function HomeScreen() {
     const router = useRouter();
+    const { recentSearches } = useSearch();
     const [freshArrivals, setFreshArrivals] = useState<any[]>(FRESH_ARRIVALS);
     const [recommended, setRecommended] = useState<any[]>(RECOMMENDED);
     const [nearby, setNearby] = useState<any[]>(NEARBY_FALLBACK);
@@ -135,9 +137,10 @@ export default function HomeScreen() {
                 }));
             }
 
-            const recResponse = await productService.getProducts({ limit: 5, page: 2 });
-            if (recResponse.products?.length > 0) {
-                setRecommended(recResponse.products.map(p => ({
+            // Fetch Recommended — based on recent searches
+            const recProducts = await productService.getRecommended(recentSearches, 8);
+            if (recProducts.length > 0) {
+                setRecommended(recProducts.map(p => ({
                     id: p.productId,
                     name: p.productName,
                     desc: `₹${p.price}`,
@@ -436,8 +439,8 @@ const styles = StyleSheet.create({
     viewAllText: { color: '#FBBF24', fontSize: 12, fontWeight: '600' },
     horizontalList: { paddingLeft: 20, paddingRight: 10, marginBottom: 30 },
     recommendCard: { width: 140, marginRight: 15 },
-    recommendImageContainer: { height: 140, backgroundColor: '#f9f9f9', borderRadius: 15, marginBottom: 10, justifyContent: 'center', alignItems: 'center', padding: 10, shadowColor: '#AAA', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 5, elevation: 5 },
-    recommendImage: { width: '90%', height: '90%', resizeMode: 'contain' },
+    recommendImageContainer: { height: 140, backgroundColor: '#f9f9f9', borderRadius: 15, marginBottom: 10, overflow: 'hidden', shadowColor: '#AAA', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 5, elevation: 5 },
+    recommendImage: { width: '100%', height: '100%', resizeMode: 'cover' },
     recommendName: { fontWeight: '700', color: '#333', fontSize: 14, textAlign: 'center' },
     recommendDesc: { color: '#888', fontSize: 10, textAlign: 'center' },
     freshCard: { width: 160, height: 220, borderRadius: 15, marginRight: 15, overflow: 'hidden' },

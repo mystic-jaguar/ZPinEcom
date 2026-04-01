@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Header from '../../components/Header';
 import SearchBar from '../../components/SearchBar';
 import { CATEGORY_DATA, CategoryNode } from '../../constants/categories';
+import { useSearch } from '../../context/SearchContext';
 
 if (Platform.OS === 'android') {
     if (UIManager.setLayoutAnimationEnabledExperimental) {
@@ -214,7 +215,10 @@ export default function CategoriesScreen() {
 
     const selectedCategory = CATEGORY_DATA.find(c => c.id === selectedCategoryId) || CATEGORY_DATA[0];
 
+    const { addSearch } = useSearch();
+
     const handleLeafPress = (itemName: string, rootCategory: string) => {
+        addSearch(itemName); // track category navigation as a search
         router.push({
             pathname: '/product-listing',
             params: {

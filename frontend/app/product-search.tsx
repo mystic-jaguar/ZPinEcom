@@ -5,11 +5,13 @@ import { FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react
 import { SafeAreaView } from 'react-native-safe-area-context';
 import SearchBar from '../components/SearchBar';
 import SkeletonCard from '../components/product/SkeletonCard';
+import { useSearch } from '../context/SearchContext';
 import { productService } from '../services/product';
 import { ProductObject } from '../types/types';
 
 export default function ProductSearchScreen() {
     const router = useRouter();
+    const { addSearch } = useSearch();
     const [searchQuery, setSearchQuery] = useState('');
     const [allProducts, setAllProducts] = useState<ProductObject[]>([]);
     const [loading, setLoading] = useState(true);
@@ -28,10 +30,24 @@ export default function ProductSearchScreen() {
         )
         : [];
 
+    // Save search when user stops typing and has results
+    const handleSearchChange = (text: string) => {
+        setSearchQuery(text);
+        if (text.trim().length >= 2) {
+            addSearch(text.trim());
+        }
+    };
+
+    const handleProductPress = (item: ProductObject) => {
+        // Save the product name and category as search terms
+        if (item.deepestCategoryName) addSearch(item.deepestCategoryName);
+        router.push(`/product/${item.productId}`);
+    };
+
     const renderProductItem = ({ item }: { item: ProductObject }) => (
         <TouchableOpacity
             style={styles.productCard}
-            onPress={() => router.push(`/product/${item.productId}`)}
+            onPress={() => handleProductPress(item)}
         >
             <View style={styles.imageContainer}>
                 {item.images?.[0] ? (
@@ -72,7 +88,7 @@ export default function ProductSearchScreen() {
                     <SearchBar
                         placeholder="Search for products..."
                         value={searchQuery}
-                        onChangeText={setSearchQuery}
+                        onChangeText={handleSearchChange}
                         autoFocus
                     />
                 </View>

@@ -5,72 +5,75 @@ const json429 = (msg: string) => ({
   message: msg,
 });
 
+const isProd = process.env.NODE_ENV === 'production';
+
 // ── Global API limiter — applied to every route ───────────────────────────────
-// 300 requests per 15 minutes per IP — blocks scrapers and bots
+// Production: 300 req/15min — blocks scrapers and bots
+// Development: 2000 req/15min — allows normal dev/testing without hitting limits
 export const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 300,
+  max: isProd ? 300 : 2000,
   message: json429('Too many requests. Please slow down.'),
   standardHeaders: true,
   legacyHeaders: false,
-  skip: (req) => req.path === '/health', // never limit health checks
+  skip: (req) => req.path === '/health',
 });
 
 // ── Product listing — public, high-value scraping target ─────────────────────
-// 60 requests per minute per IP
+// Production: 60/min | Development: unlimited
 export const productListLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 60,
+  max: isProd ? 60 : 10000,
   message: json429('Too many product requests. Please try again shortly.'),
   standardHeaders: true,
   legacyHeaders: false,
 });
 
 // ── Order creation — prevent order spam ──────────────────────────────────────
-// 10 orders per hour per IP
+// Production: 10/hour | Development: unlimited
 export const orderCreateLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
-  max: 10,
+  max: isProd ? 10 : 10000,
   message: json429('Too many orders placed. Please try again later.'),
   standardHeaders: true,
   legacyHeaders: false,
 });
 
 // ── Cart writes — prevent cart flooding ──────────────────────────────────────
-// 60 cart mutations per 5 minutes per IP
+// Production: 60/5min | Development: unlimited
 export const cartWriteLimiter = rateLimit({
   windowMs: 5 * 60 * 1000,
-  max: 60,
+  max: isProd ? 60 : 10000,
   message: json429('Too many cart requests. Please slow down.'),
   standardHeaders: true,
   legacyHeaders: false,
 });
 
 // ── Review submission — prevent review spam ───────────────────────────────────
-// 5 reviews per hour per IP
+// Production: 5/hour | Development: unlimited
 export const reviewLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
-  max: 5,
+  max: isProd ? 5 : 10000,
   message: json429('Too many reviews submitted. Please try again later.'),
   standardHeaders: true,
   legacyHeaders: false,
 });
 
 // ── Coupon validation — prevent brute-force coupon guessing ──────────────────
-// 20 validations per 15 minutes per IP
+// Production: 20/15min | Development: unlimited
 export const couponLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 20,
+  max: isProd ? 20 : 10000,
   message: json429('Too many coupon attempts. Please try again later.'),
   standardHeaders: true,
   legacyHeaders: false,
 });
 
 // ── Address creation — prevent address flooding ───────────────────────────────
-// 10 addresses per hour per IP
+// Production: 10/hour | Development: unlimited
 export const addressLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
-  max: 10,
+  max: isProd ? 10 : 10000,
   message: json429('Too many address requests. Please try again later.'),
   standardHeaders: true,
   legacyHeaders: false,

@@ -139,6 +139,50 @@ export const productService = {
     },
 
     /**
+     * Get recommended products based on recent search terms.
+     * Fetches products matching any of the search keywords.
+     */
+    async getRecommended(searchTerms: string[], limit = 10): Promise<ProductObject[]> {
+        if (!searchTerms.length) {
+            // No search history — fall back to latest products
+            try {
+                const r = await apiClient.get('products', { params: { limit } });
+                return (r.data.products || []).map((p: any) => ({
+                    ...p,
+                    productId: p.productId || p.id,
+                    price: Number(p.price) || 0,
+                }));
+            } catch { return []; }
+        }
+
+        try {
+            // Fetch products for each unique term in parallel, deduplicate by productId
+            const seen = new Set<string>();
+            const results: ProductObject[] = [];
+
+            await Promise.all(
+                searchTerms.slice(0, 5).map(async (term) => {
+                    try {
+                        const r = await apiClient.get(`products/category/${encodeURIComponent(term)}`, { params: { limit: 6 } });
+                        const items: any[] = r.data.products || [];
+                        items.forEach(p => {
+                            const id = p.productId || p.id;
+                            if (!seen.has(id)) {
+                                seen.add(id);
+                                results.push({ ...p, productId: id, price: Number(p.price) || 0 });
+                            }
+                        });
+                    } catch { /* term may not match any category */ }
+                })
+            );
+
+            return results.slice(0, limit);
+        } catch (error) {
+            throw new Error(handleApiError(error));
+        }
+    },
+
+    /**
      * Get top 5 categories with the most recently added product (for Fresh Arrivals)
      */
     async getFreshCategories(): Promise<{ name: string; categoryPath: any; imageUrl: string | null; latestAt: string }[]> {

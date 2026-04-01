@@ -1,15 +1,18 @@
-import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
-import { Dimensions, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import ProfileOption from '../../components/profile/ProfileOption';
-
 import ActionModal from '@/components/common/ActionModal';
 import { useCart } from '@/context/CartContext';
 import { useWishlist } from '@/context/WishlistContext';
 import { authService } from '@/services/auth';
+import { Feather } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import { Dimensions, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import AvatarInitials from '../../components/common/AvatarInitials';
+import ProfileOption from '../../components/profile/ProfileOption';
+import { useSearch } from '../../context/SearchContext';
 import { useUser } from '../../context/UserContext';
+import { productService } from '../../services/product';
+import { ProductObject } from '../../types/types';
 
 const { width } = Dimensions.get('window');
 
@@ -26,8 +29,16 @@ export default function ProfileScreen() {
     const { user, resetUser } = useUser();
     const { clearCart } = useCart();
     const { clearWishlist } = useWishlist();
+    const { recentSearches } = useSearch();
     const router = useRouter();
     const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+    const [recommended, setRecommended] = useState<ProductObject[]>([]);
+
+    useEffect(() => {
+        productService.getRecommended(recentSearches, 8)
+            .then(setRecommended)
+            .catch(() => {});
+    }, [recentSearches.join(',')]);
 
     const handleLogout = async () => {
         try {
@@ -78,13 +89,11 @@ export default function ProfileScreen() {
 
                     <View style={styles.profileInfo}>
                         <View style={styles.avatarContainer}>
-                            <Image
-                                source={
-                                    typeof user.profileImage === 'string'
-                                        ? { uri: user.profileImage }
-                                        : user.profileImage
-                                }
-                                style={styles.avatar}
+                            <AvatarInitials
+                                name={user.name || 'User'}
+                                size={80}
+                                borderWidth={3}
+                                borderColor="#fff"
                             />
                             <View style={styles.onlineBadge} />
                         </View>
@@ -119,15 +128,27 @@ export default function ProfileScreen() {
                     </View>
 
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.recommendedList}>
-                        {RECOMMENDED.map((item) => (
-                            <TouchableOpacity key={item.id} style={styles.recommendCard}>
+                        {recommended.length > 0 ? recommended.map((item) => (
+                            <TouchableOpacity
+                                key={item.productId}
+                                style={styles.recommendCard}
+                                onPress={() => router.push(`/product/${item.productId}`)}
+                            >
                                 <View style={styles.recommendImageContainer}>
-                                    <Image source={{ uri: item.image }} style={styles.recommendImage} />
+                                    {item.images?.[0] ? (
+                                        <Image source={{ uri: item.images[0] as string }} style={styles.recommendImage} />
+                                    ) : (
+                                        <View style={[styles.recommendImage, { backgroundColor: '#f0f0f0' }]} />
+                                    )}
                                 </View>
-                                <Text style={styles.recommendName}>{item.name}</Text>
-                                <Text style={styles.recommendDesc}>{item.desc}</Text>
+                                <Text style={styles.recommendName} numberOfLines={1}>{item.productName}</Text>
+                                <Text style={styles.recommendDesc}>₹{item.price}</Text>
                             </TouchableOpacity>
-                        ))}
+                        )) : (
+                            <View style={{ paddingVertical: 20, paddingHorizontal: 10 }}>
+                                <Text style={{ color: '#9CA3AF', fontSize: 13 }}>Search for products to see recommendations</Text>
+                            </View>
+                        )}
                     </ScrollView>
 
                     {/* Account Settings */}
@@ -345,22 +366,17 @@ const styles = StyleSheet.create({
         backgroundColor: '#f9f9f9',
         borderRadius: 15,
         marginBottom: 10,
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: 10,
+        overflow: 'hidden',
         shadowColor: "#AAA",
-        shadowOffset: {
-            width: 0,
-            height: 4,
-        },
+        shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.1,
         shadowRadius: 5,
         elevation: 5,
     },
     recommendImage: {
-        width: '90%',
-        height: '90%',
-        resizeMode: 'contain'
+        width: '100%',
+        height: '100%',
+        resizeMode: 'cover',
     },
     recommendName: {
         fontWeight: '700',
