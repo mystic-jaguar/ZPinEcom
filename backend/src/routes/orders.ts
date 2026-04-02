@@ -128,7 +128,7 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
     await client.query('BEGIN');
 
     const cartResult = await client.query(
-      `SELECT ci.*, p.price, p.product_name,
+      `SELECT ci.*, p.price, p.product_name, p.user_id as seller_id,
         (SELECT image_url FROM product_images WHERE product_id = p.id LIMIT 1) as image
        FROM ${CART} ci
        JOIN products p ON p.id = ci.product_id
@@ -168,15 +168,24 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
     const orderId = generateId();
     const orderNumber = `ZP-${orderId}`;
 
+    // Determine primary seller (seller with most items by value)
+    const sellerTotals: Record<string, number> = {};
+    cartResult.rows.forEach((item: any) => {
+      if (item.seller_id) {
+        sellerTotals[item.seller_id] = (sellerTotals[item.seller_id] || 0) + Number(item.price) * item.quantity;
+      }
+    });
+    const primarySellerId = Object.keys(sellerTotals).sort((a, b) => sellerTotals[b] - sellerTotals[a])[0] || null;
+
     await client.query(
       `INSERT INTO ${ORDERS}
-        (id, order_number, user_id, status, payment_status, total_amount, shipping_amount,
+        (id, order_number, user_id, seller_id, status, payment_status, total_amount, shipping_amount,
          tax_amount, final_amount, shipping_address, payment_method, notes, estimated_delivery, created_at, updated_at)
-       VALUES ($1,$2,$3,'pending','pending',$4,$5,$6,$7,$8,$9,$10,
+       VALUES ($1,$2,$3,$4,'pending','pending',$5,$6,$7,$8,$9,$10,$11,
          (NOW() AT TIME ZONE 'Asia/Kolkata') + INTERVAL '5 days',
          (NOW() AT TIME ZONE 'Asia/Kolkata'),
          (NOW() AT TIME ZONE 'Asia/Kolkata'))`,
-      [orderId, orderNumber, req.userId, totalAmount, shippingAmount, taxAmount, finalAmount,
+      [orderId, orderNumber, req.userId, primarySellerId, totalAmount, shippingAmount, taxAmount, finalAmount,
        JSON.stringify(shippingAddress), paymentMethod, notes || '']
     );
 
@@ -189,6 +198,26 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
     }
 
     await client.query(`DELETE FROM ${CART} WHERE user_id = $1`, [req.userId]);
+
+    // Notify each unique seller about the new order
+    const uniqueSellers = [...new Set(cartResult.rows.map((i: any) => i.seller_id).filter(Boolean))];
+    for (const sellerId of uniqueSellers) {
+      const sellerItems = cartResult.rows.filter((i: any) => i.seller_id === sellerId);
+      const sellerTotal = sellerItems.reduce((s: number, i: any) => s + Number(i.price) * i.quantity, 0);
+      const itemNames = sellerItems.map((i: any) => i.product_name).join(', ');
+
+      await client.query(
+        `INSERT INTO notifications (id, user_id, title, message, type, data, is_read, created_at)
+         VALUES (uuid_generate_v4(), $1, $2, $3, 'new_order', $4, false, NOW())`,
+        [
+          sellerId,
+          `New Order: ${orderNumber}`,
+          `You have a new order for ${sellerItems.length} item(s): ${itemNames}. Total: ₹${sellerTotal.toFixed(2)}`,
+          JSON.stringify({ orderId, orderNumber, itemCount: sellerItems.length, total: sellerTotal }),
+        ]
+      );
+    }
+
     await client.query('COMMIT');
 
     res.status(201).json({
@@ -264,6 +293,8 @@ router.post('/:id/return', authenticate, async (req: AuthRequest, res: Response)
 
 // PATCH /api/v1/orders/:id/cancel
 router.patch('/:id/cancel', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+  const { refundMethod } = req.body; // 'original' | 'wallet'
+
   try {
     const result = await pool.query(
       `UPDATE ${ORDERS}
@@ -278,12 +309,29 @@ router.patch('/:id/cancel', authenticate, async (req: AuthRequest, res: Response
       return;
     }
 
+    const refundAmount = Number(result.rows[0].final_amount);
+
+    // Credit wallet if user chose wallet refund
+    if (refundMethod === 'wallet' && refundAmount > 0) {
+      const wallet = await getOrCreateWallet(req.userId!);
+      await pool.query(
+        `UPDATE wallets SET balance = balance + $1, updated_at = NOW() WHERE id = $2`,
+        [refundAmount, wallet.id]
+      );
+      await pool.query(
+        `INSERT INTO wallet_transactions (wallet_id, user_id, type, amount, description, reference_id)
+         VALUES ($1,$2,'credit',$3,$4,$5)`,
+        [wallet.id, req.userId, refundAmount, `Refund for cancelled order`, req.params.id]
+      );
+    }
+
     res.json({
       success: true,
       data: {
         message: 'Order cancelled',
-        refundAmount: Number(result.rows[0].final_amount),
-        refundStatus: 'initiated',
+        refundAmount,
+        refundStatus: refundMethod === 'wallet' ? 'credited_to_wallet' : 'initiated',
+        refundMethod: refundMethod || 'original',
       },
     });
   } catch (err) {

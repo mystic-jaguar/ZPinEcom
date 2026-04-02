@@ -3,15 +3,23 @@ import { Colors } from '@/constants/Colors';
 import { PaymentCard, PaymentUPI, usePayment } from '@/context/PaymentContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { WalletData, walletService } from '../../services/wallet';
 
 export default function ProfilePaymentMethodsScreen() {
     const router = useRouter();
     const { cards, upis, deleteCard, deleteUPI } = usePayment();
+    const [wallet, setWallet] = useState<WalletData | null>(null);
 
     const [modalVisible, setModalVisible] = useState(false);
     const [itemToDelete, setItemToDelete] = useState<{ type: 'Card' | 'UPI', id: string } | null>(null);
+
+    useEffect(() => {
+        walletService.getWallet()
+            .then(setWallet)
+            .catch(() => {}); // fail silently — wallet section just won't show balance
+    }, []);
 
     const confirmDelete = (type: 'Card' | 'UPI', id: string) => {
         setItemToDelete({ type, id });
@@ -121,8 +129,51 @@ export default function ProfilePaymentMethodsScreen() {
 
             <ScrollView style={styles.scrollContainer} contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={false}>
 
-                {/* Saved Cards */}
+                {/* ZPIN Wallet */}
                 <View style={styles.sectionHeaderRow}>
+                    <Text style={styles.sectionTitle}>ZPIN Wallet</Text>
+                </View>
+                <View style={styles.walletCard}>
+                    <View style={styles.walletLeft}>
+                        <View style={styles.walletIconBg}>
+                            <Ionicons name="wallet" size={28} color="#FBBF24" />
+                        </View>
+                        <View>
+                            <Text style={styles.walletLabel}>ZPIN Wallet</Text>
+                            <Text style={styles.walletSub}>Instant refunds & payments</Text>
+                        </View>
+                    </View>
+                    <View style={styles.walletRight}>
+                        <Text style={styles.walletBalanceLabel}>BALANCE</Text>
+                        <Text style={styles.walletBalance}>
+                            ₹{wallet ? wallet.balance.toFixed(2) : '0.00'}
+                        </Text>
+                    </View>
+                </View>
+
+                {/* Recent wallet transactions */}
+                {wallet && wallet.transactions.length > 0 && (
+                    <View style={styles.txnContainer}>
+                        <Text style={styles.txnTitle}>Recent Transactions</Text>
+                        {wallet.transactions.slice(0, 5).map(t => (
+                            <View key={t.id} style={styles.txnRow}>
+                                <View style={[styles.txnDot, { backgroundColor: t.type === 'credit' ? '#22C55E' : '#EF4444' }]} />
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.txnDesc} numberOfLines={1}>{t.description}</Text>
+                                    <Text style={styles.txnDate}>
+                                        {new Date(t.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                    </Text>
+                                </View>
+                                <Text style={[styles.txnAmount, { color: t.type === 'credit' ? '#22C55E' : '#EF4444' }]}>
+                                    {t.type === 'credit' ? '+' : '-'}₹{t.amount.toFixed(2)}
+                                </Text>
+                            </View>
+                        ))}
+                    </View>
+                )}
+
+                {/* Saved Cards */}
+                <View style={[styles.sectionHeaderRow, { marginTop: 20 }]}>
                     <Text style={styles.sectionTitle}>Saved Cards</Text>
                     <Text style={styles.cardCount}>{cards.length} CARDS</Text>
                 </View>
@@ -393,5 +444,96 @@ const styles = StyleSheet.create({
         color: '#000',
         marginLeft: 10,
         letterSpacing: 0.5,
+    },
+
+    // Wallet styles
+    walletCard: {
+        backgroundColor: '#1a1a1a',
+        borderRadius: 20,
+        padding: 20,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    walletLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+    },
+    walletIconBg: {
+        width: 52,
+        height: 52,
+        borderRadius: 16,
+        backgroundColor: 'rgba(251,191,36,0.15)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 14,
+    },
+    walletLabel: {
+        fontSize: 16,
+        fontWeight: '800',
+        color: '#fff',
+        marginBottom: 2,
+    },
+    walletSub: {
+        fontSize: 11,
+        color: '#9CA3AF',
+    },
+    walletRight: {
+        alignItems: 'flex-end',
+    },
+    walletBalanceLabel: {
+        fontSize: 10,
+        fontWeight: '700',
+        color: '#9CA3AF',
+        letterSpacing: 1,
+        marginBottom: 4,
+    },
+    walletBalance: {
+        fontSize: 22,
+        fontWeight: '900',
+        color: '#FBBF24',
+    },
+    txnContainer: {
+        backgroundColor: '#fff',
+        borderRadius: 16,
+        padding: 16,
+        marginBottom: 16,
+    },
+    txnTitle: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: '#6B7280',
+        marginBottom: 12,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
+    txnRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 8,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F3F4F6',
+        gap: 10,
+    },
+    txnDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+    },
+    txnDesc: {
+        fontSize: 13,
+        color: '#1a1a1a',
+        fontWeight: '500',
+    },
+    txnDate: {
+        fontSize: 11,
+        color: '#9CA3AF',
+        marginTop: 2,
+    },
+    txnAmount: {
+        fontSize: 14,
+        fontWeight: '700',
     },
 });

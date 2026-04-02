@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "ZPinEcom",
-    "slug": "ZPinEcom",
+    "name": "ZPIN",
+    "slug": "ZPIN",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -31,8 +31,8 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "ZPin uses your location to show nearby product availability.",
-          "locationWhenInUsePermission": "ZPin uses your location to show nearby product availability.",
+          "locationAlwaysAndWhenInUsePermission": "ZPIN uses your location to show nearby product availability.",
+          "locationWhenInUsePermission": "ZPIN uses your location to show nearby product availability.",
           "isIosBackgroundLocationEnabled": false
         }
       ],

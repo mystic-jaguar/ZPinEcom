@@ -111,7 +111,10 @@ export default function CancelOrderScreen() {
 
             let msg = response?.message || `${isReturn ? 'Return initiated' : 'Order cancelled'} successfully.`;
             if (response?.refundAmount && response.refundAmount > 0) {
-                msg += `\n\nRefund of ₹${response.refundAmount.toFixed(2)} initiated (${response.refundStatus}).`;
+                const refundDest = response.refundMethod === 'wallet' || refundMethod === 'wallet'
+                    ? 'ZPIN Wallet'
+                    : 'original payment method';
+                msg += `\n\nRefund of ₹${response.refundAmount.toFixed(2)} credited to your ${refundDest}.`;
             }
             setSuccessMessage(msg);
             setIsSubmitting(false);
@@ -214,7 +217,7 @@ export default function CancelOrderScreen() {
                                     ]}>
                                         {refundMethod === 'wallet' && <View style={styles.radioInner} />}
                                     </View>
-                                    <Text style={styles.refundTitle}>ZPin Wallet</Text>
+                                    <Text style={styles.refundTitle}>ZPIN Wallet</Text>
                                 </View>
                                 <Text style={styles.refundDesc}>Instant refund to your ZPin Wallet. Can be used for future purchases.</Text>
                             </TouchableOpacity>

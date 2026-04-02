@@ -46,7 +46,7 @@ export default function AvatarInitials({
 
 const styles = StyleSheet.create({
     circle: {
-        backgroundColor: '#FBBF24',
+        backgroundColor: '#fff',
         justifyContent: 'center',
         alignItems: 'center',
     },

@@ -9,9 +9,11 @@ import { requestLogger } from './middleware/requestLogger';
 import authRoutes from './routes/auth';
 import cartRoutes from './routes/cart';
 import couponRoutes from './routes/coupons';
+import notificationRoutes from './routes/notifications';
 import orderRoutes from './routes/orders';
 import productRoutes from './routes/products';
 import userRoutes from './routes/users';
+import walletRoutes from './routes/wallet';
 import wishlistRoutes from './routes/wishlist';
 import { logger } from './utils/logger';
 
@@ -76,6 +78,8 @@ app.use('/api/v1/cart', cartRoutes);
 app.use('/api/v1/wishlist', wishlistRoutes);
 app.use('/api/v1/orders', orderRoutes);
 app.use('/api/v1/coupons', couponRoutes);
+app.use('/api/v1/notifications', notificationRoutes);
+app.use('/api/v1/wallet', walletRoutes);
 
 // Health check — excluded from rate limiting
 app.get('/health', (_, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));

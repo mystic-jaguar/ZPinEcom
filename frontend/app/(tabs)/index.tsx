@@ -184,7 +184,7 @@ export default function HomeScreen() {
                 visible={showLocationModal}
                 icon="map-pin"
                 title="Enable Location"
-                message="ZPin uses your location to show nearby product availability in your area."
+                message="ZPIN uses your location to show nearby product availability in your area."
                 primaryButtonText="Allow Location"
                 onPrimaryPress={async () => {
                     setShowLocationModal(false);
