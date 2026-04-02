@@ -56,39 +56,29 @@ export default function ProductListing() {
             setLoading(true);
             setError(null);
 
-            const targetName = (subCategoryName as string) || (categoryName as string);
+            const subCat = subCategoryName as string;
+            const rootCat = categoryName as string;
+            const targetName = subCat || rootCat;
 
             if (targetName) {
-                // Collect all descendant names from the category tree
-                const node = findNode(CATEGORY_DATA, targetName);
-                const labels = node ? collectLabels(node) : [targetName];
+                // Fetch by the most specific name available
+                // The backend ILIKE matches deepest_category_name and category_path
+                const response = await productService.getProductsByCategory(targetName, { limit: 500 });
+                let items = (response as any).products || (response as any).data || [];
 
-                // Fetch products for each leaf label and merge (deduplicated by productId)
-                const seen = new Set<string>();
-                const allProducts: ProductObject[] = [];
+                // If subCategoryName gave 0 results, fall back to rootCat
+                if (items.length === 0 && subCat && rootCat && rootCat !== subCat) {
+                    const fallback = await productService.getProductsByCategory(rootCat, { limit: 500 });
+                    items = (fallback as any).products || (fallback as any).data || [];
+                }
 
-                await Promise.all(
-                    labels.map(async (label) => {
-                        try {
-                            const response = await productService.getProductsByCategory(label, { limit: 100 });
-                            const items = (response as any).products || (response as any).data || [];
-                            items.forEach((p: ProductObject) => {
-                                const id = p.productId || (p as any).id;
-                                if (!seen.has(id)) {
-                                    seen.add(id);
-                                    allProducts.push({ ...p, productId: id });
-                                }
-                            });
-                        } catch {
-                            // individual label may return 0 results — that's fine
-                        }
-                    })
-                );
-
-                setProducts(allProducts);
+                setProducts(items.map((p: ProductObject) => ({
+                    ...p,
+                    productId: p.productId || (p as any).id,
+                })));
             } else {
                 // No category — show all
-                const response = await productService.getProducts({ limit: 100 });
+                const response = await productService.getProducts({ limit: 200 });
                 setProducts(response.products);
             }
         } catch (err: any) {

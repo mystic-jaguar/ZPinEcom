@@ -1,48 +1,63 @@
 import { Feather } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import SearchBar from '../components/SearchBar';
 import SkeletonCard from '../components/product/SkeletonCard';
 import { useSearch } from '../context/SearchContext';
-import { productService } from '../services/product';
+import apiClient from '../services/api';
 import { ProductObject } from '../types/types';
 
 export default function ProductSearchScreen() {
     const router = useRouter();
     const { addSearch } = useSearch();
     const [searchQuery, setSearchQuery] = useState('');
-    const [allProducts, setAllProducts] = useState<ProductObject[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [searchResults, setSearchResults] = useState<ProductObject[]>([]);
+    const [relatedProducts, setRelatedProducts] = useState<ProductObject[]>([]);
+    const [loading, setLoading] = useState(false);
+    const searchTimeout = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    useEffect(() => {
-        productService.getProducts({ limit: 200 })
-            .then(r => setAllProducts(r.products))
-            .catch(() => {})
-            .finally(() => setLoading(false));
-    }, []);
+    const runSearch = async (query: string) => {
+        if (!query.trim()) {
+            setSearchResults([]);
+            setRelatedProducts([]);
+            return;
+        }
+        setLoading(true);
+        try {
+            const response = await apiClient.get('products/search', { params: { q: query, limit: 50 } });
+            setSearchResults(response.data.products || []);
+            setRelatedProducts(response.data.related || []);
+        } catch {
+            setSearchResults([]);
+            setRelatedProducts([]);
+        } finally {
+            setLoading(false);
+        }
+    };
 
-    const filteredProducts = searchQuery.trim()
-        ? allProducts.filter(p =>
-            p.productName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            (p.deepestCategoryName || '').toLowerCase().includes(searchQuery.toLowerCase())
-        )
-        : [];
-
-    // Save search when user stops typing and has results
     const handleSearchChange = (text: string) => {
         setSearchQuery(text);
+        if (searchTimeout.current) clearTimeout(searchTimeout.current);
         if (text.trim().length >= 2) {
             addSearch(text.trim());
+            searchTimeout.current = setTimeout(() => runSearch(text), 400);
+        } else {
+            setSearchResults([]);
+            setRelatedProducts([]);
         }
     };
 
     const handleProductPress = (item: ProductObject) => {
-        // Save the product name and category as search terms
         if (item.deepestCategoryName) addSearch(item.deepestCategoryName);
         router.push(`/product/${item.productId}`);
     };
+
+    const allDisplayed = [
+        ...searchResults,
+        ...relatedProducts.filter(r => !searchResults.find(s => s.productId === r.productId)),
+    ];
 
     const renderProductItem = ({ item }: { item: ProductObject }) => (
         <TouchableOpacity
@@ -102,15 +117,22 @@ export default function ProductSearchScreen() {
                         ))}
                     </View>
                 ) : searchQuery.length > 0 ? (
-                    filteredProducts.length > 0 ? (
+                    allDisplayed.length > 0 ? (
                         <FlatList
-                            data={filteredProducts}
+                            data={allDisplayed}
                             renderItem={renderProductItem}
                             keyExtractor={item => item.productId}
                             numColumns={2}
                             columnWrapperStyle={styles.columnWrapper}
                             contentContainerStyle={styles.listContent}
                             showsVerticalScrollIndicator={false}
+                            ListHeaderComponent={
+                                relatedProducts.length > 0 && searchResults.length > 0 ? (
+                                    <Text style={styles.sectionLabel}>
+                                        {searchResults.length} result{searchResults.length !== 1 ? 's' : ''} · Related products below
+                                    </Text>
+                                ) : null
+                            }
                         />
                     ) : (
                         <View style={styles.emptyState}>
@@ -245,5 +267,13 @@ const styles = StyleSheet.create({
         marginTop: 15,
         fontSize: 16,
         color: '#ccc',
-    }
+    },
+    sectionLabel: {
+        fontSize: 13,
+        color: '#9CA3AF',
+        fontWeight: '600',
+        paddingHorizontal: 5,
+        paddingBottom: 10,
+        paddingTop: 5,
+    },
 });

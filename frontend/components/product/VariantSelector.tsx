@@ -1,9 +1,20 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
+// Map common color names to hex for display
+const COLOR_MAP: Record<string, string> = {
+    red: '#EF4444', blue: '#3B82F6', green: '#22C55E', yellow: '#FBBF24',
+    black: '#1a1a1a', white: '#F9FAFB', grey: '#9CA3AF', gray: '#9CA3AF',
+    pink: '#EC4899', purple: '#A855F7', orange: '#F97316', brown: '#92400E',
+    navy: '#1E3A5F', maroon: '#7F1D1D', beige: '#D4B896', cream: '#FFF8E7',
+    teal: '#14B8A6', indigo: '#6366F1', violet: '#7C3AED', gold: '#D97706',
+    silver: '#94A3B8', coral: '#F87171', mint: '#6EE7B7', lavender: '#C4B5FD',
+};
+
 interface VariantSelectorProps {
     colors?: string[];
     sizes?: string[];
+    sizeQuantities?: Record<string, number>;
     selectedColor?: string;
     selectedSize?: string;
     onSelectColor?: (color: string) => void;
@@ -13,31 +24,46 @@ interface VariantSelectorProps {
 export default function VariantSelector({
     colors,
     sizes,
+    sizeQuantities,
     selectedColor,
     selectedSize,
     onSelectColor,
-    onSelectSize
+    onSelectSize,
 }: VariantSelectorProps) {
+    if ((!colors || colors.length === 0) && (!sizes || sizes.length === 0)) {
+        return null;
+    }
 
     return (
         <View style={styles.container}>
             {/* Color Selector */}
             {colors && colors.length > 0 && (
                 <View style={styles.section}>
+                    <Text style={styles.label}>
+                        COLOR{selectedColor ? `: ${selectedColor.charAt(0).toUpperCase() + selectedColor.slice(1)}` : ''}
+                    </Text>
                     <View style={styles.row}>
-                        {colors.map((color, index) => {
+                        {colors.map((color) => {
                             const isSelected = selectedColor === color;
+                            const hex = COLOR_MAP[color.toLowerCase()] || '#E5E7EB';
+                            const isDark = ['black', 'navy', 'maroon', 'indigo', 'violet'].includes(color.toLowerCase());
                             return (
                                 <TouchableOpacity
-                                    key={index}
+                                    key={color}
                                     onPress={() => onSelectColor?.(color)}
                                     style={[
-                                        styles.colorCircle,
-                                        { backgroundColor: color },
-                                        isSelected && styles.selectedColorBorder
+                                        styles.colorChip,
+                                        { backgroundColor: hex },
+                                        isSelected && styles.colorChipSelected,
+                                        color.toLowerCase() === 'white' && styles.colorChipWhite,
                                     ]}
                                 >
-                                    {isSelected && <View style={styles.innerWhiteDot} />}
+                                    <Text style={[
+                                        styles.colorChipText,
+                                        { color: isDark ? '#fff' : '#1a1a1a' },
+                                    ]}>
+                                        {color.charAt(0).toUpperCase() + color.slice(1)}
+                                    </Text>
                                 </TouchableOpacity>
                             );
                         })}
@@ -49,28 +75,35 @@ export default function VariantSelector({
             {sizes && sizes.length > 0 && (
                 <View style={styles.section}>
                     <View style={styles.sizeHeaderRow}>
-                        <Text style={styles.label}>SELECT SIZE</Text>
+                        <Text style={styles.label}>SIZE</Text>
                         <Text style={styles.sizeChartLink}>Size Chart</Text>
                     </View>
-
                     <View style={styles.row}>
-                        {sizes.map((size, index) => {
+                        {sizes.map((size) => {
                             const isSelected = selectedSize === size;
+                            const stock = sizeQuantities?.[size];
+                            const outOfStock = stock !== undefined && stock === 0;
                             return (
                                 <TouchableOpacity
-                                    key={index}
-                                    onPress={() => onSelectSize?.(size)}
+                                    key={size}
+                                    onPress={() => !outOfStock && onSelectSize?.(size)}
                                     style={[
                                         styles.sizeBox,
-                                        isSelected && styles.selectedSizeBox
+                                        isSelected && styles.selectedSizeBox,
+                                        outOfStock && styles.outOfStockBox,
                                     ]}
+                                    disabled={outOfStock}
                                 >
                                     <Text style={[
                                         styles.sizeText,
-                                        isSelected && styles.selectedSizeText
+                                        isSelected && styles.selectedSizeText,
+                                        outOfStock && styles.outOfStockText,
                                     ]}>
                                         {size}
                                     </Text>
+                                    {stock !== undefined && stock > 0 && stock <= 5 && (
+                                        <Text style={styles.lowStockText}>Only {stock} left</Text>
+                                    )}
                                 </TouchableOpacity>
                             );
                         })}
@@ -82,85 +115,85 @@ export default function VariantSelector({
 }
 
 const styles = StyleSheet.create({
-    container: {
-        marginTop: 15
-    },
-    section: {
-        marginBottom: 20
-    },
-    row: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        flexWrap: 'wrap'
-    },
+    container: { marginTop: 15 },
+    section: { marginBottom: 20 },
+    row: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
     sizeHeaderRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 10
+        marginBottom: 10,
     },
     label: {
         fontSize: 12,
         fontWeight: '700',
         color: '#333',
         textTransform: 'uppercase',
-        letterSpacing: 0.5
+        letterSpacing: 0.5,
+        marginBottom: 10,
     },
     sizeChartLink: {
         fontSize: 12,
         color: '#FBBF24',
         fontWeight: '600',
-        textDecorationLine: 'underline'
+        textDecorationLine: 'underline',
     },
-
-    // Color Styles
-    colorCircle: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        marginRight: 12,
-        justifyContent: 'center',
-        alignItems: 'center',
-        elevation: 2,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.2,
-        shadowRadius: 2,
+    // Color chips
+    colorChip: {
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        borderRadius: 20,
         borderWidth: 2,
-        borderColor: 'white' // Default border
+        borderColor: 'transparent',
     },
-    selectedColorBorder: {
-        borderColor: '#1a1a1a', // Active border
+    colorChipSelected: {
+        borderColor: '#1a1a1a',
     },
-    innerWhiteDot: {
-        width: 10,
-        height: 10,
-        borderRadius: 5,
-        backgroundColor: '#fff'
+    colorChipWhite: {
+        borderColor: '#E5E7EB',
     },
-
-    // Size Styles
+    colorChipText: {
+        fontSize: 13,
+        fontWeight: '600',
+    },
+    // Size boxes
     sizeBox: {
-        width: 45,
-        height: 45,
+        minWidth: 50,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
         borderRadius: 8,
         borderWidth: 1.5,
-        borderColor: '#eee',
+        borderColor: '#E5E7EB',
         justifyContent: 'center',
         alignItems: 'center',
-        marginRight: 10,
-        backgroundColor: '#fff'
+        backgroundColor: '#fff',
     },
     selectedSizeBox: {
         borderColor: '#FBBF24',
-        backgroundColor: '#FFFBE6'
+        backgroundColor: '#FFFBE6',
+    },
+    outOfStockBox: {
+        borderColor: '#F3F4F6',
+        backgroundColor: '#F9FAFB',
+        opacity: 0.5,
     },
     sizeText: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#555'
+        color: '#555',
     },
     selectedSizeText: {
-        color: '#1a1a1a'
-    }
+        color: '#1a1a1a',
+        fontWeight: '700',
+    },
+    outOfStockText: {
+        color: '#9CA3AF',
+        textDecorationLine: 'line-through',
+    },
+    lowStockText: {
+        fontSize: 9,
+        color: '#EF4444',
+        fontWeight: '600',
+        marginTop: 2,
+    },
 });

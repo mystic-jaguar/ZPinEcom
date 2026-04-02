@@ -7,6 +7,14 @@ import { generateId } from '../utils/id';
 const router = Router();
 
 function normalizeProduct(row: any) {
+  // Extract sizes from size_quantities keys (e.g. {S:10, M:15} → ['S','M'])
+  const sizeQuantities = row.size_quantities || {};
+  const sizes = Object.keys(sizeQuantities).filter(k => sizeQuantities[k] > 0);
+
+  // Extract colors from extracted_attributes
+  const attrs = row.extracted_attributes || {};
+  const colors: string[] = attrs.colors || [];
+
   return {
     productId: row.id,
     userId: row.user_id,
@@ -21,8 +29,78 @@ function normalizeProduct(row: any) {
     images: row.images || [],
     timeStamp: row.created_at,
     rating: Number(row.average_rating) || 0,
+    sizes: sizes.length > 0 ? sizes : undefined,
+    colors: colors.length > 0 ? colors : undefined,
+    sizeQuantities: Object.keys(sizeQuantities).length > 0 ? sizeQuantities : undefined,
+    attributes: Object.keys(attrs).length > 0 ? attrs : undefined,
   };
 }
+
+// GET /api/v1/products/search?q= — full-text product name search with related products
+router.get('/search', productListLimiter, async (req: Request, res: Response): Promise<void> => {
+  const q = (req.query.q as string || '').trim();
+  const limit = Math.min(Number(req.query.limit) || 50, 200);
+
+  if (!q) {
+    res.json({ success: true, products: [], related: [] });
+    return;
+  }
+
+  try {
+    // Normalize query — treat "keychain" and "key chain" as equivalent
+    const normalized = q.replace(/\s+/g, '').toLowerCase();
+    const spaced = q.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase();
+
+    const result = await pool.query(
+      `SELECT p.*,
+        COALESCE(json_agg(DISTINCT pi.image_url) FILTER (WHERE pi.image_url IS NOT NULL), '[]') as images,
+        COALESCE(AVG(pr.rating), 0) as average_rating
+       FROM products p
+       LEFT JOIN product_images pi ON pi.product_id = p.id
+       LEFT JOIN product_reviews pr ON pr.product_id = p.id
+       WHERE p.in_stock = true
+         AND (
+           LOWER(REPLACE(p.product_name, ' ', '')) LIKE $1
+           OR LOWER(p.product_name) LIKE $2
+         )
+       GROUP BY p.id
+       ORDER BY p.created_at DESC
+       LIMIT $3`,
+      [`%${normalized}%`, `%${spaced}%`, limit]
+    );
+
+    const products = result.rows.map(normalizeProduct);
+
+    // Fetch related products — same deepest_category_name, excluding already found
+    let related: any[] = [];
+    if (products.length > 0) {
+      const categories = [...new Set(products.map(p => p.deepestCategoryName).filter(Boolean))];
+      const foundIds = products.map(p => p.productId);
+
+      const relatedResult = await pool.query(
+        `SELECT p.*,
+          COALESCE(json_agg(DISTINCT pi.image_url) FILTER (WHERE pi.image_url IS NOT NULL), '[]') as images,
+          COALESCE(AVG(pr.rating), 0) as average_rating
+         FROM products p
+         LEFT JOIN product_images pi ON pi.product_id = p.id
+         LEFT JOIN product_reviews pr ON pr.product_id = p.id
+         WHERE p.in_stock = true
+           AND p.deepest_category_name = ANY($1)
+           AND p.id != ALL($2)
+         GROUP BY p.id
+         ORDER BY p.created_at DESC
+         LIMIT 10`,
+        [categories, foundIds]
+      );
+      related = relatedResult.rows.map(normalizeProduct);
+    }
+
+    res.json({ success: true, products, related });
+  } catch (err) {
+    console.error('search error:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
 
 // GET /api/v1/products/nearby — product counts per nearby category based on location context
 // Since products don't have coordinates, we return counts per category
@@ -113,7 +191,7 @@ router.get('/fresh-categories', async (req: Request, res: Response): Promise<voi
 // GET /api/v1/products/category/:categoryName — filter by category name
 router.get('/category/:categoryName', productListLimiter, async (req: Request, res: Response): Promise<void> => {
   const page = Number(req.query.page) || 1;
-  const limit = Number(req.query.limit) || 50;
+  const limit = Math.min(Number(req.query.limit) || 100, 500); // default 100, max 500
   const offset = (page - 1) * limit;
   const { categoryName } = req.params;
 
@@ -122,10 +200,10 @@ router.get('/category/:categoryName', productListLimiter, async (req: Request, r
       `SELECT COUNT(*) FROM products
        WHERE in_stock = true
          AND (
-           LOWER(deepest_category_name) = LOWER($1)
+           deepest_category_name ILIKE $1
            OR category_path::text ILIKE $2
          )`,
-      [categoryName, `%${categoryName}%`]
+      [`%${categoryName}%`, `%${categoryName}%`]
     );
     const total = Number(countResult.rows[0].count);
 
@@ -138,13 +216,13 @@ router.get('/category/:categoryName', productListLimiter, async (req: Request, r
        LEFT JOIN product_reviews pr ON pr.product_id = p.id
        WHERE p.in_stock = true
          AND (
-           LOWER(p.deepest_category_name) = LOWER($1)
+           p.deepest_category_name ILIKE $1
            OR p.category_path::text ILIKE $2
          )
        GROUP BY p.id
        ORDER BY p.created_at DESC
        LIMIT $3 OFFSET $4`,
-      [categoryName, `%${categoryName}%`, limit, offset]
+      [`%${categoryName}%`, `%${categoryName}%`, limit, offset]
     );
 
     res.json({
@@ -168,7 +246,7 @@ router.get('/category/:categoryName', productListLimiter, async (req: Request, r
 // GET /api/v1/products — all products (paginated)
 router.get('/', productListLimiter, async (req: Request, res: Response): Promise<void> => {
   const page = Number(req.query.page) || 1;
-  const limit = Number(req.query.limit) || 20;
+  const limit = Math.min(Number(req.query.limit) || 50, 200); // default 50, max 200
   const offset = (page - 1) * limit;
 
   try {

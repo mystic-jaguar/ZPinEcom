@@ -9,8 +9,18 @@ import ProductImageCarousel from '../../components/product/ProductImageCarousel'
 import VariantSelector from '../../components/product/VariantSelector';
 import { useCart } from '../../context/CartContext';
 import { useWishlist } from '../../context/WishlistContext';
+import apiClient from '../../services/api';
 import { productService } from '../../services/product';
 import { ProductObject } from '../../types/types';
+
+interface Review {
+    id: string;
+    userId: string;
+    rating: number;
+    comment: string;
+    user: { name: string };
+    createdAt: string;
+}
 
 export default function ProductDetails() {
     const { id } = useLocalSearchParams();
@@ -23,6 +33,9 @@ export default function ProductDetails() {
     // Product State
     const [product, setProduct] = useState<ProductObject | null>(null);
     const [relatedProducts, setRelatedProducts] = useState<ProductObject[]>([]);
+    const [reviews, setReviews] = useState<Review[]>([]);
+    const [reviewTotal, setReviewTotal] = useState(0);
+    const [activeCoupon, setActiveCoupon] = useState<{ code: string; description: string; discountType: string; discountValue: number } | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -41,12 +54,19 @@ export default function ProductDetails() {
         try {
             setLoading(true);
             setError(null);
-            const [data, related] = await Promise.all([
+            const [data, related, reviewsRes, couponsRes] = await Promise.all([
                 productService.getProductById(productId),
                 productService.getProducts({ limit: 6 }).then(r => r.products.filter(p => p.productId !== productId).slice(0, 4)).catch(() => []),
+                apiClient.get(`products/${productId}/reviews`, { params: { limit: 10 } }).catch(() => ({ data: { data: [], pagination: { totalItems: 0 } } })),
+                apiClient.get('coupons').catch(() => ({ data: { data: [] } })),
             ]);
             setProduct(data);
             setRelatedProducts(related);
+            setReviews(reviewsRes.data?.data || []);
+            setReviewTotal(reviewsRes.data?.pagination?.totalItems || 0);
+            // Pick the first active coupon to display
+            const activeCoupons = (couponsRes.data?.data || []).filter((c: any) => c.status === 'active');
+            if (activeCoupons.length > 0) setActiveCoupon(activeCoupons[0]);
             if (data.colors && data.colors.length > 0) setSelectedColor(data.colors[0]);
             if (data.sizes && data.sizes.length > 0) setSelectedSize(data.sizes[2] || data.sizes[0]);
         } catch (err: any) {
@@ -121,11 +141,34 @@ export default function ProductDetails() {
                 <View style={styles.mainInfo}>
                     <View style={styles.titleRow}>
                         <Text style={styles.productName}>{product.productName}</Text>
-                        <View style={styles.ratingBadge}>
-                            <Text style={styles.ratingText}>{product.rating}</Text>
-                            <Ionicons name="star" size={10} color="#fff" />
-                        </View>
+                        {(product.rating ?? 0) > 0 && (
+                            <View style={[styles.ratingBadge, { backgroundColor: (product.rating ?? 0) >= 4 ? '#059669' : (product.rating ?? 0) >= 3 ? '#D97706' : '#EF4444' }]}>
+                                <Text style={styles.ratingText}>{(product.rating ?? 0).toFixed(1)}</Text>
+                                <Ionicons name="star" size={10} color="#fff" />
+                            </View>
+                        )}
                     </View>
+
+                    {/* Rating summary row */}
+                    {reviewTotal > 0 && (
+                        <View style={styles.ratingSummaryRow}>
+                            {[5,4,3,2,1].map(star => {
+                                const count = reviews.filter(r => r.rating === star).length;
+                                const pct = reviews.length > 0 ? (count / reviews.length) * 100 : 0;
+                                return (
+                                    <View key={star} style={styles.ratingBarRow}>
+                                        <Text style={styles.ratingBarLabel}>{star}</Text>
+                                        <Ionicons name="star" size={10} color="#FBBF24" />
+                                        <View style={styles.ratingBarTrack}>
+                                            <View style={[styles.ratingBarFill, { width: `${pct}%` }]} />
+                                        </View>
+                                        <Text style={styles.ratingBarCount}>{count}</Text>
+                                    </View>
+                                );
+                            })}
+                            <Text style={styles.ratingTotalText}>{reviewTotal} rating{reviewTotal !== 1 ? 's' : ''}</Text>
+                        </View>
+                    )}
 
                     {product.subtitle && (
                         <Text style={styles.subtitle}>{product.subtitle}</Text>
@@ -141,16 +184,25 @@ export default function ProductDetails() {
                         )}
                     </View>
 
-                    {/* Lightning Offer Banner */}
-                    <View style={styles.offerBanner}>
-                        <View style={styles.offerIcon}>
-                            <Feather name="tag" size={16} color="#F59E0B" />
+                    {/* Coupon Banner — from database */}
+                    {activeCoupon && (
+                        <View style={styles.offerBanner}>
+                            <View style={styles.offerIcon}>
+                                <Feather name="tag" size={16} color="#F59E0B" />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.offerTitle}>
+                                    {activeCoupon.discountType === 'percentage'
+                                        ? `${activeCoupon.discountValue}% OFF`
+                                        : `₹${activeCoupon.discountValue} OFF`}
+                                </Text>
+                                <Text style={styles.offerDesc}>
+                                    {activeCoupon.description} Use code:{' '}
+                                    <Text style={{ fontWeight: '700' }}>{activeCoupon.code}</Text>
+                                </Text>
+                            </View>
                         </View>
-                        <View>
-                            <Text style={styles.offerTitle}>Lightning Offer</Text>
-                            <Text style={styles.offerDesc}>Get extra ₹100 OFF on your first purchase. Use code: <Text style={{ fontWeight: '700' }}>ZIPIN100</Text></Text>
-                        </View>
-                    </View>
+                    )}
 
                     {/* Action Buttons */}
                     <View style={styles.actionRow}>
@@ -186,6 +238,7 @@ export default function ProductDetails() {
                     <VariantSelector
                         colors={product.colors}
                         sizes={product.sizes}
+                        sizeQuantities={(product as any).sizeQuantities}
                         selectedColor={selectedColor}
                         selectedSize={selectedSize}
                         onSelectColor={setSelectedColor}
@@ -241,8 +294,26 @@ export default function ProductDetails() {
                         </Text>
                     </AccordionItem>
 
-                    <AccordionItem title="Reviews (1,248)">
-                        <Text style={styles.bodyText}>User reviews will appear here.</Text>
+                    <AccordionItem title={`Reviews${reviewTotal > 0 ? ` (${reviewTotal})` : ''}`}>
+                        {reviews.length === 0 ? (
+                            <Text style={styles.bodyText}>No reviews yet. Be the first to review!</Text>
+                        ) : (
+                            reviews.map(r => (
+                                <View key={r.id} style={styles.reviewItem}>
+                                    <View style={styles.reviewHeader}>
+                                        <View style={styles.reviewRatingBadge}>
+                                            <Text style={styles.reviewRatingText}>{r.rating}</Text>
+                                            <Ionicons name="star" size={9} color="#fff" />
+                                        </View>
+                                        <Text style={styles.reviewerName}>{r.user?.name || 'User'}</Text>
+                                        <Text style={styles.reviewDate}>
+                                            {new Date(r.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                        </Text>
+                                    </View>
+                                    <Text style={styles.reviewComment}>{r.comment}</Text>
+                                </View>
+                            ))
+                        )}
                     </AccordionItem>
 
                     <AccordionItem title="Shipping & Returns">
@@ -540,5 +611,89 @@ const styles = StyleSheet.create({
         color: '#555',
         lineHeight: 18,
         fontStyle: 'italic'
-    }
+    },
+    // Rating summary
+    ratingSummaryRow: {
+        marginBottom: 16,
+        backgroundColor: '#F9FAFB',
+        borderRadius: 10,
+        padding: 12,
+    },
+    ratingBarRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 4,
+    },
+    ratingBarLabel: {
+        fontSize: 11,
+        color: '#555',
+        width: 12,
+        marginRight: 3,
+    },
+    ratingBarTrack: {
+        flex: 1,
+        height: 6,
+        backgroundColor: '#E5E7EB',
+        borderRadius: 3,
+        marginHorizontal: 6,
+        overflow: 'hidden',
+    },
+    ratingBarFill: {
+        height: '100%',
+        backgroundColor: '#FBBF24',
+        borderRadius: 3,
+    },
+    ratingBarCount: {
+        fontSize: 11,
+        color: '#888',
+        width: 16,
+        textAlign: 'right',
+    },
+    ratingTotalText: {
+        fontSize: 11,
+        color: '#9CA3AF',
+        marginTop: 6,
+        textAlign: 'right',
+    },
+    // Reviews
+    reviewItem: {
+        paddingVertical: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F3F4F6',
+    },
+    reviewHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 6,
+        gap: 8,
+    },
+    reviewRatingBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#059669',
+        paddingHorizontal: 5,
+        paddingVertical: 2,
+        borderRadius: 4,
+        gap: 2,
+    },
+    reviewRatingText: {
+        color: '#fff',
+        fontSize: 11,
+        fontWeight: '700',
+    },
+    reviewerName: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#1a1a1a',
+        flex: 1,
+    },
+    reviewDate: {
+        fontSize: 11,
+        color: '#9CA3AF',
+    },
+    reviewComment: {
+        fontSize: 13,
+        color: '#555',
+        lineHeight: 20,
+    },
 });
