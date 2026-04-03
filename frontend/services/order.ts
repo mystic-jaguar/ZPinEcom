@@ -2,11 +2,11 @@ import { ApiPaginatedResponse, ApiSuccessResponse, OrderObject } from '../types/
 import apiClient, { handleApiError } from './api';
 
 export interface CreateOrderData {
-    cartItems: string[];          // Array of cart item IDs
-    shippingAddressId: string;    // Address ID or full address object
+    cartItems: { productId: string; quantity: number }[];
+    shippingAddressId: string;
     paymentMethod: 'razorpay' | 'cod' | 'wallet';
-    paymentId?: string;           // Required for razorpay
-    deliveryBoyId?: string;       // Optional
+    paymentId?: string;
+    deliveryBoyId?: string;
     notes?: string;
     couponCode?: string;
 }

@@ -120,16 +120,21 @@ export default function HomeScreen() {
     };
 
     const fetchProducts = async (lat?: number, lng?: number) => {
-        if (isLoadingProducts) return; // Prevent concurrent calls
-        
+        if (isLoadingProducts) return;
         setIsLoadingProducts(true);
         setError(null);
-        
+
         try {
-            const freshCats = await productService.getFreshCategories();
-            if (freshCats.length > 0) {
+            // Fire all 3 requests in parallel — eliminates sequential blocking
+            const [freshCats, recProducts, nearbyData] = await Promise.allSettled([
+                productService.getFreshCategories(),
+                productService.getRecommended(recentSearches, 8),
+                productService.getNearbyCategories(lat, lng),
+            ]);
+
+            if (freshCats.status === 'fulfilled' && freshCats.value.length > 0) {
                 const CARD_COLORS = ['#E9E3D5', '#D4E6D5', '#D4D6E6', '#E6D4D4', '#E6E4D4'];
-                setFreshArrivals(freshCats.map((cat, i) => {
+                setFreshArrivals(freshCats.value.map((cat, i) => {
                     const pathArr = Array.isArray(cat.categoryPath) ? cat.categoryPath : [];
                     const rootCat = pathArr[0]?.name || cat.name;
                     return {
@@ -144,10 +149,8 @@ export default function HomeScreen() {
                 }));
             }
 
-            // Fetch Recommended — based on recent searches
-            const recProducts = await productService.getRecommended(recentSearches, 8);
-            if (recProducts.length > 0) {
-                setRecommended(recProducts.map(p => ({
+            if (recProducts.status === 'fulfilled' && recProducts.value.length > 0) {
+                setRecommended(recProducts.value.map(p => ({
                     id: p.productId,
                     name: p.productName,
                     desc: `₹${p.price}`,
@@ -157,9 +160,8 @@ export default function HomeScreen() {
                 })));
             }
 
-            const nearbyData = await productService.getNearbyCategories(lat, lng);
-            if (nearbyData.length > 0) {
-                setNearby(nearbyData.map((cat, i) => ({
+            if (nearbyData.status === 'fulfilled' && nearbyData.value.length > 0) {
+                setNearby(nearbyData.value.map((cat, i) => ({
                     id: String(i),
                     name: cat.name,
                     image: cat.imageUrl
@@ -172,7 +174,6 @@ export default function HomeScreen() {
             }
         } catch (error) {
             console.error('Error fetching home products:', error);
-            setError('Failed to load products. Please check your connection.');
         } finally {
             setIsLoadingProducts(false);
         }

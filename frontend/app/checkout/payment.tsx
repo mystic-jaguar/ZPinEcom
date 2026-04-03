@@ -63,10 +63,16 @@ export default function CheckoutPaymentScreen() {
             paymentMethodMap[selectedPaymentMethod || ''] || 'cod';
 
         try {
+            // Pass cart items from context so backend can sync if DB cart is stale
+            const cartPayload = cartItems.map(item => ({
+                productId: item.productId,
+                quantity: item.quantity,
+            }));
+
             const response = await orderService.createOrder({
                 shippingAddressId: selectedAddressId,
                 paymentMethod: backendMethod,
-                cartItems: [],
+                cartItems: cartPayload,
                 notes: isInstant ? 'instant_delivery' : 'standard_delivery',
             });
 

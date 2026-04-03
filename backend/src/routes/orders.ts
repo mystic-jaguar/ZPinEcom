@@ -129,7 +129,7 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response): Promis
 
 // POST /api/v1/orders
 router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res: Response): Promise<void> => {
-  const { shippingAddressId, paymentMethod, notes } = req.body;
+  const { shippingAddressId, paymentMethod, notes, cartItems: bodyCartItems } = req.body;
 
   if (!shippingAddressId || !paymentMethod) {
     res.status(400).json({ success: false, message: 'shippingAddressId and paymentMethod are required' });
@@ -140,7 +140,7 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
   try {
     await client.query('BEGIN');
 
-    const cartResult = await client.query(
+    let cartResult = await client.query(
       `SELECT ci.*, p.price, p.product_name, p.user_id as seller_id,
         (SELECT image_url FROM product_images WHERE product_id = p.id LIMIT 1) as image
        FROM ${CART} ci
@@ -148,6 +148,45 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
        WHERE ci.user_id = $1`,
       [req.userId]
     );
+
+    // If DB cart is empty but client sent cart items, sync them first
+    if (cartResult.rows.length === 0 && Array.isArray(bodyCartItems) && bodyCartItems.length > 0) {
+      for (const item of bodyCartItems) {
+        if (!item.productId) continue;
+        const product = await client.query(
+          'SELECT price, in_stock, product_name, user_id FROM products WHERE id = $1',
+          [item.productId]
+        );
+        if (product.rows.length === 0 || !product.rows[0].in_stock) continue;
+
+        const existing = await client.query(
+          `SELECT id FROM ${CART} WHERE user_id = $1 AND product_id = $2`,
+          [req.userId, item.productId]
+        );
+        if (existing.rows.length > 0) {
+          await client.query(
+            `UPDATE ${CART} SET quantity = $1, updated_at = NOW() WHERE id = $2`,
+            [item.quantity || 1, existing.rows[0].id]
+          );
+        } else {
+          await client.query(
+            `INSERT INTO ${CART} (id, user_id, product_id, quantity, price_at_add, created_at, updated_at)
+             VALUES ($1,$2,$3,$4,$5,NOW(),NOW())`,
+            [generateId(), req.userId, item.productId, item.quantity || 1, product.rows[0].price]
+          );
+        }
+      }
+
+      // Re-fetch cart after sync
+      cartResult = await client.query(
+        `SELECT ci.*, p.price, p.product_name, p.user_id as seller_id,
+          (SELECT image_url FROM product_images WHERE product_id = p.id LIMIT 1) as image
+         FROM ${CART} ci
+         JOIN products p ON p.id = ci.product_id
+         WHERE ci.user_id = $1`,
+        [req.userId]
+      );
+    }
 
     if (cartResult.rows.length === 0) {
       await client.query('ROLLBACK');
@@ -214,6 +253,35 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
 
     await client.query(`DELETE FROM ${CART} WHERE user_id = $1`, [req.userId]);
 
+    // Notify customer — order confirmation (type: new_order, consistent with seller)
+    const customerItems = cartResult.rows.map((i: any) => ({
+      productId: i.product_id,
+      productName: i.product_name,
+      quantity: i.quantity,
+      price: Number(i.price),
+      image: i.image || null,
+    }));
+
+    await client.query(
+      `INSERT INTO notifications (id, user_id, title, message, type, data, is_read, created_at)
+       VALUES ($1, $2, $3, $4, 'new_order', $5, false, (NOW() AT TIME ZONE 'Asia/Kolkata'))`,
+      [
+        generateId(),
+        req.userId,
+        `Order Confirmed: ${orderNumber}`,
+        `Your order ${orderNumber} for ${customerItems.length} item(s) has been placed. Total: ₹${finalAmount.toFixed(2)}`,
+        JSON.stringify({
+          orderId,
+          orderNumber,
+          itemCount: customerItems.length,
+          total: finalAmount,
+          items: customerItems,
+          shippingAddress,
+          paymentMethod,
+        }),
+      ]
+    );
+
     // Notify each unique seller about the new order
     const uniqueSellers = [...new Set(cartResult.rows.map((i: any) => i.seller_id).filter(Boolean))];
     for (const sellerId of uniqueSellers) {
@@ -223,13 +291,27 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
 
       await client.query(
         `INSERT INTO notifications (id, user_id, title, message, type, data, is_read, created_at)
-         VALUES ($1, $2, $3, $4, 'new_order', $5, false, NOW())`,
+         VALUES ($1, $2, $3, $4, 'new_order', $5, false, (NOW() AT TIME ZONE 'Asia/Kolkata'))`,
         [
           generateId(),
           sellerId,
           `New Order: ${orderNumber}`,
           `You have a new order for ${sellerItems.length} item(s): ${itemNames}. Total: ₹${sellerTotal.toFixed(2)}`,
-          JSON.stringify({ orderId, orderNumber, itemCount: sellerItems.length, total: sellerTotal }),
+          JSON.stringify({
+            orderId,
+            orderNumber,
+            itemCount: sellerItems.length,
+            total: sellerTotal,
+            items: sellerItems.map((i: any) => ({
+              productId: i.product_id,
+              productName: i.product_name,
+              quantity: i.quantity,
+              price: Number(i.price),
+              image: i.image || null,
+            })),
+            shippingAddress,
+            paymentMethod,
+          }),
         ]
       );
     }
