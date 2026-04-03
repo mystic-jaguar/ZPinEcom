@@ -17,9 +17,10 @@ export const pool = new Pool({
   ssl: isProd
     ? { rejectUnauthorized: true }
     : { rejectUnauthorized: false },
-  max: 10,
+  max: 20,                        // Increased from 10 to 20 for better concurrency
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 5000,
+  allowExitOnIdle: false,         // Keep pool alive even when idle
 });
 
 pool.on('error', (err) => {

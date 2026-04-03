@@ -53,6 +53,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     const [userDetails, setUserDetailsState] = useState<UserDetailsObject | undefined>(undefined);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
+    const loadUserInProgressRef = React.useRef(false);
 
     // Load User from Storage
     useEffect(() => {
@@ -60,6 +61,14 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     }, []);
 
     const loadUser = async () => {
+        // Prevent concurrent loadUser calls
+        if (loadUserInProgressRef.current) {
+            console.log('loadUser already in progress, skipping...');
+            return;
+        }
+        
+        loadUserInProgressRef.current = true;
+        
         try {
             const userData = await AsyncStorage.getItem(USER_STORAGE_KEY);
             const userDetailsData = await AsyncStorage.getItem(USER_DETAILS_STORAGE_KEY);
@@ -115,6 +124,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
             console.error('Error loading user:', error);
             setIsAuthenticated(false);
         } finally {
+            loadUserInProgressRef.current = false;
             setIsLoading(false);
         }
     };

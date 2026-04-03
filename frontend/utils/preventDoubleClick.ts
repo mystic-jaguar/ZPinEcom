@@ -1,3 +1,5 @@
+import React from 'react';
+
 /**
  * Utility to prevent double-click/double-tap on buttons
  * Usage: wrap your onPress handler with this function
@@ -40,6 +42,3 @@ export const usePreventDoubleClick = (callback: () => void, delay: number = DOUB
         callback();
     }, [callback, delay]);
 };
-
-// For React Native
-import React from 'react';

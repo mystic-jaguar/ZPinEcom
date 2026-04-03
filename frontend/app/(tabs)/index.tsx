@@ -56,6 +56,8 @@ export default function HomeScreen() {
     const [locationLabel, setLocationLabel] = useState<string>('Your Area');
     const [locationGranted, setLocationGranted] = useState<boolean | null>(null);
     const [showLocationModal, setShowLocationModal] = useState(false);
+    const [isLoadingProducts, setIsLoadingProducts] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         // Check current permission status first — only show pre-prompt if undetermined
@@ -118,6 +120,11 @@ export default function HomeScreen() {
     };
 
     const fetchProducts = async (lat?: number, lng?: number) => {
+        if (isLoadingProducts) return; // Prevent concurrent calls
+        
+        setIsLoadingProducts(true);
+        setError(null);
+        
         try {
             const freshCats = await productService.getFreshCategories();
             if (freshCats.length > 0) {
@@ -165,6 +172,9 @@ export default function HomeScreen() {
             }
         } catch (error) {
             console.error('Error fetching home products:', error);
+            setError('Failed to load products. Please check your connection.');
+        } finally {
+            setIsLoadingProducts(false);
         }
     };
 

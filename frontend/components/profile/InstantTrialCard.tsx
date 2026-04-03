@@ -28,12 +28,22 @@ export default function InstantTrialCard({ isDelivered = false, deliveredAt }: I
     const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     useEffect(() => {
-        if (!isDelivered || secondsLeft <= 0) return;
+        if (!isDelivered || secondsLeft <= 0) {
+            // Clear any existing interval when conditions are not met
+            if (intervalRef.current) {
+                clearInterval(intervalRef.current);
+                intervalRef.current = null;
+            }
+            return;
+        }
 
         intervalRef.current = setInterval(() => {
             setSecondsLeft(prev => {
                 if (prev <= 1) {
-                    clearInterval(intervalRef.current!);
+                    if (intervalRef.current) {
+                        clearInterval(intervalRef.current);
+                        intervalRef.current = null;
+                    }
                     return 0;
                 }
                 return prev - 1;
@@ -41,9 +51,12 @@ export default function InstantTrialCard({ isDelivered = false, deliveredAt }: I
         }, 1000);
 
         return () => {
-            if (intervalRef.current) clearInterval(intervalRef.current);
+            if (intervalRef.current) {
+                clearInterval(intervalRef.current);
+                intervalRef.current = null;
+            }
         };
-    }, [isDelivered]);
+    }, [isDelivered, secondsLeft]);
 
     const isExpired = isDelivered && secondsLeft === 0;
     const isRunning = isDelivered && secondsLeft > 0;

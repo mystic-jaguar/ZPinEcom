@@ -10,6 +10,19 @@ const ORDER_ITEMS = 'order_items';
 const CART = 'cart_items';
 const ADDRESSES = 'addresses';
 
+// Helper: get or create wallet for a user
+async function getOrCreateWallet(userId: string) {
+  const existing = await pool.query('SELECT * FROM wallets WHERE user_id = $1', [userId]);
+  if (existing.rows.length > 0) return existing.rows[0];
+
+  const walletId = generateId();
+  const created = await pool.query(
+    `INSERT INTO wallets (id, user_id, balance) VALUES ($1,$2,0.00) RETURNING *`,
+    [walletId, userId]
+  );
+  return created.rows[0];
+}
+
 function normalizeOrder(row: any) {
   return {
     id: row.id,
@@ -138,6 +151,7 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
 
     if (cartResult.rows.length === 0) {
       await client.query('ROLLBACK');
+      client.release();
       res.status(400).json({ success: false, message: 'Cart is empty' });
       return;
     }
@@ -148,6 +162,7 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
     );
     if (addrResult.rows.length === 0) {
       await client.query('ROLLBACK');
+      client.release();
       res.status(404).json({ success: false, message: 'Shipping address not found' });
       return;
     }
@@ -208,8 +223,9 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
 
       await client.query(
         `INSERT INTO notifications (id, user_id, title, message, type, data, is_read, created_at)
-         VALUES (uuid_generate_v4(), $1, $2, $3, 'new_order', $4, false, NOW())`,
+         VALUES ($1, $2, $3, $4, 'new_order', $5, false, NOW())`,
         [
+          generateId(),
           sellerId,
           `New Order: ${orderNumber}`,
           `You have a new order for ${sellerItems.length} item(s): ${itemNames}. Total: ₹${sellerTotal.toFixed(2)}`,
@@ -226,7 +242,11 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
       data: { order: { id: orderId, orderNumber, finalAmount, status: 'pending' } },
     });
   } catch (err) {
-    await client.query('ROLLBACK');
+    try {
+      await client.query('ROLLBACK');
+    } catch (rollbackErr) {
+      console.error('ROLLBACK error:', rollbackErr);
+    }
     console.error('createOrder error:', err);
     res.status(500).json({ success: false, message: 'Server error' });
   } finally {

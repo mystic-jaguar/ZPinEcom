@@ -1,3 +1,5 @@
+import { randomBytes } from 'crypto';
+
 const CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
 
 /**
@@ -6,7 +8,7 @@ const CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
  */
 export function generateId(): string {
     let id = '';
-    const bytes = require('crypto').randomBytes(7);
+    const bytes = randomBytes(7);
     for (let i = 0; i < 7; i++) {
         id += CHARS[bytes[i] % CHARS.length];
     }

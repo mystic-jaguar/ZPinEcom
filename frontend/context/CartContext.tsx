@@ -95,13 +95,15 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
             await AsyncStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
         } catch (error) {
             console.error('Error saving cart:', error);
+            // Consider showing a user notification here in production
+            throw error;
         }
     };
 
     const addToCart = async (product: ProductObject, selectedColor?: string, selectedSize?: string) => {
         // Optimistic update
         const cartItemId = `${product.productId}-${selectedColor || 'default'}-${selectedSize || 'default'}`;
-        let quantityToAdd = 1;
+        const previousItems = cartItems;
 
         setCartItems(prevItems => {
             const existingItem = prevItems.find(item => item.cartItemId === cartItemId);
@@ -127,7 +129,11 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
                 };
                 newItems = [...prevItems, newCartItem];
             }
-            saveCart(newItems);
+            // Save asynchronously but don't block state update
+            saveCart(newItems).catch(err => {
+                console.error('Failed to persist cart to storage:', err);
+                // In a production app, you might want to show a toast/notification here
+            });
             return newItems;
         });
 
@@ -139,6 +145,10 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
             }
         } catch (error) {
             console.error('Error syncing add to cart:', error);
+            // Rollback optimistic update on failure
+            setCartItems(previousItems);
+            await saveCart(previousItems);
+            throw error;
         }
     };
 
@@ -148,9 +158,12 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
         const itemToRemove = cartItems.find(item => item.cartItemId === cartItemId);
         const productId = itemToRemove?.productId;
 
+        const previousItems = cartItems;
         setCartItems(prevItems => {
             const newItems = prevItems.filter(item => item.cartItemId !== cartItemId);
-            saveCart(newItems);
+            saveCart(newItems).catch(err => {
+                console.error('Failed to persist cart removal:', err);
+            });
             return newItems;
         });
 
@@ -162,6 +175,10 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
                 }
             } catch (error) {
                 console.error('Error syncing remove from cart:', error);
+                // Rollback on failure
+                setCartItems(previousItems);
+                await saveCart(previousItems);
+                throw error;
             }
         }
     };
@@ -174,13 +191,16 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
         const itemToUpdate = cartItems.find(item => item.cartItemId === cartItemId);
         const productId = itemToUpdate?.productId;
 
+        const previousItems = cartItems;
         setCartItems(prevItems => {
             const newItems = prevItems.map(item =>
                 item.cartItemId === cartItemId
                     ? { ...item, quantity }
                     : item
             );
-            saveCart(newItems);
+            saveCart(newItems).catch(err => {
+                console.error('Failed to persist quantity update:', err);
+            });
             return newItems;
         });
 
@@ -192,6 +212,10 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
                 }
             } catch (error) {
                 console.error('Error syncing update quantity:', error);
+                // Rollback on failure
+                setCartItems(previousItems);
+                await saveCart(previousItems);
+                throw error;
             }
         }
     };

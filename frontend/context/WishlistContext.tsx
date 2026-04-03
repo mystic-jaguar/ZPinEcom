@@ -82,17 +82,21 @@ export const WishlistProvider = ({ children }: { children: ReactNode }) => {
             await AsyncStorage.setItem(WISHLIST_STORAGE_KEY, JSON.stringify(items));
         } catch (error) {
             console.error('Error saving wishlist:', error);
+            throw error;
         }
     };
 
     const addToWishlist = async (product: ProductObject) => {
         // Optimistic update
+        const previousItems = wishlistItems;
         setWishlistItems(prev => {
             if (prev.some(item => item.productId === product.productId)) {
                 return prev;
             }
             const newItems = [...prev, product];
-            saveWishlist(newItems);
+            saveWishlist(newItems).catch(err => {
+                console.error('Failed to persist wishlist:', err);
+            });
             return newItems;
         });
 
@@ -104,14 +108,21 @@ export const WishlistProvider = ({ children }: { children: ReactNode }) => {
             }
         } catch (error) {
             console.error('Error syncing add to wishlist:', error);
+            // Rollback on failure
+            setWishlistItems(previousItems);
+            await saveWishlist(previousItems);
+            throw error;
         }
     };
 
     const removeFromWishlist = async (productId: string) => {
         // Optimistic update
+        const previousItems = wishlistItems;
         setWishlistItems(prev => {
             const newItems = prev.filter(item => item.productId !== productId);
-            saveWishlist(newItems);
+            saveWishlist(newItems).catch(err => {
+                console.error('Failed to persist wishlist removal:', err);
+            });
             return newItems;
         });
 
@@ -123,6 +134,10 @@ export const WishlistProvider = ({ children }: { children: ReactNode }) => {
             }
         } catch (error) {
             console.error('Error syncing remove from wishlist:', error);
+            // Rollback on failure
+            setWishlistItems(previousItems);
+            await saveWishlist(previousItems);
+            throw error;
         }
     };
 

@@ -95,7 +95,7 @@ router.post('/new-order', async (req: Request, res: Response): Promise<void> => 
  * Query: ?sellerId=xxx
  */
 router.get('/new-order/count', async (req: Request, res: Response): Promise<void> => {
-  const { sellerId } = req.query;
+  const sellerId = req.query.sellerId as string;
 
   if (!sellerId) {
     res.status(400).json({ success: false, message: 'sellerId is required' });
