@@ -24,7 +24,9 @@ export default function TrackOrderScreen() {
     // Retrieve Order
     const order = getOrderById(orderId as string);
     const isInstant = order?.notes === 'instant_delivery';
-    const isStandard = !isInstant;
+
+    const canCancel = order && ['pending', 'processing', 'confirmed'].includes(order.status);
+    const canReturn = order && order.status === 'delivered';
 
     return (
         <View style={styles.mainContainer}>
@@ -121,9 +123,35 @@ export default function TrackOrderScreen() {
                         <Text style={styles.viewOrderText}>View Order</Text>
                     </TouchableOpacity>
 
-                    <TouchableOpacity style={styles.contactSupportBtn}>
-                        <Text style={styles.contactSupportText}>Contact Support</Text>
-                    </TouchableOpacity>
+                    {canCancel && (
+                        <TouchableOpacity
+                            style={styles.cancelBtn}
+                            onPress={() => router.push({
+                                pathname: '/profile/cancel-order',
+                                params: { orderId: orderId as string }
+                            })}
+                        >
+                            <Text style={styles.cancelBtnText}>Cancel Order</Text>
+                        </TouchableOpacity>
+                    )}
+
+                    {canReturn && (
+                        <TouchableOpacity
+                            style={styles.contactSupportBtn}
+                            onPress={() => router.push('/profile/returns')}
+                        >
+                            <Text style={styles.contactSupportText}>Return Order</Text>
+                        </TouchableOpacity>
+                    )}
+
+                    {!canCancel && !canReturn && (
+                        <TouchableOpacity
+                            style={styles.contactSupportBtn}
+                            onPress={() => router.push('/profile/help-center')}
+                        >
+                            <Text style={styles.contactSupportText}>Contact Support</Text>
+                        </TouchableOpacity>
+                    )}
                 </View>
             </View>
         </View>
@@ -281,5 +309,20 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '700',
         color: '#1a1a1a',
+    },
+    cancelBtn: {
+        flex: 1.5,
+        height: 54,
+        borderRadius: 16,
+        backgroundColor: '#FEE2E2',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: '#EF4444',
+    },
+    cancelBtnText: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#EF4444',
     },
 });

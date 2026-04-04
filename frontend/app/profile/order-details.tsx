@@ -19,10 +19,10 @@ export default function OrderDetailsScreen() {
     const order = getOrderById(orderId as string);
     const isInstantDelivery = order?.notes === 'instant_delivery';
 
-    // Calculate if order can be cancelled (within 24 hours of placement)
-    const canCancel = order && ['processing', 'pending'].includes(order.status);
+    // Can cancel only before it's out for delivery
+    const canCancel = order && ['pending', 'processing', 'confirmed'].includes(order.status);
 
-    // Calculate if order is eligible for return (within 5 days of delivery)
+    // Can return only after delivered
     const canReturn = order && order.status === 'delivered';
 
     const handleDownloadInvoice = () => {
