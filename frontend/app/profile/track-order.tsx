@@ -25,7 +25,7 @@ export default function TrackOrderScreen() {
     const order = getOrderById(orderId as string);
     const isInstant = order?.notes === 'instant_delivery';
 
-    const canCancel = order && ['pending', 'processing', 'confirmed'].includes(order.status);
+    const canCancel = order && ['pending', 'confirmed'].includes(order.status);
     const canReturn = order && order.status === 'delivered';
 
     return (

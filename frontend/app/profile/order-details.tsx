@@ -19,8 +19,8 @@ export default function OrderDetailsScreen() {
     const order = getOrderById(orderId as string);
     const isInstantDelivery = order?.notes === 'instant_delivery';
 
-    // Can cancel only before it's out for delivery
-    const canCancel = order && ['pending', 'processing', 'confirmed'].includes(order.status);
+    // Can cancel only before it's out for delivery (processing = out for delivery in timeline)
+    const canCancel = order && ['pending', 'confirmed'].includes(order.status);
 
     // Can return only after delivered
     const canReturn = order && order.status === 'delivered';
