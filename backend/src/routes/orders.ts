@@ -442,5 +442,54 @@ router.patch('/:id/cancel', authenticate, async (req: AuthRequest, res: Response
   }
 });
 
+// PATCH /api/v1/orders/:id/confirm — Vendor accepts the order
+router.patch('/:id/confirm', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    // Only the seller of this order can confirm it
+    const result = await pool.query(
+      `UPDATE ${ORDERS}
+       SET status = 'confirmed', updated_at = NOW()
+       WHERE id = $1 AND seller_id = $2 AND status = 'pending'
+       RETURNING id, order_number, status`,
+      [req.params.id, req.userId]
+    );
+
+    if (result.rows.length === 0) {
+      res.status(400).json({ success: false, message: 'Order not found or cannot be confirmed' });
+      return;
+    }
+
+    const order = result.rows[0];
+
+    // Notify the customer
+    const customerResult = await pool.query(
+      `SELECT user_id FROM ${ORDERS} WHERE id = $1`,
+      [req.params.id]
+    );
+    if (customerResult.rows.length > 0) {
+      await pool.query(
+        `INSERT INTO notifications (id, user_id, type, title, message, data, created_at)
+         VALUES ($1,$2,'order_update',$3,$4,$5, NOW())`,
+        [
+          generateId(),
+          customerResult.rows[0].user_id,
+          `Order Confirmed: ${order.order_number}`,
+          `Your order ${order.order_number} has been accepted by the vendor and is being prepared.`,
+          JSON.stringify({ orderId: order.id, orderNumber: order.order_number, status: 'confirmed' }),
+        ]
+      );
+    }
+
+    res.json({
+      success: true,
+      data: { orderId: order.id, orderNumber: order.order_number, status: 'confirmed' },
+      message: 'Order confirmed successfully',
+    });
+  } catch (err) {
+    console.error('confirmOrder error:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 export default router;
 

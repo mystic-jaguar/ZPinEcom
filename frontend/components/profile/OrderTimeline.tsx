@@ -1,43 +1,44 @@
-import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
 import React, { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
 
 const STEPS = [
     {
+        key: 'pending',
+        title: 'Ordered',
+        subtext: 'Your order has been placed successfully.',
+    },
+    {
         key: 'confirmed',
         title: 'Order Confirmed',
-        subtext: 'Your order has been placed successfully.',
-        icon: null,
+        subtext: 'Your order has been accepted by the vendor.',
     },
     {
-        key: 'shipped',
-        title: 'Shipped',
-        subtext: 'Item has been dispatched from warehouse.',
-        icon: null,
-    },
-    {
-        key: 'out_for_delivery',
-        title: 'Out for Delivery',
-        subtext: 'Your package is on the way.',
-        icon: <MaterialCommunityIcons name="truck-delivery" size={14} color="#fff" />,
+        key: 'processing',
+        title: 'Order Picked',
+        subtext: 'Your order has been picked up by the delivery partner.',
     },
     {
         key: 'delivered',
         title: 'Delivered',
         subtext: 'Package delivered successfully.',
-        icon: null,
     },
 ];
 
-// Map order status → active step index (0-based)
+// Map backend status → active step index (0-based)
 function statusToStep(status?: string): number {
     switch (status) {
-        case 'confirmed':   return 0;
-        case 'shipped':     return 1;
-        case 'out_for_delivery':
-        case 'processing':  return 2;
-        case 'delivered':   return 3;
-        default:            return 0; // pending → show first step active
+        case 'pending':
+            return 0;
+        case 'confirmed':
+        case 'processing':   // vendor accepts → sets processing → show as "Order Confirmed"
+            return 1;
+        case 'shipped':      // delivery partner picks up → show as "Order Picked"
+            return 2;
+        case 'delivered':
+            return 3;
+        default:
+            return 0;
     }
 }
 
@@ -50,14 +51,13 @@ interface StepProps {
     title: string;
     subtext?: string;
     date?: string;
-    icon?: React.ReactNode | null;
     isCompleted: boolean;
     isActive: boolean;
     isLast: boolean;
-    lineProgress: Animated.Value; // 0→1 fill of the connector below this step
+    lineProgress: Animated.Value;
 }
 
-function TimelineStep({ title, subtext, date, icon, isCompleted, isActive, isLast, lineProgress }: StepProps) {
+function TimelineStep({ title, subtext, date, isCompleted, isActive, isLast, lineProgress }: StepProps) {
     const lineHeight = lineProgress.interpolate({
         inputRange: [0, 1],
         outputRange: ['0%', '100%'],
@@ -74,7 +74,7 @@ function TimelineStep({ title, subtext, date, icon, isCompleted, isActive, isLas
                     {isCompleted ? (
                         <Feather name="check" size={14} color="#fff" />
                     ) : isActive ? (
-                        icon || <View style={styles.activePulse} />
+                        <View style={styles.activePulse} />
                     ) : (
                         <View style={styles.pendingDot} />
                     )}
@@ -133,7 +133,6 @@ export default function OrderTimeline({ status, dates }: OrderTimelineProps) {
                         title={step.title}
                         subtext={step.subtext}
                         date={dates?.[i]}
-                        icon={step.icon}
                         isCompleted={i < activeStep}
                         isActive={i === activeStep}
                         isLast={i === STEPS.length - 1}
