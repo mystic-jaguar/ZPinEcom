@@ -3,7 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as ExpoLocation from 'expo-location';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Dimensions, Image, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, Image, Linking, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
 import Header from '../../components/Header';
@@ -58,6 +58,22 @@ export default function HomeScreen() {
     const [showLocationModal, setShowLocationModal] = useState(false);
     const [isLoadingProducts, setIsLoadingProducts] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [refreshing, setRefreshing] = useState(false);
+
+    const onRefresh = async () => {
+        setRefreshing(true);
+        if (locationGranted) {
+            try {
+                const loc = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced });
+                await fetchProducts(loc.coords.latitude, loc.coords.longitude);
+            } catch {
+                await fetchProducts();
+            }
+        } else {
+            await fetchProducts();
+        }
+        setRefreshing(false);
+    };
 
     useEffect(() => {
         // Check current permission status first — only show pre-prompt if undetermined
@@ -223,7 +239,18 @@ export default function HomeScreen() {
                     fetchProducts();
                 }}
             />
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+            <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.scrollContent}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        colors={['#FBBF24']}
+                        tintColor="#FBBF24"
+                    />
+                }
+            >
 
                 <SearchBar
                     editable={false}

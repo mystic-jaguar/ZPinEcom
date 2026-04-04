@@ -1,7 +1,7 @@
 import { Feather, FontAwesome5 } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useState } from 'react';
+import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import DeliveryPartnerCard from '../../components/profile/DeliveryPartnerCard';
 import InstantTrialCard from '../../components/profile/InstantTrialCard';
 import OrderTimeline from '../../components/profile/OrderTimeline';
@@ -12,7 +12,14 @@ export default function TrackOrderScreen() {
     const router = useRouter();
     const params = useLocalSearchParams();
     const { orderId } = params;
-    const { getOrderById } = useOrder();
+    const { getOrderById, refreshOrders } = useOrder();
+    const [refreshing, setRefreshing] = useState(false);
+
+    const onRefresh = async () => {
+        setRefreshing(true);
+        await refreshOrders();
+        setRefreshing(false);
+    };
 
     // Retrieve Order
     const order = getOrderById(orderId as string);
@@ -68,6 +75,14 @@ export default function TrackOrderScreen() {
                     style={styles.scrollView}
                     contentContainerStyle={styles.scrollContent}
                     showsVerticalScrollIndicator={false}
+                    refreshControl={
+                        <RefreshControl
+                            refreshing={refreshing}
+                            onRefresh={onRefresh}
+                            colors={['#FBBF24']}
+                            tintColor="#FBBF24"
+                        />
+                    }
                 >
                     <View style={styles.overlapContainer}>
                         {/* Conditional Info Card (Overlapping) */}

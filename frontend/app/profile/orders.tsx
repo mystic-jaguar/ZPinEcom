@@ -1,7 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
-import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import OrderCard, { OrderStatus } from '../../components/profile/OrderCard';
 import OrderFilters from '../../components/profile/OrderFilters';
@@ -10,9 +10,16 @@ import { useOrder } from '../../context/OrderContext';
 
 export default function AllOrdersScreen() {
     const router = useRouter();
-    const { orders } = useOrder();
+    const { orders, refreshOrders } = useOrder();
     const [searchQuery, setSearchQuery] = useState('');
     const [activeFilter, setActiveFilter] = useState('All');
+    const [refreshing, setRefreshing] = useState(false);
+
+    const onRefresh = async () => {
+        setRefreshing(true);
+        await refreshOrders();
+        setRefreshing(false);
+    };
 
     const filteredOrders = useMemo(() => {
         return orders.filter((order) => {
@@ -68,6 +75,14 @@ export default function AllOrdersScreen() {
 
             <FlatList
                 data={filteredOrders}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        colors={['#FBBF24']}
+                        tintColor="#FBBF24"
+                    />
+                }
                 renderItem={({ item }) => (
                     <OrderCard
                         order={{

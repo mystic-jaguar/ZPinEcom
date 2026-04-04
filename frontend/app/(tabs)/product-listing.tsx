@@ -45,6 +45,13 @@ export default function ProductListing() {
         ratings: [],
         discounts: []
     });
+    const [refreshing, setRefreshing] = useState(false);
+
+    const onRefresh = async () => {
+        setRefreshing(true);
+        await loadProducts();
+        setRefreshing(false);
+    };
 
     // Fetch Products — use all descendant category names for server-side filtering
     useEffect(() => {
@@ -404,6 +411,14 @@ export default function ProductListing() {
                 columnWrapperStyle={styles.columnWrapper}
                 contentContainerStyle={styles.listContent}
                 showsVerticalScrollIndicator={false}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        colors={['#FBBF24']}
+                        tintColor="#FBBF24"
+                    />
+                }
                 ListEmptyComponent={
                     <View style={styles.emptyState}>
                         <Feather name="inbox" size={48} color="#ccc" />

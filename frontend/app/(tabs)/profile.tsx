@@ -5,7 +5,7 @@ import { authService } from '@/services/auth';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Dimensions, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, Image, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AvatarInitials from '../../components/common/AvatarInitials';
 import ProfileOption from '../../components/profile/ProfileOption';
@@ -33,12 +33,22 @@ export default function ProfileScreen() {
     const router = useRouter();
     const [logoutModalVisible, setLogoutModalVisible] = useState(false);
     const [recommended, setRecommended] = useState<ProductObject[]>([]);
+    const [refreshing, setRefreshing] = useState(false);
 
-    useEffect(() => {
+    const loadRecommended = () =>
         productService.getRecommended(recentSearches, 8)
             .then(setRecommended)
             .catch(() => {});
+
+    useEffect(() => {
+        loadRecommended();
     }, [recentSearches.join(',')]);
+
+    const onRefresh = async () => {
+        setRefreshing(true);
+        await loadRecommended();
+        setRefreshing(false);
+    };
 
     const handleLogout = async () => {
         try {
@@ -75,7 +85,18 @@ export default function ProfileScreen() {
             {/* Header Background */}
             <View style={styles.headerBg} />
 
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+            <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.scrollContent}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        colors={['#FBBF24']}
+                        tintColor="#FBBF24"
+                    />
+                }
+            >
 
                 {/* Header Content */}
                 <SafeAreaView edges={['top']} style={styles.headerSafeArea}>
