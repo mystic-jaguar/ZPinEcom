@@ -219,7 +219,7 @@ export default function CancelOrderScreen() {
                                     </View>
                                     <Text style={styles.refundTitle}>ZPIN Wallet</Text>
                                 </View>
-                                <Text style={styles.refundDesc}>Instant refund to your ZPin Wallet. Can be used for future purchases.</Text>
+                                <Text style={styles.refundDesc}>Instant refund to your ZPIN Wallet. Can be used for future purchases.</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
