@@ -195,15 +195,26 @@ router.get('/category/:categoryName', productListLimiter, async (req: Request, r
   const offset = (page - 1) * limit;
   const { categoryName } = req.params;
 
+  // Use exact case-insensitive match for deepest_category_name,
+  // and a JSON element match for category_path to avoid substring false-positives
+  // e.g. "shirts" should NOT match "t-shirts" or "sweatshirts"
   try {
     const countResult = await pool.query(
       `SELECT COUNT(*) FROM products
        WHERE in_stock = true
          AND (
-           deepest_category_name ILIKE $1
-           OR category_path::text ILIKE $2
+           LOWER(deepest_category_name) = LOWER($1)
+           OR EXISTS (
+             SELECT 1 FROM jsonb_array_elements(
+               CASE WHEN category_path IS NOT NULL
+                    THEN category_path::jsonb
+                    ELSE '[]'::jsonb
+               END
+             ) AS elem
+             WHERE LOWER(elem->>'name') = LOWER($1)
+           )
          )`,
-      [`%${categoryName}%`, `%${categoryName}%`]
+      [categoryName]
     );
     const total = Number(countResult.rows[0].count);
 
@@ -216,13 +227,21 @@ router.get('/category/:categoryName', productListLimiter, async (req: Request, r
        LEFT JOIN product_reviews pr ON pr.product_id = p.id
        WHERE p.in_stock = true
          AND (
-           p.deepest_category_name ILIKE $1
-           OR p.category_path::text ILIKE $2
+           LOWER(p.deepest_category_name) = LOWER($1)
+           OR EXISTS (
+             SELECT 1 FROM jsonb_array_elements(
+               CASE WHEN p.category_path IS NOT NULL
+                    THEN p.category_path::jsonb
+                    ELSE '[]'::jsonb
+               END
+             ) AS elem
+             WHERE LOWER(elem->>'name') = LOWER($1)
+           )
          )
        GROUP BY p.id
        ORDER BY p.created_at DESC
-       LIMIT $3 OFFSET $4`,
-      [`%${categoryName}%`, `%${categoryName}%`, limit, offset]
+       LIMIT $2 OFFSET $3`,
+      [categoryName, limit, offset]
     );
 
     res.json({

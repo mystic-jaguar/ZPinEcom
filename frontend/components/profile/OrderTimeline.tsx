@@ -4,11 +4,6 @@ import { Animated, StyleSheet, Text, View } from 'react-native';
 
 const STEPS = [
     {
-        key: 'pending',
-        title: 'Ordered',
-        subtext: 'Your order has been placed successfully.',
-    },
-    {
         key: 'confirmed',
         title: 'Order Confirmed',
         subtext: 'Your order has been accepted by the vendor.',
@@ -29,14 +24,13 @@ const STEPS = [
 function statusToStep(status?: string): number {
     switch (status) {
         case 'pending':
-            return 0;
         case 'confirmed':
         case 'processing':   // vendor accepts → sets processing → show as "Order Confirmed"
-            return 1;
+            return 0;
         case 'shipped':      // delivery partner picks up → show as "Order Picked"
-            return 2;
+            return 1;
         case 'delivered':
-            return 3;
+            return 2;
         default:
             return 0;
     }

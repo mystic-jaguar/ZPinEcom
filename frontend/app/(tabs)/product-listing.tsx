@@ -6,6 +6,7 @@ import {
     Dimensions,
     FlatList,
     Image,
+    RefreshControl,
     ScrollView,
     StyleSheet,
     Text,
@@ -68,23 +69,14 @@ export default function ProductListing() {
             const targetName = subCat || rootCat;
 
             if (targetName) {
-                // Fetch by the most specific name available
-                // The backend ILIKE matches deepest_category_name and category_path
                 const response = await productService.getProductsByCategory(targetName, { limit: 500 });
-                let items = (response as any).products || (response as any).data || [];
-
-                // If subCategoryName gave 0 results, fall back to rootCat
-                if (items.length === 0 && subCat && rootCat && rootCat !== subCat) {
-                    const fallback = await productService.getProductsByCategory(rootCat, { limit: 500 });
-                    items = (fallback as any).products || (fallback as any).data || [];
-                }
+                const items = (response as any).products || (response as any).data || [];
 
                 setProducts(items.map((p: ProductObject) => ({
                     ...p,
                     productId: p.productId || (p as any).id,
                 })));
             } else {
-                // No category — show all
                 const response = await productService.getProducts({ limit: 200 });
                 setProducts(response.products);
             }

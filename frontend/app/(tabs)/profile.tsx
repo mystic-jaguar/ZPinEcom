@@ -114,7 +114,7 @@ export default function ProfileScreen() {
                                 name={user.name || 'User'}
                                 size={80}
                                 borderWidth={3}
-                                borderColor="#fff"
+                                borderColor="#000"
                             />
                             <View style={styles.onlineBadge} />
                         </View>
