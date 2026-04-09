@@ -1,10 +1,53 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios, { AxiosError, AxiosInstance } from 'axios';
+import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 
 // API Configuration
 // URL is set via EXPO_PUBLIC_API_URL environment variable in .env
 // Never hardcode IPs or credentials here — use .env (gitignored)
-const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api/v1/';
+const ensureApiV1Base = (url: string): string => {
+    const trimmed = url.trim().replace(/\/+$/, '');
+    return trimmed.endsWith('/api/v1') ? `${trimmed}/` : `${trimmed}/api/v1/`;
+};
+
+const getExpoHostIp = (): string | null => {
+    const hostUri =
+        Constants.expoConfig?.hostUri ||
+        (Constants as any)?.manifest2?.extra?.expoGo?.debuggerHost ||
+        (Constants as any)?.manifest?.debuggerHost;
+
+    if (!hostUri || typeof hostUri !== 'string') {
+        return null;
+    }
+
+    return hostUri.split(':')[0] || null;
+};
+
+const resolveBaseUrl = (): string => {
+    const envUrl = process.env.EXPO_PUBLIC_API_URL;
+    if (envUrl) {
+        return ensureApiV1Base(envUrl);
+    }
+
+    const hostIp = getExpoHostIp();
+    if (hostIp) {
+        return `http://${hostIp}:5000/api/v1/`;
+    }
+
+    // Android emulator can't reach localhost of host machine directly.
+    if (Platform.OS === 'android') {
+        return 'http://10.0.2.2:5000/api/v1/';
+    }
+
+    return 'http://localhost:5000/api/v1/';
+};
+
+const BASE_URL = resolveBaseUrl();
+
+if (__DEV__) {
+    console.log(`[API] Base URL: ${BASE_URL}`);
+}
 
 // Storage keys
 export const STORAGE_KEYS = {

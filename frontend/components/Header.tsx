@@ -39,13 +39,13 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingRight: '5%',
         paddingStart: '1%',
-        paddingVertical: 10,
+        paddingVertical: 1,
         backgroundColor: '#fff'
     },
     logoContainer: {
-        height: 50,
+        height: 70,
         // Width can be flexible or fixed depending on logo aspect ratio
-        width: 100,
+        width: 140,
         justifyContent: 'center',
         alignItems: 'flex-start'
     },
