@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import express from 'express';
 import helmet from 'helmet';
 
+import { pool } from './db';
 import { httpsRedirect } from './middleware/httpsRedirect';
 import { inputSanitizer } from './middleware/inputSanitizer';
 import { globalLimiter } from './middleware/rateLimits';
@@ -16,12 +17,21 @@ import productRoutes from './routes/products';
 import userRoutes from './routes/users';
 import walletRoutes from './routes/wallet';
 import wishlistRoutes from './routes/wishlist';
+import { prepareSensitiveDataEncryption } from './utils/encryption';
 import { logger } from './utils/logger';
 
 dotenv.config();
 
 // Validate required env vars at startup — fail fast rather than silently
-const REQUIRED_ENV = ['DB_HOST', 'DB_NAME', 'DB_USER', 'DB_PASSWORD', 'JWT_SECRET', 'JWT_REFRESH_SECRET'];
+const REQUIRED_ENV = [
+  'DB_HOST',
+  'DB_NAME',
+  'DB_USER',
+  'DB_PASSWORD',
+  'JWT_SECRET',
+  'JWT_REFRESH_SECRET',
+  'DATA_ENCRYPTION_KEY',
+];
 const missing = REQUIRED_ENV.filter(k => !process.env[k]);
 if (missing.length > 0) {
   logger.error('startup.missing_env', { missing });
@@ -101,8 +111,17 @@ app.use((err: any, req: express.Request, res: express.Response, _next: express.N
 });
 
 // ─── Start ───────────────────────────────────────────────────────────────────
-app.listen(PORT, '0.0.0.0', () => {
-  logger.info('server.started', { port: PORT, env: process.env.NODE_ENV || 'development' });
+async function startServer() {
+  await prepareSensitiveDataEncryption(pool);
+
+  app.listen(PORT, '0.0.0.0', () => {
+    logger.info('server.started', { port: PORT, env: process.env.NODE_ENV || 'development' });
+  });
+}
+
+startServer().catch((err) => {
+  logger.error('startup.failed', { message: err.message, stack: err.stack });
+  process.exit(1);
 });
 
 // Handle uncaught errors — log before crashing

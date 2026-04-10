@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-**Project Status:** 60% Complete | Production-Ready for MVP with critical gaps
+**Project Status:** 72% Complete | Production-Ready for MVP with critical gaps
 
 **Backend:** 9 API route modules with 40+ endpoints | Express.js + PostgreSQL
 **Frontend:** Expo React Native | 13+ screens across auth, shopping, checkout, profiles
@@ -159,7 +159,7 @@
 
 ---
 
-#### Order Management (Partial)
+#### Order Management
 | Feature | Status | Details |
 |---------|--------|---------|
 | Create Order | ✅ | From cart with address, payment method, items |
@@ -169,27 +169,19 @@
 | Payment Status | ✅ | pending, completed, failed, refunded |
 | Estimated Delivery | ✅ | Calculated based on order date |
 | Tracking Number | ✅ | Generated on shipment |
+| Cancel Order | ✅ | Endpoint implemented: `/api/v1/orders/:id/cancel` |
+| Return Order | ✅ | Endpoint implemented: `/api/v1/orders/:id/return` |
+| Return Reason | ✅ | Captured in return request payload |
+| Return Status Tracking | ✅ | Endpoints implemented: `/api/v1/orders/:id/return-status` |
+| Track Order | ✅ | Endpoint implemented: `/api/v1/orders/:id/track` |
 
 **Implementation Details:**
-- Backend: `routes/orders.ts` (partial - 6 endpoints working)
+- Backend: `routes/orders.ts` (comprehensive order lifecycle endpoints)
 - Frontend: `app/profile/orders.tsx`, `app/profile/order-details.tsx`
 
 ---
 
 ### ⚠️ PARTIAL IMPLEMENTATIONS (Needs Completion)
-
-#### Order Cancellation & Returns
-| Feature | Status | Details |
-|---------|--------|---------|
-| Cancel Order | ❌ | No endpoint: `/api/v1/orders/:id/cancel` |
-| Return Order | ❌ | No endpoint: `/api/v1/orders/:id/return` |
-| Return Reason | ❌ | Can't capture return reason |
-| Return Status Tracking | ❌ | UI exists but no backend support |
-| Track Order | ❌ | No endpoint: `/api/v1/orders/:id/track` |
-
-**Impact:** Frontend screens exist (`cancel-order.tsx`, `returns.tsx`) but API calls will fail
-
----
 
 #### Product Reviews & Ratings
 | Feature | Status | Details |
@@ -241,7 +233,7 @@
 ### 🔧 TECHNICAL IMPLEMENTATION DETAILS
 
 #### Backend Database Schema
-**13 Tables Implemented:**
+**17 Tables Implemented:**
 1. `users` - User accounts with roles
 2. `refresh_tokens` - JWT refresh token storage
 3. `auth_tokens` - Active session tracking
@@ -254,11 +246,11 @@
 10. `order_items` - Order line items
 11. `coupons` - Promotion codes with usage tracking
 12. `wallets` - User wallet balances
-13. `transactions` - Wallet debit/credit history
+13. `wallet_transactions` - Wallet debit/credit history
 14. `notifications` - User notification feed
-15. `product_reviews` (schema exists but routes incomplete)
+15. `return_requests` - Return order requests and status timeline
 16. `addresses` - User shipping addresses
-17. `product_reviews` - Ratings and reviews (rate limiter exists but no routes)
+17. `product_reviews` - Ratings and reviews (schema exists; routes incomplete)
 
 **Rate Limiters Configured:**
 - Login: 10 attempts / 15 min
@@ -349,16 +341,18 @@ Root (_layout.tsx)
 - CORS configuration
 - Password hashing with bcrypt (12 rounds)
 - Helmet security headers (HSTS, CSP)
+- Input sanitization middleware
 - Request logging with structured logs
+- Sensitive data encryption at rest (wallet balances and address fields)
+- Encrypted shipping-address payload storage for orders
 
 ### ⚠️ Missing/Gaps
 - No payment PCI compliance (payment endpoints missing)
 - No CSRF protection needed (API-only, but good practice)
-- No input sanitization middleware
 - No SQL injection protection (using parameterized queries, so safe)
-- No sensitive data encryption (wallet balances, addresses in plain DB)
 - No audit logging for sensitive operations
 - No 2FA/MFA support
+- Encryption key rotation policy/process not implemented yet
 
 ---
 
@@ -385,7 +379,7 @@ Root (_layout.tsx)
 
 ## 🚀 DEPLOYMENT READINESS
 
-### MVP Ready (60% - Can Launch With Constraints)
+### MVP Ready (72% - Can Launch With Constraints)
 ✅ Core e-commerce flows working  
 ✅ User authentication complete  
 ✅ Product browsing & discovery  
@@ -393,10 +387,11 @@ Root (_layout.tsx)
 ✅ Checkout (shipping address)  
 ✅ Coupon application  
 ✅ Order creation (with COD)  
+✅ Order cancellation/returns and tracking endpoints  
+✅ Encryption at rest for wallet/address data  
 
 ### Blocking Issues for Production
 ❌ **Payment gateway integration required**  
-❌ Order cancellation/returns  
 ❌ Product reviews  
 
 ### Recommended Phase 2 Work
@@ -417,10 +412,10 @@ Root (_layout.tsx)
 3. Test end-to-end checkout flow
 
 ### Short-term (Week 1-2)
-1. Add order cancellation endpoint
-2. Add return management endpoints
-3. Complete review system routes
-4. Fix frontend API error handling for payment failures
+1. Complete review system routes
+2. Fix frontend API error handling for payment failures
+3. Add payment integration retry/reconciliation flows
+4. Add encryption key rotation runbook and audit logging
 
 ### Medium-term (Week 3-4)
 1. Admin dashboard for order fulfillment
@@ -441,10 +436,10 @@ Root (_layout.tsx)
 | User Profile | ✅ 90% | 8/9 | Edit endpoints | Good |
 | Coupons | ✅ 100% | 4/4 | 0 | Production-ready |
 | Wallet | ✅ 90% | 4/5 | Top-up flow | Good |
-| Orders | ⚠️ 60% | 4/8 | Cancel, Return, Track | Partial |
+| Orders | ✅ 90% | 9/10 | Payment verification coupling | Good |
 | Payments | ❌ 0% | 0/5 | All routes | BLOCKING |
 | Notifications | ✅ 90% | 5/5 | Frontend UI | Good |
-| **Overall** | **⚠️ 60%** | **49/58** | **9 critical** | **MVP-ready** |
+| **Overall** | **⚠️ 72%** | **54/58** | **4 critical** | **MVP-ready** |
 
 ---
 

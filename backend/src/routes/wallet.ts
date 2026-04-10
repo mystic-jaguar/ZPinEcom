@@ -1,19 +1,22 @@
 import { Response, Router } from 'express';
 import { pool } from '../db';
 import { authenticate, AuthRequest } from '../middleware/auth';
+import { decryptMoney, encryptMoney } from '../utils/encryption';
 import { generateId } from '../utils/id';
 
 const router = Router();
 
 // ── Helper: get or create wallet for a user ───────────────────────────────────
-async function getOrCreateWallet(userId: string) {
-  const existing = await pool.query('SELECT * FROM wallets WHERE user_id = $1', [userId]);
+type Queryable = { query: (text: string, params?: any[]) => Promise<any> };
+
+async function getOrCreateWallet(userId: string, db: Queryable = pool) {
+  const existing = await db.query('SELECT * FROM wallets WHERE user_id = $1', [userId]);
   if (existing.rows.length > 0) return existing.rows[0];
 
   const walletId = generateId();
-  const created = await pool.query(
-    `INSERT INTO wallets (id, user_id, balance) VALUES ($1,$2,0.00) RETURNING *`,
-    [walletId, userId]
+  const created = await db.query(
+    `INSERT INTO wallets (id, user_id, balance) VALUES ($1,$2,$3) RETURNING *`,
+    [walletId, userId, encryptMoney(0)]
   );
   return created.rows[0];
 }
@@ -36,7 +39,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response): Promise<v
       success: true,
       data: {
         walletId: wallet.id,
-        balance: Number(wallet.balance),
+        balance: decryptMoney(wallet.balance),
         transactions: txns.rows.map(t => ({
           id: t.id,
           type: t.type,
@@ -64,25 +67,38 @@ router.post('/credit', authenticate, async (req: AuthRequest, res: Response): Pr
   }
 
   try {
-    const wallet = await getOrCreateWallet(req.userId!);
+    const client = await pool.connect();
+    let newBalance = 0;
 
-    await pool.query(
-      `UPDATE wallets SET balance = balance + $1, updated_at = NOW() WHERE id = $2`,
-      [amount, wallet.id]
-    );
+    try {
+      await client.query('BEGIN');
+      const wallet = await getOrCreateWallet(req.userId!, client);
+      const currentBalance = decryptMoney(wallet.balance);
+      newBalance = currentBalance + Number(amount);
 
-    await pool.query(
-      `INSERT INTO wallet_transactions (wallet_id, user_id, type, amount, description, reference_id)
-       VALUES ($1,$2,'credit',$3,$4,$5)`,
-      [wallet.id, req.userId, amount, description || 'Wallet credit', referenceId || null]
-    );
+      await client.query(
+        `UPDATE wallets SET balance = $1, updated_at = NOW() WHERE id = $2`,
+        [encryptMoney(newBalance), wallet.id]
+      );
 
-    const updated = await pool.query('SELECT balance FROM wallets WHERE id = $1', [wallet.id]);
+      await client.query(
+        `INSERT INTO wallet_transactions (wallet_id, user_id, type, amount, description, reference_id)
+         VALUES ($1,$2,'credit',$3,$4,$5)`,
+        [wallet.id, req.userId, amount, description || 'Wallet credit', referenceId || null]
+      );
+
+      await client.query('COMMIT');
+    } catch (txErr) {
+      await client.query('ROLLBACK');
+      throw txErr;
+    } finally {
+      client.release();
+    }
 
     res.json({
       success: true,
       message: `₹${Number(amount).toFixed(2)} credited to ZPIN Wallet`,
-      data: { newBalance: Number(updated.rows[0].balance) },
+      data: { newBalance },
     });
   } catch (err) {
     console.error('creditWallet error:', err);
@@ -100,30 +116,45 @@ router.post('/debit', authenticate, async (req: AuthRequest, res: Response): Pro
   }
 
   try {
-    const wallet = await getOrCreateWallet(req.userId!);
+    const client = await pool.connect();
+    let newBalance = 0;
 
-    if (Number(wallet.balance) < Number(amount)) {
-      res.status(400).json({ success: false, message: 'Insufficient wallet balance' });
-      return;
+    try {
+      await client.query('BEGIN');
+      const wallet = await getOrCreateWallet(req.userId!, client);
+      const currentBalance = decryptMoney(wallet.balance);
+
+      if (currentBalance < Number(amount)) {
+        await client.query('ROLLBACK');
+        res.status(400).json({ success: false, message: 'Insufficient wallet balance' });
+        return;
+      }
+
+      newBalance = currentBalance - Number(amount);
+
+      await client.query(
+        `UPDATE wallets SET balance = $1, updated_at = NOW() WHERE id = $2`,
+        [encryptMoney(newBalance), wallet.id]
+      );
+
+      await client.query(
+        `INSERT INTO wallet_transactions (wallet_id, user_id, type, amount, description, reference_id)
+         VALUES ($1,$2,'debit',$3,$4,$5)`,
+        [wallet.id, req.userId, amount, description || 'Wallet payment', referenceId || null]
+      );
+
+      await client.query('COMMIT');
+    } catch (txErr) {
+      await client.query('ROLLBACK');
+      throw txErr;
+    } finally {
+      client.release();
     }
-
-    await pool.query(
-      `UPDATE wallets SET balance = balance - $1, updated_at = NOW() WHERE id = $2`,
-      [amount, wallet.id]
-    );
-
-    await pool.query(
-      `INSERT INTO wallet_transactions (wallet_id, user_id, type, amount, description, reference_id)
-       VALUES ($1,$2,'debit',$3,$4,$5)`,
-      [wallet.id, req.userId, amount, description || 'Wallet payment', referenceId || null]
-    );
-
-    const updated = await pool.query('SELECT balance FROM wallets WHERE id = $1', [wallet.id]);
 
     res.json({
       success: true,
       message: `₹${Number(amount).toFixed(2)} debited from ZPIN Wallet`,
-      data: { newBalance: Number(updated.rows[0].balance) },
+      data: { newBalance },
     });
   } catch (err) {
     console.error('debitWallet error:', err);

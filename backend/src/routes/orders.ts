@@ -2,6 +2,7 @@ import { Response, Router } from 'express';
 import { pool } from '../db';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { orderCreateLimiter } from '../middleware/rateLimits';
+import { decryptAddressPayload, decryptMoney, encryptAddressPayload, encryptMoney } from '../utils/encryption';
 import { generateId } from '../utils/id';
 import { safeIdentifier } from '../utils/sql';
 
@@ -126,8 +127,8 @@ async function getOrCreateWallet(userId: string) {
 
   const walletId = generateId();
   const created = await pool.query(
-    `INSERT INTO wallets (id, user_id, balance) VALUES ($1,$2,0.00) RETURNING *`,
-    [walletId, userId]
+    `INSERT INTO wallets (id, user_id, balance) VALUES ($1,$2,$3) RETURNING *`,
+    [walletId, userId, encryptMoney(0)]
   );
   return created.rows[0];
 }
@@ -143,7 +144,7 @@ function normalizeOrder(row: any) {
     shippingAmount: Number(row.shipping_amount || 0),
     taxAmount: Number(row.tax_amount || 0),
     finalAmount: Number(row.final_amount),
-    shippingAddress: row.shipping_address,
+    shippingAddress: decryptAddressPayload(row.shipping_address),
     paymentMethod: row.payment_method,
     paymentId: row.payment_id,
     estimatedDelivery: row.estimated_delivery,
@@ -362,12 +363,13 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
       return;
     }
 
-    const addr = addrResult.rows[0];
+    const addr = decryptAddressPayload(addrResult.rows[0]);
     const shippingAddress = {
       name: addr.name, phone: addr.phone,
       address: addr.address_line1, city: addr.city,
       state: addr.state, pincode: addr.pincode, country: addr.country,
     };
+    const encryptedShippingAddress = encryptAddressPayload(shippingAddress);
 
     const totalAmount = cartResult.rows.reduce(
       (sum: number, item: any) => sum + Number(item.price) * item.quantity, 0
@@ -396,7 +398,7 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
          (NOW() AT TIME ZONE 'Asia/Kolkata'),
          (NOW() AT TIME ZONE 'Asia/Kolkata'))`,
       [orderId, orderNumber, req.userId, primarySellerId, totalAmount, shippingAmount, taxAmount, finalAmount,
-       JSON.stringify(shippingAddress), paymentMethod, notes || '']
+       JSON.stringify(encryptedShippingAddress), paymentMethod, notes || '']
     );
 
     for (const item of cartResult.rows) {
@@ -432,7 +434,7 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
           itemCount: customerItems.length,
           total: finalAmount,
           items: customerItems,
-          shippingAddress,
+          shippingAddress: encryptedShippingAddress,
           paymentMethod,
         }),
       ]
@@ -465,7 +467,7 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
               price: Number(i.price),
               image: i.image || null,
             })),
-            shippingAddress,
+            shippingAddress: encryptedShippingAddress,
             paymentMethod,
           }),
         ]
@@ -764,9 +766,10 @@ router.patch('/:id/cancel', authenticate, async (req: AuthRequest, res: Response
     // Credit wallet if user chose wallet refund
     if (refundMethod === 'wallet' && refundAmount > 0) {
       const wallet = await getOrCreateWallet(req.userId!);
+      const updatedBalance = decryptMoney(wallet.balance) + refundAmount;
       await pool.query(
-        `UPDATE wallets SET balance = balance + $1, updated_at = NOW() WHERE id = $2`,
-        [refundAmount, wallet.id]
+        `UPDATE wallets SET balance = $1, updated_at = NOW() WHERE id = $2`,
+        [encryptMoney(updatedBalance), wallet.id]
       );
       await pool.query(
         `INSERT INTO wallet_transactions (wallet_id, user_id, type, amount, description, reference_id)

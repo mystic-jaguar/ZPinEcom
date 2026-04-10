@@ -1,5 +1,6 @@
 import { Request, Response, Router } from 'express';
 import { pool } from '../db';
+import { decryptAddressPayload } from '../utils/encryption';
 import { isValidShortId } from '../utils/id';
 
 const router = Router();
@@ -81,10 +82,23 @@ router.post('/new-order', async (req: Request, res: Response): Promise<void> => 
         id: n.id,
         title: n.title,
         message: n.message,
-        data: (() => { try { return JSON.parse(n.data); } catch { return {}; } })(),
+        data: (() => {
+          try {
+            const parsed = JSON.parse(n.data);
+            if (parsed?.shippingAddress) {
+              parsed.shippingAddress = decryptAddressPayload(parsed.shippingAddress);
+            }
+            return parsed;
+          } catch {
+            return {};
+          }
+        })(),
         createdAt: n.created_at,
       })),
-      orders: ordersResult.rows,
+      orders: ordersResult.rows.map((row) => ({
+        ...row,
+        shipping_address: decryptAddressPayload(row.shipping_address || {}),
+      })),
     });
   } catch (err) {
     console.error('notifications/new-order error:', err);

@@ -54,14 +54,14 @@ CREATE INDEX IF NOT EXISTS idx_auth_tokens_token   ON auth_tokens(token);
 CREATE TABLE IF NOT EXISTS addresses (
   id            VARCHAR(7)   PRIMARY KEY,
   user_id       VARCHAR(7)   NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  name          VARCHAR(255) NOT NULL,
-  phone         VARCHAR(20),
+  name          TEXT         NOT NULL,
+  phone         TEXT,
   address_line1 TEXT         NOT NULL,
   address_line2 TEXT,
-  city          VARCHAR(100) NOT NULL,
-  state         VARCHAR(100) NOT NULL,
-  pincode       VARCHAR(20)  NOT NULL,
-  country       VARCHAR(100) NOT NULL DEFAULT 'India',
+  city          TEXT         NOT NULL,
+  state         TEXT         NOT NULL,
+  pincode       TEXT         NOT NULL,
+  country       TEXT         NOT NULL DEFAULT 'India',
   landmark      TEXT,
   label         VARCHAR(50)  NOT NULL DEFAULT 'Home',
   is_default    BOOLEAN      NOT NULL DEFAULT false,
@@ -159,7 +159,31 @@ CREATE TABLE IF NOT EXISTS order_cancellations (
 );
 CREATE INDEX IF NOT EXISTS idx_order_cancellations_order_id ON order_cancellations(order_id);
 
--- ── 11-13. products, product_images, product_reviews ──────────────────────────
+-- ── 11. wallets ───────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS wallets (
+  id         VARCHAR(7)  PRIMARY KEY,
+  user_id    VARCHAR(7)  NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+  balance    TEXT        NOT NULL,
+  created_at TIMESTAMP   NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP   NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_wallets_user_id ON wallets(user_id);
+
+-- ── 12. wallet_transactions ──────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS wallet_transactions (
+  id           VARCHAR(7)    PRIMARY KEY,
+  wallet_id    VARCHAR(7)    NOT NULL REFERENCES wallets(id) ON DELETE CASCADE,
+  user_id      VARCHAR(7)    NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  type         VARCHAR(20)   NOT NULL CHECK (type IN ('credit', 'debit')),
+  amount       NUMERIC(10,2) NOT NULL CHECK (amount > 0),
+  description  TEXT,
+  reference_id VARCHAR(64),
+  created_at   TIMESTAMP     NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_wallet_transactions_wallet_id ON wallet_transactions(wallet_id);
+CREATE INDEX IF NOT EXISTS idx_wallet_transactions_user_id ON wallet_transactions(user_id);
+
+-- ── 13-15. products, product_images, product_reviews ──────────────────────────
 -- products and product_images tables are managed separately (seeded externally).
 -- product_reviews is created here to ensure it exists on fresh DB deployments.
 

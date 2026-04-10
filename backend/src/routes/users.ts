@@ -2,6 +2,7 @@ import { Response, Router } from 'express';
 import { pool } from '../db';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { addressLimiter } from '../middleware/rateLimits';
+import { decryptAddressPayload, encryptAddressPayload } from '../utils/encryption';
 import { generateId } from '../utils/id';
 import { safeIdentifier } from '../utils/sql';
 
@@ -42,7 +43,7 @@ function normalizeOrder(row: any) {
     shippingAmount: Number(row.shipping_amount || 0),
     taxAmount: Number(row.tax_amount || 0),
     finalAmount: Number(row.final_amount || 0),
-    shippingAddress: row.shipping_address || {},
+    shippingAddress: decryptAddressPayload(row.shipping_address || {}),
     paymentMethod: row.payment_method || 'cod',
     paymentId: row.payment_id,
     estimatedDelivery: row.estimated_delivery,
@@ -53,6 +54,10 @@ function normalizeOrder(row: any) {
     updatedAt: row.updated_at,
     date: row.created_at,
   };
+}
+
+function normalizeAddress(row: any) {
+  return decryptAddressPayload(row);
 }
 
 // ── GET /api/v1/users/orders ──────────────────────────────────────────────────
@@ -112,7 +117,7 @@ router.get('/shipping-addresses', authenticate, async (req: AuthRequest, res: Re
       `SELECT * FROM ${ADDRESSES} WHERE user_id = $1 ORDER BY is_default DESC, created_at DESC`,
       [req.userId]
     );
-    res.json({ success: true, data: result.rows });
+    res.json({ success: true, data: result.rows.map(normalizeAddress) });
   } catch (err) {
     console.error('getAddresses error:', err);
     res.status(500).json({ success: false, message: 'Server error' });
@@ -201,6 +206,18 @@ router.post('/shipping-address', authenticate, addressLimiter, async (req: AuthR
   const { name, phone, addressLine1, addressLine2, city, state, pincode, country, landmark, label, isDefault } = req.body;
 
   try {
+    const encryptedAddress = encryptAddressPayload({
+      name,
+      phone,
+      address_line1: addressLine1,
+      address_line2: addressLine2 || '',
+      city,
+      state,
+      pincode,
+      country: country || 'India',
+      landmark: landmark || '',
+    });
+
     if (isDefault) {
       await pool.query(
         `UPDATE ${ADDRESSES} SET is_default = false WHERE user_id = $1`,
@@ -212,10 +229,24 @@ router.post('/shipping-address', authenticate, addressLimiter, async (req: AuthR
       `INSERT INTO ${ADDRESSES}
         (id, user_id, name, phone, address_line1, address_line2, city, state, pincode, country, landmark, label, is_default, created_at, updated_at)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,NOW(),NOW()) RETURNING *`,
-      [generateId(), req.userId, name, phone, addressLine1, addressLine2 || '', city, state, pincode, country || 'India', landmark || '', label || 'Home', isDefault || false]
+      [
+        generateId(),
+        req.userId,
+        encryptedAddress.name,
+        encryptedAddress.phone,
+        encryptedAddress.address_line1,
+        encryptedAddress.address_line2,
+        encryptedAddress.city,
+        encryptedAddress.state,
+        encryptedAddress.pincode,
+        encryptedAddress.country,
+        encryptedAddress.landmark,
+        label || 'Home',
+        isDefault || false,
+      ]
     );
 
-    res.status(201).json({ success: true, data: result.rows[0] });
+    res.status(201).json({ success: true, data: normalizeAddress(result.rows[0]) });
   } catch (err) {
     console.error('addAddress error:', err);
     res.status(500).json({ success: false, message: 'Server error' });
