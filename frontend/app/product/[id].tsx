@@ -11,7 +11,7 @@ import { useCart } from '../../context/CartContext';
 import { useOrder } from '../../context/OrderContext';
 import { useUser } from '../../context/UserContext';
 import { useWishlist } from '../../context/WishlistContext';
-import apiClient from '../../services/api';
+import apiClient, { tokenManager } from '../../services/api';
 import { productService } from '../../services/product';
 import { reviewService } from '../../services/review';
 import { ProductObject, ReviewObject } from '../../types/types';
@@ -59,9 +59,12 @@ export default function ProductDetails() {
 
     const loadReviews = async (currentProductId: string) => {
         try {
+            const accessToken = await tokenManager.getAccessToken();
             const [reviewsRes, mineRes] = await Promise.all([
                 reviewService.getProductReviews(currentProductId, 1, 10),
-                isAuthenticated ? reviewService.getProductReviews(currentProductId, 1, 1, true).catch(() => null) : Promise.resolve(null),
+                accessToken && accessToken !== 'null' && accessToken !== 'undefined'
+                    ? reviewService.getProductReviews(currentProductId, 1, 1, true).catch(() => null)
+                    : Promise.resolve(null),
             ]);
             setReviews(reviewsRes.data || []);
             setReviewTotal(reviewsRes.pagination?.totalItems || 0);

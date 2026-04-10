@@ -139,6 +139,22 @@ apiClient.interceptors.request.use(
     }
 );
 
+// Shared refresh promise to prevent concurrent token refresh race conditions.
+// If multiple requests fail with 401 simultaneously, only one refresh call is made.
+let refreshPromise: Promise<string> | null = null;
+
+async function refreshAccessToken(): Promise<string> {
+    const refreshToken = await AsyncStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
+    if (!refreshToken) {
+        throw new Error('SESSION_EXPIRED');
+    }
+    const response = await axios.post(`${BASE_URL}auth/refresh-token`, { refreshToken });
+    const { accessToken, refreshToken: newRefreshToken } = response.data;
+    await AsyncStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, accessToken);
+    await AsyncStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, newRefreshToken);
+    return accessToken;
+}
+
 // Response interceptor - Handle errors and token refresh
 apiClient.interceptors.response.use(
     (response) => {
@@ -152,24 +168,19 @@ apiClient.interceptors.response.use(
             originalRequest._retry = true;
 
             try {
-                const refreshToken = await AsyncStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
-                if (refreshToken) {
-                    // POST :- /api/v1/users/refresh-token
-                    const response = await axios.post(`${BASE_URL}auth/refresh-token`, {
-                        refreshToken,
+                // Deduplicate: reuse in-flight refresh if one is already running
+                if (!refreshPromise) {
+                    refreshPromise = refreshAccessToken().finally(() => {
+                        refreshPromise = null;
                     });
-
-                    const { accessToken, refreshToken: newRefreshToken } = response.data;
-
-                    await AsyncStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, accessToken);
-                    await AsyncStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, newRefreshToken);
-
-                    // Retry original request with new token
-                    originalRequest.headers.set('Cookie', `token=${accessToken}`);
-                    originalRequest.headers.set('Authorization', `Bearer ${accessToken}`);
-                    originalRequest.headers.set('x-auth-token', accessToken);
-                    return apiClient(originalRequest);
                 }
+                const accessToken = await refreshPromise;
+
+                // Retry original request with new token
+                originalRequest.headers.set('Cookie', `token=${accessToken}`);
+                originalRequest.headers.set('Authorization', `Bearer ${accessToken}`);
+                originalRequest.headers.set('x-auth-token', accessToken);
+                return apiClient(originalRequest);
             } catch (refreshError) {
                 // Refresh failed — clear all auth state and force re-login
                 await AsyncStorage.multiRemove([

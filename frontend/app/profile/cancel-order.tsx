@@ -48,6 +48,9 @@ export default function CancelOrderScreen() {
     const [errorMessage, setErrorMessage] = useState('');
 
     const order = getOrderById(orderId as string);
+    const selectedOrderItemId = isReturn && productId
+        ? order?.items.find(item => item.productId === productId)?.orderItemId
+        : undefined;
 
     if (!order) {
         return (
@@ -79,25 +82,8 @@ export default function CancelOrderScreen() {
         try {
             let response;
             if (isReturn) {
-                // Implementation for Return
-                // Currently just mocked/same as cancel for now as per instructions to unify
-                // Ideally: await returnOrder(orderId, { orderItemIds: [productId], reason: selectedReason });
-
-                // Using cancelOrder for now but ideally this should be a separate API call if backend supports it
-                // OR we just simulate success for now if returnOrder is not fully ready in context
-
-                // Temporary: Using cancelOrder logic but maybe should use returnOrder from service directly if context doesn't have it
-                // For now, let's assume we use the same flow or call the service directly if not in context
-
-                // If returnOrder is available in Context, use it. usage: returnOrder(id, data)
-                // Since I haven't added returnOrder to Context yet, checking implementation plan...
-                // Plan said: "Use returnOrder API instead of cancelOrder"
-
-                // But returnOrder is NOT in Context yet. I need to add it or import service directly.
-                // Let's import service directly for now to avoid context modifications unless necessary.
-
                 response = await orderService.returnOrder(order.id, {
-                    orderItemIds: productId ? [productId] : [], // Use productId as orderItemId for now
+                    orderItemIds: selectedOrderItemId ? [selectedOrderItemId] : [],
                     reason: selectedReason,
                     description: 'Return request via app'
                 }) as any;
@@ -235,7 +221,7 @@ export default function CancelOrderScreen() {
                         <ActivityIndicator color="#fff" />
                     ) : (
                         <Text style={styles.confirmButtonText}>
-                            {isReturn ? "Confirmed Return" : "Confirm Cancellation"}
+                            {isReturn ? "Confirm Return" : "Confirm Cancellation"}
                         </Text>
                     )}
                 </TouchableOpacity>

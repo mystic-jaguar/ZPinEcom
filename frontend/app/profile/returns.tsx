@@ -9,29 +9,56 @@ import ReturnEligibleCard from '../../components/profile/ReturnEligibleCard';
 import { useOrder } from '../../context/OrderContext';
 import { orderService } from '../../services/order';
 
+type ReturnStatusRecord = {
+    returnStatus: string;
+    reason: string;
+    description?: string;
+    requestedAt: string;
+    updatedAt: string;
+};
+
+const RETURN_WINDOW_DAYS = 7;
+const ACTIVE_RETURN_STATUSES = new Set(['requested', 'picked_up']);
+
+function isWithinReturnWindow(order: { status: string; updatedAt?: string; createdAt?: string }) {
+    if (order.status !== 'delivered') return false;
+
+    const referenceValue = order.updatedAt || order.createdAt;
+    if (!referenceValue) return false;
+
+    const referenceDate = new Date(referenceValue);
+    if (Number.isNaN(referenceDate.getTime())) return false;
+
+    const elapsedMs = Date.now() - referenceDate.getTime();
+    const returnWindowMs = RETURN_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+
+    return elapsedMs >= 0 && elapsedMs <= returnWindowMs;
+}
+
+function formatStatusLabel(status: string) {
+    return status.replace(/_/g, ' ').toUpperCase();
+}
+
 export default function ReturnsRefundsScreen() {
     const router = useRouter();
     const { orders } = useOrder();
     const [searchQuery, setSearchQuery] = useState('');
     const [showHistory, setShowHistory] = useState(false);
-    const [returnStatusByOrder, setReturnStatusByOrder] = useState<Record<string, {
-        returnStatus: string;
-        reason: string;
-        description?: string;
-        requestedAt: string;
-        updatedAt: string;
-    }>>({});
+    const [isLoadingReturnStatuses, setIsLoadingReturnStatuses] = useState(true);
+    const [returnStatusByOrder, setReturnStatusByOrder] = useState<Record<string, ReturnStatusRecord>>({});
 
     useEffect(() => {
         let cancelled = false;
 
         const loadReturnStatuses = async () => {
+            setIsLoadingReturnStatuses(true);
             const candidateOrders = orders.filter(order =>
-                ['delivered', 'returned', 'cancelled', 'return_requested'].includes(order.status) || order.paymentStatus === 'refunded'
+                ['delivered', 'return_requested', 'returned'].includes(order.status)
             );
 
             if (candidateOrders.length === 0) {
                 setReturnStatusByOrder({});
+                setIsLoadingReturnStatuses(false);
                 return;
             }
 
@@ -50,6 +77,7 @@ export default function ReturnsRefundsScreen() {
                     return acc;
                 }, {});
                 setReturnStatusByOrder(nextStatuses);
+                setIsLoadingReturnStatuses(false);
             }
         };
 
@@ -60,17 +88,22 @@ export default function ReturnsRefundsScreen() {
         };
     }, [orders]);
 
-    // Flatten all items from orders to show in returns list
-    // In a real app, you might filter by 'Delivered' status and within return window
-    const returnableItems = orders.flatMap(order =>
-        (order.items || []).map(item => ({
+    const returnableItems = orders.flatMap(order => {
+        const returnData = returnStatusByOrder[order.id];
+        const hasActiveReturn = Boolean(returnData && ACTIVE_RETURN_STATUSES.has(returnData.returnStatus));
+
+        if (!isWithinReturnWindow(order) || hasActiveReturn || order.status === 'returned' || order.paymentStatus === 'refunded') {
+            return [];
+        }
+
+        return (order.items || []).map(item => ({
             ...item,
-            orderId: order.id,          // UUID for API calls
+            orderId: order.id,
             orderNumber: order.orderNumber,
             date: order.date,
-            status: order.status
-        }))
-    );
+            status: order.status,
+        }));
+    });
 
     // Filter items based on search query
     const filteredItems = returnableItems.filter(item => {
@@ -82,47 +115,57 @@ export default function ReturnsRefundsScreen() {
         );
     });
 
-    // Filter for completed refunds/returns
-    const completedRefunds = orders
-        .filter(order => order.status === 'returned' || order.status === 'cancelled' || order.paymentStatus === 'refunded')
-        .map(order => ({
-            orderId: order.orderNumber,
-            amount: `₹${(order.finalAmount || 0).toFixed(2)}`,
-            statusLabel: returnStatusByOrder[order.id]?.returnStatus
-                ? returnStatusByOrder[order.id].returnStatus.replace(/_/g, ' ').toUpperCase()
-                : (order.status === 'cancelled' ? 'CANCELLED' : 'REFUNDED'),
-            completedDate: order.updatedAt ? new Date(order.updatedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '',
-            steps: [
-                { label: 'Requested', state: 'completed' as const, icon: 'check' as const },
-                { label: 'Processed', state: 'completed' as const, icon: 'settings' as const },
-                { label: 'Refunded', state: 'completed' as const, icon: 'dollar-sign' as const },
-            ],
-            infoText: returnStatusByOrder[order.id]?.reason
-                ? `Return reason: ${returnStatusByOrder[order.id].reason}. Refund of ₹${(order.finalAmount || 0).toFixed(2)} has been processed to your ${order.paymentMethod === 'wallet' ? 'wallet' : 'original payment method'}.`
-                : `Refund of ₹${(order.finalAmount || 0).toFixed(2)} has been processed to your ${order.paymentMethod === 'wallet' ? 'wallet' : 'original payment method'}.`
-        }));
-
     const activeReturns = orders
         .filter(order => {
             const returnData = returnStatusByOrder[order.id];
-            return Boolean(returnData) && !['returned', 'cancelled'].includes(order.status);
+            return Boolean(returnData && ACTIVE_RETURN_STATUSES.has(returnData.returnStatus));
         })
         .map(order => {
             const returnData = returnStatusByOrder[order.id];
-            const normalizedStatus = (returnData?.returnStatus || 'requested').replace(/_/g, ' ');
+            const currentStatus = returnData?.returnStatus || 'requested';
+            const isPickedUp = currentStatus === 'picked_up';
 
             return {
                 orderId: order.orderNumber,
                 amount: `₹${(order.finalAmount || 0).toFixed(2)}`,
-                statusLabel: normalizedStatus.toUpperCase(),
+                statusLabel: formatStatusLabel(currentStatus),
                 steps: [
                     { label: 'Requested', state: 'completed' as const, icon: 'check' as const },
-                    { label: 'Processing', state: ['approved', 'picked_up', 'processing', 'refund_initiated'].includes(returnData?.returnStatus || '') ? 'active' as const : 'pending' as const, icon: 'settings' as const },
-                    { label: 'Refunded', state: ['refund_initiated', 'refunded'].includes(returnData?.returnStatus || '') ? 'completed' as const : 'pending' as const, icon: 'dollar-sign' as const },
+                    { label: 'Picked Up', state: isPickedUp ? 'completed' as const : 'active' as const, icon: 'truck' as const },
+                    { label: 'Refunded', state: 'pending' as const, icon: 'dollar-sign' as const },
                 ],
-                infoText: `Return reason: ${returnData?.reason || 'N/A'}. Current status: ${normalizedStatus}.`
+                infoText: returnData?.reason
+                    ? `Return reason: ${returnData.reason}. Current status: ${formatStatusLabel(currentStatus)}.`
+                    : `Current status: ${formatStatusLabel(currentStatus)}.`
             };
         });
+
+    const completedRefunds = orders
+        .filter(order => {
+            return order.status === 'returned';
+        })
+        .map(order => {
+            const returnData = returnStatusByOrder[order.id];
+
+            return {
+                orderId: order.orderNumber,
+                amount: `₹${(order.finalAmount || 0).toFixed(2)}`,
+                statusLabel: 'REFUNDED',
+                completedDate: order.updatedAt ? new Date(order.updatedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '',
+                steps: [
+                    { label: 'Requested', state: 'completed' as const, icon: 'check' as const },
+                    { label: 'Picked Up', state: 'completed' as const, icon: 'truck' as const },
+                    { label: 'Refunded', state: 'completed' as const, icon: 'dollar-sign' as const },
+                ],
+                infoText: returnData?.reason
+                    ? `Return reason: ${returnData.reason}. Refund of ₹${(order.finalAmount || 0).toFixed(2)} has been completed.`
+                    : `Refund of ₹${(order.finalAmount || 0).toFixed(2)} has been completed.`
+            };
+        });
+
+    const hasActiveReturns = activeReturns.length > 0;
+    const hasRefundHistory = completedRefunds.length > 0;
+    const isHistoryVisible = hasActiveReturns ? showHistory : true;
 
     return (
         <View style={styles.container}>
@@ -164,7 +207,12 @@ export default function ReturnsRefundsScreen() {
                     <Text style={styles.itemCount}>{filteredItems.length} ITEMS</Text>
                 </View>
 
-                {filteredItems.length === 0 ? (
+                {isLoadingReturnStatuses ? (
+                    <View style={styles.emptyState}>
+                        <Feather name="refresh-cw" size={48} color="#9CA3AF" />
+                        <Text style={styles.emptyText}>Checking return eligibility...</Text>
+                    </View>
+                ) : filteredItems.length === 0 ? (
                     <View style={styles.emptyState}>
                         <Feather name="inbox" size={48} color="#9CA3AF" />
                         <Text style={styles.emptyText}>
@@ -176,8 +224,8 @@ export default function ReturnsRefundsScreen() {
                         <ReturnEligibleCard
                             key={`${item.orderId}-${item.productId}-${index}`}
                             image={item.image}
-                            status={item.status === 'delivered' ? `DELIVERED` : item.status.toUpperCase()}
-                            statusColor={item.status === 'delivered' ? '#D97706' : '#F59E0B'}
+                            status="RETURN ELIGIBLE"
+                            statusColor="#0F766E"
                             name={item.productName}
                             variant={item.variant || 'Standard Variant'}
                             onInitiate={() => {
@@ -197,43 +245,21 @@ export default function ReturnsRefundsScreen() {
                     ))
                 )}
 
-                {/* Refund Status Section — in-progress orders from real data */}
-                {orders.filter(o => o.status === 'processing' || o.status === 'shipped').length > 0 && (
+                {/* Return Tracking Section */}
+                {(hasActiveReturns || hasRefundHistory) && (
                     <>
                         <View style={styles.sectionHeader}>
-                            <Text style={styles.sectionTitle}>Refund Status</Text>
-                            <TouchableOpacity onPress={() => setShowHistory(!showHistory)}>
-                                <Text style={styles.viewHistoryText}>
-                                    {showHistory ? 'Hide History' : 'View History'}
-                                </Text>
-                            </TouchableOpacity>
+                            <Text style={styles.sectionTitle}>{hasActiveReturns ? 'Return Tracking' : 'Refund History'}</Text>
+                            {hasRefundHistory && hasActiveReturns && (
+                                <TouchableOpacity onPress={() => setShowHistory(!showHistory)}>
+                                    <Text style={styles.viewHistoryText}>
+                                        {showHistory ? 'Hide History' : 'View History'}
+                                    </Text>
+                                </TouchableOpacity>
+                            )}
                         </View>
 
-                        {orders.filter(o => o.status === 'processing' || o.status === 'shipped').map(order => (
-                            <RefundStatusCard
-                                key={order.id}
-                                orderId={order.orderNumber}
-                                amount={`₹${order.finalAmount.toFixed(2)}`}
-                                statusLabel="IN PROGRESS"
-                                steps={[
-                                    { label: 'Requested', state: 'completed', icon: 'check' },
-                                    { label: 'Picked up', state: order.status === 'shipped' ? 'completed' : 'active', icon: 'truck' },
-                                    { label: 'Refunded', state: 'pending', icon: 'dollar-sign' },
-                                ]}
-                                infoText={`Your order ${order.orderNumber} is ${order.status}. Refund will be processed if returned.`}
-                            />
-                        ))}
-                    </>
-                )}
-
-                {activeReturns.length > 0 && (
-                    <>
-                        <View style={styles.sectionHeader}>
-                            <Text style={styles.sectionTitle}>Return Tracking</Text>
-                            <Text style={styles.itemCount}>{activeReturns.length} ACTIVE</Text>
-                        </View>
-
-                        {activeReturns.map((returnItem) => (
+                        {hasActiveReturns && activeReturns.map((returnItem) => (
                             <RefundStatusCard
                                 key={returnItem.orderId}
                                 orderId={returnItem.orderId}
@@ -243,13 +269,21 @@ export default function ReturnsRefundsScreen() {
                                 infoText={returnItem.infoText}
                             />
                         ))}
+
+                        {!hasActiveReturns && hasRefundHistory && (
+                            <TouchableOpacity onPress={() => setShowHistory(!showHistory)}>
+                                <Text style={styles.viewHistoryText}>
+                                    {isHistoryVisible ? 'Hide History' : 'View History'}
+                                </Text>
+                            </TouchableOpacity>
+                        )}
                     </>
                 )}
 
                 {/* Completed Refunds History */}
-                {showHistory && (
+                {isHistoryVisible && hasRefundHistory && (
                     <View style={styles.historySection}>
-                        <Text style={styles.historySectionTitle}>Completed Refunds</Text>
+                        <Text style={styles.historySectionTitle}>Refund History</Text>
                         {completedRefunds.map((refund, index) => (
                             <RefundStatusCard
                                 key={refund.orderId}

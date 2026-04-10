@@ -78,6 +78,111 @@ function mapReviewRow(row: any) {
   };
 }
 
+// GET /api/v1/products/recommended — personalized recommendations for authenticated user
+// Signals (weighted): purchase history (+3/category), wishlist (+2/category), search terms (+1/category)
+// Excludes already-purchased product IDs. Falls back to latest products if no signals.
+router.get('/recommended', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+  const limit = Math.min(Number(req.query.limit) || 10, 30);
+  const searchTerms: string[] = req.query.terms
+    ? String(req.query.terms).split(',').map(t => t.trim()).filter(Boolean).slice(0, 5)
+    : [];
+
+  try {
+    const categoryScores = new Map<string, number>();
+    const purchasedProductIds: string[] = [];
+
+    // Signal 1: purchase history (weight 3)
+    const orderResult = await pool.query(
+      `SELECT oi.product_id, p.deepest_category_name
+       FROM order_items oi
+       JOIN orders o ON o.id = oi.order_id
+       JOIN products p ON p.id = oi.product_id
+       WHERE o.user_id = $1 AND p.deepest_category_name IS NOT NULL`,
+      [req.userId]
+    );
+    for (const row of orderResult.rows) {
+      purchasedProductIds.push(row.product_id);
+      const cat = row.deepest_category_name as string;
+      categoryScores.set(cat, (categoryScores.get(cat) ?? 0) + 3);
+    }
+
+    // Signal 2: wishlist (weight 2)
+    const wishlistResult = await pool.query(
+      `SELECT p.deepest_category_name
+       FROM wishlists w
+       JOIN products p ON p.id = w.product_id
+       WHERE w.user_id = $1 AND p.deepest_category_name IS NOT NULL`,
+      [req.userId]
+    );
+    for (const row of wishlistResult.rows) {
+      const cat = row.deepest_category_name as string;
+      categoryScores.set(cat, (categoryScores.get(cat) ?? 0) + 2);
+    }
+
+    // Signal 3: search terms — match against deepest_category_name (weight 1)
+    if (searchTerms.length > 0) {
+      const termResult = await pool.query(
+        `SELECT DISTINCT deepest_category_name FROM products
+         WHERE in_stock = true
+           AND deepest_category_name IS NOT NULL
+           AND LOWER(deepest_category_name) = ANY($1)`,
+        [searchTerms.map(t => t.toLowerCase())]
+      );
+      for (const row of termResult.rows) {
+        const cat = row.deepest_category_name as string;
+        categoryScores.set(cat, (categoryScores.get(cat) ?? 0) + 1);
+      }
+    }
+
+    // No signals at all — fall back to latest products
+    if (categoryScores.size === 0) {
+      const fallback = await pool.query(
+        `SELECT p.*,
+          COALESCE(json_agg(DISTINCT pi.image_url) FILTER (WHERE pi.image_url IS NOT NULL), '[]') as images,
+          COALESCE(AVG(pr.rating), 0) as average_rating
+         FROM products p
+         LEFT JOIN product_images pi ON pi.product_id = p.id
+         LEFT JOIN product_reviews pr ON pr.product_id = p.id
+         WHERE p.in_stock = true
+         GROUP BY p.id
+         ORDER BY p.created_at DESC
+         LIMIT $1`,
+        [limit]
+      );
+      res.json({ success: true, products: fallback.rows.map(normalizeProduct), source: 'fallback' });
+      return;
+    }
+
+    // Sort categories by score descending, take top 5
+    const topCategories = [...categoryScores.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([cat]) => cat);
+
+    // Fetch products from top categories, excluding already-purchased items
+    const result = await pool.query(
+      `SELECT p.*,
+        COALESCE(json_agg(DISTINCT pi.image_url) FILTER (WHERE pi.image_url IS NOT NULL), '[]') as images,
+        COALESCE(AVG(pr.rating), 0) as average_rating
+       FROM products p
+       LEFT JOIN product_images pi ON pi.product_id = p.id
+       LEFT JOIN product_reviews pr ON pr.product_id = p.id
+       WHERE p.in_stock = true
+         AND p.deepest_category_name = ANY($1)
+         AND p.id != ALL($2)
+       GROUP BY p.id
+       ORDER BY p.created_at DESC
+       LIMIT $3`,
+      [topCategories, purchasedProductIds.length > 0 ? purchasedProductIds : [''], limit]
+    );
+
+    res.json({ success: true, products: result.rows.map(normalizeProduct), source: 'personalized' });
+  } catch (err) {
+    console.error('recommended error:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 // GET /api/v1/products/search?q= — full-text product name search with related products
 router.get('/search', productListLimiter, async (req: Request, res: Response): Promise<void> => {
   const q = (req.query.q as string || '').trim();
@@ -393,24 +498,46 @@ router.get('/:id/reviews', async (req: Request, res: Response): Promise<void> =>
   const mineOnly = String(req.query.mine || '').toLowerCase() === 'true' || String(req.query.mine || '') === '1';
 
   if (mineOnly) {
+    const token = req.headers.authorization?.startsWith('Bearer ')
+      ? req.headers.authorization.slice(7)
+      : (req.headers['x-auth-token'] as string | undefined) || req.cookies?.token;
+
+    if (!token) {
+      res.json({
+        success: true,
+        data: [],
+        pagination: {
+          currentPage: page,
+          totalPages: 0,
+          totalItems: 0,
+          itemsPerPage: limit,
+          hasNextPage: false,
+          hasPrevPage: false,
+        },
+      });
+      return;
+    }
+
     let authenticated = false;
     authenticate(req as AuthRequest, res, () => {
       authenticated = true;
     });
 
-    if (!authenticated) {
+    if (!authenticated || !(req as AuthRequest).userId) {
+      res.json({
+        success: true,
+        data: [],
+        pagination: {
+          currentPage: page,
+          totalPages: 0,
+          totalItems: 0,
+          itemsPerPage: limit,
+          hasNextPage: false,
+          hasPrevPage: false,
+        },
+      });
       return;
     }
-
-    if (!(req as AuthRequest).userId) {
-      res.status(401).json({ success: false, message: 'Invalid or expired token' });
-      return;
-    }
-  }
-
-  if (mineOnly && !(req as AuthRequest).userId) {
-    res.status(401).json({ success: false, message: 'Invalid or expired token' });
-    return;
   }
 
   try {

@@ -62,6 +62,12 @@ export const WishlistProvider = ({ children }: { children: ReactNode }) => {
                         }
                     } catch (apiError) {
                         console.warn('Failed to load wishlist from server:', apiError);
+                        // If session expired, clear local wishlist too — user needs to re-login
+                        if ((apiError as Error)?.message === 'SESSION_EXPIRED') {
+                            setWishlistItems([]);
+                            await AsyncStorage.removeItem(WISHLIST_STORAGE_KEY);
+                            return;
+                        }
                     }
                 }
             }

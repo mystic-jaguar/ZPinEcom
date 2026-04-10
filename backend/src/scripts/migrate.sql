@@ -139,6 +139,9 @@ CREATE TABLE IF NOT EXISTS return_requests (
   reason         TEXT         NOT NULL,
   description    TEXT,
   status         VARCHAR(50)  NOT NULL DEFAULT 'requested',
+  picked_up_at   TIMESTAMP,
+  refunded_at    TIMESTAMP,
+  status_history JSONB        NOT NULL DEFAULT '[]'::jsonb,
   created_at     TIMESTAMP    NOT NULL DEFAULT NOW(),
   updated_at     TIMESTAMP    NOT NULL DEFAULT NOW()
 );
@@ -157,5 +160,20 @@ CREATE TABLE IF NOT EXISTS order_cancellations (
 CREATE INDEX IF NOT EXISTS idx_order_cancellations_order_id ON order_cancellations(order_id);
 
 -- ── 11-13. products, product_images, product_reviews ──────────────────────────
--- These tables already exist and require no structural changes.
--- product_reviews JOIN fix is handled in the backend code (products.ts).
+-- products and product_images tables are managed separately (seeded externally).
+-- product_reviews is created here to ensure it exists on fresh DB deployments.
+
+CREATE TABLE IF NOT EXISTS product_reviews (
+  id                   VARCHAR(7)    PRIMARY KEY,
+  product_id           UUID          NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  user_id              VARCHAR(7)    NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  rating               INTEGER       NOT NULL CHECK (rating >= 1 AND rating <= 5),
+  comment              TEXT          NOT NULL,
+  images               TEXT          NOT NULL DEFAULT '[]',
+  is_verified_purchase BOOLEAN       NOT NULL DEFAULT false,
+  created_at           TIMESTAMP     NOT NULL DEFAULT NOW(),
+  updated_at           TIMESTAMP     NOT NULL DEFAULT NOW(),
+  UNIQUE(product_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_product_reviews_product_id ON product_reviews(product_id);
+CREATE INDEX IF NOT EXISTS idx_product_reviews_user_id    ON product_reviews(user_id);

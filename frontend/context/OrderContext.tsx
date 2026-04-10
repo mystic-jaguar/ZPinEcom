@@ -59,6 +59,7 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
                     paymentMethod: o.paymentMethod || 'cod',
                     paymentId: o.paymentId,
                     items: Array.isArray(o.items) ? o.items.map((item: any) => ({
+                        orderItemId: item.orderItemId || item.id,
                         productId: item.productId,
                         productName: item.productName,
                         quantity: item.quantity,

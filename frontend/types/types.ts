@@ -283,6 +283,7 @@ export interface CouponObject {
  * Order Item Object (product in order)
  */
 export interface OrderItemObject {
+    orderItemId?: string;
     productId: string;
     productName: string;
     quantity: number;

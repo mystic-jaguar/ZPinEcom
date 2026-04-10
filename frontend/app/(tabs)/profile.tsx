@@ -36,7 +36,7 @@ export default function ProfileScreen() {
     const [refreshing, setRefreshing] = useState(false);
 
     const loadRecommended = () =>
-        productService.getRecommended(recentSearches, 8)
+        productService.getPersonalizedRecommended(recentSearches, 8)
             .then(setRecommended)
             .catch(() => {});
 

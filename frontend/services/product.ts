@@ -139,6 +139,27 @@ export const productService = {
     },
 
     /**
+     * Get personalized recommendations using purchase history, wishlist, and search terms.
+     * Requires authentication. Falls back to search-term-based recommendations if unauthenticated.
+     */
+    async getPersonalizedRecommended(searchTerms: string[], limit = 10): Promise<ProductObject[]> {
+        try {
+            const params: Record<string, any> = { limit };
+            if (searchTerms.length > 0) params.terms = searchTerms.slice(0, 5).join(',');
+
+            const r = await apiClient.get('products/recommended', { params });
+            return (r.data.products || []).map((p: any) => ({
+                ...p,
+                productId: p.productId || p.id,
+                price: Number(p.price) || 0,
+            }));
+        } catch {
+            // Not authenticated or server error — fall back to search-term logic
+            return this.getRecommended(searchTerms, limit);
+        }
+    },
+
+    /**
      * Get recommended products based on recent search terms.
      * Fetches products matching any of the search keywords.
      */

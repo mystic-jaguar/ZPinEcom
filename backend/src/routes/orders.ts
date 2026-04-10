@@ -36,6 +36,9 @@ async function ensureOrderSupportTables() {
   await pool.query(
     `CREATE INDEX IF NOT EXISTS idx_return_requests_user_id ON ${RETURN_REQUESTS}(user_id)`
   );
+  await pool.query(`ALTER TABLE ${RETURN_REQUESTS} ADD COLUMN IF NOT EXISTS picked_up_at TIMESTAMP`);
+  await pool.query(`ALTER TABLE ${RETURN_REQUESTS} ADD COLUMN IF NOT EXISTS refunded_at TIMESTAMP`);
+  await pool.query(`ALTER TABLE ${RETURN_REQUESTS} ADD COLUMN IF NOT EXISTS status_history JSONB NOT NULL DEFAULT '[]'::jsonb`);
 
   await pool.query(
     `CREATE TABLE IF NOT EXISTS ${ORDER_CANCELLATIONS} (
@@ -79,17 +82,37 @@ function buildTrackingHistory(order: any, returnRequest?: any) {
   }
 
   if (returnRequest) {
+    const history = Array.isArray(returnRequest.status_history) ? returnRequest.status_history : [];
     steps.push({
       status: 'return_requested',
       title: 'Return requested',
       timestamp: returnRequest.created_at,
       note: returnRequest.reason,
     });
-    steps.push({
-      status: returnRequest.status,
-      title: `Return ${String(returnRequest.status).replace(/_/g, ' ')}`,
-      timestamp: returnRequest.updated_at,
-    });
+
+    const pickedUpEvent = history.find((event: any) => event.status === 'picked_up');
+    if (pickedUpEvent || returnRequest.picked_up_at) {
+      steps.push({
+        status: 'picked_up',
+        title: 'Return picked up',
+        timestamp: pickedUpEvent?.at || returnRequest.picked_up_at,
+      });
+    }
+
+    const refundedEvent = history.find((event: any) => event.status === 'refunded');
+    if (refundedEvent || returnRequest.refunded_at) {
+      steps.push({
+        status: 'refunded',
+        title: 'Refunded',
+        timestamp: refundedEvent?.at || returnRequest.refunded_at,
+      });
+    } else {
+      steps.push({
+        status: returnRequest.status,
+        title: `Return ${String(returnRequest.status).replace(/_/g, ' ')}`,
+        timestamp: returnRequest.updated_at,
+      });
+    }
   }
 
   return steps;
@@ -147,7 +170,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response): Promise<v
     const result = await pool.query(
       `SELECT o.*,
         COALESCE(json_agg(json_build_object(
-          'productId', oi.product_id,
+              'orderItemId', oi.id,
           'productName', oi.product_name,
           'quantity', oi.quantity,
           'price', oi.price,
@@ -187,7 +210,7 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response): Promis
     const result = await pool.query(
       `SELECT o.*,
         COALESCE(json_agg(json_build_object(
-          'productId', oi.product_id,
+              'orderItemId', oi.id,
           'productName', oi.product_name,
           'quantity', oi.quantity,
           'price', oi.price,
@@ -230,7 +253,7 @@ router.get('/:id/track', authenticate, async (req: AuthRequest, res: Response): 
     }
 
     const returnResult = await pool.query(
-      `SELECT id, reason, status, created_at, updated_at
+      `SELECT id, reason, status, picked_up_at, refunded_at, status_history, created_at, updated_at
        FROM ${RETURN_REQUESTS}
        WHERE order_id = $1 AND user_id = $2
        ORDER BY created_at DESC
@@ -500,7 +523,7 @@ router.post('/:id/return', authenticate, async (req: AuthRequest, res: Response)
     const existingReturn = await pool.query(
       `SELECT id, status, created_at, updated_at
        FROM ${RETURN_REQUESTS}
-       WHERE order_id = $1 AND user_id = $2 AND status IN ('requested', 'approved', 'picked_up', 'processing', 'refund_initiated')
+       WHERE order_id = $1 AND user_id = $2 AND status IN ('requested', 'picked_up')
        ORDER BY created_at DESC
        LIMIT 1`,
       [req.params.id, req.userId]
@@ -524,9 +547,19 @@ router.post('/:id/return', authenticate, async (req: AuthRequest, res: Response)
     // Insert into return_requests table
     const returnId = generateId();
     await pool.query(
-      `INSERT INTO ${RETURN_REQUESTS} (id, order_id, user_id, order_item_ids, reason, description, status, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, 'requested', NOW(), NOW())`,
-      [returnId, req.params.id, req.userId, JSON.stringify(orderItemIds || []), reason, description || '']
+      `INSERT INTO ${RETURN_REQUESTS} (id, order_id, user_id, order_item_ids, reason, description, status, picked_up_at, refunded_at, status_history, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, 'requested', NULL, NULL, $7, NOW(), NOW())`,
+      [
+        returnId,
+        req.params.id,
+        req.userId,
+        JSON.stringify(orderItemIds || []),
+        reason,
+        description || '',
+        JSON.stringify([
+          { status: 'requested', at: new Date().toISOString() }
+        ]),
+      ]
     );
 
     // Update order status to 'return_requested'
@@ -551,6 +584,97 @@ router.post('/:id/return', authenticate, async (req: AuthRequest, res: Response)
   }
 });
 
+// PATCH /api/v1/orders/:id/return-status
+router.patch('/:id/return-status', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+  const nextStatus = String(req.body?.status || '').trim();
+
+  if (!['picked_up', 'refunded'].includes(nextStatus)) {
+    res.status(400).json({ success: false, message: 'status must be picked_up or refunded' });
+    return;
+  }
+
+  if (req.userRole === 'customer') {
+    res.status(403).json({ success: false, message: 'Forbidden' });
+    return;
+  }
+
+  try {
+    await ensureOrderSupportTables();
+
+    const returnResult = await pool.query(
+      `SELECT id, order_id, status, status_history, picked_up_at, refunded_at
+       FROM ${RETURN_REQUESTS}
+       WHERE order_id = $1
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [req.params.id]
+    );
+
+    if (returnResult.rows.length === 0) {
+      res.status(404).json({ success: false, message: 'Return request not found' });
+      return;
+    }
+
+    const currentReturn = returnResult.rows[0];
+    const allowedNextStatuses: Record<string, string[]> = {
+      requested: ['picked_up'],
+      picked_up: ['refunded'],
+    };
+
+    if (!allowedNextStatuses[currentReturn.status]?.includes(nextStatus)) {
+      res.status(400).json({ success: false, message: 'Invalid return status transition' });
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const history = Array.isArray(currentReturn.status_history) ? currentReturn.status_history : [];
+    history.push({ status: nextStatus, at: now, by: req.userId, role: req.userRole });
+
+    const updateFields: string[] = ['status = $2', 'status_history = $3', 'updated_at = NOW()'];
+    const values: any[] = [req.params.id, nextStatus, JSON.stringify(history)];
+
+    if (nextStatus === 'picked_up') {
+      updateFields.unshift('picked_up_at = NOW()');
+    }
+
+    if (nextStatus === 'refunded') {
+      updateFields.unshift('refunded_at = NOW()');
+    }
+
+    await pool.query(
+      `UPDATE ${RETURN_REQUESTS}
+       SET ${updateFields.join(', ')}
+       WHERE order_id = $1
+       RETURNING id`,
+      values
+    );
+
+    if (nextStatus === 'refunded') {
+      await pool.query(
+        `UPDATE ${ORDERS}
+         SET status = 'returned', payment_status = 'refunded', updated_at = NOW()
+         WHERE id = $1`,
+        [req.params.id]
+      );
+    }
+
+    res.json({
+      success: true,
+      data: {
+        orderId: req.params.id,
+        returnId: currentReturn.id,
+        status: nextStatus,
+        pickedUpAt: nextStatus === 'picked_up' ? now : currentReturn.picked_up_at,
+        refundedAt: nextStatus === 'refunded' ? now : currentReturn.refunded_at,
+        statusHistory: history,
+      },
+    });
+  } catch (err) {
+    console.error('updateReturnStatus error:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 // GET /api/v1/orders/:id/return-status
 router.get('/:id/return-status', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -569,7 +693,7 @@ router.get('/:id/return-status', authenticate, async (req: AuthRequest, res: Res
     }
 
     const returnResult = await pool.query(
-      `SELECT id, order_item_ids, reason, description, status, created_at, updated_at
+      `SELECT id, order_item_ids, reason, description, status, picked_up_at, refunded_at, status_history, created_at, updated_at
        FROM ${RETURN_REQUESTS}
        WHERE order_id = $1 AND user_id = $2
        ORDER BY created_at DESC
@@ -598,6 +722,9 @@ router.get('/:id/return-status', authenticate, async (req: AuthRequest, res: Res
         orderItemIds: Array.isArray(rr.order_item_ids) ? rr.order_item_ids : [],
         requestedAt: rr.created_at,
         updatedAt: rr.updated_at,
+        pickedUpAt: rr.picked_up_at,
+        refundedAt: rr.refunded_at,
+        statusHistory: Array.isArray(rr.status_history) ? rr.status_history : [],
       },
     });
   } catch (err) {
