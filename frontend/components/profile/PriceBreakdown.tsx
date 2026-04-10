@@ -5,6 +5,9 @@ interface PriceBreakdownProps {
     itemsTotal: number;
     instantTrialFee?: number;
     deliveryCharges: number;
+    gstAmount?: number;
+    couponDiscount?: number;
+    couponCode?: string;
     grandTotal: number;
 }
 
@@ -12,39 +15,60 @@ export default function PriceBreakdown({
     itemsTotal,
     instantTrialFee = 0,
     deliveryCharges,
+    gstAmount = 0,
+    couponDiscount = 0,
+    couponCode,
     grandTotal
 }: PriceBreakdownProps) {
     const safeTotal = Number(itemsTotal) || 0;
     const safeFee = Number(instantTrialFee) || 0;
     const safeDelivery = Number(deliveryCharges) || 0;
+    const safeGst = Number(gstAmount) || 0;
+    const safeCouponDiscount = Number(couponDiscount) || 0;
     const safeGrand = Number(grandTotal) || 0;
+
+    const formatINR = (value: number) => `₹${value.toFixed(2)}`;
 
     return (
         <View style={styles.container}>
             <View style={styles.row}>
-                <Text style={styles.label}>Items Total</Text>
-                <Text style={styles.value}>₹{safeTotal.toLocaleString('en-IN')}.00</Text>
+                <Text style={styles.label}>Subtotal</Text>
+                <Text style={styles.value}>{formatINR(safeTotal)}</Text>
             </View>
 
             {safeFee > 0 && (
                 <View style={styles.row}>
                     <Text style={styles.label}>Instant Trial Fee</Text>
-                    <Text style={[styles.value, styles.warningValue]}>+ ₹{safeFee.toLocaleString('en-IN')}.00</Text>
+                    <Text style={[styles.value, styles.warningValue]}>+ {formatINR(safeFee)}</Text>
                 </View>
             )}
 
             <View style={styles.row}>
-                <Text style={styles.label}>Delivery Charges</Text>
+                <Text style={styles.label}>Shipping Fee</Text>
                 <Text style={[styles.value, styles.successValue]}>
-                    {safeDelivery === 0 ? 'FREE' : `₹${safeDelivery.toLocaleString('en-IN')}`}
+                    {safeDelivery === 0 ? 'FREE' : formatINR(safeDelivery)}
                 </Text>
             </View>
+
+            <View style={styles.row}>
+                <Text style={styles.label}>Tax (GST 18%)</Text>
+                <Text style={styles.value}>{formatINR(safeGst)}</Text>
+            </View>
+
+            {safeCouponDiscount > 0 && (
+                <View style={styles.row}>
+                    <Text style={[styles.label, styles.successValue]}>
+                        {couponCode ? `Coupon Discount (${couponCode})` : 'Coupon Discount'}
+                    </Text>
+                    <Text style={[styles.value, styles.successValue]}>- {formatINR(safeCouponDiscount)}</Text>
+                </View>
+            )}
 
             <View style={styles.divider} />
 
             <View style={styles.row}>
-                <Text style={styles.grandTotalLabel}>Grand Total</Text>
-                <Text style={styles.grandTotalValue}>₹{safeGrand.toLocaleString('en-IN')}.00</Text>
+                <Text style={styles.grandTotalLabel}>Total Amount</Text>
+                <Text style={styles.grandTotalValue}>{formatINR(safeGrand)}</Text>
             </View>
         </View>
     );

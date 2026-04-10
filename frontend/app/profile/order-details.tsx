@@ -19,6 +19,26 @@ export default function OrderDetailsScreen() {
     const order = getOrderById(orderId as string);
     const isInstantDelivery = order?.notes === 'instant_delivery';
 
+    let couponCode: string | undefined;
+    let noteCouponDiscount = 0;
+    if (order?.notes && typeof order.notes === 'string') {
+        try {
+            const parsedNotes = JSON.parse(order.notes);
+            couponCode = parsedNotes?.couponCode;
+            noteCouponDiscount = Number(parsedNotes?.couponDiscount || 0);
+        } catch {
+            // Notes are typically plain text; ignore parsing errors.
+        }
+    }
+
+    const itemsTotal = Number(order?.totalAmount || 0);
+    const gstAmount = Number(order?.taxAmount || 0);
+    const shippingFee = Number(order?.shippingAmount || 0);
+    const instantTrialFee = isInstantDelivery ? 50 : 0;
+    const preDiscountTotal = itemsTotal + shippingFee + gstAmount + instantTrialFee;
+    const inferredCouponDiscount = Math.max(0, Number((preDiscountTotal - Number(order?.finalAmount || 0)).toFixed(2)));
+    const couponDiscount = Math.max(noteCouponDiscount, inferredCouponDiscount);
+
     // Can cancel only before it's out for delivery (processing = out for delivery in timeline)
     const canCancel = order && ['pending', 'confirmed'].includes(order.status);
 
@@ -146,9 +166,12 @@ export default function OrderDetailsScreen() {
                     <Text style={styles.sectionTitle}>PRICE DETAILS</Text>
                     <View style={styles.priceCard}>
                         <PriceBreakdown
-                            itemsTotal={order.totalAmount || order.finalAmount}
-                            instantTrialFee={isInstantDelivery ? 50 : 0}
-                            deliveryCharges={Number(order.shippingAmount) || 0}
+                            itemsTotal={itemsTotal || order.finalAmount}
+                            instantTrialFee={instantTrialFee}
+                            deliveryCharges={shippingFee}
+                            gstAmount={gstAmount}
+                            couponDiscount={couponDiscount}
+                            couponCode={couponCode}
                             grandTotal={order.finalAmount}
                         />
                     </View>
