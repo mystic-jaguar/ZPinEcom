@@ -390,20 +390,52 @@ router.get('/:id/reviews', async (req: Request, res: Response): Promise<void> =>
   const page = Number(req.query.page) || 1;
   const limit = Number(req.query.limit) || 10;
   const offset = (page - 1) * limit;
+  const mineOnly = String(req.query.mine || '').toLowerCase() === 'true' || String(req.query.mine || '') === '1';
+
+  if (mineOnly) {
+    let authenticated = false;
+    authenticate(req as AuthRequest, res, () => {
+      authenticated = true;
+    });
+
+    if (!authenticated) {
+      return;
+    }
+
+    if (!(req as AuthRequest).userId) {
+      res.status(401).json({ success: false, message: 'Invalid or expired token' });
+      return;
+    }
+  }
+
+  if (mineOnly && !(req as AuthRequest).userId) {
+    res.status(401).json({ success: false, message: 'Invalid or expired token' });
+    return;
+  }
 
   try {
     const result = await pool.query(
-      `SELECT pr.*, u.name as user_name, u.profile_image as user_profile_image
-       FROM product_reviews pr
-       JOIN users u ON u.id = pr.user_id
-       WHERE pr.product_id = $1
-       ORDER BY pr.created_at DESC
-       LIMIT $2 OFFSET $3`,
-      [req.params.id, limit, offset]
+      mineOnly
+        ? `SELECT pr.*, u.name as user_name, u.profile_image as user_profile_image
+           FROM product_reviews pr
+           JOIN users u ON u.id = pr.user_id
+           WHERE pr.product_id = $1 AND pr.user_id = $2
+           ORDER BY pr.created_at DESC
+           LIMIT $3 OFFSET $4`
+        : `SELECT pr.*, u.name as user_name, u.profile_image as user_profile_image
+           FROM product_reviews pr
+           JOIN users u ON u.id = pr.user_id
+           WHERE pr.product_id = $1
+           ORDER BY pr.created_at DESC
+           LIMIT $2 OFFSET $3`,
+      mineOnly ? [req.params.id, (req as AuthRequest).userId, limit, offset] : [req.params.id, limit, offset]
     );
 
     const countResult = await pool.query(
-      'SELECT COUNT(*) FROM product_reviews WHERE product_id = $1', [req.params.id]
+      mineOnly
+        ? 'SELECT COUNT(*) FROM product_reviews WHERE product_id = $1 AND user_id = $2'
+        : 'SELECT COUNT(*) FROM product_reviews WHERE product_id = $1',
+      mineOnly ? [req.params.id, (req as AuthRequest).userId] : [req.params.id]
     );
     const total = Number(countResult.rows[0].count);
 

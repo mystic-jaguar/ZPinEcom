@@ -17,11 +17,11 @@ export const reviewService = {
     /**
      * Get reviews for a product
      */
-    async getProductReviews(productId: string, page?: number, limit?: number) {
+    async getProductReviews(productId: string, page?: number, limit?: number, mine?: boolean) {
         try {
             // GET :- /api/v1/products/:id/reviews
             const response = await apiClient.get<ApiPaginatedResponse<ReviewObject>>(`products/${productId}/reviews`, {
-                params: { page, limit },
+                params: { page, limit, mine },
             });
             return response.data;
         } catch (error) {

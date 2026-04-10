@@ -1,39 +1,43 @@
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import AccordionItem from '../../components/common/AccordionItem';
 import ActionModal from '../../components/common/ActionModal';
 import DeliveryOptionSelector from '../../components/product/DeliveryOptionSelector';
 import ProductImageCarousel from '../../components/product/ProductImageCarousel';
 import VariantSelector from '../../components/product/VariantSelector';
 import { useCart } from '../../context/CartContext';
+import { useOrder } from '../../context/OrderContext';
+import { useUser } from '../../context/UserContext';
 import { useWishlist } from '../../context/WishlistContext';
 import apiClient from '../../services/api';
 import { productService } from '../../services/product';
-import { ProductObject } from '../../types/types';
-
-interface Review {
-    id: string;
-    userId: string;
-    rating: number;
-    comment: string;
-    user: { name: string };
-    createdAt: string;
-}
+import { reviewService } from '../../services/review';
+import { ProductObject, ReviewObject } from '../../types/types';
 
 export default function ProductDetails() {
     const { id } = useLocalSearchParams();
+    const productId = Array.isArray(id) ? id[0] : id;
     const router = useRouter();
     const { addToCart } = useCart();
     const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
+    const { user, isAuthenticated } = useUser();
+    const { orders, isLoading: isOrdersLoading } = useOrder();
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [showVariantWarningModal, setShowVariantWarningModal] = useState(false);
+    const [showDeleteReviewModal, setShowDeleteReviewModal] = useState(false);
+    const [reviewFeedback, setReviewFeedback] = useState<string | null>(null);
+    const [reviewRating, setReviewRating] = useState(5);
+    const [reviewComment, setReviewComment] = useState('');
+    const [reviewSubmitting, setReviewSubmitting] = useState(false);
+    const [reviewToDelete, setReviewToDelete] = useState<ReviewObject | null>(null);
 
     // Product State
     const [product, setProduct] = useState<ProductObject | null>(null);
     const [relatedProducts, setRelatedProducts] = useState<ProductObject[]>([]);
-    const [reviews, setReviews] = useState<Review[]>([]);
+    const [reviews, setReviews] = useState<ReviewObject[]>([]);
+    const [myReview, setMyReview] = useState<ReviewObject | null>(null);
     const [reviewTotal, setReviewTotal] = useState(0);
     const [activeCoupon, setActiveCoupon] = useState<{ code: string; description: string; discountType: string; discountValue: number } | null>(null);
     const [loading, setLoading] = useState(true);
@@ -44,26 +48,59 @@ export default function ProductDetails() {
     const [selectedSize, setSelectedSize] = useState('');
     const [deliveryOption, setDeliveryOption] = useState<'instant' | 'standard'>('instant');
 
-    useEffect(() => {
-        if (id) {
-            loadProduct(id as string);
+    const ownReview = myReview || reviews.find(review => review.userId === user.id);
+    const hasDeliveredPurchase = Boolean(
+        isAuthenticated && product && orders.some(order =>
+            order.status === 'delivered' && order.items.some(item => item.productId === product.productId)
+        )
+    );
+    const canWriteReview = hasDeliveredPurchase;
+    const showReviewForm = canWriteReview || Boolean(ownReview);
+
+    const loadReviews = async (currentProductId: string) => {
+        try {
+            const [reviewsRes, mineRes] = await Promise.all([
+                reviewService.getProductReviews(currentProductId, 1, 10),
+                isAuthenticated ? reviewService.getProductReviews(currentProductId, 1, 1, true).catch(() => null) : Promise.resolve(null),
+            ]);
+            setReviews(reviewsRes.data || []);
+            setReviewTotal(reviewsRes.pagination?.totalItems || 0);
+            setMyReview(mineRes?.data?.[0] || null);
+        } catch {
+            setReviews([]);
+            setMyReview(null);
+            setReviewTotal(0);
         }
-    }, [id]);
+    };
+
+    useEffect(() => {
+        if (productId) {
+            loadProduct(productId);
+        }
+    }, [productId]);
+
+    useEffect(() => {
+        if (ownReview) {
+            setReviewRating(ownReview.rating);
+            setReviewComment(ownReview.comment);
+        } else {
+            setReviewRating(5);
+            setReviewComment('');
+        }
+    }, [ownReview?.id]);
 
     const loadProduct = async (productId: string) => {
         try {
             setLoading(true);
             setError(null);
-            const [data, related, reviewsRes, couponsRes] = await Promise.all([
+            const [data, related, couponsRes] = await Promise.all([
                 productService.getProductById(productId),
                 productService.getProducts({ limit: 6 }).then(r => r.products.filter(p => p.productId !== productId).slice(0, 4)).catch(() => []),
-                apiClient.get(`products/${productId}/reviews`, { params: { limit: 10 } }).catch(() => ({ data: { data: [], pagination: { totalItems: 0 } } })),
                 apiClient.get('coupons').catch(() => ({ data: { data: [] } })),
             ]);
             setProduct(data);
             setRelatedProducts(related);
-            setReviews(reviewsRes.data?.data || []);
-            setReviewTotal(reviewsRes.data?.pagination?.totalItems || 0);
+            await loadReviews(productId);
             // Pick the first active coupon to display
             const activeCoupons = (couponsRes.data?.data || []).filter((c: any) => c.status === 'active');
             if (activeCoupons.length > 0) setActiveCoupon(activeCoupons[0]);
@@ -73,6 +110,62 @@ export default function ProductDetails() {
             setError(err.message || 'Failed to load product details');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleReviewSubmit = async () => {
+        if (!product) return;
+        if (!canWriteReview && !ownReview) return;
+
+        const trimmedComment = reviewComment.trim();
+        if (!trimmedComment) {
+            setReviewFeedback('Please write a review comment.');
+            return;
+        }
+
+        try {
+            setReviewSubmitting(true);
+            setReviewFeedback(null);
+
+            if (ownReview) {
+                await reviewService.updateProductReview(product.productId, ownReview.id, {
+                    rating: reviewRating,
+                    comment: trimmedComment,
+                });
+                setReviewFeedback('Your review was updated.');
+            } else {
+                await reviewService.addProductReview(product.productId, {
+                    rating: reviewRating,
+                    comment: trimmedComment,
+                });
+                setReviewFeedback('Thanks for reviewing this product.');
+            }
+
+            await loadReviews(product.productId);
+        } catch (err: any) {
+            setReviewFeedback(err.message || 'Failed to submit review.');
+        } finally {
+            setReviewSubmitting(false);
+        }
+    };
+
+    const handleDeleteReview = async () => {
+        if (!product || !reviewToDelete) return;
+
+        try {
+            setReviewSubmitting(true);
+            setReviewFeedback(null);
+            await reviewService.deleteProductReview(product.productId, reviewToDelete.id);
+            setReviewToDelete(null);
+            setShowDeleteReviewModal(false);
+            setReviewComment('');
+            setReviewRating(5);
+            setReviewFeedback('Your review was deleted.');
+            await loadReviews(product.productId);
+        } catch (err: any) {
+            setReviewFeedback(err.message || 'Failed to delete review.');
+        } finally {
+            setReviewSubmitting(false);
         }
     };
 
@@ -295,25 +388,99 @@ export default function ProductDetails() {
                     </AccordionItem>
 
                     <AccordionItem title={`Reviews${reviewTotal > 0 ? ` (${reviewTotal})` : ''}`}>
-                        {reviews.length === 0 ? (
-                            <Text style={styles.bodyText}>No reviews yet. Be the first to review!</Text>
-                        ) : (
-                            reviews.map(r => (
-                                <View key={r.id} style={styles.reviewItem}>
-                                    <View style={styles.reviewHeader}>
-                                        <View style={styles.reviewRatingBadge}>
-                                            <Text style={styles.reviewRatingText}>{r.rating}</Text>
-                                            <Ionicons name="star" size={9} color="#fff" />
-                                        </View>
-                                        <Text style={styles.reviewerName}>{r.user?.name || 'User'}</Text>
-                                        <Text style={styles.reviewDate}>
-                                            {new Date(r.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                                        </Text>
-                                    </View>
-                                    <Text style={styles.reviewComment}>{r.comment}</Text>
+                        {showReviewForm ? (
+                            <View style={styles.reviewComposer}>
+                                <View style={styles.reviewComposerHeader}>
+                                    <Text style={styles.reviewComposerTitle}>{ownReview ? 'Edit your review' : 'Write a review'}</Text>
+                                    <Text style={styles.reviewComposerSubtitle}>
+                                        {ownReview
+                                            ? 'You can update or delete your review at any time.'
+                                            : 'This product has been delivered to your account, so you can leave a review now.'}
+                                    </Text>
                                 </View>
-                            ))
+
+                                <View style={styles.reviewStarsRow}>
+                                    {[1, 2, 3, 4, 5].map((star) => (
+                                        <TouchableOpacity
+                                            key={star}
+                                            onPress={() => setReviewRating(star)}
+                                            style={styles.reviewStarButton}
+                                        >
+                                            <Ionicons
+                                                name="star"
+                                                size={22}
+                                                color={star <= reviewRating ? '#FBBF24' : '#D1D5DB'}
+                                            />
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+
+                                <TextInput
+                                    value={reviewComment}
+                                    onChangeText={setReviewComment}
+                                    placeholder="Share what you liked, quality, fit, or delivery experience..."
+                                    placeholderTextColor="#9CA3AF"
+                                    multiline
+                                    numberOfLines={4}
+                                    style={styles.reviewInput}
+                                />
+
+                                {reviewFeedback ? <Text style={styles.reviewFeedback}>{reviewFeedback}</Text> : null}
+
+                                <View style={styles.reviewActionRow}>
+                                    <TouchableOpacity
+                                        style={[styles.reviewSubmitButton, reviewSubmitting && styles.reviewButtonDisabled]}
+                                        onPress={handleReviewSubmit}
+                                        disabled={reviewSubmitting}
+                                    >
+                                        <Text style={styles.reviewSubmitButtonText}>
+                                            {reviewSubmitting ? 'Saving...' : ownReview ? 'Update Review' : 'Submit Review'}
+                                        </Text>
+                                    </TouchableOpacity>
+
+                                    {ownReview && (
+                                        <TouchableOpacity
+                                            style={[styles.reviewDeleteButton, reviewSubmitting && styles.reviewButtonDisabled]}
+                                            onPress={() => {
+                                                setReviewToDelete(ownReview);
+                                                setShowDeleteReviewModal(true);
+                                            }}
+                                            disabled={reviewSubmitting}
+                                        >
+                                            <Text style={styles.reviewDeleteButtonText}>Delete</Text>
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
+                            </View>
+                        ) : (
+                            <View style={styles.reviewLockedCard}>
+                                <Text style={styles.bodyText}>You can write a review after this product has been delivered.</Text>
+                                {isOrdersLoading && <Text style={styles.reviewLockedHint}>Checking your delivered orders...</Text>}
+                            </View>
                         )}
+
+                        <View style={styles.reviewList}>
+                            {reviews.length === 0 ? (
+                                <Text style={styles.bodyText}>No reviews yet. Be the first to review!</Text>
+                            ) : (
+                                reviews.map(r => (
+                                    <View key={r.id} style={[styles.reviewItem, r.userId === user.id && styles.ownReviewItem]}>
+                                        <View style={styles.reviewHeader}>
+                                            <View style={styles.reviewRatingBadge}>
+                                                <Text style={styles.reviewRatingText}>{r.rating}</Text>
+                                                <Ionicons name="star" size={9} color="#fff" />
+                                            </View>
+                                            <Text style={styles.reviewerName}>{r.user?.name || 'User'}</Text>
+                                            {r.isVerifiedPurchase && <Text style={styles.reviewVerifiedText}>Verified purchase</Text>}
+                                            <Text style={styles.reviewDate}>
+                                                {new Date(r.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                            </Text>
+                                        </View>
+                                        <Text style={styles.reviewComment}>{r.comment}</Text>
+                                    </View>
+                                ))
+                            )}
+                        </View>
                     </AccordionItem>
 
                     <AccordionItem title="Shipping & Returns">
@@ -380,6 +547,24 @@ export default function ProductDetails() {
                 primaryButtonText="OK"
                 onPrimaryPress={() => setShowVariantWarningModal(false)}
                 onClose={() => setShowVariantWarningModal(false)}
+            />
+
+            <ActionModal
+                visible={showDeleteReviewModal}
+                title="Delete review?"
+                message={reviewToDelete ? `Delete your review for ${product.productName}? This cannot be undone.` : 'Delete this review?'}
+                icon="trash-2"
+                primaryButtonText={reviewSubmitting ? 'Deleting...' : 'Delete'}
+                onPrimaryPress={handleDeleteReview}
+                secondaryButtonText="Cancel"
+                onSecondaryPress={() => {
+                    setShowDeleteReviewModal(false);
+                    setReviewToDelete(null);
+                }}
+                onClose={() => {
+                    setShowDeleteReviewModal(false);
+                    setReviewToDelete(null);
+                }}
             />
         </View>
     );
@@ -655,11 +840,116 @@ const styles = StyleSheet.create({
         marginTop: 6,
         textAlign: 'right',
     },
+    reviewList: {
+        marginTop: 14,
+    },
+    reviewComposer: {
+        backgroundColor: '#F9FAFB',
+        borderRadius: 14,
+        padding: 14,
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+    },
+    reviewComposerHeader: {
+        marginBottom: 12,
+    },
+    reviewComposerTitle: {
+        fontSize: 16,
+        fontWeight: '800',
+        color: '#1a1a1a',
+        marginBottom: 4,
+    },
+    reviewComposerSubtitle: {
+        fontSize: 12,
+        color: '#6B7280',
+        lineHeight: 18,
+    },
+    reviewStarsRow: {
+        flexDirection: 'row',
+        marginBottom: 12,
+    },
+    reviewStarButton: {
+        marginRight: 6,
+    },
+    reviewInput: {
+        minHeight: 108,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        borderRadius: 12,
+        backgroundColor: '#fff',
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        color: '#1a1a1a',
+        fontSize: 14,
+        textAlignVertical: 'top',
+        marginBottom: 10,
+    },
+    reviewFeedback: {
+        fontSize: 12,
+        color: '#B45309',
+        marginBottom: 10,
+    },
+    reviewActionRow: {
+        flexDirection: 'row',
+        gap: 10,
+    },
+    reviewSubmitButton: {
+        flex: 1,
+        backgroundColor: '#FBBF24',
+        paddingVertical: 12,
+        borderRadius: 10,
+        alignItems: 'center',
+    },
+    reviewSubmitButtonText: {
+        fontSize: 14,
+        fontWeight: '800',
+        color: '#1a1a1a',
+    },
+    reviewDeleteButton: {
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: '#FCA5A5',
+        backgroundColor: '#FEF2F2',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    reviewDeleteButtonText: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#B91C1C',
+    },
+    reviewButtonDisabled: {
+        opacity: 0.7,
+    },
+    reviewLockedCard: {
+        backgroundColor: '#FFFBEB',
+        borderRadius: 14,
+        padding: 14,
+        marginBottom: 14,
+        borderWidth: 1,
+        borderColor: '#FDE68A',
+    },
+    reviewLockedHint: {
+        fontSize: 12,
+        color: '#B45309',
+        marginTop: 6,
+    },
     // Reviews
     reviewItem: {
         paddingVertical: 10,
         borderBottomWidth: 1,
         borderBottomColor: '#F3F4F6',
+        gap: 4,
+    },
+    ownReviewItem: {
+        backgroundColor: '#FFFBEB',
+        borderRadius: 12,
+        paddingHorizontal: 10,
+        borderBottomWidth: 0,
+        marginBottom: 8,
     },
     reviewHeader: {
         flexDirection: 'row',
@@ -695,5 +985,10 @@ const styles = StyleSheet.create({
         fontSize: 13,
         color: '#555',
         lineHeight: 20,
+    },
+    reviewVerifiedText: {
+        fontSize: 11,
+        color: '#059669',
+        fontWeight: '700',
     },
 });
