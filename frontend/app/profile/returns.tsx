@@ -1,18 +1,64 @@
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import RefundStatusCard from '../../components/profile/RefundStatusCard';
 import ReturnEligibleCard from '../../components/profile/ReturnEligibleCard';
 
 import { useOrder } from '../../context/OrderContext';
+import { orderService } from '../../services/order';
 
 export default function ReturnsRefundsScreen() {
     const router = useRouter();
     const { orders } = useOrder();
     const [searchQuery, setSearchQuery] = useState('');
     const [showHistory, setShowHistory] = useState(false);
+    const [returnStatusByOrder, setReturnStatusByOrder] = useState<Record<string, {
+        returnStatus: string;
+        reason: string;
+        description?: string;
+        requestedAt: string;
+        updatedAt: string;
+    }>>({});
+
+    useEffect(() => {
+        let cancelled = false;
+
+        const loadReturnStatuses = async () => {
+            const candidateOrders = orders.filter(order =>
+                ['delivered', 'returned', 'cancelled', 'return_requested'].includes(order.status) || order.paymentStatus === 'refunded'
+            );
+
+            if (candidateOrders.length === 0) {
+                setReturnStatusByOrder({});
+                return;
+            }
+
+            const entries = await Promise.all(candidateOrders.map(async order => {
+                try {
+                    const response = await orderService.getReturnStatus(order.id);
+                    return [order.id, (response as any).data] as const;
+                } catch {
+                    return [order.id, null] as const;
+                }
+            }));
+
+            if (!cancelled) {
+                const nextStatuses = entries.reduce<Record<string, any>>((acc, [orderId, data]) => {
+                    if (data) acc[orderId] = data;
+                    return acc;
+                }, {});
+                setReturnStatusByOrder(nextStatuses);
+            }
+        };
+
+        loadReturnStatuses();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [orders]);
 
     // Flatten all items from orders to show in returns list
     // In a real app, you might filter by 'Delivered' status and within return window
@@ -42,15 +88,41 @@ export default function ReturnsRefundsScreen() {
         .map(order => ({
             orderId: order.orderNumber,
             amount: `₹${(order.finalAmount || 0).toFixed(2)}`,
-            statusLabel: order.status === 'cancelled' ? 'CANCELLED' : 'REFUNDED',
+            statusLabel: returnStatusByOrder[order.id]?.returnStatus
+                ? returnStatusByOrder[order.id].returnStatus.replace(/_/g, ' ').toUpperCase()
+                : (order.status === 'cancelled' ? 'CANCELLED' : 'REFUNDED'),
             completedDate: order.updatedAt ? new Date(order.updatedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '',
             steps: [
                 { label: 'Requested', state: 'completed' as const, icon: 'check' as const },
                 { label: 'Processed', state: 'completed' as const, icon: 'settings' as const },
                 { label: 'Refunded', state: 'completed' as const, icon: 'dollar-sign' as const },
             ],
-            infoText: `Refund of ₹${(order.finalAmount || 0).toFixed(2)} has been processed to your ${order.paymentMethod === 'wallet' ? 'wallet' : 'original payment method'}.`
+            infoText: returnStatusByOrder[order.id]?.reason
+                ? `Return reason: ${returnStatusByOrder[order.id].reason}. Refund of ₹${(order.finalAmount || 0).toFixed(2)} has been processed to your ${order.paymentMethod === 'wallet' ? 'wallet' : 'original payment method'}.`
+                : `Refund of ₹${(order.finalAmount || 0).toFixed(2)} has been processed to your ${order.paymentMethod === 'wallet' ? 'wallet' : 'original payment method'}.`
         }));
+
+    const activeReturns = orders
+        .filter(order => {
+            const returnData = returnStatusByOrder[order.id];
+            return Boolean(returnData) && !['returned', 'cancelled'].includes(order.status);
+        })
+        .map(order => {
+            const returnData = returnStatusByOrder[order.id];
+            const normalizedStatus = (returnData?.returnStatus || 'requested').replace(/_/g, ' ');
+
+            return {
+                orderId: order.orderNumber,
+                amount: `₹${(order.finalAmount || 0).toFixed(2)}`,
+                statusLabel: normalizedStatus.toUpperCase(),
+                steps: [
+                    { label: 'Requested', state: 'completed' as const, icon: 'check' as const },
+                    { label: 'Processing', state: ['approved', 'picked_up', 'processing', 'refund_initiated'].includes(returnData?.returnStatus || '') ? 'active' as const : 'pending' as const, icon: 'settings' as const },
+                    { label: 'Refunded', state: ['refund_initiated', 'refunded'].includes(returnData?.returnStatus || '') ? 'completed' as const : 'pending' as const, icon: 'dollar-sign' as const },
+                ],
+                infoText: `Return reason: ${returnData?.reason || 'N/A'}. Current status: ${normalizedStatus}.`
+            };
+        });
 
     return (
         <View style={styles.container}>
@@ -149,6 +221,26 @@ export default function ReturnsRefundsScreen() {
                                     { label: 'Refunded', state: 'pending', icon: 'dollar-sign' },
                                 ]}
                                 infoText={`Your order ${order.orderNumber} is ${order.status}. Refund will be processed if returned.`}
+                            />
+                        ))}
+                    </>
+                )}
+
+                {activeReturns.length > 0 && (
+                    <>
+                        <View style={styles.sectionHeader}>
+                            <Text style={styles.sectionTitle}>Return Tracking</Text>
+                            <Text style={styles.itemCount}>{activeReturns.length} ACTIVE</Text>
+                        </View>
+
+                        {activeReturns.map((returnItem) => (
+                            <RefundStatusCard
+                                key={returnItem.orderId}
+                                orderId={returnItem.orderId}
+                                amount={returnItem.amount}
+                                statusLabel={returnItem.statusLabel}
+                                steps={returnItem.steps}
+                                infoText={returnItem.infoText}
                             />
                         ))}
                     </>

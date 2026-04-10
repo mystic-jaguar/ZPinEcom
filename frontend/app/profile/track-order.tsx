@@ -1,12 +1,13 @@
 import { Feather, FontAwesome5 } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import DeliveryPartnerCard from '../../components/profile/DeliveryPartnerCard';
 import InstantTrialCard from '../../components/profile/InstantTrialCard';
 import OrderTimeline from '../../components/profile/OrderTimeline';
 import StandardDeliveryCard from '../../components/profile/StandardDeliveryCard';
 import { useOrder } from '../../context/OrderContext';
+import { orderService } from '../../services/order';
 
 export default function TrackOrderScreen() {
     const router = useRouter();
@@ -14,19 +15,46 @@ export default function TrackOrderScreen() {
     const { orderId } = params;
     const { getOrderById, refreshOrders } = useOrder();
     const [refreshing, setRefreshing] = useState(false);
+    const [trackingData, setTrackingData] = useState<{
+        trackingNumber: string | null;
+        currentStatus: string;
+        estimatedDelivery?: string;
+        trackingHistory: Array<{ status: string; title: string; timestamp: string | null; note?: string }>;
+    } | null>(null);
 
     const onRefresh = async () => {
         setRefreshing(true);
         await refreshOrders();
+        if (orderId) {
+            await loadTracking(orderId as string);
+        }
         setRefreshing(false);
     };
+
+    const loadTracking = async (targetOrderId: string) => {
+        try {
+            const response = await orderService.trackOrder(targetOrderId);
+            setTrackingData((response as any)?.data ?? null);
+        } catch (error) {
+            setTrackingData(null);
+        } finally {
+        }
+    };
+
+    useEffect(() => {
+        if (orderId) {
+            loadTracking(orderId as string);
+        }
+    }, [orderId]);
 
     // Retrieve Order
     const order = getOrderById(orderId as string);
     const isInstant = order?.notes === 'instant_delivery';
+    const liveStatus = trackingData?.currentStatus || order?.status;
+    const liveEstimatedDelivery = trackingData?.estimatedDelivery || order?.estimatedDelivery;
 
-    const canCancel = order && ['pending', 'confirmed'].includes(order.status);
-    const canReturn = order && order.status === 'delivered';
+    const canCancel = order && ['pending', 'confirmed'].includes(liveStatus as any);
+    const canReturn = order && liveStatus === 'delivered';
 
     return (
         <View style={styles.mainContainer}>
@@ -50,9 +78,12 @@ export default function TrackOrderScreen() {
                     <View style={styles.orderTextColumn}>
                         <Text style={styles.orderIdLabel}>ORDER ID: #{order?.orderNumber ?? "ZPIN-88219"}</Text>
                         <Text style={styles.estimatedTime}>
-                            {isInstant ? "Today, 4:15 PM" : "Friday, 26 Jan"}
+                            {liveEstimatedDelivery ? new Date(liveEstimatedDelivery).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : (isInstant ? "Today, 4:15 PM" : "Friday, 26 Jan")}
                         </Text>
                         <Text style={styles.estimatedLabel}>Estimated Delivery</Text>
+                        {trackingData?.trackingNumber && (
+                            <Text style={styles.trackingNumber}>Tracking No. {trackingData.trackingNumber}</Text>
+                        )}
                     </View>
 
                     <View style={styles.badgeContainer}>
@@ -90,7 +121,7 @@ export default function TrackOrderScreen() {
                         {/* Conditional Info Card (Overlapping) */}
                         {isInstant ? (
                             <InstantTrialCard
-                                isDelivered={order?.status === 'delivered'}
+                                isDelivered={liveStatus === 'delivered'}
                                 deliveredAt={order?.updatedAt}
                             />
                         ) : (
@@ -101,7 +132,7 @@ export default function TrackOrderScreen() {
                     <View style={styles.sheetContent}>
                         {/* Timeline Card */}
                         <View style={styles.sectionContainer}>
-                            <OrderTimeline status={order?.status} />
+                            <OrderTimeline status={liveStatus as any} />
                         </View>
 
                         {/* Delivery Partner */}
@@ -215,6 +246,12 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#4B5563',
         fontWeight: '500',
+    },
+    trackingNumber: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#4B5563',
+        marginTop: 6,
     },
     badgeContainer: {
         marginLeft: 16,

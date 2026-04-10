@@ -9,6 +9,91 @@ const ORDERS = 'orders';
 const ORDER_ITEMS = 'order_items';
 const CART = 'cart_items';
 const ADDRESSES = 'addresses';
+const RETURN_REQUESTS = 'return_requests';
+const ORDER_CANCELLATIONS = 'order_cancellations';
+
+let supportTablesReady = false;
+
+async function ensureOrderSupportTables() {
+  if (supportTablesReady) return;
+
+  await pool.query(
+    `CREATE TABLE IF NOT EXISTS ${RETURN_REQUESTS} (
+      id VARCHAR(7) PRIMARY KEY,
+      order_id VARCHAR(7) NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+      user_id VARCHAR(7) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      order_item_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
+      reason TEXT NOT NULL,
+      description TEXT,
+      status VARCHAR(50) NOT NULL DEFAULT 'requested',
+      created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+    )`
+  );
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS idx_return_requests_order_id ON ${RETURN_REQUESTS}(order_id)`
+  );
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS idx_return_requests_user_id ON ${RETURN_REQUESTS}(user_id)`
+  );
+
+  await pool.query(
+    `CREATE TABLE IF NOT EXISTS ${ORDER_CANCELLATIONS} (
+      id VARCHAR(7) PRIMARY KEY,
+      order_id VARCHAR(7) NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+      user_id VARCHAR(7) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      reason TEXT NOT NULL,
+      refund_method VARCHAR(50) NOT NULL DEFAULT 'original',
+      created_at TIMESTAMP NOT NULL DEFAULT NOW()
+    )`
+  );
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS idx_order_cancellations_order_id ON ${ORDER_CANCELLATIONS}(order_id)`
+  );
+
+  supportTablesReady = true;
+}
+
+function buildTrackingHistory(order: any, returnRequest?: any) {
+  const steps: Array<{ status: string; title: string; timestamp: string | null; note?: string }> = [
+    { status: 'pending', title: 'Order placed', timestamp: order.created_at },
+  ];
+
+  const flow = ['confirmed', 'processing', 'shipped', 'delivered'];
+  for (const status of flow) {
+    if (order.status === status || flow.indexOf(order.status) > flow.indexOf(status)) {
+      steps.push({
+        status,
+        title: `Order ${status}`,
+        timestamp: order.updated_at,
+      });
+    }
+  }
+
+  if (order.status === 'cancelled') {
+    steps.push({
+      status: 'cancelled',
+      title: 'Order cancelled',
+      timestamp: order.updated_at,
+    });
+  }
+
+  if (returnRequest) {
+    steps.push({
+      status: 'return_requested',
+      title: 'Return requested',
+      timestamp: returnRequest.created_at,
+      note: returnRequest.reason,
+    });
+    steps.push({
+      status: returnRequest.status,
+      title: `Return ${String(returnRequest.status).replace(/_/g, ' ')}`,
+      timestamp: returnRequest.updated_at,
+    });
+  }
+
+  return steps;
+}
 
 // Helper: get or create wallet for a user
 async function getOrCreateWallet(userId: string) {
@@ -123,6 +208,53 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response): Promis
     res.json({ success: true, data: { order: normalizeOrder(result.rows[0]) } });
   } catch (err) {
     console.error('getOrder error:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// GET /api/v1/orders/:id/track
+router.get('/:id/track', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    await ensureOrderSupportTables();
+
+    const orderResult = await pool.query(
+      `SELECT id, order_number, status, tracking_number, estimated_delivery, created_at, updated_at
+       FROM ${ORDERS}
+       WHERE id = $1 AND user_id = $2`,
+      [req.params.id, req.userId]
+    );
+
+    if (orderResult.rows.length === 0) {
+      res.status(404).json({ success: false, message: 'Order not found' });
+      return;
+    }
+
+    const returnResult = await pool.query(
+      `SELECT id, reason, status, created_at, updated_at
+       FROM ${RETURN_REQUESTS}
+       WHERE order_id = $1 AND user_id = $2
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [req.params.id, req.userId]
+    );
+
+    const order = orderResult.rows[0];
+    const returnRequest = returnResult.rows[0];
+    const trackingHistory = buildTrackingHistory(order, returnRequest);
+
+    res.json({
+      success: true,
+      data: {
+        orderId: order.id,
+        orderNumber: order.order_number,
+        trackingNumber: order.tracking_number || null,
+        currentStatus: returnRequest ? 'return_in_progress' : order.status,
+        estimatedDelivery: order.estimated_delivery,
+        trackingHistory,
+      },
+    });
+  } catch (err) {
+    console.error('trackOrder error:', err);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
@@ -346,6 +478,8 @@ router.post('/:id/return', authenticate, async (req: AuthRequest, res: Response)
   }
 
   try {
+    await ensureOrderSupportTables();
+
     // Verify the order belongs to this user and is delivered
     const orderResult = await pool.query(
       `SELECT id, status, final_amount FROM ${ORDERS} WHERE id = $1 AND user_id = $2`,
@@ -358,15 +492,39 @@ router.post('/:id/return', authenticate, async (req: AuthRequest, res: Response)
     }
 
     const order = orderResult.rows[0];
-    if (order.status !== 'delivered') {
+    if (!['delivered', 'return_requested'].includes(order.status)) {
       res.status(400).json({ success: false, message: 'Only delivered orders can be returned' });
+      return;
+    }
+
+    const existingReturn = await pool.query(
+      `SELECT id, status, created_at, updated_at
+       FROM ${RETURN_REQUESTS}
+       WHERE order_id = $1 AND user_id = $2 AND status IN ('requested', 'approved', 'picked_up', 'processing', 'refund_initiated')
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [req.params.id, req.userId]
+    );
+
+    if (existingReturn.rows.length > 0) {
+      const activeReturn = existingReturn.rows[0];
+      res.json({
+        success: true,
+        data: {
+          returnId: activeReturn.id,
+          status: activeReturn.status,
+          message: 'Return request is already active for this order',
+          refundAmount: Number(order.final_amount),
+          refundStatus: 'initiated',
+        },
+      });
       return;
     }
 
     // Insert into return_requests table
     const returnId = generateId();
     await pool.query(
-      `INSERT INTO return_requests (id, order_id, user_id, order_item_ids, reason, description, status, created_at, updated_at)
+      `INSERT INTO ${RETURN_REQUESTS} (id, order_id, user_id, order_item_ids, reason, description, status, created_at, updated_at)
        VALUES ($1, $2, $3, $4, $5, $6, 'requested', NOW(), NOW())`,
       [returnId, req.params.id, req.userId, JSON.stringify(orderItemIds || []), reason, description || '']
     );
@@ -393,11 +551,73 @@ router.post('/:id/return', authenticate, async (req: AuthRequest, res: Response)
   }
 });
 
+// GET /api/v1/orders/:id/return-status
+router.get('/:id/return-status', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    await ensureOrderSupportTables();
+
+    const orderResult = await pool.query(
+      `SELECT id, order_number, status, updated_at
+       FROM ${ORDERS}
+       WHERE id = $1 AND user_id = $2`,
+      [req.params.id, req.userId]
+    );
+
+    if (orderResult.rows.length === 0) {
+      res.status(404).json({ success: false, message: 'Order not found' });
+      return;
+    }
+
+    const returnResult = await pool.query(
+      `SELECT id, order_item_ids, reason, description, status, created_at, updated_at
+       FROM ${RETURN_REQUESTS}
+       WHERE order_id = $1 AND user_id = $2
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [req.params.id, req.userId]
+    );
+
+    if (returnResult.rows.length === 0) {
+      res.status(404).json({ success: false, message: 'No return request found for this order' });
+      return;
+    }
+
+    const rr = returnResult.rows[0];
+    const order = orderResult.rows[0];
+
+    res.json({
+      success: true,
+      data: {
+        returnId: rr.id,
+        orderId: order.id,
+        orderNumber: order.order_number,
+        orderStatus: order.status,
+        returnStatus: rr.status,
+        reason: rr.reason,
+        description: rr.description,
+        orderItemIds: Array.isArray(rr.order_item_ids) ? rr.order_item_ids : [],
+        requestedAt: rr.created_at,
+        updatedAt: rr.updated_at,
+      },
+    });
+  } catch (err) {
+    console.error('getReturnStatus error:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 // PATCH /api/v1/orders/:id/cancel
 router.patch('/:id/cancel', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
-  const { refundMethod } = req.body; // 'original' | 'wallet'
+  const { refundMethod, reason } = req.body; // refundMethod: 'original' | 'wallet'
+
+  if (!reason || typeof reason !== 'string') {
+    res.status(400).json({ success: false, message: 'reason is required' });
+    return;
+  }
 
   try {
+    await ensureOrderSupportTables();
+
     const result = await pool.query(
       `UPDATE ${ORDERS}
        SET status = 'cancelled', payment_status = 'refunded', updated_at = NOW()
@@ -426,6 +646,12 @@ router.patch('/:id/cancel', authenticate, async (req: AuthRequest, res: Response
         [wallet.id, req.userId, refundAmount, `Refund for cancelled order`, req.params.id]
       );
     }
+
+    await pool.query(
+      `INSERT INTO ${ORDER_CANCELLATIONS} (id, order_id, user_id, reason, refund_method, created_at)
+       VALUES ($1, $2, $3, $4, $5, NOW())`,
+      [generateId(), req.params.id, req.userId, reason, refundMethod || 'original']
+    );
 
     res.json({
       success: true,

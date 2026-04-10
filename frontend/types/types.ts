@@ -297,7 +297,7 @@ export interface OrderObject {
     userId: string;
     sellerId: string;
     orderNumber: string;
-    status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'returned';
+    status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'returned' | 'return_requested';
     paymentStatus: 'pending' | 'paid' | 'failed' | 'refunded';
     totalAmount: number;
     shippingAmount: number;

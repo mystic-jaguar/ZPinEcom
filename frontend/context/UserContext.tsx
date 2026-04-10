@@ -60,6 +60,42 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         loadUser();
     }, []);
 
+    const refreshUserFromServer = async (userId: string) => {
+        try {
+            const response = await userService.getUserById(userId);
+            if (response.success && response.data) {
+                const raw = response.data as any;
+                const serverUser: UserObject = {
+                    ...raw,
+                    id: raw.id || raw._id || '',
+                    dob: raw.dob || '',
+                    gender: raw.gender || '',
+                    profileImage: raw.profileImage || raw.profile_image || null,
+                    receivePushNotifications: raw.receivePushNotifications ?? raw.receive_push_notifications ?? true,
+                    receiveEmailUpdates: raw.receiveEmailUpdates ?? raw.receive_email_updates ?? false,
+                    receiveOrderUpdates: raw.receiveOrderUpdates ?? raw.receive_order_updates ?? true,
+                } as any;
+                setUserState(serverUser);
+                await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(serverUser));
+            }
+        } catch (apiError: any) {
+            const status = apiError?.response?.status;
+            const isSessionExpired = apiError?.message === 'SESSION_EXPIRED';
+            const isNetworkError = apiError?.message?.includes('Network error');
+
+            if (status === 401 || status === 403 || isSessionExpired) {
+                setIsAuthenticated(false);
+                await tokenManager.clearTokens?.();
+                await AsyncStorage.multiRemove([USER_STORAGE_KEY, USER_DETAILS_STORAGE_KEY]);
+                return;
+            }
+
+            if (!isNetworkError) {
+                console.warn('Failed to refresh user data from server:', apiError);
+            }
+        }
+    };
+
     const loadUser = async () => {
         // Prevent concurrent loadUser calls
         if (loadUserInProgressRef.current) {
@@ -82,43 +118,20 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
                 };
                 setUserState(parsedUser);
                 setIsAuthenticated(true);
-
-                if (parsedUser.id) {
-                    try {
-                        const response = await userService.getUserById(parsedUser.id);
-                        if (response.success && response.data) {
-                            const raw = response.data as any;
-                            const serverUser: UserObject = {
-                                ...raw,
-                                id: raw.id || raw._id || '',
-                                // Explicitly map profile fields so they're never lost
-                                dob: raw.dob || '',
-                                gender: raw.gender || '',
-                                profileImage: raw.profileImage || raw.profile_image || null,
-                                receivePushNotifications: raw.receivePushNotifications ?? raw.receive_push_notifications ?? true,
-                                receiveEmailUpdates: raw.receiveEmailUpdates ?? raw.receive_email_updates ?? false,
-                                receiveOrderUpdates: raw.receiveOrderUpdates ?? raw.receive_order_updates ?? true,
-                            } as any;
-                            setUserState(serverUser);
-                            await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(serverUser));
-                        }
-                    } catch (apiError: any) {
-                        console.warn('Failed to refresh user data from server:', apiError);
-                        const status = apiError?.response?.status;
-                        const isSessionExpired = apiError?.message === 'SESSION_EXPIRED';
-                        if (status === 401 || status === 403 || isSessionExpired) {
-                            setIsAuthenticated(false);
-                            await tokenManager.clearTokens?.();
-                            await AsyncStorage.multiRemove([USER_STORAGE_KEY, USER_DETAILS_STORAGE_KEY]);
-                        }
-                    }
-                }
             } else {
                 setIsAuthenticated(false);
             }
 
             if (userDetailsData) {
                 setUserDetails(JSON.parse(userDetailsData));
+            }
+
+            // Render immediately from cached data, then refresh in the background.
+            if (token && token !== 'null' && userData) {
+                const parsedUser = JSON.parse(userData);
+                if (parsedUser.id || parsedUser._id) {
+                    void refreshUserFromServer(parsedUser.id || parsedUser._id);
+                }
             }
         } catch (error) {
             console.error('Error loading user:', error);

@@ -130,6 +130,32 @@ CREATE TABLE IF NOT EXISTS order_items (
 );
 CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id);
 
--- ── 9-11. products, product_images, product_reviews ──────────────────────────
+-- ── 9. return_requests ───────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS return_requests (
+  id             VARCHAR(7)   PRIMARY KEY,
+  order_id       VARCHAR(7)   NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  user_id        VARCHAR(7)   NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  order_item_ids JSONB        NOT NULL DEFAULT '[]'::jsonb,
+  reason         TEXT         NOT NULL,
+  description    TEXT,
+  status         VARCHAR(50)  NOT NULL DEFAULT 'requested',
+  created_at     TIMESTAMP    NOT NULL DEFAULT NOW(),
+  updated_at     TIMESTAMP    NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_return_requests_order_id ON return_requests(order_id);
+CREATE INDEX IF NOT EXISTS idx_return_requests_user_id  ON return_requests(user_id);
+
+-- ── 10. order_cancellations ──────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS order_cancellations (
+  id            VARCHAR(7)   PRIMARY KEY,
+  order_id      VARCHAR(7)   NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  user_id       VARCHAR(7)   NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  reason        TEXT         NOT NULL,
+  refund_method VARCHAR(50)  NOT NULL DEFAULT 'original',
+  created_at    TIMESTAMP    NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_order_cancellations_order_id ON order_cancellations(order_id);
+
+-- ── 11-13. products, product_images, product_reviews ──────────────────────────
 -- These tables already exist and require no structural changes.
 -- product_reviews JOIN fix is handled in the backend code (products.ts).

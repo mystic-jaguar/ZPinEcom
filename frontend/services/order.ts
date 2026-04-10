@@ -130,6 +130,30 @@ export const orderService = {
     },
 
     /**
+     * Get return request status for an order
+     */
+    async getReturnStatus(id: string) {
+        try {
+            // GET :- /api/v1/orders/:id/return-status
+            const response = await apiClient.get<ApiSuccessResponse<{
+                returnId: string;
+                orderId: string;
+                orderNumber: string;
+                orderStatus: string;
+                returnStatus: string;
+                reason: string;
+                description?: string;
+                orderItemIds: string[];
+                requestedAt: string;
+                updatedAt: string;
+            }>>(`orders/${id}/return-status`);
+            return response.data;
+        } catch (error) {
+            throw new Error(handleApiError(error));
+        }
+    },
+
+    /**
      * Download order invoice
      */
     async downloadInvoice(id: string) {
