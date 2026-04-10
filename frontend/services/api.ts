@@ -24,13 +24,45 @@ const getExpoHostIp = (): string | null => {
     return hostUri.split(':')[0] || null;
 };
 
+const isLocalAddress = (url: string): boolean => {
+    try {
+        const parsed = new URL(url);
+        const hostname = parsed.hostname.toLowerCase();
+
+        return (
+            hostname === 'localhost' ||
+            hostname === '127.0.0.1' ||
+            hostname === '10.0.2.2' ||
+            hostname.startsWith('10.') ||
+            hostname.startsWith('192.168.') ||
+            /^172\.(1[6-9]|2\d|3[0-1])\./.test(hostname)
+        );
+    } catch {
+        return false;
+    }
+};
+
 const resolveBaseUrl = (): string => {
     const envUrl = process.env.EXPO_PUBLIC_API_URL;
-    if (envUrl) {
+
+    const hostIp = getExpoHostIp();
+
+    if (__DEV__) {
+        if (envUrl && !isLocalAddress(envUrl)) {
+            return ensureApiV1Base(envUrl);
+        }
+
+        if (hostIp) {
+            return `http://${hostIp}:5000/api/v1/`;
+        }
+
+        if (envUrl) {
+            return ensureApiV1Base(envUrl);
+        }
+    } else if (envUrl) {
         return ensureApiV1Base(envUrl);
     }
 
-    const hostIp = getExpoHostIp();
     if (hostIp) {
         return `http://${hostIp}:5000/api/v1/`;
     }
