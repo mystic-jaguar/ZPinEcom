@@ -7,6 +7,12 @@ export interface CreateReviewData {
     images?: string[];
 }
 
+export interface UpdateReviewData {
+    rating?: number;
+    comment?: string;
+    images?: string[];
+}
+
 export const reviewService = {
     /**
      * Get reviews for a product
@@ -30,6 +36,37 @@ export const reviewService = {
         try {
             // POST :- /api/v1/products/:id/reviews
             const response = await apiClient.post<ApiSuccessResponse<{ message: string }>>(`products/${productId}/reviews`, data);
+            return response.data;
+        } catch (error) {
+            throw new Error(handleApiError(error));
+        }
+    },
+
+    /**
+     * Update an existing review for a product
+     */
+    async updateProductReview(productId: string, reviewId: string, data: UpdateReviewData) {
+        try {
+            // PUT :- /api/v1/products/:id/reviews/:reviewId
+            const response = await apiClient.put<ApiSuccessResponse<{ message: string }>>(
+                `products/${productId}/reviews/${reviewId}`,
+                data
+            );
+            return response.data;
+        } catch (error) {
+            throw new Error(handleApiError(error));
+        }
+    },
+
+    /**
+     * Delete a review from a product
+     */
+    async deleteProductReview(productId: string, reviewId: string) {
+        try {
+            // DELETE :- /api/v1/products/:id/reviews/:reviewId
+            const response = await apiClient.delete<ApiSuccessResponse<{ message: string }>>(
+                `products/${productId}/reviews/${reviewId}`
+            );
             return response.data;
         } catch (error) {
             throw new Error(handleApiError(error));

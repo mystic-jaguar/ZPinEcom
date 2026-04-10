@@ -156,6 +156,8 @@ export interface ReviewObject {
         profileImage?: string;
     };
     createdAt: string;
+    updatedAt?: string;
+    isVerifiedPurchase?: boolean;
 }
 
 /**

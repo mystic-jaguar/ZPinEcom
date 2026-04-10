@@ -36,6 +36,48 @@ function normalizeProduct(row: any) {
   };
 }
 
+const PRODUCT_ID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const SHORT_ID_REGEX = /^[A-Z0-9]{7}$/;
+
+function isValidProductId(id: string): boolean {
+  return PRODUCT_ID_REGEX.test(id) || SHORT_ID_REGEX.test(id);
+}
+
+function normalizeReviewImages(images: unknown): string[] {
+  if (Array.isArray(images)) {
+    return images.filter((image): image is string => typeof image === 'string');
+  }
+
+  if (typeof images === 'string') {
+    try {
+      const parsed = JSON.parse(images);
+      return Array.isArray(parsed) ? parsed.filter((image): image is string => typeof image === 'string') : [];
+    } catch {
+      return [];
+    }
+  }
+
+  return [];
+}
+
+function mapReviewRow(row: any) {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    productId: row.product_id,
+    rating: Number(row.rating),
+    comment: row.comment,
+    images: normalizeReviewImages(row.images),
+    user: {
+      name: row.user_name,
+      profileImage: row.user_profile_image || undefined,
+    },
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    isVerifiedPurchase: row.is_verified_purchase,
+  };
+}
+
 // GET /api/v1/products/search?q= — full-text product name search with related products
 router.get('/search', productListLimiter, async (req: Request, res: Response): Promise<void> => {
   const q = (req.query.q as string || '').trim();
@@ -308,9 +350,7 @@ router.get('/', productListLimiter, async (req: Request, res: Response): Promise
 router.get('/:id', async (req: Request, res: Response): Promise<void> => {
   const { id } = req.params;
   // Accept both UUID format (legacy) and 7-char alphanumeric IDs
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  const shortIdRegex = /^[A-Z0-9]{7}$/;
-  if (!uuidRegex.test(id) && !shortIdRegex.test(id)) {
+  if (!isValidProductId(id)) {
     res.status(404).json({ success: false, message: 'Product not found' });
     return;
   }
@@ -342,13 +382,18 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
 
 // GET /api/v1/products/:id/reviews
 router.get('/:id/reviews', async (req: Request, res: Response): Promise<void> => {
+  if (!isValidProductId(req.params.id)) {
+    res.status(404).json({ success: false, message: 'Product not found' });
+    return;
+  }
+
   const page = Number(req.query.page) || 1;
   const limit = Number(req.query.limit) || 10;
   const offset = (page - 1) * limit;
 
   try {
     const result = await pool.query(
-      `SELECT pr.*, u.name as user_name
+      `SELECT pr.*, u.name as user_name, u.profile_image as user_profile_image
        FROM product_reviews pr
        JOIN users u ON u.id = pr.user_id
        WHERE pr.product_id = $1
@@ -364,15 +409,7 @@ router.get('/:id/reviews', async (req: Request, res: Response): Promise<void> =>
 
     res.json({
       success: true,
-      data: result.rows.map(r => ({
-        id: r.id,
-        userId: r.user_id,
-        productId: r.product_id,
-        rating: r.rating,
-        comment: r.comment,
-        user: { name: r.user_name },
-        createdAt: r.created_at,
-      })),
+      data: result.rows.map(mapReviewRow),
       pagination: {
         currentPage: page,
         totalPages: Math.ceil(total / limit),
@@ -390,13 +427,31 @@ router.get('/:id/reviews', async (req: Request, res: Response): Promise<void> =>
 
 // POST /api/v1/products/:id/reviews
 router.post('/:id/reviews', authenticate, reviewLimiter, async (req: AuthRequest, res: Response): Promise<void> => {
-  const { rating, comment } = req.body;
-  if (!rating || !comment) {
+  if (!isValidProductId(req.params.id)) {
+    res.status(404).json({ success: false, message: 'Product not found' });
+    return;
+  }
+
+  const { rating, comment, images } = req.body;
+  const parsedRating = Number(rating);
+  const parsedComment = typeof comment === 'string' ? comment.trim() : '';
+
+  if (!Number.isInteger(parsedRating) || parsedRating < 1 || parsedRating > 5) {
+    res.status(400).json({ success: false, message: 'Rating must be between 1 and 5' });
+    return;
+  }
+  if (!parsedComment) {
     res.status(400).json({ success: false, message: 'Rating and comment are required' });
     return;
   }
-  if (rating < 1 || rating > 5) {
-    res.status(400).json({ success: false, message: 'Rating must be between 1 and 5' });
+
+  if (images !== undefined && !Array.isArray(images)) {
+    res.status(400).json({ success: false, message: 'Images must be an array of strings' });
+    return;
+  }
+  const normalizedImages = normalizeReviewImages(images);
+  if (images !== undefined && normalizedImages.length !== images.length) {
+    res.status(400).json({ success: false, message: 'Images must be an array of strings' });
     return;
   }
 
@@ -419,13 +474,128 @@ router.post('/:id/reviews', authenticate, reviewLimiter, async (req: AuthRequest
     }
 
     await pool.query(
-      `INSERT INTO product_reviews (id, product_id, user_id, rating, comment, created_at, updated_at)
-       VALUES ($1,$2,$3,$4,$5,NOW(),NOW())`,
-      [generateId(), req.params.id, req.userId, rating, comment]
+      `INSERT INTO product_reviews (id, product_id, user_id, rating, comment, images, is_verified_purchase, created_at, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,false,NOW(),NOW())`,
+      [generateId(), req.params.id, req.userId, parsedRating, parsedComment, JSON.stringify(normalizedImages)]
     );
     res.status(201).json({ success: true, message: 'Review added' });
   } catch (err) {
     console.error('addReview error:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// PUT /api/v1/products/:id/reviews/:reviewId
+router.put('/:id/reviews/:reviewId', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+  if (!isValidProductId(req.params.id)) {
+    res.status(404).json({ success: false, message: 'Product not found' });
+    return;
+  }
+
+  const { rating, comment, images } = req.body;
+
+  if (rating === undefined && comment === undefined && images === undefined) {
+    res.status(400).json({ success: false, message: 'No review fields provided' });
+    return;
+  }
+
+  if (rating !== undefined) {
+    const parsedRating = Number(rating);
+    if (!Number.isInteger(parsedRating) || parsedRating < 1 || parsedRating > 5) {
+      res.status(400).json({ success: false, message: 'Rating must be between 1 and 5' });
+      return;
+    }
+  }
+
+  if (comment !== undefined && (typeof comment !== 'string' || !comment.trim())) {
+    res.status(400).json({ success: false, message: 'Comment cannot be empty' });
+    return;
+  }
+
+  if (images !== undefined && !Array.isArray(images)) {
+    res.status(400).json({ success: false, message: 'Images must be an array of strings' });
+    return;
+  }
+
+  const normalizedImages = images !== undefined ? normalizeReviewImages(images) : [];
+  if (images !== undefined && normalizedImages.length !== images.length) {
+    res.status(400).json({ success: false, message: 'Images must be an array of strings' });
+    return;
+  }
+
+  try {
+    const existing = await pool.query(
+      `SELECT id, user_id, product_id, rating, comment, images
+       FROM product_reviews
+       WHERE id = $1 AND product_id = $2`,
+      [req.params.reviewId, req.params.id]
+    );
+
+    if (existing.rows.length === 0) {
+      res.status(404).json({ success: false, message: 'Review not found' });
+      return;
+    }
+
+    if (existing.rows[0].user_id !== req.userId) {
+      res.status(403).json({ success: false, message: 'You can only edit your own review' });
+      return;
+    }
+
+    const nextRating = rating !== undefined ? Number(rating) : Number(existing.rows[0].rating);
+    const nextComment = comment !== undefined ? String(comment).trim() : String(existing.rows[0].comment);
+    const nextImages = images !== undefined ? normalizedImages : normalizeReviewImages(existing.rows[0].images);
+
+    await pool.query(
+      `UPDATE product_reviews
+       SET rating = $1,
+           comment = $2,
+           images = $3,
+           updated_at = NOW()
+       WHERE id = $4 AND product_id = $5 AND user_id = $6`,
+      [nextRating, nextComment, JSON.stringify(nextImages), req.params.reviewId, req.params.id, req.userId]
+    );
+
+    res.json({ success: true, message: 'Review updated' });
+  } catch (err) {
+    console.error('updateReview error:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// DELETE /api/v1/products/:id/reviews/:reviewId
+router.delete('/:id/reviews/:reviewId', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+  if (!isValidProductId(req.params.id)) {
+    res.status(404).json({ success: false, message: 'Product not found' });
+    return;
+  }
+
+  try {
+    const existing = await pool.query(
+      `SELECT id, user_id
+       FROM product_reviews
+       WHERE id = $1 AND product_id = $2`,
+      [req.params.reviewId, req.params.id]
+    );
+
+    if (existing.rows.length === 0) {
+      res.status(404).json({ success: false, message: 'Review not found' });
+      return;
+    }
+
+    if (existing.rows[0].user_id !== req.userId) {
+      res.status(403).json({ success: false, message: 'You can only delete your own review' });
+      return;
+    }
+
+    await pool.query(
+      `DELETE FROM product_reviews
+       WHERE id = $1 AND product_id = $2 AND user_id = $3`,
+      [req.params.reviewId, req.params.id, req.userId]
+    );
+
+    res.json({ success: true, message: 'Review deleted' });
+  } catch (err) {
+    console.error('deleteReview error:', err);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
