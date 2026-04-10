@@ -4,6 +4,7 @@ import express from 'express';
 import helmet from 'helmet';
 
 import { httpsRedirect } from './middleware/httpsRedirect';
+import { inputSanitizer } from './middleware/inputSanitizer';
 import { globalLimiter } from './middleware/rateLimits';
 import { requestLogger } from './middleware/requestLogger';
 import authRoutes from './routes/auth';
@@ -69,6 +70,9 @@ app.use(cors({
 // ─── Body Parsing ─────────────────────────────────────────────────────────────
 app.use(express.json({ limit: '50kb' }));
 app.use(express.urlencoded({ extended: true, limit: '50kb' }));
+
+// ─── Input Sanitization ──────────────────────────────────────────────────────
+app.use(inputSanitizer);
 
 // ─── Routes ─────────────────────────────────────────────────────────────────
 app.use('/api/v1/auth', authRoutes);

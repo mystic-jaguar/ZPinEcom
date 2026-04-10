@@ -1,5 +1,6 @@
 import { Request, Response, Router } from 'express';
 import { pool } from '../db';
+import { isValidShortId } from '../utils/id';
 
 const router = Router();
 
@@ -15,7 +16,7 @@ const router = Router();
 router.post('/new-order', async (req: Request, res: Response): Promise<void> => {
   const { sellerId } = req.body;
 
-  if (!sellerId) {
+  if (!sellerId || typeof sellerId !== 'string' || !isValidShortId(sellerId)) {
     res.status(400).json({ success: false, message: 'sellerId is required' });
     return;
   }
@@ -100,7 +101,7 @@ router.post('/new-order', async (req: Request, res: Response): Promise<void> => 
 router.get('/new-order/count', async (req: Request, res: Response): Promise<void> => {
   const sellerId = req.query.sellerId as string;
 
-  if (!sellerId) {
+  if (!sellerId || !isValidShortId(sellerId)) {
     res.status(400).json({ success: false, message: 'sellerId is required' });
     return;
   }

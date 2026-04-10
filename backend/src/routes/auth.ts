@@ -5,13 +5,14 @@ import rateLimit from 'express-rate-limit';
 import jwt from 'jsonwebtoken';
 import { pool } from '../db';
 import { generateId } from '../utils/id';
+import { safeIdentifier } from '../utils/sql';
 import { logger } from '../utils/logger';
 
 const router = Router();
 
-const USERS = 'users';
-const REFRESH_TOKENS = 'refresh_tokens';
-const AUTH_TOKENS = 'auth_tokens';
+const USERS = safeIdentifier('users');
+const REFRESH_TOKENS = safeIdentifier('refresh_tokens');
+const AUTH_TOKENS = safeIdentifier('auth_tokens');
 
 // ─── Rate Limiters ────────────────────────────────────────────────────────────
 

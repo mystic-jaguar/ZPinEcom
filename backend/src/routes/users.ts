@@ -3,13 +3,14 @@ import { pool } from '../db';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { addressLimiter } from '../middleware/rateLimits';
 import { generateId } from '../utils/id';
+import { safeIdentifier } from '../utils/sql';
 
 const router = Router();
 
-const USERS = 'users';
-const ORDERS = 'orders';
-const ORDER_ITEMS = 'order_items';
-const ADDRESSES = 'addresses';
+const USERS = safeIdentifier('users');
+const ORDERS = safeIdentifier('orders');
+const ORDER_ITEMS = safeIdentifier('order_items');
+const ADDRESSES = safeIdentifier('addresses');
 
 function normalizeUser(row: any) {
   return {
@@ -143,7 +144,7 @@ router.put('/profileDetails', authenticate, async (req: AuthRequest, res: Respon
 
     const push = (col: string, val: any) => {
       values.push(val);
-      setClauses.push(`${col} = $${values.length}`);
+      setClauses.push(`${safeIdentifier(col)} = $${values.length}`);
     };
 
     if (name)                              push('name', name);

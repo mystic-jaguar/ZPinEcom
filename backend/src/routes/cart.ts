@@ -2,10 +2,11 @@ import { Response, Router } from 'express';
 import { pool } from '../db';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { cartWriteLimiter } from '../middleware/rateLimits';
-import { generateId } from '../utils/id';
+import { generateId, isValidShortId } from '../utils/id';
+import { safeIdentifier } from '../utils/sql';
 
 const router = Router();
-const T = 'cart_items';
+const T = safeIdentifier('cart_items');
 
 // GET /api/v1/cart/count
 router.get('/count', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
@@ -73,6 +74,11 @@ router.post('/', authenticate, cartWriteLimiter, async (req: AuthRequest, res: R
     return;
   }
 
+  if (typeof productId !== 'string' || !isValidShortId(productId)) {
+    res.status(400).json({ success: false, message: 'Invalid productId' });
+    return;
+  }
+
   try {
     const product = await pool.query('SELECT price, in_stock FROM products WHERE id = $1', [productId]);
     if (product.rows.length === 0) {
@@ -117,6 +123,11 @@ router.put('/:productId', authenticate, async (req: AuthRequest, res: Response):
     return;
   }
 
+  if (!isValidShortId(req.params.productId)) {
+    res.status(400).json({ success: false, message: 'Invalid productId' });
+    return;
+  }
+
   try {
     const result = await pool.query(
       `UPDATE ${T} SET quantity = $1, updated_at = NOW() WHERE user_id = $2 AND product_id = $3 RETURNING id`,
@@ -135,6 +146,11 @@ router.put('/:productId', authenticate, async (req: AuthRequest, res: Response):
 
 // DELETE /api/v1/cart/:productId
 router.delete('/:productId', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+  if (!isValidShortId(req.params.productId)) {
+    res.status(400).json({ success: false, message: 'Invalid productId' });
+    return;
+  }
+
   try {
     await pool.query(`DELETE FROM ${T} WHERE user_id = $1 AND product_id = $2`, [req.userId, req.params.productId]);
     res.json({ success: true, message: 'Item removed from cart' });

@@ -3,14 +3,15 @@ import { pool } from '../db';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { orderCreateLimiter } from '../middleware/rateLimits';
 import { generateId } from '../utils/id';
+import { safeIdentifier } from '../utils/sql';
 
 const router = Router();
-const ORDERS = 'orders';
-const ORDER_ITEMS = 'order_items';
-const CART = 'cart_items';
-const ADDRESSES = 'addresses';
-const RETURN_REQUESTS = 'return_requests';
-const ORDER_CANCELLATIONS = 'order_cancellations';
+const ORDERS = safeIdentifier('orders');
+const ORDER_ITEMS = safeIdentifier('order_items');
+const CART = safeIdentifier('cart_items');
+const ADDRESSES = safeIdentifier('addresses');
+const RETURN_REQUESTS = safeIdentifier('return_requests');
+const ORDER_CANCELLATIONS = safeIdentifier('order_cancellations');
 
 let supportTablesReady = false;
 

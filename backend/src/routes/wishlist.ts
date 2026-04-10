@@ -2,9 +2,10 @@ import { Response, Router } from 'express';
 import { generateId } from '../utils/id';
 import { pool } from '../db';
 import { authenticate, AuthRequest } from '../middleware/auth';
+import { safeIdentifier } from '../utils/sql';
 
 const router = Router();
-const T = 'wishlists';
+const T = safeIdentifier('wishlists');
 
 // GET /api/v1/wishlist/count
 router.get('/count', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
