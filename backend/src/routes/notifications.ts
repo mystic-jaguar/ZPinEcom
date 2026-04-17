@@ -41,7 +41,7 @@ router.post('/new-order', async (req: Request, res: Response): Promise<void> => 
 
     // Extract order IDs from notification data
     const orderIds = notifResult.rows
-      .map(n => {
+      .map((n: any) => {
         try { return JSON.parse(n.data)?.orderId; } catch { return null; }
       })
       .filter(Boolean);
@@ -78,7 +78,7 @@ router.post('/new-order', async (req: Request, res: Response): Promise<void> => 
 
     res.json({
       success: true,
-      notifications: notifResult.rows.map(n => ({
+      notifications: notifResult.rows.map((n: any) => ({
         id: n.id,
         title: n.title,
         message: n.message,
@@ -95,7 +95,7 @@ router.post('/new-order', async (req: Request, res: Response): Promise<void> => 
         })(),
         createdAt: n.created_at,
       })),
-      orders: ordersResult.rows.map((row) => ({
+      orders: ordersResult.rows.map((row: any) => ({
         ...row,
         shipping_address: decryptAddressPayload(row.shipping_address || {}),
       })),

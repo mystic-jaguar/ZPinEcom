@@ -40,7 +40,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response): Promise<v
       data: {
         walletId: wallet.id,
         balance: decryptMoney(wallet.balance),
-        transactions: txns.rows.map(t => ({
+        transactions: txns.rows.map((t: any) => ({
           id: t.id,
           type: t.type,
           amount: Number(t.amount),

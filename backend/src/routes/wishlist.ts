@@ -1,7 +1,7 @@
 import { Response, Router } from 'express';
-import { generateId } from '../utils/id';
 import { pool } from '../db';
 import { authenticate, AuthRequest } from '../middleware/auth';
+import { generateId } from '../utils/id';
 import { safeIdentifier } from '../utils/sql';
 
 const router = Router();
@@ -53,7 +53,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response): Promise<v
 
     res.json({
       success: true,
-      data: result.rows.map(r => ({
+      data: result.rows.map((r: any) => ({
         productId: r.product_id,
         productName: r.product_name,
         price: Number(r.price),

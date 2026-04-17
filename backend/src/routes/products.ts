@@ -155,7 +155,7 @@ router.get('/recommended', authenticate, async (req: AuthRequest, res: Response)
 
     // Sort categories by score descending, take top 5
     const topCategories = [...categoryScores.entries()]
-      .sort((a, b) => b[1] - a[1])
+      .sort((a: [string, number], b: [string, number]) => b[1] - a[1])
       .slice(0, 5)
       .map(([cat]) => cat);
 
@@ -221,8 +221,8 @@ router.get('/search', productListLimiter, async (req: Request, res: Response): P
     // Fetch related products — same deepest_category_name, excluding already found
     let related: any[] = [];
     if (products.length > 0) {
-      const categories = [...new Set(products.map(p => p.deepestCategoryName).filter(Boolean))];
-      const foundIds = products.map(p => p.productId);
+      const categories = [...new Set(products.map((p: any) => p.deepestCategoryName).filter(Boolean))];
+      const foundIds = products.map((p: any) => p.productId);
 
       const relatedResult = await pool.query(
         `SELECT p.*,
@@ -318,7 +318,7 @@ router.get('/fresh-categories', async (req: Request, res: Response): Promise<voi
 
     // Sort by latest_at desc, take top 5
     const sorted = result.rows
-      .sort((a, b) => new Date(b.latest_at).getTime() - new Date(a.latest_at).getTime())
+      .sort((a: any, b: any) => new Date(b.latest_at).getTime() - new Date(a.latest_at).getTime())
       .slice(0, 5);
 
     const categories = sorted.map(r => ({

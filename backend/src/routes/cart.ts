@@ -32,7 +32,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response): Promise<v
       [req.userId]
     );
 
-    const cart = result.rows.map(r => ({
+    const cart = result.rows.map((r: any) => ({
       cartItemId: r.id,
       productId: r.product_id,
       quantity: r.quantity,
@@ -48,7 +48,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response): Promise<v
       timeStamp: r.created_at,
     }));
 
-    const totalAmount = cart.reduce((sum, item) => sum + item.priceAtAdd * item.quantity, 0);
+    const totalAmount = cart.reduce((sum: number, item: any) => sum + item.priceAtAdd * item.quantity, 0);
 
     res.json({
       success: true,
@@ -56,8 +56,8 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response): Promise<v
         cart,
         totalItems: cart.length,
         totalAmount,
-        hasUnavailableItems: cart.some(i => !i.isAvailable),
-        hasPriceChanges: cart.some(i => i.priceAtAdd !== i.product.price),
+        hasUnavailableItems: cart.some((i: any) => !i.isAvailable),
+        hasPriceChanges: cart.some((i: any) => i.priceAtAdd !== i.product.price),
       },
     });
   } catch (err) {

@@ -19,7 +19,7 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
       ORDER BY not_expired DESC, created_at DESC
     `);
 
-    const coupons = result.rows.map(r => {
+    const coupons = result.rows.map((r: any) => {
       let status: 'active' | 'expired' | 'used';
       if (!r.not_expired) status = 'expired';
       else if (!r.under_limit) status = 'used';

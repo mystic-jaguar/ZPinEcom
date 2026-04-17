@@ -69,7 +69,7 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
   : ['*'];
 
 app.use(cors({
-  origin: allowedOrigins.includes('*') ? '*' : (origin, cb) => {
+  origin: allowedOrigins.includes('*') ? '*' : (origin: string | undefined, cb: (err: Error | null, allow?: boolean) => void) => {
     if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
     logger.warn('cors.blocked', { origin });
     cb(new Error('Not allowed by CORS'));
