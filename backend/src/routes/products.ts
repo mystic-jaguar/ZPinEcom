@@ -585,13 +585,13 @@ router.get('/:id/reviews', async (req: Request, res: Response): Promise<void> =>
         ? `SELECT pr.*, u.name as user_name, NULL::text as user_profile_image
            FROM product_reviews pr
            JOIN users u ON u.id = pr.user_id
-           WHERE pr.product_id = $1 AND pr.user_id = $2
+           WHERE pr.product_id = $1::text AND pr.user_id = $2
            ORDER BY pr.created_at DESC
            LIMIT $3 OFFSET $4`
         : `SELECT pr.*, u.name as user_name, NULL::text as user_profile_image
            FROM product_reviews pr
            JOIN users u ON u.id = pr.user_id
-           WHERE pr.product_id = $1
+           WHERE pr.product_id = $1::text
            ORDER BY pr.created_at DESC
            LIMIT $2 OFFSET $3`,
       mineOnly ? [productUUID, mineUserId, limit, offset] : [productUUID, limit, offset]
@@ -599,8 +599,8 @@ router.get('/:id/reviews', async (req: Request, res: Response): Promise<void> =>
 
     const countResult = await pool.query(
       mineOnly
-        ? 'SELECT COUNT(*) FROM product_reviews WHERE product_id = $1 AND user_id = $2'
-        : 'SELECT COUNT(*) FROM product_reviews WHERE product_id = $1',
+        ? 'SELECT COUNT(*) FROM product_reviews WHERE product_id = $1::text AND user_id = $2'
+        : 'SELECT COUNT(*) FROM product_reviews WHERE product_id = $1::text',
       mineOnly ? [productUUID, mineUserId] : [productUUID]
     );
     const total = Number(countResult.rows[0].count);
@@ -664,7 +664,7 @@ router.post('/:id/reviews', authenticate, reviewLimiter, async (req: AuthRequest
 
     // Prevent duplicate reviews from the same user
     const existing = await pool.query(
-      'SELECT id FROM product_reviews WHERE product_id = $1 AND user_id = $2',
+      'SELECT id FROM product_reviews WHERE product_id = $1::text AND user_id = $2',
       [productUUID, req.userId]
     );
     if (existing.rows.length > 0) {
