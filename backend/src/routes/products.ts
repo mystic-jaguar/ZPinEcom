@@ -1,4 +1,5 @@
 import { Request, Response, Router } from 'express';
+import jwt from 'jsonwebtoken';
 import { pool } from '../db';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { productListLimiter, reviewLimiter } from '../middleware/rateLimits';
@@ -86,6 +87,33 @@ function mapReviewRow(row: any) {
     updatedAt: row.updated_at,
     isVerifiedPurchase: row.is_verified_purchase,
   };
+}
+
+function extractToken(req: Request): string | null {
+  if (req.headers.authorization?.startsWith('Bearer ')) {
+    return req.headers.authorization.slice(7);
+  }
+
+  const xAuthToken = req.headers['x-auth-token'];
+  if (typeof xAuthToken === 'string' && xAuthToken) {
+    return xAuthToken;
+  }
+
+  const cookieToken = (req as any).cookies?.token;
+  if (typeof cookieToken === 'string' && cookieToken) {
+    return cookieToken;
+  }
+
+  return null;
+}
+
+function getUserIdFromToken(token: string): string | null {
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as { userId?: string };
+    return typeof decoded?.userId === 'string' ? decoded.userId : null;
+  } catch {
+    return null;
+  }
 }
 
 // GET /api/v1/products/recommended — personalized recommendations for authenticated user
@@ -502,55 +530,50 @@ router.get('/:id/reviews', async (req: Request, res: Response): Promise<void> =>
     return;
   }
 
-  const page = Math.max(Number(req.query.page) || 1, 1);
-  const limit = Math.min(Math.max(Number(req.query.limit) || 10, 1), 100);
-  const offset = (page - 1) * limit;
-  const mineOnly = String(req.query.mine || '').toLowerCase() === 'true' || String(req.query.mine || '') === '1';
-
-  if (mineOnly) {
-    const token = req.headers.authorization?.startsWith('Bearer ')
-      ? req.headers.authorization.slice(7)
-      : (req.headers['x-auth-token'] as string | undefined) || req.cookies?.token;
-
-    if (!token) {
-      res.json({
-        success: true,
-        data: [],
-        pagination: {
-          currentPage: page,
-          totalPages: 0,
-          totalItems: 0,
-          itemsPerPage: limit,
-          hasNextPage: false,
-          hasPrevPage: false,
-        },
-      });
-      return;
-    }
-
-    let authenticated = false;
-    authenticate(req as AuthRequest, res, () => {
-      authenticated = true;
-    });
-
-    if (!authenticated || !(req as AuthRequest).userId) {
-      res.json({
-        success: true,
-        data: [],
-        pagination: {
-          currentPage: page,
-          totalPages: 0,
-          totalItems: 0,
-          itemsPerPage: limit,
-          hasNextPage: false,
-          hasPrevPage: false,
-        },
-      });
-      return;
-    }
-  }
-
   try {
+    const page = Math.max(Number(req.query.page) || 1, 1);
+    const limit = Math.min(Math.max(Number(req.query.limit) || 10, 1), 100);
+    const offset = (page - 1) * limit;
+    const mineOnly = String(req.query.mine || '').toLowerCase() === 'true' || String(req.query.mine || '') === '1';
+
+    let mineUserId: string | null = null;
+
+    if (mineOnly) {
+      const token = extractToken(req);
+      if (!token) {
+        res.json({
+          success: true,
+          data: [],
+          pagination: {
+            currentPage: page,
+            totalPages: 0,
+            totalItems: 0,
+            itemsPerPage: limit,
+            hasNextPage: false,
+            hasPrevPage: false,
+          },
+        });
+        return;
+      }
+
+      mineUserId = getUserIdFromToken(token);
+      if (!mineUserId) {
+        res.json({
+          success: true,
+          data: [],
+          pagination: {
+            currentPage: page,
+            totalPages: 0,
+            totalItems: 0,
+            itemsPerPage: limit,
+            hasNextPage: false,
+            hasPrevPage: false,
+          },
+        });
+        return;
+      }
+    }
+
     const productUUID = await resolveProductUUID(req.params.id);
     if (!productUUID) {
       res.status(404).json({ success: false, message: 'Product not found' });
@@ -571,14 +594,14 @@ router.get('/:id/reviews', async (req: Request, res: Response): Promise<void> =>
            WHERE pr.product_id = $1
            ORDER BY pr.created_at DESC
            LIMIT $2 OFFSET $3`,
-      mineOnly ? [productUUID, (req as AuthRequest).userId, limit, offset] : [productUUID, limit, offset]
+      mineOnly ? [productUUID, mineUserId, limit, offset] : [productUUID, limit, offset]
     );
 
     const countResult = await pool.query(
       mineOnly
         ? 'SELECT COUNT(*) FROM product_reviews WHERE product_id = $1 AND user_id = $2'
         : 'SELECT COUNT(*) FROM product_reviews WHERE product_id = $1',
-      mineOnly ? [productUUID, (req as AuthRequest).userId] : [productUUID]
+      mineOnly ? [productUUID, mineUserId] : [productUUID]
     );
     const total = Number(countResult.rows[0].count);
 
