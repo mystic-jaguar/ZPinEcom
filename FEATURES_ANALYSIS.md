@@ -2,9 +2,9 @@
 
 ## Executive Summary
 
-**Project Status:** 72% Complete | Production-Ready for MVP with critical gaps
+**Project Status:** 78% Complete | Production-Ready for MVP with critical gaps
 
-**Backend:** 9 API route modules with 40+ endpoints | Express.js + PostgreSQL
+**Backend:** 9 API route modules with 50+ endpoints | Express.js + PostgreSQL
 **Frontend:** Expo React Native | 13+ screens across auth, shopping, checkout, profiles
 **Key Gap:** Payment gateway integration (blocking checkout completion)
 
@@ -46,12 +46,15 @@
 | Related Products | ✅ | Automatic suggestion based on deepest category |
 | Stock Management | ✅ | Per-product quantity tracking, in-stock filtering |
 | Variant Support | ✅ | Size quantities stored as JSON (e.g., {S:10, M:15, L:8}) |
+| Personalized Recommendations | ✅ | Weighted signals: purchase history (+3), wishlist (+2), search terms (+1); falls back to latest products |
+| Fresh Categories | ✅ | Top 5 categories with most recently added products |
 
 **Implementation Details:**
-- Backend: `routes/products.ts` (9 endpoints)
+- Backend: `routes/products.ts` (13 endpoints)
 - Frontend: `app/(tabs)/product-listing.tsx`, `app/product/[id].tsx`
 - Search: Normalized fuzzy matching on product name
 - Pagination: 20 items default, configurable up to 200
+- Recommendations: Excludes already-purchased products, top 5 categories by score, limit 30
 
 ---
 
@@ -186,15 +189,20 @@
 #### Product Reviews & Ratings
 | Feature | Status | Details |
 |---------|--------|---------|
-| Submit Review | ❌ | Backend expects endpoint (POST `/api/v1/products/:id/reviews`) |
-| Get Reviews | ❌ | No list reviews endpoint |
-| Edit Review | ❌ | No update endpoint |
-| Delete Review | ❌ | No delete endpoint |
+| Submit Review | ✅ | POST `/api/v1/products/:id/reviews` — auth required, duplicate prevention, image support |
+| Get Reviews | ✅ | GET `/api/v1/products/:id/reviews` — paginated, supports `?mine=true` filter |
+| Edit Review | ✅ | PUT `/api/v1/products/:id/reviews/:reviewId` — owner-only, partial field updates |
+| Delete Review | ✅ | DELETE `/api/v1/products/:id/reviews/:reviewId` — owner-only |
 | Review Average | ✅ | Calculated in product queries |
+| Verified Purchase Flag | ✅ | `is_verified_purchase` stored per review (currently defaults to false) |
 
 **Implementation Details:**
-- Backend: `routes/products.ts` has rate limiter `reviewLimiter` but no actual route handlers
-- Frontend: `services/review.ts` exists with all CRUD methods but will fail on POST
+- Backend: `routes/products.ts` — full CRUD review handlers implemented
+- Rate limit: 30 requests/min via `reviewLimiter`
+- Duplicate guard: one review per user per product (409 on conflict)
+- Image support: array of URL strings, normalized and validated
+- DB migration: `scripts/fix-product-reviews-product-id.sql` + `runFixProductReviews.ts` to ensure UUID column type
+- Frontend: `services/review.ts` — all methods now have working backend endpoints
 
 ---
 
@@ -261,6 +269,12 @@
 - Cart Write: 50 requests / min
 - Order Create: 20 requests / 15 min
 - Global: 1000 requests / 15 min
+
+**Migration Scripts:**
+- `scripts/runMigration.ts` — main schema migration runner
+- `scripts/runFixProductReviews.ts` — fixes `product_reviews.product_id` to UUID type
+- `scripts/runFixProductReviewsUserId.ts` — fixes `product_reviews.user_id` column
+- `scripts/fix-product-reviews-product-id.sql` / `fix-product-reviews-user-id.sql` — underlying SQL patches
 
 ---
 
@@ -379,28 +393,28 @@ Root (_layout.tsx)
 
 ## 🚀 DEPLOYMENT READINESS
 
-### MVP Ready (72% - Can Launch With Constraints)
+### MVP Ready (78% - Can Launch With Constraints)
 ✅ Core e-commerce flows working  
 ✅ User authentication complete  
 ✅ Product browsing & discovery  
+✅ Product recommendations (personalized + fresh categories)  
 ✅ Shopping cart  
 ✅ Checkout (shipping address)  
 ✅ Coupon application  
 ✅ Order creation (with COD)  
 ✅ Order cancellation/returns and tracking endpoints  
 ✅ Encryption at rest for wallet/address data  
+✅ Product reviews — full CRUD (submit, list, edit, delete)  
 
 ### Blocking Issues for Production
-❌ **Payment gateway integration required**  
-❌ Product reviews  
+❌ **Payment gateway integration required**
 
 ### Recommended Phase 2 Work
 - [ ] Razorpay/payment gateway integration (2-3 weeks)
-- [ ] Order management completed (1-2 weeks)
-- [ ] Reviews system (1 week)
 - [ ] Admin dashboard for seller/order management (2-3 weeks)
 - [ ] Email notifications (1 week)
 - [ ] Analytics & logging (1 week)
+- [ ] Verified purchase flag automation (link reviews to order history)
 
 ---
 
@@ -412,10 +426,10 @@ Root (_layout.tsx)
 3. Test end-to-end checkout flow
 
 ### Short-term (Week 1-2)
-1. Complete review system routes
-2. Fix frontend API error handling for payment failures
-3. Add payment integration retry/reconciliation flows
-4. Add encryption key rotation runbook and audit logging
+1. Fix frontend API error handling for payment failures
+2. Add payment integration retry/reconciliation flows
+3. Add encryption key rotation runbook and audit logging
+4. Wire `is_verified_purchase` flag — auto-set when reviewer has a delivered order for the product
 
 ### Medium-term (Week 3-4)
 1. Admin dashboard for order fulfillment
@@ -430,7 +444,7 @@ Root (_layout.tsx)
 | Feature Area | Status | Working | Missing | Quality |
 |--------------|--------|---------|---------|---------|
 | Authentication | ✅ 100% | 6/6 | 0 | Production-ready |
-| Products | ✅ 90% | 9/10 | Reviews | Good |
+| Products | ✅ 100% | 13/13 | 0 | Production-ready |
 | Cart | ✅ 100% | 6/6 | 0 | Production-ready |
 | Wishlist | ✅ 100% | 5/5 | 0 | Production-ready |
 | User Profile | ✅ 90% | 8/9 | Edit endpoints | Good |
@@ -439,7 +453,7 @@ Root (_layout.tsx)
 | Orders | ✅ 90% | 9/10 | Payment verification coupling | Good |
 | Payments | ❌ 0% | 0/5 | All routes | BLOCKING |
 | Notifications | ✅ 90% | 5/5 | Frontend UI | Good |
-| **Overall** | **⚠️ 72%** | **54/58** | **4 critical** | **MVP-ready** |
+| **Overall** | **⚠️ 78%** | **60/63** | **1 critical** | **MVP-ready** |
 
 ---
 
@@ -462,7 +476,7 @@ Root (_layout.tsx)
 - `frontend/services/auth.ts` - Auth operations
 - `frontend/services/payment.ts` - Payment operations (will fail)
 - `frontend/services/order.ts` - Order CRUD
-- `frontend/services/review.ts` - Reviews (will fail)
+- `frontend/services/review.ts` - Product reviews (fully functional)
 
 ### Frontend Screens
 - Auth: `frontend/app/auth/*`
