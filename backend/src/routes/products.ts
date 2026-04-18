@@ -49,7 +49,7 @@ function isValidProductId(id: string): boolean {
  * Returns null if the product doesn't exist.
  */
 async function resolveProductUUID(id: string): Promise<string | null> {
-  const result = await pool.query('SELECT id::text FROM products WHERE id::text = $1', [id]);
+  const result = await pool.query('SELECT id FROM products WHERE id = $1', [id]);
   if (result.rows.length === 0) return null;
   return result.rows[0].id as string;
 }
@@ -585,13 +585,13 @@ router.get('/:id/reviews', async (req: Request, res: Response): Promise<void> =>
         ? `SELECT pr.*, u.name as user_name, NULL::text as user_profile_image
            FROM product_reviews pr
            JOIN users u ON u.id = pr.user_id
-           WHERE pr.product_id = $1::text AND pr.user_id = $2
+           WHERE pr.product_id = $1 AND pr.user_id = $2
            ORDER BY pr.created_at DESC
            LIMIT $3 OFFSET $4`
         : `SELECT pr.*, u.name as user_name, NULL::text as user_profile_image
            FROM product_reviews pr
            JOIN users u ON u.id = pr.user_id
-           WHERE pr.product_id = $1::text
+           WHERE pr.product_id = $1
            ORDER BY pr.created_at DESC
            LIMIT $2 OFFSET $3`,
       mineOnly ? [productUUID, mineUserId, limit, offset] : [productUUID, limit, offset]
@@ -599,8 +599,8 @@ router.get('/:id/reviews', async (req: Request, res: Response): Promise<void> =>
 
     const countResult = await pool.query(
       mineOnly
-        ? 'SELECT COUNT(*) FROM product_reviews WHERE product_id = $1::text AND user_id = $2'
-        : 'SELECT COUNT(*) FROM product_reviews WHERE product_id = $1::text',
+        ? 'SELECT COUNT(*) FROM product_reviews WHERE product_id = $1 AND user_id = $2'
+        : 'SELECT COUNT(*) FROM product_reviews WHERE product_id = $1',
       mineOnly ? [productUUID, mineUserId] : [productUUID]
     );
     const total = Number(countResult.rows[0].count);
@@ -664,7 +664,7 @@ router.post('/:id/reviews', authenticate, reviewLimiter, async (req: AuthRequest
 
     // Prevent duplicate reviews from the same user
     const existing = await pool.query(
-      'SELECT id FROM product_reviews WHERE product_id = $1::text AND user_id = $2',
+      'SELECT id FROM product_reviews WHERE product_id = $1 AND user_id = $2',
       [productUUID, req.userId]
     );
     if (existing.rows.length > 0) {
@@ -732,7 +732,7 @@ router.put('/:id/reviews/:reviewId', authenticate, async (req: AuthRequest, res:
     const existing = await pool.query(
       `SELECT id, user_id, product_id, rating, comment, images
        FROM product_reviews
-       WHERE id = $1 AND product_id = $2::text`,
+       WHERE id = $1 AND product_id = $2`,
       [req.params.reviewId, productUUID]
     );
 
@@ -756,7 +756,7 @@ router.put('/:id/reviews/:reviewId', authenticate, async (req: AuthRequest, res:
            comment = $2,
            images = $3,
            updated_at = NOW()
-       WHERE id = $4 AND product_id = $5::text AND user_id = $6`,
+       WHERE id = $4 AND product_id = $5 AND user_id = $6`,
       [nextRating, nextComment, JSON.stringify(nextImages), req.params.reviewId, productUUID, req.userId]
     );
 
@@ -784,7 +784,7 @@ router.delete('/:id/reviews/:reviewId', authenticate, async (req: AuthRequest, r
     const existing = await pool.query(
       `SELECT id, user_id
        FROM product_reviews
-       WHERE id = $1 AND product_id = $2::text`,
+       WHERE id = $1 AND product_id = $2`,
       [req.params.reviewId, productUUID]
     );
 
@@ -800,7 +800,7 @@ router.delete('/:id/reviews/:reviewId', authenticate, async (req: AuthRequest, r
 
     await pool.query(
       `DELETE FROM product_reviews
-       WHERE id = $1 AND product_id = $2::text AND user_id = $3`,
+       WHERE id = $1 AND product_id = $2 AND user_id = $3`,
       [req.params.reviewId, productUUID, req.userId]
     );
 
