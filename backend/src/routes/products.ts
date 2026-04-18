@@ -43,6 +43,16 @@ function isValidProductId(id: string): boolean {
   return PRODUCT_ID_REGEX.test(id) || SHORT_ID_REGEX.test(id);
 }
 
+/**
+ * Resolves a product ID (UUID or 7-char short ID) to its UUID.
+ * Returns null if the product doesn't exist.
+ */
+async function resolveProductUUID(id: string): Promise<string | null> {
+  const result = await pool.query('SELECT id FROM products WHERE id = $1', [id]);
+  if (result.rows.length === 0) return null;
+  return result.rows[0].id as string;
+}
+
 function normalizeReviewImages(images: unknown): string[] {
   if (Array.isArray(images)) {
     return images.filter((image): image is string => typeof image === 'string');
@@ -492,8 +502,8 @@ router.get('/:id/reviews', async (req: Request, res: Response): Promise<void> =>
     return;
   }
 
-  const page = Number(req.query.page) || 1;
-  const limit = Number(req.query.limit) || 10;
+  const page = Math.max(Number(req.query.page) || 1, 1);
+  const limit = Math.min(Math.max(Number(req.query.limit) || 10, 1), 100);
   const offset = (page - 1) * limit;
   const mineOnly = String(req.query.mine || '').toLowerCase() === 'true' || String(req.query.mine || '') === '1';
 
@@ -541,28 +551,34 @@ router.get('/:id/reviews', async (req: Request, res: Response): Promise<void> =>
   }
 
   try {
+    const productUUID = await resolveProductUUID(req.params.id);
+    if (!productUUID) {
+      res.status(404).json({ success: false, message: 'Product not found' });
+      return;
+    }
+
     const result = await pool.query(
       mineOnly
-        ? `SELECT pr.*, u.name as user_name, u.profile_image as user_profile_image
+        ? `SELECT pr.*, u.name as user_name, NULL::text as user_profile_image
            FROM product_reviews pr
            JOIN users u ON u.id = pr.user_id
            WHERE pr.product_id = $1 AND pr.user_id = $2
            ORDER BY pr.created_at DESC
            LIMIT $3 OFFSET $4`
-        : `SELECT pr.*, u.name as user_name, u.profile_image as user_profile_image
+        : `SELECT pr.*, u.name as user_name, NULL::text as user_profile_image
            FROM product_reviews pr
            JOIN users u ON u.id = pr.user_id
            WHERE pr.product_id = $1
            ORDER BY pr.created_at DESC
            LIMIT $2 OFFSET $3`,
-      mineOnly ? [req.params.id, (req as AuthRequest).userId, limit, offset] : [req.params.id, limit, offset]
+      mineOnly ? [productUUID, (req as AuthRequest).userId, limit, offset] : [productUUID, limit, offset]
     );
 
     const countResult = await pool.query(
       mineOnly
         ? 'SELECT COUNT(*) FROM product_reviews WHERE product_id = $1 AND user_id = $2'
         : 'SELECT COUNT(*) FROM product_reviews WHERE product_id = $1',
-      mineOnly ? [req.params.id, (req as AuthRequest).userId] : [req.params.id]
+      mineOnly ? [productUUID, (req as AuthRequest).userId] : [productUUID]
     );
     const total = Number(countResult.rows[0].count);
 
@@ -615,17 +631,18 @@ router.post('/:id/reviews', authenticate, reviewLimiter, async (req: AuthRequest
   }
 
   try {
-    // Verify product exists
+    // Verify product exists and resolve UUID
     const product = await pool.query('SELECT id FROM products WHERE id = $1', [req.params.id]);
     if (product.rows.length === 0) {
       res.status(404).json({ success: false, message: 'Product not found' });
       return;
     }
+    const productUUID = product.rows[0].id as string;
 
     // Prevent duplicate reviews from the same user
     const existing = await pool.query(
       'SELECT id FROM product_reviews WHERE product_id = $1 AND user_id = $2',
-      [req.params.id, req.userId]
+      [productUUID, req.userId]
     );
     if (existing.rows.length > 0) {
       res.status(409).json({ success: false, message: 'You have already reviewed this product' });
@@ -635,7 +652,7 @@ router.post('/:id/reviews', authenticate, reviewLimiter, async (req: AuthRequest
     await pool.query(
       `INSERT INTO product_reviews (id, product_id, user_id, rating, comment, images, is_verified_purchase, created_at, updated_at)
        VALUES ($1,$2,$3,$4,$5,$6,false,NOW(),NOW())`,
-      [generateId(), req.params.id, req.userId, parsedRating, parsedComment, JSON.stringify(normalizedImages)]
+      [generateId(), productUUID, req.userId, parsedRating, parsedComment, JSON.stringify(normalizedImages)]
     );
     res.status(201).json({ success: true, message: 'Review added' });
   } catch (err) {
@@ -683,11 +700,17 @@ router.put('/:id/reviews/:reviewId', authenticate, async (req: AuthRequest, res:
   }
 
   try {
+    const productUUID = await resolveProductUUID(req.params.id);
+    if (!productUUID) {
+      res.status(404).json({ success: false, message: 'Product not found' });
+      return;
+    }
+
     const existing = await pool.query(
       `SELECT id, user_id, product_id, rating, comment, images
        FROM product_reviews
        WHERE id = $1 AND product_id = $2`,
-      [req.params.reviewId, req.params.id]
+      [req.params.reviewId, productUUID]
     );
 
     if (existing.rows.length === 0) {
@@ -711,7 +734,7 @@ router.put('/:id/reviews/:reviewId', authenticate, async (req: AuthRequest, res:
            images = $3,
            updated_at = NOW()
        WHERE id = $4 AND product_id = $5 AND user_id = $6`,
-      [nextRating, nextComment, JSON.stringify(nextImages), req.params.reviewId, req.params.id, req.userId]
+      [nextRating, nextComment, JSON.stringify(nextImages), req.params.reviewId, productUUID, req.userId]
     );
 
     res.json({ success: true, message: 'Review updated' });
@@ -729,11 +752,17 @@ router.delete('/:id/reviews/:reviewId', authenticate, async (req: AuthRequest, r
   }
 
   try {
+    const productUUID = await resolveProductUUID(req.params.id);
+    if (!productUUID) {
+      res.status(404).json({ success: false, message: 'Product not found' });
+      return;
+    }
+
     const existing = await pool.query(
       `SELECT id, user_id
        FROM product_reviews
        WHERE id = $1 AND product_id = $2`,
-      [req.params.reviewId, req.params.id]
+      [req.params.reviewId, productUUID]
     );
 
     if (existing.rows.length === 0) {
@@ -749,7 +778,7 @@ router.delete('/:id/reviews/:reviewId', authenticate, async (req: AuthRequest, r
     await pool.query(
       `DELETE FROM product_reviews
        WHERE id = $1 AND product_id = $2 AND user_id = $3`,
-      [req.params.reviewId, req.params.id, req.userId]
+      [req.params.reviewId, productUUID, req.userId]
     );
 
     res.json({ success: true, message: 'Review deleted' });

@@ -45,7 +45,7 @@ export default function HelpCenterScreen() {
         { id: '1', category: 'Orders', question: 'How do I track my order?', answer: 'You can track your order by going to "My Orders" in your profile and clicking on the specific order. You\'ll see real-time tracking information and estimated delivery time.' },
         { id: '2', category: 'Orders', question: 'Can I modify my order after placing it?', answer: 'You can modify your order within 30 minutes of placing it. Go to "My Orders" and select "Modify Order". After 30 minutes, the order is processed and cannot be changed.' },
         { id: '3', category: 'Orders', question: 'How long does delivery take?', answer: 'Standard delivery takes 3-5 business days. Instant Trial delivery is available within 2 hours in select cities. You can see estimated delivery dates during checkout.' },
-        { id: '4', category: 'Orders', question: 'Do you deliver to my area?', answer: 'We deliver across India. Enter your pincode during checkout to check if delivery is available in your area and see the estimated delivery time.' },
+        { id: '4', category: 'Orders', question: 'Do you deliver to my area?', answer: 'We deliver across Pune. Enter your pincode during checkout to check if delivery is available in your area and see the estimated delivery time.' },
 
         // Returns & Refunds
         { id: '5', category: 'Returns', question: 'What is Instant Trial?', answer: 'Instant Trial allows you to try products at the time of delivery. If you don\'t like the product, you can return it immediately to the delivery person without any charges.' },
