@@ -12,10 +12,9 @@ export const pool = new Pool({
   database: process.env.DB_NAME,
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
-  // In production: enforce SSL and reject self-signed certs
-  // In development: allow self-signed (Render uses valid certs in prod)
+  // SSL: use env var to control cert validation (Hostinger may use self-signed)
   ssl: isProd
-    ? { rejectUnauthorized: true }
+    ? { rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false' }
     : { rejectUnauthorized: false },
   max: 20,                        // Increased from 10 to 20 for better concurrency
   idleTimeoutMillis: 30000,

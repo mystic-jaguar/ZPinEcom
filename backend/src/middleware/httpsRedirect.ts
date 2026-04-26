@@ -10,6 +10,11 @@ export function httpsRedirect(req: Request, res: Response, next: NextFunction): 
         return next(); // skip in development
     }
 
+    // Skip HTTPS redirect when running on bare IP (no domain/SSL configured)
+    if (process.env.HTTPS_REDIRECT !== 'true') {
+        return next();
+    }
+
     const proto = req.headers['x-forwarded-proto'];
     if (proto && proto !== 'https') {
         const httpsUrl = `https://${req.headers.host}${req.url}`;
