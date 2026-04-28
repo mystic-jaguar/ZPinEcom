@@ -80,7 +80,7 @@ router.post('/', authenticate, cartWriteLimiter, async (req: AuthRequest, res: R
   }
 
   try {
-    const product = await pool.query('SELECT price, in_stock FROM products WHERE id = $1', [productId]);
+    const product = await pool.query('SELECT price, in_stock FROM products WHERE id = $1::uuid', [productId]);
     if (product.rows.length === 0) {
       res.status(404).json({ success: false, message: 'Product not found' });
       return;
@@ -91,7 +91,7 @@ router.post('/', authenticate, cartWriteLimiter, async (req: AuthRequest, res: R
     }
 
     const existing = await pool.query(
-      `SELECT id FROM ${T} WHERE user_id = $1 AND product_id = $2`,
+      `SELECT id FROM ${T} WHERE user_id = $1 AND product_id = $2::uuid`,
       [req.userId, productId]
     );
 
@@ -103,7 +103,7 @@ router.post('/', authenticate, cartWriteLimiter, async (req: AuthRequest, res: R
     } else {
       await pool.query(
         `INSERT INTO ${T} (id, user_id, product_id, quantity, price_at_add, created_at, updated_at)
-         VALUES ($1,$2,$3,$4,$5,NOW(),NOW())`,
+         VALUES ($1,$2,$3::uuid,$4,$5,NOW(),NOW())`,
         [generateId(), req.userId, productId, quantity, product.rows[0].price]
       );
     }
@@ -130,7 +130,7 @@ router.put('/:productId', authenticate, async (req: AuthRequest, res: Response):
 
   try {
     const result = await pool.query(
-      `UPDATE ${T} SET quantity = $1, updated_at = NOW() WHERE user_id = $2 AND product_id = $3 RETURNING id`,
+      `UPDATE ${T} SET quantity = $1, updated_at = NOW() WHERE user_id = $2 AND product_id = $3::uuid RETURNING id`,
       [quantity, req.userId, req.params.productId]
     );
     if (result.rows.length === 0) {
@@ -152,7 +152,7 @@ router.delete('/:productId', authenticate, async (req: AuthRequest, res: Respons
   }
 
   try {
-    await pool.query(`DELETE FROM ${T} WHERE user_id = $1 AND product_id = $2`, [req.userId, req.params.productId]);
+    await pool.query(`DELETE FROM ${T} WHERE user_id = $1 AND product_id = $2::uuid`, [req.userId, req.params.productId]);
     res.json({ success: true, message: 'Item removed from cart' });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Server error' });

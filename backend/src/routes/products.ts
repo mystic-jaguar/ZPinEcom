@@ -49,7 +49,7 @@ function isValidProductId(id: string): boolean {
  * Returns null if the product doesn't exist.
  */
 async function resolveProductUUID(id: string): Promise<string | null> {
-  const result = await pool.query('SELECT id FROM products WHERE id = $1', [id]);
+  const result = await pool.query('SELECT id FROM products WHERE id = $1::uuid', [id]);
   if (result.rows.length === 0) return null;
   return result.rows[0].id as string;
 }
@@ -506,7 +506,7 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
        FROM products p
        LEFT JOIN product_images pi ON pi.product_id = p.id
        LEFT JOIN product_reviews pr ON pr.product_id = p.id
-       WHERE p.id = $1
+       WHERE p.id = $1::uuid
        GROUP BY p.id`,
       [id]
     );
@@ -655,7 +655,7 @@ router.post('/:id/reviews', authenticate, reviewLimiter, async (req: AuthRequest
 
   try {
     // Verify product exists and resolve UUID
-    const product = await pool.query('SELECT id FROM products WHERE id = $1', [req.params.id]);
+    const product = await pool.query('SELECT id FROM products WHERE id = $1::uuid', [req.params.id]);
     if (product.rows.length === 0) {
       res.status(404).json({ success: false, message: 'Product not found' });
       return;

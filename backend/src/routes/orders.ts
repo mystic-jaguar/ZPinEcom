@@ -311,13 +311,13 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
       for (const item of bodyCartItems) {
         if (!item.productId) continue;
         const product = await client.query(
-          'SELECT price, in_stock, product_name, user_id FROM products WHERE id = $1',
+          'SELECT price, in_stock, product_name, user_id FROM products WHERE id = $1::uuid',
           [item.productId]
         );
         if (product.rows.length === 0 || !product.rows[0].in_stock) continue;
 
         const existing = await client.query(
-          `SELECT id FROM ${CART} WHERE user_id = $1 AND product_id = $2`,
+          `SELECT id FROM ${CART} WHERE user_id = $1 AND product_id = $2::uuid`,
           [req.userId, item.productId]
         );
         if (existing.rows.length > 0) {
@@ -328,7 +328,7 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
         } else {
           await client.query(
             `INSERT INTO ${CART} (id, user_id, product_id, quantity, price_at_add, created_at, updated_at)
-             VALUES ($1,$2,$3,$4,$5,NOW(),NOW())`,
+             VALUES ($1,$2,$3::uuid,$4,$5,NOW(),NOW())`,
             [generateId(), req.userId, item.productId, item.quantity || 1, product.rows[0].price]
           );
         }

@@ -85,7 +85,7 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response): Promise<
 
   try {
     const existing = await pool.query(
-      `SELECT id FROM ${T} WHERE user_id = $1 AND product_id = $2`,
+      `SELECT id FROM ${T} WHERE user_id = $1 AND product_id = $2::uuid`,
       [req.userId, productId]
     );
     if (existing.rows.length > 0) {
@@ -93,7 +93,7 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response): Promise<
       return;
     }
     await pool.query(
-      `INSERT INTO ${T} (id, user_id, product_id, created_at) VALUES ($1,$2,$3,NOW())`,
+      `INSERT INTO ${T} (id, user_id, product_id, created_at) VALUES ($1,$2,$3::uuid,NOW())`,
       [generateId(), req.userId, productId]
     );
     res.status(201).json({ success: true, message: 'Added to wishlist' });
@@ -107,7 +107,7 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response): Promise<
 router.delete('/:productId', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     await pool.query(
-      `DELETE FROM ${T} WHERE user_id = $1 AND product_id = $2`,
+      `DELETE FROM ${T} WHERE user_id = $1 AND product_id = $2::uuid`,
       [req.userId, req.params.productId]
     );
     res.json({ success: true, message: 'Removed from wishlist' });
