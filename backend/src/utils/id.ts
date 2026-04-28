@@ -2,6 +2,7 @@ import { randomBytes } from 'crypto';
 
 const CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
 const SHORT_ID_PATTERN = /^[A-Z0-9]{7}$/;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * Generates a random 7-character alphanumeric ID (e.g. "A3K9X2M").
@@ -17,5 +18,5 @@ export function generateId(): string {
 }
 
 export function isValidShortId(value: string): boolean {
-    return SHORT_ID_PATTERN.test(value);
+    return SHORT_ID_PATTERN.test(value) || UUID_PATTERN.test(value);
 }
