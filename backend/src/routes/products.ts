@@ -599,7 +599,7 @@ router.get('/:id/reviews', async (req: Request, res: Response): Promise<void> =>
 
     const countResult = await pool.query(
       mineOnly
-        ? 'SELECT COUNT(*) FROM product_reviews WHERE product_id = $1 AND user_id = $2'
+        ? 'SELECT COUNT(*) FROM product_reviews WHERE product_id = $1 AND user_id::text = $2'
         : 'SELECT COUNT(*) FROM product_reviews WHERE product_id = $1',
       mineOnly ? [productUUID, mineUserId] : [productUUID]
     );
@@ -730,7 +730,7 @@ router.put('/:id/reviews/:reviewId', authenticate, async (req: AuthRequest, res:
     }
 
     const existing = await pool.query(
-      `SELECT id, user_id, product_id, rating, comment, images
+      `SELECT id, user_id::text as user_id, product_id, rating, comment, images
        FROM product_reviews
        WHERE id = $1 AND product_id = $2`,
       [req.params.reviewId, productUUID]
@@ -782,7 +782,7 @@ router.delete('/:id/reviews/:reviewId', authenticate, async (req: AuthRequest, r
     }
 
     const existing = await pool.query(
-      `SELECT id, user_id
+      `SELECT id, user_id::text as user_id
        FROM product_reviews
        WHERE id = $1 AND product_id = $2`,
       [req.params.reviewId, productUUID]
