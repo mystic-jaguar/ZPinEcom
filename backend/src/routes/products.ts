@@ -584,13 +584,13 @@ router.get('/:id/reviews', async (req: Request, res: Response): Promise<void> =>
       mineOnly
         ? `SELECT pr.*, u.name as user_name, NULL::text as user_profile_image
            FROM product_reviews pr
-           JOIN users u ON u.id = pr.user_id
-           WHERE pr.product_id = $1 AND pr.user_id = $2
+           JOIN users u ON u.id = pr.user_id::text
+           WHERE pr.product_id = $1 AND pr.user_id::text = $2
            ORDER BY pr.created_at DESC
            LIMIT $3 OFFSET $4`
         : `SELECT pr.*, u.name as user_name, NULL::text as user_profile_image
            FROM product_reviews pr
-           JOIN users u ON u.id = pr.user_id
+           JOIN users u ON u.id = pr.user_id::text
            WHERE pr.product_id = $1
            ORDER BY pr.created_at DESC
            LIMIT $2 OFFSET $3`,
@@ -664,7 +664,7 @@ router.post('/:id/reviews', authenticate, reviewLimiter, async (req: AuthRequest
 
     // Prevent duplicate reviews from the same user
     const existing = await pool.query(
-      'SELECT id FROM product_reviews WHERE product_id = $1 AND user_id = $2',
+      'SELECT id FROM product_reviews WHERE product_id = $1 AND user_id::text = $2',
       [productUUID, req.userId]
     );
     if (existing.rows.length > 0) {
@@ -674,7 +674,7 @@ router.post('/:id/reviews', authenticate, reviewLimiter, async (req: AuthRequest
 
     await pool.query(
       `INSERT INTO product_reviews (id, product_id, user_id, rating, comment, images, is_verified_purchase, created_at, updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,false,NOW(),NOW())`,
+       VALUES ($1,$2,$3::uuid,$4,$5,$6,false,NOW(),NOW())`,
       [generateId(), productUUID, req.userId, parsedRating, parsedComment, JSON.stringify(normalizedImages)]
     );
     res.status(201).json({ success: true, message: 'Review added' });
@@ -756,7 +756,7 @@ router.put('/:id/reviews/:reviewId', authenticate, async (req: AuthRequest, res:
            comment = $2,
            images = $3,
            updated_at = NOW()
-       WHERE id = $4 AND product_id = $5 AND user_id = $6`,
+       WHERE id = $4 AND product_id = $5 AND user_id::text = $6`,
       [nextRating, nextComment, JSON.stringify(nextImages), req.params.reviewId, productUUID, req.userId]
     );
 
@@ -800,7 +800,7 @@ router.delete('/:id/reviews/:reviewId', authenticate, async (req: AuthRequest, r
 
     await pool.query(
       `DELETE FROM product_reviews
-       WHERE id = $1 AND product_id = $2 AND user_id = $3`,
+       WHERE id = $1 AND product_id = $2 AND user_id::text = $3`,
       [req.params.reviewId, productUUID, req.userId]
     );
 
