@@ -55,7 +55,7 @@ export default function AddPaymentMethodScreen() {
                     setCardNumber(card.cardNumber);
                     setCardHolder(card.cardHolderName);
                     setExpiry(card.expiryDate);
-                    setCvv(card.cvv);
+                    setCvv(card.cvv ?? '');
                     setCardType(card.cardType);
                 }
             } else if (type === 'UPI') {
@@ -101,52 +101,62 @@ export default function AddPaymentMethodScreen() {
         return true;
     };
 
-    const handleSave = () => {
-        if (selectedType === 'Card') {
-            if (!validateCard()) return;
-            const cleanNumber = cardNumber.replace(/\s/g, '');
+    const [isSaving, setIsSaving] = useState(false);
 
-            if (id && type === 'Card') {
-                updateCard(id, {
-                    cardNumber: cleanNumber,
-                    cardHolderName: cardHolder,
-                    expiryDate: expiry,
-                    cvv: cvv,
-                    cardType: cardType
-                });
-                showModal('Success', 'Card updated successfully!', 'check-circle', () => {
-                    setModalVisible(false);
-                    router.back();
-                });
-            } else {
-                addCard({
-                    cardNumber: cleanNumber,
-                    cardHolderName: cardHolder,
-                    expiryDate: expiry,
-                    cvv: cvv,
-                    cardType: cardType
-                });
-                showModal('Success', 'Card added successfully!', 'check-circle', () => {
-                    setModalVisible(false);
-                    router.back();
-                });
-            }
-        } else {
-            if (!validateUPI()) return;
+    const handleSave = async () => {
+        if (isSaving) return;
+        setIsSaving(true);
+        try {
+            if (selectedType === 'Card') {
+                if (!validateCard()) return;
+                const cleanNumber = cardNumber.replace(/\s/g, '');
 
-            if (id && type === 'UPI') {
-                updateUPI(id, upiId, upiApp);
-                showModal('Success', 'UPI ID updated successfully!', 'check-circle', () => {
-                    setModalVisible(false);
-                    router.back();
-                });
+                if (id && type === 'Card') {
+                    await updateCard(id, {
+                        cardNumber: cleanNumber,
+                        cardHolderName: cardHolder,
+                        expiryDate: expiry,
+                        cvv: cvv,
+                        cardType: cardType
+                    });
+                    showModal('Success', 'Card updated successfully!', 'check-circle', () => {
+                        setModalVisible(false);
+                        router.back();
+                    });
+                } else {
+                    await addCard({
+                        cardNumber: cleanNumber,
+                        cardHolderName: cardHolder,
+                        expiryDate: expiry,
+                        cvv: cvv,
+                        cardType: cardType
+                    });
+                    showModal('Success', 'Card added successfully!', 'check-circle', () => {
+                        setModalVisible(false);
+                        router.back();
+                    });
+                }
             } else {
-                addUPI(upiId, upiApp);
-                showModal('Success', 'UPI ID added successfully!', 'check-circle', () => {
-                    setModalVisible(false);
-                    router.back();
-                });
+                if (!validateUPI()) return;
+
+                if (id && type === 'UPI') {
+                    await updateUPI(id, upiId, upiApp);
+                    showModal('Success', 'UPI ID updated successfully!', 'check-circle', () => {
+                        setModalVisible(false);
+                        router.back();
+                    });
+                } else {
+                    await addUPI(upiId, upiApp);
+                    showModal('Success', 'UPI ID added successfully!', 'check-circle', () => {
+                        setModalVisible(false);
+                        router.back();
+                    });
+                }
             }
+        } catch (err: any) {
+            showModal('Error', err.message || 'Failed to save. Please try again.');
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -337,8 +347,8 @@ export default function AddPaymentMethodScreen() {
             </ScrollView>
 
             <View style={styles.footer}>
-                <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-                    <Text style={styles.saveButtonText}>SAVE PAYMENT METHOD</Text>
+                <TouchableOpacity style={[styles.saveButton, isSaving && { opacity: 0.6 }]} onPress={handleSave} disabled={isSaving}>
+                    <Text style={styles.saveButtonText}>{isSaving ? 'SAVING...' : 'SAVE PAYMENT METHOD'}</Text>
                 </TouchableOpacity>
             </View>
 

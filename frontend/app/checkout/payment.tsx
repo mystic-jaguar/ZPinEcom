@@ -10,9 +10,10 @@ import { useUser } from '@/context/UserContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { orderService } from '../../services/order';
+import { walletService } from '../../services/wallet';
 
 export default function CheckoutPaymentScreen() {
     const router = useRouter();

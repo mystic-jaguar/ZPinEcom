@@ -94,6 +94,7 @@ app.use('/api/v1/orders', orderRoutes);
 app.use('/api/v1/coupons', couponRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
 app.use('/api/v1/wallet', walletRoutes);
+app.use('/api/v1/payment-methods', paymentMethodRoutes);
 
 // Health check — excluded from rate limiting
 app.get('/health', (_, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));

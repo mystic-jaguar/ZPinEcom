@@ -1,21 +1,24 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
+import React, { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react';
+import { paymentMethodsService } from '../services/paymentMethods';
 import { PaymentCardObject, PaymentUPIObject } from '../types/types';
 
-const PAYMENT_CARDS_STORAGE_KEY = '@ZPinEcom:paymentCards';
-const PAYMENT_UPIS_STORAGE_KEY = '@ZPinEcom:paymentUPIs';
+// Re-export types used by payment-methods screen
+export type PaymentCard = PaymentCardObject;
+export type PaymentUPI = PaymentUPIObject;
 
 interface PaymentContextType {
     cards: PaymentCardObject[];
     upis: PaymentUPIObject[];
-    addCard: (card: Omit<PaymentCardObject, 'id' | 'bankName' | 'iconName' | 'iconColor'>) => void;
-    updateCard: (id: string, updates: Partial<PaymentCardObject>) => void;
-    deleteCard: (id: string) => void;
-    addUPI: (upiId: string, upiApp: 'Google Pay' | 'PhonePe' | 'Paytm') => void;
-    updateUPI: (id: string, upiId: string, upiApp: 'Google Pay' | 'PhonePe' | 'Paytm') => void;
-    deleteUPI: (id: string) => void;
+    loading: boolean;
+    addCard: (card: Omit<PaymentCardObject, 'id' | 'bankName' | 'iconName' | 'iconColor'>) => Promise<void>;
+    updateCard: (id: string, updates: Partial<PaymentCardObject>) => Promise<void>;
+    deleteCard: (id: string) => Promise<void>;
+    addUPI: (upiId: string, upiApp: 'Google Pay' | 'PhonePe' | 'Paytm') => Promise<void>;
+    updateUPI: (id: string, upiId: string, upiApp: 'Google Pay' | 'PhonePe' | 'Paytm') => Promise<void>;
+    deleteUPI: (id: string) => Promise<void>;
     getCard: (id: string) => PaymentCardObject | undefined;
     getUPI: (id: string) => PaymentUPIObject | undefined;
+    reload: () => Promise<void>;
 }
 
 const PaymentContext = createContext<PaymentContextType | undefined>(undefined);
@@ -23,87 +26,73 @@ const PaymentContext = createContext<PaymentContextType | undefined>(undefined);
 export const PaymentProvider = ({ children }: { children: ReactNode }) => {
     const [cards, setCards] = useState<PaymentCardObject[]>([]);
     const [upis, setUpis] = useState<PaymentUPIObject[]>([]);
+    const [loading, setLoading] = useState(false);
 
-    // Load payment methods from AsyncStorage
-    // API: GET /api/v1/users/payment-methods
-    useEffect(() => {
-        loadPaymentMethods();
-    }, []);
-
-    const loadPaymentMethods = async () => {
+    const loadPaymentMethods = useCallback(async () => {
+        setLoading(true);
         try {
-            const [cardsData, upisData] = await Promise.all([
-                AsyncStorage.getItem(PAYMENT_CARDS_STORAGE_KEY),
-                AsyncStorage.getItem(PAYMENT_UPIS_STORAGE_KEY)
-            ]);
-
-            if (cardsData) setCards(JSON.parse(cardsData));
-            if (upisData) setUpis(JSON.parse(upisData));
+            const methods = await paymentMethodsService.getAll();
+            setCards(methods.filter(m => m.type === 'card').map(m => m as PaymentCardObject));
+            setUpis(methods.filter(m => m.type === 'upi').map(m => m as PaymentUPIObject));
         } catch (error) {
             console.error('Error loading payment methods:', error);
+        } finally {
+            setLoading(false);
         }
+    }, []);
+
+    useEffect(() => {
+        loadPaymentMethods();
+    }, [loadPaymentMethods]);
+
+    const addCard = async (card: Omit<PaymentCardObject, 'id' | 'bankName' | 'iconName' | 'iconColor'>) => {
+        const newCard = await paymentMethodsService.addCard({
+            cardNumber: card.cardNumber,
+            cardHolderName: card.cardHolderName,
+            expiryDate: card.expiryDate,
+            cardType: card.cardType,
+        });
+        setCards(prev => [...prev, newCard as PaymentCardObject]);
     };
 
-    const addCard = (card: Omit<PaymentCardObject, 'id' | 'bankName' | 'iconName' | 'iconColor'>) => {
-        const newCard: PaymentCardObject = {
-            id: Math.random().toString(36).substr(2, 9),
-            ...card,
-            bankName: 'HDFC Bank', // Mock logic for bank name
-            iconName: 'card', // Default icon
-            iconColor: '#4CAF50'
-        };
-        const newCards = [...cards, newCard];
-        setCards(newCards);
-        AsyncStorage.setItem(PAYMENT_CARDS_STORAGE_KEY, JSON.stringify(newCards));
-        // API: POST /api/v1/users/payment-methods
+    const updateCard = async (id: string, updates: Partial<PaymentCardObject>) => {
+        const updated = await paymentMethodsService.updateCard(id, {
+            cardNumber: updates.cardNumber,
+            cardHolderName: updates.cardHolderName,
+            expiryDate: updates.expiryDate,
+            cardType: updates.cardType,
+        });
+        setCards(prev => prev.map(c => c.id === id ? { ...c, ...updated } : c));
     };
 
-    const updateCard = (id: string, updates: Partial<PaymentCardObject>) => {
-        const updatedCards = cards.map(c => c.id === id ? { ...c, ...updates } : c);
-        setCards(updatedCards);
-        AsyncStorage.setItem(PAYMENT_CARDS_STORAGE_KEY, JSON.stringify(updatedCards));
+    const deleteCard = async (id: string) => {
+        await paymentMethodsService.delete(id);
+        setCards(prev => prev.filter(c => c.id !== id));
     };
 
-    const deleteCard = (id: string) => {
-        const filteredCards = cards.filter(c => c.id !== id);
-        setCards(filteredCards);
-        AsyncStorage.setItem(PAYMENT_CARDS_STORAGE_KEY, JSON.stringify(filteredCards));
+    const addUPI = async (upiId: string, upiApp: 'Google Pay' | 'PhonePe' | 'Paytm') => {
+        const newUPI = await paymentMethodsService.addUPI(upiId, upiApp);
+        setUpis(prev => [...prev, newUPI as PaymentUPIObject]);
     };
 
-    const addUPI = (upiId: string, upiApp: 'Google Pay' | 'PhonePe' | 'Paytm') => {
-        const newUPI: PaymentUPIObject = {
-            id: Math.random().toString(36).substr(2, 9),
-            upiId,
-            label: upiApp,
-            subLabel: upiId,
-            upiApp: upiApp
-        };
-        const newUpis = [...upis, newUPI];
-        setUpis(newUpis);
-        AsyncStorage.setItem(PAYMENT_UPIS_STORAGE_KEY, JSON.stringify(newUpis));
-        // API: POST /api/v1/users/payment-methods
+    const updateUPI = async (id: string, upiId: string, upiApp: 'Google Pay' | 'PhonePe' | 'Paytm') => {
+        const updated = await paymentMethodsService.updateUPI(id, upiId, upiApp);
+        setUpis(prev => prev.map(u => u.id === id ? { ...u, ...updated } : u));
     };
 
-    const updateUPI = (id: string, upiId: string, upiApp: 'Google Pay' | 'PhonePe' | 'Paytm') => {
-        const updatedUpis = upis.map(u => u.id === id ? { ...u, upiId, label: upiApp, subLabel: upiId, upiApp: upiApp } : u);
-        setUpis(updatedUpis);
-        AsyncStorage.setItem(PAYMENT_UPIS_STORAGE_KEY, JSON.stringify(updatedUpis));
-    };
-
-    const deleteUPI = (id: string) => {
-        const filteredUpis = upis.filter(u => u.id !== id);
-        setUpis(filteredUpis);
-        AsyncStorage.setItem(PAYMENT_UPIS_STORAGE_KEY, JSON.stringify(filteredUpis));
+    const deleteUPI = async (id: string) => {
+        await paymentMethodsService.delete(id);
+        setUpis(prev => prev.filter(u => u.id !== id));
     };
 
     const getCard = (id: string) => cards.find(c => c.id === id);
     const getUPI = (id: string) => upis.find(u => u.id === id);
 
-
     return (
         <PaymentContext.Provider value={{
             cards,
             upis,
+            loading,
             addCard,
             updateCard,
             deleteCard,
@@ -111,7 +100,8 @@ export const PaymentProvider = ({ children }: { children: ReactNode }) => {
             updateUPI,
             deleteUPI,
             getCard,
-            getUPI
+            getUPI,
+            reload: loadPaymentMethods,
         }}>
             {children}
         </PaymentContext.Provider>
