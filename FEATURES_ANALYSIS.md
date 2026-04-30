@@ -1,486 +1,396 @@
-# RuFlo E-Commerce Project - Complete Feature Analysis
+# ZPIN E-Commerce Project — Feature Analysis
 
 ## Executive Summary
 
-**Project Status:** 78% Complete | Production-Ready for MVP with critical gaps
+**Project Status:** 85% Complete | MVP-ready with one critical gap (payment gateway)
 
-**Backend:** 9 API route modules with 50+ endpoints | Express.js + PostgreSQL
-**Frontend:** Expo React Native | 13+ screens across auth, shopping, checkout, profiles
-**Key Gap:** Payment gateway integration (blocking checkout completion)
+**Backend:** 9 API route modules | Express.js + TypeScript + PostgreSQL
+**Frontend:** Expo React Native | 20+ screens across auth, shopping, checkout, profile
+**Key Gap:** Payment gateway integration (Razorpay) — blocks full checkout completion
 
 ---
 
-## 📊 FEATURE MATRIX
+## FEATURE MATRIX
 
-### ✅ COMPLETE & WORKING (Ready for Production)
+### COMPLETE & WORKING
 
 #### Authentication System
 | Feature | Status | Details |
 |---------|--------|---------|
-| User Registration | ✅ | Email validation, password hashing with bcrypt, rate-limited signup |
-| User Login | ✅ | JWT + refresh token system, 15-min rate limit (10 attempts) |
-| Password Reset | ✅ | OTP generation, email delivery, rate-limited to 5/15min |
-| OTP Verification | ✅ | Email OTP verification for signup and password reset |
-| Token Refresh | ✅ | Auto-refresh with 401 interception in frontend |
-| Logout | ✅ | Token invalidation and local storage cleanup |
-| Role-Based Access | ✅ | User vs. Admin roles with middleware enforcement |
+| User Registration | ✅ | Email + password, bcrypt (12 rounds), rate-limited (3/hour) |
+| User Login | ✅ | Email or username, timing-attack prevention, 10 attempts/15min |
+| JWT Token System | ✅ | 15-min access tokens + 30-day refresh tokens with rotation |
+| OTP Verification | ✅ | Cryptographically secure 6-digit OTP for email verification |
+| Password Reset | ✅ | OTP-based flow: sendOTP → verifyOTP → resetPassword |
+| Logout | ✅ | Token invalidation and cleanup |
+| Role-Based Access | ✅ | `user` vs `seller` roles enforced via middleware |
+| User Enumeration Prevention | ✅ | Same response for missing users and wrong passwords |
 
-**Implementation Details:**
-- Backend: `routes/auth.ts` (lines 1-300+)
-- Frontend: `app/auth/*` (login, signup, forgot-password, reset-password, verify-otp)
-- Middleware: `middleware/auth.ts` (JWT validation, role checking)
-- Rate limiters: 10 login/15min, 5 OTP/15min, 3 signup/hour
+- Backend: `routes/auth.ts`
+- Frontend: `app/auth/` (login, signup, forgot-password, verify-otp, verify-reset-otp, reset-password)
+- Middleware: `middleware/auth.ts` — JWT from Bearer token, `x-auth-token` header, or cookies
 
 ---
 
 #### Product Management
 | Feature | Status | Details |
 |---------|--------|---------|
-| Browse Products | ✅ | Category-based pagination, 50-200 items per request |
-| Product Search | ✅ | Full-text search with typo tolerance (e.g., "keychain" vs "key chain") |
-| Product Details | ✅ | Images, price, stock, attributes (size, color), ratings |
-| Product Images | ✅ | Multiple images per product, lazy loading in frontend |
-| Product Ratings | ✅ | Average rating calculation, displayed on product cards |
-| Nearby Categories | ✅ | Smart category suggestions (Men, Women, Kids, Makeup) |
-| Get Category Hierarchy | ✅ | Full category tree retrieval with parent-child relationships |
-| Related Products | ✅ | Automatic suggestion based on deepest category |
-| Stock Management | ✅ | Per-product quantity tracking, in-stock filtering |
-| Variant Support | ✅ | Size quantities stored as JSON (e.g., {S:10, M:15, L:8}) |
-| Personalized Recommendations | ✅ | Weighted signals: purchase history (+3), wishlist (+2), search terms (+1); falls back to latest products |
-| Fresh Categories | ✅ | Top 5 categories with most recently added products |
+| Browse Products | ✅ | Paginated (20 default, up to 200), category-based filtering |
+| Product Search | ✅ | Normalized full-text search (handles "keychain" vs "key chain") |
+| Product Details | ✅ | Images, price, stock, size quantities, color attributes, ratings |
+| Product Images | ✅ | Multiple images per product with display order |
+| Variant Support | ✅ | Size quantities as JSON (`{S:10, M:15, L:8}`), color extraction |
+| Personalized Recommendations | ✅ | Weighted: purchase history (+3), wishlist (+2), search terms (+1) |
+| Nearby Categories | ✅ | Men, Women, Kids, Makeup with live product counts |
+| Fresh Categories | ✅ | Top 5 categories by most recently added products |
+| Category Hierarchy | ✅ | Full category path stored per product (`category_path`) |
+| Stock Management | ✅ | Per-product quantity tracking, `in_stock` flag |
+| Product Reviews | ✅ | Full CRUD — submit, list, edit, delete with duplicate prevention |
+| Review Images | ✅ | Array of image URLs per review, normalized and validated |
+| Verified Purchase Flag | ✅ | `is_verified_purchase` stored per review (defaults false; auto-set pending) |
+| Average Rating | ✅ | Calculated in product queries and returned on product cards |
 
-**Implementation Details:**
-- Backend: `routes/products.ts` (13 endpoints)
-- Frontend: `app/(tabs)/product-listing.tsx`, `app/product/[id].tsx`
-- Search: Normalized fuzzy matching on product name
-- Pagination: 20 items default, configurable up to 200
-- Recommendations: Excludes already-purchased products, top 5 categories by score, limit 30
+- Backend: `routes/products.ts` (13+ endpoints)
+- Frontend: `app/(tabs)/product-listing.tsx`, `app/product/[id].tsx`, `app/product-search.tsx`
+- Rate limit: 60 requests/min for product listing, 30/min for reviews
 
 ---
 
 #### Shopping Cart
 | Feature | Status | Details |
 |---------|--------|---------|
-| Add to Cart | ✅ | Validates stock before adding, rate-limited |
-| View Cart | ✅ | Shows all items with current prices and availability |
-| Update Quantity | ✅ | Increment/decrement with validation |
-| Remove Item | ✅ | Single item or bulk clear cart |
-| Cart Persistence | ✅ | AsyncStorage sync for offline access |
-| Price Validation | ✅ | Detects price changes since adding to cart |
-| Stock Validation | ✅ | Flags unavailable items (out of stock or insufficient qty) |
-| Cart Count | ✅ | Quick endpoint for badge display |
+| Add to Cart | ✅ | Auto-increments if item exists, validates stock |
+| View Cart | ✅ | Returns items with current prices and availability status |
+| Update Quantity | ✅ | Validates against available stock |
+| Remove Item | ✅ | Single item removal |
+| Clear Cart | ✅ | Bulk delete all items |
+| Price Change Detection | ✅ | Flags items where price changed since adding |
+| Stock Validation | ✅ | Flags out-of-stock or insufficient quantity items |
+| Cart Count | ✅ | Lightweight endpoint for badge display |
 
-**Implementation Details:**
 - Backend: `routes/cart.ts` (6 endpoints)
-- Frontend: `context/CartContext.tsx`, `services/cart.ts`
-- Rate limit: 50 writes/min
-- Fallback storage: AsyncStorage when offline
+- Frontend: `app/(tabs)/cart.tsx`, `context/CartContext.tsx`
 
 ---
 
 #### Wishlist
 | Feature | Status | Details |
 |---------|--------|---------|
-| Add to Wishlist | ✅ | Creates wishlist_items entry |
-| Remove from Wishlist | ✅ | Soft delete or hard delete |
-| View Wishlist | ✅ | Paginated list of wishlisted products |
-| Check Wishlist Status | ✅ | Query if product is in user's wishlist |
+| Add to Wishlist | ✅ | Duplicate prevention (409 on conflict) |
+| Remove from Wishlist | ✅ | Single item removal |
+| Clear Wishlist | ✅ | Bulk delete all items |
+| View Wishlist | ✅ | Paginated list with full product details |
 | Wishlist Count | ✅ | Quick total count endpoint |
-| Wishlist Item Count | ✅ | Per-product count (how many users wishlisted it) |
 
-**Implementation Details:**
 - Backend: `routes/wishlist.ts` (5 endpoints)
-- Frontend: `context/WishlistContext.tsx`
-- Heart icon integration on product cards
+- Frontend: `app/profile/wishlist.tsx`, `context/WishlistContext.tsx`
 
 ---
 
 #### User Profile Management
 | Feature | Status | Details |
 |---------|--------|---------|
-| View Profile | ✅ | Fetch user details (email, name, phone, avatar) |
-| Edit Profile | ✅ | Update name, phone, avatar URL |
-| Addresses | ✅ | Add, update, delete, list with pagination |
-| Default Address | ✅ | Set primary shipping address |
-| View Orders | ✅ | Paginated order history with status |
-| Order Details | ✅ | Full order info including items, totals, shipping details |
+| View Profile | ✅ | Ownership enforced — users can only read their own profile |
+| Edit Profile | ✅ | Name, username, DOB, gender, profile image |
+| Notification Preferences | ✅ | Push, email, and order update toggles |
+| View Orders | ✅ | Paginated order history with items |
+| Shipping Addresses | ✅ | Add, list, set default — encrypted at rest |
+| Address Labels | ✅ | Home, Work, etc. |
 
-**Implementation Details:**
-- Backend: `routes/users.ts` (8 endpoints)
-- Frontend: `app/profile/*` screens and `context/UserContext.tsx`
-- Address validation: Phone and postal code format checking
-- Order pagination: 20 items per page
-
----
-
-#### Coupon System
-| Feature | Status | Details |
-|---------|--------|---------|
-| Browse Coupons | ✅ | List all valid coupons with details |
-| Apply Coupon | ✅ | Validate code and calculate discount |
-| Validate Coupon | ✅ | Check expiry, min purchase, usage limits |
-| Get Applicable Coupons | ✅ | Filter by cart amount, user history |
-| Discount Calculation | ✅ | Percentage or fixed amount based on coupon type |
-| Usage Tracking | ✅ | Per-user usage limits enforced |
-
-**Implementation Details:**
-- Backend: `routes/coupons.ts` (4 endpoints)
-- Frontend: `app/profile/coupons.tsx`, `context/CheckoutContext.tsx`
-- Coupon types: Percentage (e.g., 20%) or fixed (e.g., ₹500 off)
-- Applied in checkout summary with real-time recalculation
-
----
-
-#### Wallet System
-| Feature | Status | Details |
-|---------|--------|---------|
-| View Wallet Balance | ✅ | Current credits in user wallet |
-| Transaction History | ✅ | Paginated log of credits/debits |
-| Add Funds | ✅ | Top-up wallet balance (via payment method) |
-| Use Wallet for Payment | ✅ | Deduct from balance during checkout |
-| Refunds to Wallet | ✅ | Automatic credit for order cancellations/returns |
-
-**Implementation Details:**
-- Backend: `routes/wallet.ts` (4 endpoints)
-- Frontend: `context/WalletContext.tsx`, `app/profile/wallet.tsx`
-- Transactions table tracks payment method and reason
-
----
-
-#### Notifications
-| Feature | Status | Details |
-|---------|--------|---------|
-| Get Notifications | ✅ | Paginated notification feed |
-| Mark as Read | ✅ | Single or bulk read status update |
-| Delete Notification | ✅ | Single or bulk deletion |
-| Notification Types | ✅ | Order status, coupon alerts, wallet updates |
-
-**Implementation Details:**
-- Backend: `routes/notifications.ts` (5 endpoints)
-- Frontend: Connected but UI dashboard incomplete
-- Triggers: Order placed, payment confirmed, shipped, delivered
+- Backend: `routes/users.ts` (5 endpoints)
+- Frontend: `app/profile/` (edit-profile, addresses, add-address, orders, order-details)
 
 ---
 
 #### Order Management
 | Feature | Status | Details |
 |---------|--------|---------|
-| Create Order | ✅ | From cart with address, payment method, items |
-| List Orders | ✅ | Get user's order history with pagination |
-| Get Order Details | ✅ | Full order info + items + tracking |
-| Order Status | ✅ | Tracks: pending, confirmed, shipped, delivered, cancelled, returned |
-| Payment Status | ✅ | pending, completed, failed, refunded |
-| Estimated Delivery | ✅ | Calculated based on order date |
+| Create Order | ✅ | Transaction-safe, multi-seller support, auto-clears cart |
+| List Orders | ✅ | Paginated order history |
+| Order Details | ✅ | Full order with items, totals, shipping address (decrypted) |
+| Order Tracking | ✅ | Status history: pending → confirmed → processing → shipped → delivered |
+| Estimated Delivery | ✅ | Calculated on order creation |
 | Tracking Number | ✅ | Generated on shipment |
-| Cancel Order | ✅ | Endpoint implemented: `/api/v1/orders/:id/cancel` |
-| Return Order | ✅ | Endpoint implemented: `/api/v1/orders/:id/return` |
-| Return Reason | ✅ | Captured in return request payload |
-| Return Status Tracking | ✅ | Endpoints implemented: `/api/v1/orders/:id/return-status` |
-| Track Order | ✅ | Endpoint implemented: `/api/v1/orders/:id/track` |
+| Cancel Order | ✅ | Allowed for pending/confirmed orders; wallet refund option |
+| Return Request | ✅ | Submit return with reason and item IDs |
+| Return Status | ✅ | Full workflow: requested → picked_up → refunded with timestamps |
+| Seller Notifications | ✅ | New order notifications sent to all relevant sellers |
+| Customer Notifications | ✅ | Order confirmation notification sent to customer |
 
-**Implementation Details:**
-- Backend: `routes/orders.ts` (comprehensive order lifecycle endpoints)
-- Frontend: `app/profile/orders.tsx`, `app/profile/order-details.tsx`
+- Backend: `routes/orders.ts` (10+ endpoints)
+- Frontend: `app/profile/orders.tsx`, `app/profile/order-details.tsx`, `app/profile/track-order.tsx`, `app/profile/cancel-order.tsx`, `app/profile/returns.tsx`
 
 ---
 
-### ⚠️ PARTIAL IMPLEMENTATIONS (Needs Completion)
-
-#### Product Reviews & Ratings
+#### Coupon System
 | Feature | Status | Details |
 |---------|--------|---------|
-| Submit Review | ✅ | POST `/api/v1/products/:id/reviews` — auth required, duplicate prevention, image support |
-| Get Reviews | ✅ | GET `/api/v1/products/:id/reviews` — paginated, supports `?mine=true` filter |
-| Edit Review | ✅ | PUT `/api/v1/products/:id/reviews/:reviewId` — owner-only, partial field updates |
-| Delete Review | ✅ | DELETE `/api/v1/products/:id/reviews/:reviewId` — owner-only |
-| Review Average | ✅ | Calculated in product queries |
-| Verified Purchase Flag | ✅ | `is_verified_purchase` stored per review (currently defaults to false) |
+| Browse Coupons | ✅ | Lists all coupons with active/expired/used status |
+| Validate Coupon | ✅ | Checks expiry, min order amount, usage limits |
+| Percentage Discounts | ✅ | e.g., 20% off |
+| Fixed Discounts | ✅ | e.g., ₹500 off |
+| Max Discount Cap | ✅ | Prevents excessive discounts on percentage coupons |
+| Usage Tracking | ✅ | Per-coupon usage count enforced |
 
-**Implementation Details:**
-- Backend: `routes/products.ts` — full CRUD review handlers implemented
-- Rate limit: 30 requests/min via `reviewLimiter`
-- Duplicate guard: one review per user per product (409 on conflict)
-- Image support: array of URL strings, normalized and validated
-- DB migration: `scripts/fix-product-reviews-product-id.sql` + `runFixProductReviews.ts` to ensure UUID column type
-- Frontend: `services/review.ts` — all methods now have working backend endpoints
+- Backend: `routes/coupons.ts`
+- Frontend: `app/profile/coupons.tsx`, `context/CheckoutContext.tsx`
+- Rate limit: 20 attempts/15min
 
 ---
+
+#### Wallet System
+| Feature | Status | Details |
+|---------|--------|---------|
+| View Balance | ✅ | Encrypted balance decrypted on read |
+| Transaction History | ✅ | Last 20 transactions with type, amount, description |
+| Credit Wallet | ✅ | Used internally for refunds on cancellations/returns |
+| Debit Wallet | ✅ | Used for wallet payments; insufficient balance check |
+| Auto-create Wallet | ✅ | Wallet created on first access if not exists |
+| Transaction Safety | ✅ | All balance changes wrapped in DB transactions |
+
+- Backend: `routes/wallet.ts` (3 endpoints)
+- Frontend: `context/` (no dedicated wallet screen found — profile-level access)
+- Encryption: AES-256-GCM on balance values
+
+---
+
+#### Notifications
+| Feature | Status | Details |
+|---------|--------|---------|
+| New Order Notifications (Seller) | ✅ | POST fetch with full order details + decrypted address |
+| Unread Count (Seller) | ✅ | GET count of unread `new_order` notifications |
+| Mark as Read | ✅ | Auto-marked read on fetch |
+| Notification Types | ✅ | `new_order` type implemented |
+
+- Backend: `routes/notifications.ts` (2 endpoints — seller-facing only)
+- Note: Notifications are seller-side only; no customer-facing notification feed endpoint
+
+---
+
+### PARTIAL / INCOMPLETE
 
 #### Payment Processing (CRITICAL GAP)
 | Feature | Status | Details |
 |---------|--------|---------|
-| Create Payment | ❌ | No endpoint: `/api/v1/payments/create` |
-| Verify Payment | ❌ | No endpoint: `/api/v1/orders/:id/payment/verify` |
-| Retry Payment | ❌ | No endpoint: `/api/v1/orders/:id/payment/retry` |
-| Payment Details | ❌ | No endpoint: `/api/v1/payments/:id` |
-| Refund Processing | ❌ | No endpoint: `/api/v1/payments/:id/refund` |
-| Razorpay Integration | ❌ | No SDK integration or webhook handlers |
-| COD Processing | ✅ | Can create orders with COD, but no payment confirmation flow |
-| Wallet Payment | ⚠️ | Partially implemented (deducts balance but no payment validation) |
+| Create Payment | ❌ | No `POST /api/v1/payments/create` endpoint |
+| Verify Payment | ❌ | No `POST /api/v1/orders/:id/payment/verify` endpoint |
+| Retry Payment | ❌ | No `POST /api/v1/orders/:id/payment/retry` endpoint |
+| Payment Details | ❌ | No `GET /api/v1/payments/:id` endpoint |
+| Refund Processing | ❌ | No `POST /api/v1/payments/:id/refund` endpoint |
+| Razorpay Integration | ❌ | No SDK, no webhook handlers |
+| COD | ⚠️ | Orders can be created with `payment_method: 'cod'` but no confirmation flow |
+| Wallet Payment | ⚠️ | Debit endpoint exists but not wired into order creation flow |
 
-**Impact:** **BLOCKING** - Users cannot complete checkout. Payment screen exists but backend payment routes missing entirely. No `payments.ts` route file exists.
-
-**Implementation Details:**
-- Frontend: `services/payment.ts` has all methods
-- Frontend: `app/checkout/payment.tsx` renders UI with payment methods
-- Frontend: `context/PaymentContext.tsx` manages card/UPI data
-- Backend: NO CORRESPONDING ROUTE FILE
+**Impact:** BLOCKING — users cannot complete checkout for non-COD orders. `frontend/services/payment.ts` has all methods defined but all calls will fail (no backend routes).
 
 ---
 
-#### Seller Management (Future Feature)
+#### Verified Purchase Automation
 | Feature | Status | Details |
 |---------|--------|---------|
-| Seller Registration | ❌ | No endpoints |
-| Seller Dashboard | ❌ | No UI |
-| Inventory Management | ❌ | No endpoints |
-| Order Fulfillment | ❌ | No seller-side order management |
+| Auto-set `is_verified_purchase` | ⚠️ | Flag exists in DB and is stored, but not auto-set when reviewer has a delivered order for the product |
 
 ---
 
-### 🔧 TECHNICAL IMPLEMENTATION DETAILS
+#### Seller Management (Not Implemented)
+| Feature | Status |
+|---------|--------|
+| Seller Registration | ❌ |
+| Seller Dashboard | ❌ |
+| Inventory Management | ❌ |
+| Order Fulfillment UI | ❌ |
 
-#### Backend Database Schema
-**17 Tables Implemented:**
-1. `users` - User accounts with roles
-2. `refresh_tokens` - JWT refresh token storage
-3. `auth_tokens` - Active session tracking
-4. `products` - Product catalog with deep_category_name, stock
-5. `product_images` - Image URLs per product
-6. `categories` - Hierarchical category structure
-7. `cart_items` - Shopping cart with price_at_add
-8. `wishlist_items` - User wishlists
-9. `orders` - Order header with payment/shipping status
-10. `order_items` - Order line items
-11. `coupons` - Promotion codes with usage tracking
-12. `wallets` - User wallet balances
-13. `wallet_transactions` - Wallet debit/credit history
-14. `notifications` - User notification feed
-15. `return_requests` - Return order requests and status timeline
-16. `addresses` - User shipping addresses
-17. `product_reviews` - Ratings and reviews (schema exists; routes incomplete)
+---
 
-**Rate Limiters Configured:**
-- Login: 10 attempts / 15 min
-- OTP: 5 requests / 15 min
-- Signup: 3 attempts / hour
-- Product List: 60 requests / min
-- Reviews: 30 requests / min
-- Cart Write: 50 requests / min
-- Order Create: 20 requests / 15 min
-- Global: 1000 requests / 15 min
+## TECHNICAL DETAILS
 
-**Migration Scripts:**
-- `scripts/runMigration.ts` — main schema migration runner
-- `scripts/runFixProductReviews.ts` — fixes `product_reviews.product_id` to UUID type
+### Backend Stack
+- Express.js + TypeScript
+- PostgreSQL with `pg` connection pool
+- JWT (jsonwebtoken) — 15m access / 30d refresh
+- bcrypt (12 rounds) for password hashing
+- AES-256-GCM encryption for addresses and wallet balances
+- Helmet, CORS, express-rate-limit, custom input sanitizer
+
+### Database Schema (21 Active Tables)
+| Table | Purpose |
+|-------|---------|
+| `users` | Accounts with profile fields, notification prefs |
+| `refresh_tokens` | JWT refresh token rotation |
+| `auth_tokens` | OTP and password reset tokens |
+| `addresses` | Encrypted shipping addresses |
+| `cart_items` | Shopping cart with `price_at_add` |
+| `wishlists` | Saved products |
+| `orders` | Order header — status, payment, shipping |
+| `order_items` | Line items per order |
+| `products` | Catalog with category path, size quantities, attributes |
+| `product_images` | Images with display order |
+| `product_reviews` | Ratings, comments, images, verified purchase flag |
+| `categories` | Hierarchical category tree |
+| `coupons` | Discount codes with usage tracking |
+| `wallets` | Encrypted user wallet balances |
+| `wallet_transactions` | Credit/debit history |
+| `notifications` | Seller new-order notifications |
+| `return_requests` | Return workflow with status history |
+| `order_cancellations` | Cancellation reasons and refund method |
+
+### Rate Limiting Strategy
+| Endpoint | Limit |
+|----------|-------|
+| Global | 300 req/15min (prod) |
+| Login | 10 attempts/15min |
+| OTP | 5 requests/15min |
+| Signup | 3 attempts/hour |
+| Product List | 60 req/min |
+| Reviews | 30 req/min |
+| Cart Writes | 60 req/5min |
+| Order Create | 10 orders/hour |
+| Addresses | 10 adds/hour |
+| Coupons | 20 attempts/15min |
+
+### Security Implemented
+- HTTPS redirect (production)
+- Helmet security headers (HSTS 1yr, CSP, etc.)
+- CORS with origin validation
+- Input sanitization (null bytes, control chars, HTML tags, sensitive key protection)
+- SQL injection prevention (parameterized queries + `safeIdentifier` for dynamic identifiers)
+- Timing-attack prevention on login (dummy bcrypt hash on missing user)
+- User enumeration prevention
+- Password strength validation (8+ chars, letter + number)
+- JWT expiration + refresh token rotation (old tokens invalidated on use)
+- Ownership enforcement on all user data endpoints
+- Role-based access (seller-only endpoints)
+- AES-256-GCM encryption for addresses and wallet balances at rest
+- Structured security event logging with suspicious request detection
+
+### Migration Scripts
+- `scripts/runMigration.ts` — main schema migration
+- `scripts/runFixProductReviews.ts` — fixes `product_reviews.product_id` to UUID
 - `scripts/runFixProductReviewsUserId.ts` — fixes `product_reviews.user_id` column
-- `scripts/fix-product-reviews-product-id.sql` / `fix-product-reviews-user-id.sql` — underlying SQL patches
+- `scripts/seedProducts.ts` — seed product data
+- `scripts/deleteSeededProducts.ts` — cleanup seeded data
 
 ---
 
-#### Frontend Architecture
+## FRONTEND ARCHITECTURE
 
-**State Management (Context):**
-- `UserContext` - Logged-in user, auth tokens
-- `CartContext` - Shopping cart with AsyncStorage sync
-- `WishlistContext` - Wishlisted items
-- `AddressContext` - Shipping addresses
-- `CheckoutContext` - Delivery type, payment method selection
-- `PaymentContext` - Stored cards/UPIs
-- `OrderContext` - User order history
-- `SearchContext` - Search query/filter persistence
+### Stack
+- React Native + Expo (file-based routing via Expo Router)
+- Axios with auto token refresh on 401
+- React Navigation (bottom tabs)
+- Reanimated for animations
+- AsyncStorage for local persistence
 
-**Navigation Structure:**
+### Screen Map
 ```
 Root (_layout.tsx)
-├── Auth Stack
+├── Auth Stack (app/auth/)
 │   ├── login.tsx
 │   ├── signup.tsx
 │   ├── forgot-password.tsx
+│   ├── verify-reset-otp.tsx
 │   ├── reset-password.tsx
-│   ├── verify-otp.tsx
-│   └── verify-reset-otp.tsx
-├── Tabs (Bottom Navigation)
-│   ├── Home (index.tsx)
-│   ├── Categories (categories.tsx)
-│   ├── Cart (cart.tsx)
-│   ├── Product Listing (product-listing.tsx)
-│   ├── Search (product-search.tsx)
-│   └── Profile (profile.tsx)
-├── Product Details ([id].tsx)
-├── Checkout
+│   └── verify-otp.tsx
+├── Tabs (app/(tabs)/)
+│   ├── index.tsx          — Home / Dashboard
+│   ├── categories.tsx     — Category browser
+│   ├── product-listing.tsx
+│   ├── cart.tsx
+│   └── profile.tsx
+├── app/product/[id].tsx   — Product detail
+├── app/product-search.tsx — Search
+├── Checkout (app/checkout/)
 │   ├── address.tsx
 │   ├── payment.tsx
 │   └── summary.tsx
-└── Profile Sub-screens (15+ screens)
-    ├── orders.tsx, order-details.tsx
-    ├── addresses.tsx, add-address.tsx
-    ├── payment-methods.tsx, add-payment-method.tsx
+└── Profile Sub-screens (app/profile/)
+    ├── edit-profile.tsx
+    ├── orders.tsx
+    ├── order-details.tsx
+    ├── track-order.tsx
+    ├── cancel-order.tsx
+    ├── returns.tsx
+    ├── addresses.tsx
+    ├── add-address.tsx
+    ├── payment-methods.tsx
+    ├── add-payment-method.tsx
     ├── coupons.tsx
-    ├── returns.tsx, cancel-order.tsx
-    ├── help-center.tsx
-    └── edit-profile.tsx
+    ├── wishlist.tsx
+    └── help-center.tsx
 ```
 
-**Services Layer (10 Files):**
-- `api.ts` - Axios wrapper with token refresh + error handling
-- `auth.ts` - Login, signup, password reset
-- `cart.ts` - Cart CRUD
-- `product.ts` - Product search, details, nearby
-- `order.ts` - Order CRUD
-- `user.ts` - Profile management
-- `address.ts` - Address CRUD
-- `payment.ts` - Payment operations (WILL FAIL - endpoints missing)
-- `coupon.ts` - Coupon validation
-- `wallet.ts` - Wallet balance
-- `wishlist.ts` - Wishlist CRUD
-- `review.ts` - Product reviews (WILL FAIL - endpoints missing)
-- `notification.ts` - Notification fetch
-- `keepAlive.ts` - Token refresh mechanism
+### Context / State Management
+- `UserContext` — auth state, tokens
+- `CartContext` — cart with AsyncStorage sync
+- `WishlistContext` — wishlisted items
+- `AddressContext` — shipping addresses
+- `CheckoutContext` — delivery type, payment method selection
+- `PaymentContext` — stored cards/UPI data
+- `OrderContext` — order history
+- `SearchContext` — search query/filter persistence
 
-**UI Components:**
-- Header, SearchBar, TabBar (navigation)
-- Checkout components (address selection, payment methods, summary)
-- Product components (product card, image carousel)
-- Profile components (order list, address form, payment method card)
+### Services Layer
+| File | Status |
+|------|--------|
+| `api.ts` | ✅ Axios wrapper with 401 token refresh |
+| `auth.ts` | ✅ Login, signup, OTP, password reset |
+| `product.ts` | ✅ Browse, search, recommendations |
+| `cart.ts` | ✅ Full CRUD |
+| `order.ts` | ✅ Full CRUD + tracking |
+| `user.ts` | ✅ Profile + addresses |
+| `wishlist.ts` | ✅ Full CRUD |
+| `wallet.ts` | ✅ Balance + transactions |
+| `coupon.ts` | ✅ Validate + list |
+| `review.ts` | ✅ Full CRUD |
+| `payment.ts` | ❌ All methods defined but backend routes missing |
+| `location.ts` | ✅ Location utilities |
+| `keepAlive.ts` | ✅ Token refresh mechanism |
 
----
-
-## 📋 SECURITY ANALYSIS
-
-### ✅ Implemented
-- JWT authentication with refresh tokens
-- HTTPS redirect middleware
-- Rate limiting on all endpoints
-- CORS configuration
-- Password hashing with bcrypt (12 rounds)
-- Helmet security headers (HSTS, CSP)
-- Input sanitization middleware
-- Request logging with structured logs
-- Sensitive data encryption at rest (wallet balances and address fields)
-- Encrypted shipping-address payload storage for orders
-
-### ⚠️ Missing/Gaps
-- No payment PCI compliance (payment endpoints missing)
-- No CSRF protection needed (API-only, but good practice)
-- No SQL injection protection (using parameterized queries, so safe)
-- No audit logging for sensitive operations
-- No 2FA/MFA support
-- Encryption key rotation policy/process not implemented yet
+### Utilities
+- `utils/apiErrorHandler.ts` — standardized error extraction
+- `utils/preventDoubleClick.ts` — debounce for form submissions
+- `utils/typeAdapters.ts` — API response normalization
+- `utils/validation.ts` — input validation helpers
 
 ---
 
-## 📈 PERFORMANCE NOTES
+## DEPLOYMENT READINESS
 
-### Database Optimization
-- Product queries use JSON aggregation for efficient image/rating joins
-- Pagination on all list endpoints (default 20, max 200)
-- Tax/GST calculation in Frontend to reduce backend load
-- Category counts cached in products.ts nearby endpoint
+### Ready for MVP Launch
+- Core e-commerce flow (browse → cart → checkout with COD)
+- Full authentication with OTP and password reset
+- Product discovery (search, categories, recommendations)
+- Order lifecycle (create, track, cancel, return)
+- Wishlist, coupons, wallet
+- Product reviews (full CRUD)
+- Encrypted sensitive data at rest
+- Rate limiting and security hardening
 
-### Frontend Optimization
-- AsyncStorage for offline cart
-- Image lazy loading in FlatList/ScrollView
-- Token auto-refresh prevents expired session errors
-- Error retry mechanism in API client
+### Blocking for Full Production
+- Payment gateway (Razorpay) — no backend routes exist
 
-### Bottlenecks
-- No caching layer (Redis) for product data
-- Product search does string normalization on every request (could cache)
-- No CDN for images
-
----
-
-## 🚀 DEPLOYMENT READINESS
-
-### MVP Ready (78% - Can Launch With Constraints)
-✅ Core e-commerce flows working  
-✅ User authentication complete  
-✅ Product browsing & discovery  
-✅ Product recommendations (personalized + fresh categories)  
-✅ Shopping cart  
-✅ Checkout (shipping address)  
-✅ Coupon application  
-✅ Order creation (with COD)  
-✅ Order cancellation/returns and tracking endpoints  
-✅ Encryption at rest for wallet/address data  
-✅ Product reviews — full CRUD (submit, list, edit, delete)  
-
-### Blocking Issues for Production
-❌ **Payment gateway integration required**
-
-### Recommended Phase 2 Work
-- [ ] Razorpay/payment gateway integration (2-3 weeks)
-- [ ] Admin dashboard for seller/order management (2-3 weeks)
-- [ ] Email notifications (1 week)
-- [ ] Analytics & logging (1 week)
-- [ ] Verified purchase flag automation (link reviews to order history)
+### Recommended Next Steps
+1. Create `backend/src/routes/payments.ts` with Razorpay order creation + webhook verification
+2. Wire wallet debit into order creation flow
+3. Auto-set `is_verified_purchase` when reviewer has a delivered order for the product
+4. Add customer-facing notification feed (currently only seller notifications exist)
+5. Email/SMS delivery for OTPs (current implementation generates OTPs but delivery mechanism not visible in codebase)
+6. Encryption key rotation runbook
 
 ---
 
-## 📝 QUICK START TO COMPLETION
+## SUMMARY TABLE
 
-### Immediate (Day 1)
-1. Create `backend/src/routes/payments.ts` with Razorpay integration
-2. Implement payment verification webhook
-3. Test end-to-end checkout flow
-
-### Short-term (Week 1-2)
-1. Fix frontend API error handling for payment failures
-2. Add payment integration retry/reconciliation flows
-3. Add encryption key rotation runbook and audit logging
-4. Wire `is_verified_purchase` flag — auto-set when reviewer has a delivered order for the product
-
-### Medium-term (Week 3-4)
-1. Admin dashboard for order fulfillment
-2. Email notification service
-3. SMS OTP provider integration (backup to email)
-4. Seller onboarding (future)
-
----
-
-## 🎯 SUMMARY BY FEATURE AREA
-
-| Feature Area | Status | Working | Missing | Quality |
-|--------------|--------|---------|---------|---------|
-| Authentication | ✅ 100% | 6/6 | 0 | Production-ready |
-| Products | ✅ 100% | 13/13 | 0 | Production-ready |
-| Cart | ✅ 100% | 6/6 | 0 | Production-ready |
-| Wishlist | ✅ 100% | 5/5 | 0 | Production-ready |
-| User Profile | ✅ 90% | 8/9 | Edit endpoints | Good |
-| Coupons | ✅ 100% | 4/4 | 0 | Production-ready |
-| Wallet | ✅ 90% | 4/5 | Top-up flow | Good |
-| Orders | ✅ 90% | 9/10 | Payment verification coupling | Good |
-| Payments | ❌ 0% | 0/5 | All routes | BLOCKING |
-| Notifications | ✅ 90% | 5/5 | Frontend UI | Good |
-| **Overall** | **⚠️ 78%** | **60/63** | **1 critical** | **MVP-ready** |
-
----
-
-## 🔗 FILE REFERENCE GUIDE
-
-### Backend Routes
-- Auth: `backend/src/routes/auth.ts`
-- Products: `backend/src/routes/products.ts`
-- Cart: `backend/src/routes/cart.ts`
-- Orders: `backend/src/routes/orders.ts`
-- Users: `backend/src/routes/users.ts`
-- Wallet: `backend/src/routes/wallet.ts`
-- Coupons: `backend/src/routes/coupons.ts`
-- Wishlist: `backend/src/routes/wishlist.ts`
-- Notifications: `backend/src/routes/notifications.ts`
-- Payments: **MISSING** (needs to be created)
-
-### Frontend Services
-- `frontend/services/api.ts` - API client
-- `frontend/services/auth.ts` - Auth operations
-- `frontend/services/payment.ts` - Payment operations (will fail)
-- `frontend/services/order.ts` - Order CRUD
-- `frontend/services/review.ts` - Product reviews (fully functional)
-
-### Frontend Screens
-- Auth: `frontend/app/auth/*`
-- Shopping: `frontend/app/(tabs)/*`
-- Checkout: `frontend/app/checkout/*`
-- Profile: `frontend/app/profile/*`
-
+| Feature Area | Status | Endpoints | Notes |
+|---|---|---|---|
+| Authentication | ✅ 100% | 8 | Production-ready |
+| Products | ✅ 100% | 13+ | Production-ready |
+| Cart | ✅ 100% | 6 | Production-ready |
+| Wishlist | ✅ 100% | 5 | Production-ready |
+| Orders | ✅ 95% | 10+ | Missing payment verification coupling |
+| User Profile | ✅ 100% | 5 | Production-ready |
+| Coupons | ✅ 100% | 2 | Production-ready |
+| Wallet | ✅ 90% | 3 | Not wired into checkout flow |
+| Notifications | ✅ 70% | 2 | Seller-only; no customer feed |
+| Payments | ❌ 0% | 0 | BLOCKING — no backend routes |
+| **Overall** | **~85%** | **54+** | MVP-ready with COD |
