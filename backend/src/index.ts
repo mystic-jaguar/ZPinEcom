@@ -13,6 +13,7 @@ import cartRoutes from './routes/cart';
 import couponRoutes from './routes/coupons';
 import notificationRoutes from './routes/notifications';
 import orderRoutes from './routes/orders';
+import paymentMethodRoutes from './routes/paymentMethods';
 import productRoutes from './routes/products';
 import userRoutes from './routes/users';
 import walletRoutes from './routes/wallet';
@@ -39,7 +40,7 @@ if (missing.length > 0) {
 }
 
 const app = express();
-const PORT = Number(process.env.PORT) || 5000;
+const PORT = Number(process.env.PORT) || 5002;
 
 // ─── HTTPS Redirect (production only) ────────────────────────────────────────
 app.use(httpsRedirect);
