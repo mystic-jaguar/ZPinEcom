@@ -49,3 +49,9 @@ backend/.env
 #docs
 features_analysis
 technical_analysis
+database.md
+
+#claude files
+claude.md
+.claude
+.claude-flow
