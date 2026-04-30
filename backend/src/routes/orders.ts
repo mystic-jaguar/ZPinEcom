@@ -19,44 +19,63 @@ let supportTablesReady = false;
 async function ensureOrderSupportTables() {
   if (supportTablesReady) return;
 
-  await pool.query(
-    `CREATE TABLE IF NOT EXISTS ${RETURN_REQUESTS} (
-      id VARCHAR(7) PRIMARY KEY,
-      order_id VARCHAR(7) NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-      user_id VARCHAR(7) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      order_item_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
-      reason TEXT NOT NULL,
-      description TEXT,
-      status VARCHAR(50) NOT NULL DEFAULT 'requested',
-      created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMP NOT NULL DEFAULT NOW()
-    )`
-  );
-  await pool.query(
-    `CREATE INDEX IF NOT EXISTS idx_return_requests_order_id ON ${RETURN_REQUESTS}(order_id)`
-  );
-  await pool.query(
-    `CREATE INDEX IF NOT EXISTS idx_return_requests_user_id ON ${RETURN_REQUESTS}(user_id)`
-  );
-  await pool.query(`ALTER TABLE ${RETURN_REQUESTS} ADD COLUMN IF NOT EXISTS picked_up_at TIMESTAMP`);
-  await pool.query(`ALTER TABLE ${RETURN_REQUESTS} ADD COLUMN IF NOT EXISTS refunded_at TIMESTAMP`);
-  await pool.query(`ALTER TABLE ${RETURN_REQUESTS} ADD COLUMN IF NOT EXISTS status_history JSONB NOT NULL DEFAULT '[]'::jsonb`);
+  try {
+    await pool.query(
+      `CREATE TABLE IF NOT EXISTS ${RETURN_REQUESTS} (
+        id VARCHAR(7) PRIMARY KEY,
+        order_id VARCHAR(7) NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+        user_id VARCHAR(7) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        order_item_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
+        reason TEXT NOT NULL,
+        description TEXT,
+        status VARCHAR(50) NOT NULL DEFAULT 'requested',
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+      )`
+    );
+    await pool.query(
+      `CREATE INDEX IF NOT EXISTS idx_return_requests_order_id ON ${RETURN_REQUESTS}(order_id)`
+    );
+    await pool.query(
+      `CREATE INDEX IF NOT EXISTS idx_return_requests_user_id ON ${RETURN_REQUESTS}(user_id)`
+    );
 
-  await pool.query(
-    `CREATE TABLE IF NOT EXISTS ${ORDER_CANCELLATIONS} (
-      id VARCHAR(7) PRIMARY KEY,
-      order_id VARCHAR(7) NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-      user_id VARCHAR(7) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      reason TEXT NOT NULL,
-      refund_method VARCHAR(50) NOT NULL DEFAULT 'original',
-      created_at TIMESTAMP NOT NULL DEFAULT NOW()
-    )`
-  );
-  await pool.query(
-    `CREATE INDEX IF NOT EXISTS idx_order_cancellations_order_id ON ${ORDER_CANCELLATIONS}(order_id)`
-  );
+    // Wrap each ALTER TABLE in its own try/catch — column may already exist
+    const alterColumns = [
+      `ALTER TABLE ${RETURN_REQUESTS} ADD COLUMN IF NOT EXISTS picked_up_at TIMESTAMP`,
+      `ALTER TABLE ${RETURN_REQUESTS} ADD COLUMN IF NOT EXISTS refunded_at TIMESTAMP`,
+      `ALTER TABLE ${RETURN_REQUESTS} ADD COLUMN IF NOT EXISTS status_history JSONB DEFAULT '[]'::jsonb`,
+    ];
+    for (const sql of alterColumns) {
+      try {
+        await pool.query(sql);
+      } catch (alterErr: any) {
+        // Ignore "column already exists" errors (code 42701)
+        if (alterErr?.code !== '42701') {
+          console.warn('[ensureOrderSupportTables] ALTER warning:', alterErr?.message);
+        }
+      }
+    }
 
-  supportTablesReady = true;
+    await pool.query(
+      `CREATE TABLE IF NOT EXISTS ${ORDER_CANCELLATIONS} (
+        id VARCHAR(7) PRIMARY KEY,
+        order_id VARCHAR(7) NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+        user_id VARCHAR(7) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        reason TEXT NOT NULL,
+        refund_method VARCHAR(50) NOT NULL DEFAULT 'original',
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      )`
+    );
+    await pool.query(
+      `CREATE INDEX IF NOT EXISTS idx_order_cancellations_order_id ON ${ORDER_CANCELLATIONS}(order_id)`
+    );
+
+    supportTablesReady = true;
+  } catch (err: any) {
+    console.error('[ensureOrderSupportTables] Failed:', err?.message);
+    throw err;
+  }
 }
 
 function buildTrackingHistory(order: any, returnRequest?: any) {
