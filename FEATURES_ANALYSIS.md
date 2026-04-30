@@ -144,12 +144,12 @@
 | View Balance | ✅ | Encrypted balance decrypted on read |
 | Transaction History | ✅ | Last 20 transactions with type, amount, description |
 | Credit Wallet | ✅ | Used internally for refunds on cancellations/returns |
-| Debit Wallet | ✅ | Used for wallet payments; insufficient balance check |
+| Debit Wallet | ✅ | Used for wallet payments; atomically debited during order creation |
 | Auto-create Wallet | ✅ | Wallet created on first access if not exists |
 | Transaction Safety | ✅ | All balance changes wrapped in DB transactions |
 
 - Backend: `routes/wallet.ts` (3 endpoints)
-- Frontend: `context/` (no dedicated wallet screen found — profile-level access)
+- Frontend: `app/profile/payment-methods.tsx` (wallet balance + transactions), `app/checkout/payment.tsx` (wallet selectable as payment method with live balance display)
 - Encryption: AES-256-GCM on balance values
 
 ---
@@ -179,7 +179,7 @@
 | Refund Processing | ❌ | No `POST /api/v1/payments/:id/refund` endpoint |
 | Razorpay Integration | ❌ | No SDK, no webhook handlers |
 | COD | ⚠️ | Orders can be created with `payment_method: 'cod'` but no confirmation flow |
-| Wallet Payment | ⚠️ | Debit endpoint exists but not wired into order creation flow |
+| Wallet Payment | ✅ | Debit atomically wired into order creation; balance validated before order commit |
 
 **Impact:** BLOCKING — users cannot complete checkout for non-COD orders. `frontend/services/payment.ts` has all methods defined but all calls will fail (no backend routes).
 
@@ -371,7 +371,7 @@ Root (_layout.tsx)
 
 ### Recommended Next Steps
 1. Create `backend/src/routes/payments.ts` with Razorpay order creation + webhook verification
-2. Wire wallet debit into order creation flow
+2. ~~Wire wallet debit into order creation flow~~ ✅ Done
 3. Auto-set `is_verified_purchase` when reviewer has a delivered order for the product
 4. Add customer-facing notification feed (currently only seller notifications exist)
 5. Email/SMS delivery for OTPs (current implementation generates OTPs but delivery mechanism not visible in codebase)
@@ -390,7 +390,7 @@ Root (_layout.tsx)
 | Orders | ✅ 95% | 10+ | Missing payment verification coupling |
 | User Profile | ✅ 100% | 5 | Production-ready |
 | Coupons | ✅ 100% | 2 | Production-ready |
-| Wallet | ✅ 90% | 3 | Not wired into checkout flow |
+| Wallet | ✅ 100% | 3 | Fully wired into checkout flow |
 | Notifications | ✅ 70% | 2 | Seller-only; no customer feed |
 | Payments | ❌ 0% | 0 | BLOCKING — no backend routes |
 | **Overall** | **~85%** | **54+** | MVP-ready with COD |

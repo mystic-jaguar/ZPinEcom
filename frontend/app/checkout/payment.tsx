@@ -25,8 +25,13 @@ export default function CheckoutPaymentScreen() {
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [orderError, setOrderError] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [walletBalance, setWalletBalance] = useState<number | null>(null);
 
     const [redirectCategory, setRedirectCategory] = useState<string | null>(null);
+
+    useEffect(() => {
+        walletService.getWallet().then(data => setWalletBalance(data.balance)).catch(() => setWalletBalance(0));
+    }, []);
 
     // Guard: If cart is empty, redirect to cart immediately. 
     // This prevents accessing payment with empty cart and handles "Back" navigation loops.
@@ -52,12 +57,21 @@ export default function CheckoutPaymentScreen() {
     const handleConfirm = async () => {
         if (cartItems.length === 0 || !selectedAddressId || isSubmitting) return;
 
+        // Wallet balance check before submitting
+        if (selectedPaymentMethod === 'wallet') {
+            if (walletBalance === null || walletBalance < finalTotal) {
+                setOrderError(`Insufficient wallet balance. Available: ₹${(walletBalance ?? 0).toFixed(2)}, Required: ₹${finalTotal.toFixed(2)}`);
+                return;
+            }
+        }
+
         setIsSubmitting(true);
         const paymentMethodMap: Record<string, 'cod' | 'razorpay' | 'wallet'> = {
             'net_banking': 'razorpay',
             'google_pay': 'razorpay',
             'phone_pe': 'razorpay',
             'cod': 'cod',
+            'wallet': 'wallet',
         };
         const backendMethod: 'cod' | 'razorpay' | 'wallet' =
             paymentMethodMap[selectedPaymentMethod || ''] || 'cod';
@@ -209,6 +223,37 @@ export default function CheckoutPaymentScreen() {
                     {renderOption('net_banking', 'Net Banking', 'business-outline')}
                     <View style={styles.divider} />
                     {renderOption('cod', 'COD (Cash on Delivery)', 'cash-outline')}
+                </View>
+
+                <Text style={styles.sectionTitle}>ZPIN WALLET</Text>
+                <View style={styles.sectionContainer}>
+                    <TouchableOpacity
+                        activeOpacity={0.9}
+                        style={[styles.optionCard, selectedPaymentMethod === 'wallet' && styles.selectedOptionCard]}
+                        onPress={() => handlePaymentSelect('wallet')}
+                    >
+                        <View style={styles.optionLeft}>
+                            <View style={styles.iconContainer}>
+                                <Ionicons name="wallet" size={24} color={Colors.light.tint} />
+                            </View>
+                            <View>
+                                <Text style={styles.optionLabel}>ZPIN Wallet</Text>
+                                <Text style={[
+                                    styles.optionSubLabel,
+                                    walletBalance !== null && walletBalance < finalTotal ? { color: '#E53935' } : { color: '#43A047' }
+                                ]}>
+                                    {walletBalance === null
+                                        ? 'Loading...'
+                                        : `Balance: ₹${walletBalance.toFixed(2)}${walletBalance < finalTotal ? ' (Insufficient)' : ''}`}
+                                </Text>
+                            </View>
+                        </View>
+                        <View style={styles.radioContainer}>
+                            <View style={[styles.radioButton, selectedPaymentMethod === 'wallet' && styles.radioButtonSelected]}>
+                                {selectedPaymentMethod === 'wallet' && <View style={styles.radioButtonInner} />}
+                            </View>
+                        </View>
+                    </TouchableOpacity>
                 </View>
 
             </ScrollView>

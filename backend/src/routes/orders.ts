@@ -430,6 +430,43 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
 
     await client.query(`DELETE FROM ${CART} WHERE user_id = $1`, [req.userId]);
 
+    // ── Wallet payment: debit atomically within the same transaction ──────────
+    if (paymentMethod === 'wallet') {
+      const walletResult = await client.query(
+        'SELECT * FROM wallets WHERE user_id = $1',
+        [req.userId]
+      );
+      if (walletResult.rows.length === 0) {
+        await client.query('ROLLBACK');
+        client.release();
+        res.status(400).json({ success: false, message: 'Wallet not found' });
+        return;
+      }
+      const wallet = walletResult.rows[0];
+      const currentBalance = decryptMoney(wallet.balance);
+      if (currentBalance < finalAmount) {
+        await client.query('ROLLBACK');
+        client.release();
+        res.status(400).json({ success: false, message: 'Insufficient wallet balance' });
+        return;
+      }
+      const newBalance = currentBalance - finalAmount;
+      await client.query(
+        `UPDATE wallets SET balance = $1, updated_at = NOW() WHERE id = $2`,
+        [encryptMoney(newBalance), wallet.id]
+      );
+      await client.query(
+        `INSERT INTO wallet_transactions (wallet_id, user_id, type, amount, description, reference_id)
+         VALUES ($1,$2,'debit',$3,$4,$5)`,
+        [wallet.id, req.userId, finalAmount, `Payment for order ${orderNumber}`, orderId]
+      );
+      // Mark order payment as paid
+      await client.query(
+        `UPDATE ${ORDERS} SET payment_status = 'paid' WHERE id = $1`,
+        [orderId]
+      );
+    }
+
     // Notify customer — order confirmation (type: new_order, consistent with seller)
     const customerItems = cartResult.rows.map((i: any) => ({
       productId: i.product_id,
