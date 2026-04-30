@@ -297,8 +297,8 @@ router.get('/:id/track', authenticate, async (req: AuthRequest, res: Response): 
         trackingHistory,
       },
     });
-  } catch (err) {
-    console.error('trackOrder error:', err);
+  } catch (err: any) {
+    console.error('trackOrder error:', err?.message, err?.code, err?.stack);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
