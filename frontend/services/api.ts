@@ -53,7 +53,7 @@ const resolveBaseUrl = (): string => {
         }
 
         if (hostIp) {
-            return `http://${hostIp}:5000/api/v1/`;
+            return `http://${hostIp}:5002/api/v1/`;
         }
 
         if (envUrl) {
@@ -64,15 +64,15 @@ const resolveBaseUrl = (): string => {
     }
 
     if (hostIp) {
-        return `http://${hostIp}:5000/api/v1/`;
+        return `http://${hostIp}:5002/api/v1/`;
     }
 
     // Android emulator can't reach localhost of host machine directly.
     if (Platform.OS === 'android') {
-        return 'http://10.0.2.2:5000/api/v1/';
+        return 'http://10.0.2.2:5002/api/v1/';
     }
 
-    return 'http://localhost:5000/api/v1/';
+    return 'http://localhost:5002/api/v1/';
 };
 
 const BASE_URL = resolveBaseUrl();
