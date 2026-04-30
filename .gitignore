@@ -45,3 +45,7 @@ app-example
 /android
 backend/.env
 /.claw
+
+#docs
+features_analysis
+technical_analysis
