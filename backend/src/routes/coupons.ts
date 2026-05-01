@@ -3,10 +3,16 @@ import { pool } from '../db';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { couponLimiter } from '../middleware/rateLimits';
 
+const COUPON_CACHE_KEY = 'coupons:all';
+const TTL_COUPONS = 3600; // 1h
+
 const router = Router();
 
 // GET /api/v1/coupons — list all coupons with computed status
 router.get('/', async (req: Request, res: Response): Promise<void> => {
+  const cached = await cacheGet(COUPON_CACHE_KEY);
+  if (cached) { res.json(cached); return; }
+
   try {
     const result = await pool.query(`
       SELECT id, code, description, discount_type, discount_value,
@@ -41,7 +47,9 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
       };
     });
 
-    res.json({ success: true, data: coupons });
+    const response = { success: true, data: coupons };
+    await cacheSet(COUPON_CACHE_KEY, response, TTL_COUPONS);
+    res.json(response);
   } catch (err) {
     console.error('getCoupons error:', err);
     res.status(500).json({ success: false, message: 'Server error' });

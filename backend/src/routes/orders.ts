@@ -532,6 +532,12 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
 
     await client.query('COMMIT');
 
+    // Invalidate user's order list and cart caches
+    await Promise.all([
+      cacheDelPattern(`user:${req.userId}:orders:*`),
+      cacheDel(`user:${req.userId}:cart`),
+    ]);
+
     res.status(201).json({
       success: true,
       message: 'Order placed successfully',

@@ -4,6 +4,15 @@ import { pool } from '../db';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { productListLimiter, reviewLimiter } from '../middleware/rateLimits';
 import { generateId } from '../utils/id';
+import { cacheDel, cacheDelPattern, cacheGet, cacheSet } from '../utils/redis';
+
+// TTLs (seconds)
+const TTL_PRODUCT = 7200;       // 2h — individual product
+const TTL_PRODUCT_LIST = 3600;  // 1h — paginated lists / categories
+const TTL_SEARCH = 1800;        // 30m — search results
+const TTL_REVIEWS = 1800;       // 30m — reviews
+const TTL_FRESH_CAT = 7200;     // 2h — fresh categories
+const TTL_NEARBY = 3600;        // 1h — nearby categories
 
 const router = Router();
 
@@ -299,6 +308,10 @@ router.get('/nearby', async (req: Request, res: Response): Promise<void> => {
     { name: 'Makeup', keywords: ['makeup', 'make-up', 'cosmetic', 'beauty', 'skincare', 'haircare'], rootCategory: 'Beauty', subCategory: 'Makeup' },
   ];
 
+  const cacheKey = 'products:nearby';
+  const cached = await cacheGet(cacheKey);
+  if (cached) { res.json(cached); return; }
+
   try {
     const results = await Promise.all(
       NEARBY_CATEGORIES.map(async (cat) => {
@@ -331,7 +344,9 @@ router.get('/nearby', async (req: Request, res: Response): Promise<void> => {
       })
     );
 
-    res.json({ success: true, data: results });
+    const response = { success: true, data: results };
+    await cacheSet(cacheKey, response, TTL_NEARBY);
+    res.json(response);
   } catch (err) {
     console.error('nearby error:', err);
     res.status(500).json({ success: false, message: 'Server error' });
@@ -340,6 +355,10 @@ router.get('/nearby', async (req: Request, res: Response): Promise<void> => {
 
 // GET /api/v1/products/fresh-categories — top 5 categories with the most recently added product
 router.get('/fresh-categories', async (req: Request, res: Response): Promise<void> => {
+  const cacheKey = 'products:fresh-categories';
+  const cached = await cacheGet(cacheKey);
+  if (cached) { res.json(cached); return; }
+
   try {
     const result = await pool.query(`
       SELECT DISTINCT ON (deepest_category_name)
@@ -366,7 +385,9 @@ router.get('/fresh-categories', async (req: Request, res: Response): Promise<voi
       latestAt: r.latest_at,
     }));
 
-    res.json({ success: true, data: categories });
+    const response = { success: true, data: categories };
+    await cacheSet(cacheKey, response, TTL_FRESH_CAT);
+    res.json(response);
   } catch (err) {
     console.error('freshCategories error:', err);
     res.status(500).json({ success: false, message: 'Server error' });
@@ -379,6 +400,10 @@ router.get('/category/:categoryName', productListLimiter, async (req: Request, r
   const limit = Math.min(Number(req.query.limit) || 100, 500); // default 100, max 500
   const offset = (page - 1) * limit;
   const { categoryName } = req.params;
+
+  const cacheKey = `products:category:${categoryName.toLowerCase()}:p${page}:l${limit}`;
+  const cached = await cacheGet(cacheKey);
+  if (cached) { res.json(cached); return; }
 
   // Use exact case-insensitive match for deepest_category_name,
   // and a JSON element match for category_path to avoid substring false-positives
@@ -429,7 +454,7 @@ router.get('/category/:categoryName', productListLimiter, async (req: Request, r
       [categoryName, limit, offset]
     );
 
-    res.json({
+    const response = {
       success: true,
       products: result.rows.map(normalizeProduct),
       pagination: {
@@ -440,7 +465,9 @@ router.get('/category/:categoryName', productListLimiter, async (req: Request, r
         hasNextPage: page * limit < total,
         hasPrevPage: page > 1,
       },
-    });
+    };
+    await cacheSet(cacheKey, response, TTL_PRODUCT_LIST);
+    res.json(response);
   } catch (err) {
     console.error('getProductsByCategory error:', err);
     res.status(500).json({ success: false, message: 'Server error' });
@@ -452,6 +479,10 @@ router.get('/', productListLimiter, async (req: Request, res: Response): Promise
   const page = Number(req.query.page) || 1;
   const limit = Math.min(Number(req.query.limit) || 50, 200); // default 50, max 200
   const offset = (page - 1) * limit;
+
+  const cacheKey = `products:all:p${page}:l${limit}`;
+  const cached = await cacheGet(cacheKey);
+  if (cached) { res.json(cached); return; }
 
   try {
     const countResult = await pool.query(`SELECT COUNT(*) FROM products WHERE in_stock = true`);
@@ -471,7 +502,7 @@ router.get('/', productListLimiter, async (req: Request, res: Response): Promise
       [limit, offset]
     );
 
-    res.json({
+    const response = {
       success: true,
       products: result.rows.map(normalizeProduct),
       pagination: {
@@ -482,7 +513,9 @@ router.get('/', productListLimiter, async (req: Request, res: Response): Promise
         hasNextPage: page * limit < total,
         hasPrevPage: page > 1,
       },
-    });
+    };
+    await cacheSet(cacheKey, response, TTL_PRODUCT_LIST);
+    res.json(response);
   } catch (err) {
     console.error('getProducts error:', err);
     res.status(500).json({ success: false, message: 'Server error' });
@@ -497,6 +530,10 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
     res.status(404).json({ success: false, message: 'Product not found' });
     return;
   }
+
+  const cacheKey = `product:${id}`;
+  const cached = await cacheGet(cacheKey);
+  if (cached) { res.json(cached); return; }
 
   try {
     const result = await pool.query(
@@ -516,7 +553,9 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    res.json({ success: true, data: normalizeProduct(result.rows[0]) });
+    const response = { success: true, data: normalizeProduct(result.rows[0]) };
+    await cacheSet(cacheKey, response, TTL_PRODUCT);
+    res.json(response);
   } catch (err) {
     console.error('getProduct error:', err);
     res.status(500).json({ success: false, message: 'Server error' });
@@ -580,6 +619,13 @@ router.get('/:id/reviews', async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
+    // Serve from cache for public (non-mine) requests
+    if (!mineOnly) {
+      const cacheKey = `product:${productUUID}:reviews:p${page}:l${limit}`;
+      const cached = await cacheGet(cacheKey);
+      if (cached) { res.json(cached); return; }
+    }
+
     const result = await pool.query(
       mineOnly
         ? `SELECT pr.*, u.name as user_name, NULL::text as user_profile_image
@@ -605,7 +651,7 @@ router.get('/:id/reviews', async (req: Request, res: Response): Promise<void> =>
     );
     const total = Number(countResult.rows[0].count);
 
-    res.json({
+    const response = {
       success: true,
       data: result.rows.map(mapReviewRow),
       pagination: {
@@ -616,7 +662,14 @@ router.get('/:id/reviews', async (req: Request, res: Response): Promise<void> =>
         hasNextPage: page * limit < total,
         hasPrevPage: page > 1,
       },
-    });
+    };
+
+    // Only cache public (non-mine) review pages
+    if (!mineOnly) {
+      await cacheSet(`product:${productUUID}:reviews:p${page}:l${limit}`, response, TTL_REVIEWS);
+    }
+
+    res.json(response);
   } catch (err) {
     console.error('getReviews error:', err);
     res.status(500).json({ success: false, message: 'Server error' });
@@ -677,6 +730,11 @@ router.post('/:id/reviews', authenticate, reviewLimiter, async (req: AuthRequest
        VALUES ($1,$2,$3::uuid,$4,$5,$6,false,NOW(),NOW())`,
       [generateId(), productUUID, req.userId, parsedRating, parsedComment, JSON.stringify(normalizedImages)]
     );
+    // Invalidate product cache (rating changed) and all review pages
+    await Promise.all([
+      cacheDelPattern(`product:${productUUID}:reviews:*`),
+      cacheDel(`product:${productUUID}`, `product:${req.params.id}`),
+    ]);
     res.status(201).json({ success: true, message: 'Review added' });
   } catch (err) {
     console.error('addReview error:', err);
@@ -760,6 +818,11 @@ router.put('/:id/reviews/:reviewId', authenticate, async (req: AuthRequest, res:
       [nextRating, nextComment, JSON.stringify(nextImages), req.params.reviewId, productUUID, req.userId]
     );
 
+    await Promise.all([
+      cacheDelPattern(`product:${productUUID}:reviews:*`),
+      cacheDel(`product:${productUUID}`, `product:${req.params.id}`),
+    ]);
+
     res.json({ success: true, message: 'Review updated' });
   } catch (err) {
     console.error('updateReview error:', err);
@@ -803,6 +866,11 @@ router.delete('/:id/reviews/:reviewId', authenticate, async (req: AuthRequest, r
        WHERE id = $1 AND product_id = $2 AND user_id::text = $3`,
       [req.params.reviewId, productUUID, req.userId]
     );
+
+    await Promise.all([
+      cacheDelPattern(`product:${productUUID}:reviews:*`),
+      cacheDel(`product:${productUUID}`, `product:${req.params.id}`),
+    ]);
 
     res.json({ success: true, message: 'Review deleted' });
   } catch (err) {

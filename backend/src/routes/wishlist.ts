@@ -21,6 +21,7 @@ router.get('/count', authenticate, async (req: AuthRequest, res: Response): Prom
 router.delete('/clear', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     await pool.query(`DELETE FROM ${T} WHERE user_id = $1`, [req.userId]);
+    await cacheDelPattern(`user:${req.userId}:wishlist:*`);
     res.json({ success: true, message: 'Wishlist cleared' });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Server error' });
@@ -96,6 +97,7 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response): Promise<
       `INSERT INTO ${T} (id, user_id, product_id, created_at) VALUES ($1,$2,$3::uuid,NOW())`,
       [generateId(), req.userId, productId]
     );
+    await cacheDelPattern(`user:${req.userId}:wishlist:*`);
     res.status(201).json({ success: true, message: 'Added to wishlist' });
   } catch (err) {
     console.error('addWishlist error:', err);
@@ -110,6 +112,7 @@ router.delete('/:productId', authenticate, async (req: AuthRequest, res: Respons
       `DELETE FROM ${T} WHERE user_id = $1 AND product_id = $2::uuid`,
       [req.userId, req.params.productId]
     );
+    await cacheDelPattern(`user:${req.userId}:wishlist:*`);
     res.json({ success: true, message: 'Removed from wishlist' });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Server error' });

@@ -20,6 +20,7 @@ import walletRoutes from './routes/wallet';
 import wishlistRoutes from './routes/wishlist';
 import { prepareSensitiveDataEncryption } from './utils/encryption';
 import { logger } from './utils/logger';
+import redis from './utils/redis';
 
 dotenv.config();
 
@@ -115,6 +116,13 @@ app.use((err: any, req: express.Request, res: express.Response, _next: express.N
 // ─── Start ───────────────────────────────────────────────────────────────────
 async function startServer() {
   await prepareSensitiveDataEncryption(pool);
+
+  // Connect Redis (non-fatal — app works without cache)
+  try {
+    await redis.connect();
+  } catch (err: any) {
+    logger.warn('redis.connect_failed', { message: err.message });
+  }
 
   app.listen(PORT, '0.0.0.0', () => {
     logger.info('server.started', { port: PORT, env: process.env.NODE_ENV || 'development' });
