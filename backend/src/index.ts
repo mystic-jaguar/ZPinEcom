@@ -117,7 +117,12 @@ app.use((err: any, req: express.Request, res: express.Response, _next: express.N
 
 // ─── Start ───────────────────────────────────────────────────────────────────
 async function startServer() {
-  await prepareSensitiveDataEncryption(pool);
+  // Run data migration non-fatally — server must start even if migration fails
+  try {
+    await prepareSensitiveDataEncryption(pool);
+  } catch (err: any) {
+    logger.warn('startup.encryption_migration_failed', { message: err.message });
+  }
 
   // Connect Redis (non-fatal — app works without cache)
   try {
