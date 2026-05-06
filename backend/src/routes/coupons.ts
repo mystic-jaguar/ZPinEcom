@@ -2,6 +2,7 @@ import { Request, Response, Router } from 'express';
 import { pool } from '../db';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { couponLimiter } from '../middleware/rateLimits';
+import { cacheGet, cacheSet } from '../utils/redis';
 
 const COUPON_CACHE_KEY = 'coupons:all';
 const TTL_COUPONS = 3600; // 1h

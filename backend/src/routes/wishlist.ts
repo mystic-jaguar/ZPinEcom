@@ -2,6 +2,7 @@ import { Response, Router } from 'express';
 import { pool } from '../db';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { generateId } from '../utils/id';
+import { cacheDelPattern } from '../utils/redis';
 import { safeIdentifier } from '../utils/sql';
 
 const router = Router();

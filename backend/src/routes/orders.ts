@@ -4,6 +4,7 @@ import { authenticate, AuthRequest } from '../middleware/auth';
 import { orderCreateLimiter } from '../middleware/rateLimits';
 import { decryptAddressPayload, decryptMoney, encryptAddressPayload, encryptMoney } from '../utils/encryption';
 import { generateId } from '../utils/id';
+import { cacheDel, cacheDelPattern } from '../utils/redis';
 import { safeIdentifier } from '../utils/sql';
 
 const router = Router();
