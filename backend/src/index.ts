@@ -15,6 +15,7 @@ import notificationRoutes from './routes/notifications';
 import orderRoutes from './routes/orders';
 import paymentMethodRoutes from './routes/paymentMethods';
 import productRoutes from './routes/products';
+import razorpayRoutes from './routes/razorpay';
 import userRoutes from './routes/users';
 import walletRoutes from './routes/wallet';
 import wishlistRoutes from './routes/wishlist';
@@ -97,6 +98,7 @@ app.use('/api/v1/coupons', couponRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
 app.use('/api/v1/wallet', walletRoutes);
 app.use('/api/v1/payment-methods', paymentMethodRoutes);
+app.use('/api/v1/razorpay', razorpayRoutes);
 
 // Health check — excluded from rate limiting
 app.get('/health', (_, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));

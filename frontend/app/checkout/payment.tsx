@@ -67,37 +67,86 @@ export default function CheckoutPaymentScreen() {
         }
 
         setIsSubmitting(true);
-        const paymentMethodMap: Record<string, 'cod' | 'razorpay' | 'wallet'> = {
-            'net_banking': 'razorpay',
-            'google_pay': 'razorpay',
-            'phone_pe': 'razorpay',
-            'cod': 'cod',
-            'wallet': 'wallet',
-        };
+
+        // Determine backend payment method
+        const isRazorpayMethod = ['net_banking', 'google_pay', 'phone_pe', 'upi', 'card'].includes(selectedPaymentMethod || '')
+            || (cards.some(c => c.id === selectedPaymentMethod))
+            || (upis.some(u => u.id === selectedPaymentMethod));
+
         const backendMethod: 'cod' | 'razorpay' | 'wallet' =
-            paymentMethodMap[selectedPaymentMethod || ''] || 'cod';
+            selectedPaymentMethod === 'cod' ? 'cod'
+            : selectedPaymentMethod === 'wallet' ? 'wallet'
+            : isRazorpayMethod ? 'razorpay'
+            : 'cod';
 
         try {
-            // Pass cart items from context so backend can sync if DB cart is stale
             const cartPayload = cartItems.map(item => ({
                 productId: item.productId,
                 quantity: item.quantity,
             }));
 
-            const response = await orderService.createOrder({
+            // Step 1: Create the app order
+            const orderResponse = await orderService.createOrder({
                 shippingAddressId: selectedAddressId,
                 paymentMethod: backendMethod,
                 cartItems: cartPayload,
                 notes: isInstant ? 'instant_delivery' : 'standard_delivery',
             });
 
-            if (response.success && response.data) {
-                addOrder(response.data.order as any);
+            if (!orderResponse.success || !orderResponse.data) {
+                throw new Error('Failed to create order');
+            }
+
+            const appOrder = orderResponse.data.order;
+            addOrder(appOrder as any);
+
+            // Step 2: For Razorpay methods, open the payment gateway
+            if (backendMethod === 'razorpay') {
+                // Create Razorpay order on backend
+                const rzpOrderResponse = await paymentService.createRazorpayOrder(appOrder.id);
+
+                if (!rzpOrderResponse.success || !rzpOrderResponse.data) {
+                    throw new Error('Failed to initiate payment');
+                }
+
+                const { razorpayOrderId, amount, currency, keyId } = rzpOrderResponse.data;
+
+                const options = {
+                    description: `Payment for order ${appOrder.orderNumber || appOrder.id}`,
+                    image: 'https://i.imgur.com/3g7nmJC.png',
+                    currency,
+                    key: keyId,
+                    amount: String(amount),
+                    name: 'ZPIN',
+                    order_id: razorpayOrderId,
+                    prefill: {
+                        email: user?.email || '',
+                        contact: user?.phone || '',
+                        name: user?.name || '',
+                    },
+                    theme: { color: Colors.light.tint },
+                };
+
+                // Step 3: Open Razorpay checkout
+                const rzpData = await RazorpayCheckout.open(options);
+
+                // Step 4: Verify payment with backend
+                await paymentService.verifyRazorpayPayment({
+                    razorpayOrderId,
+                    razorpayPaymentId: rzpData.razorpay_payment_id,
+                    razorpaySignature: rzpData.razorpay_signature,
+                    appOrderId: appOrder.id,
+                });
             }
 
             setShowSuccessModal(true);
         } catch (error: any) {
-            setOrderError(error.message || 'Failed to place order. Please try again.');
+            // Razorpay checkout dismissed by user
+            if (error?.code === 0 || error?.description === 'Payment cancelled by user') {
+                setOrderError('Payment was cancelled. Your order has been saved — you can retry payment from your orders.');
+            } else {
+                setOrderError(error.message || 'Failed to place order. Please try again.');
+            }
         } finally {
             setIsSubmitting(false);
         }
