@@ -306,7 +306,7 @@ router.get('/:id/track', authenticate, async (req: AuthRequest, res: Response): 
 
 // POST /api/v1/orders
 router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res: Response): Promise<void> => {
-  const { shippingAddressId, paymentMethod, notes, cartItems: bodyCartItems } = req.body;
+  const { shippingAddressId, paymentMethod, notes, cartItems: bodyCartItems, deliveryFee: clientDeliveryFee, couponDiscount: clientCouponDiscount } = req.body;
 
   if (!shippingAddressId || !paymentMethod) {
     res.status(400).json({ success: false, message: 'shippingAddressId and paymentMethod are required' });
@@ -396,7 +396,11 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
     );
     const shippingAmount = totalAmount > 500 ? 0 : 49;
     const taxAmount = Math.round(totalAmount * 0.18);
-    const finalAmount = totalAmount + shippingAmount + taxAmount;
+    // Accept delivery fee and coupon discount from client (instant delivery, coupons)
+    // Clamp to safe values: deliveryFee >= 0, couponDiscount >= 0 and <= totalAmount
+    const deliveryFee = Math.max(0, Number(clientDeliveryFee) || 0);
+    const couponDiscount = Math.min(Math.max(0, Number(clientCouponDiscount) || 0), totalAmount);
+    const finalAmount = totalAmount + shippingAmount + taxAmount + deliveryFee - couponDiscount;
     const orderId = generateId();
     const orderNumber = `ZP-${orderId}`;
 
@@ -411,13 +415,13 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
 
     await client.query(
       `INSERT INTO ${ORDERS}
-        (id, order_number, user_id, seller_id, status, payment_status, total_amount, shipping_amount,
+        (id, order_number, user_id, status, payment_status, total_amount, shipping_amount,
          tax_amount, final_amount, shipping_address, payment_method, notes, estimated_delivery, created_at, updated_at)
-       VALUES ($1,$2,$3,$4,'pending','pending',$5,$6,$7,$8,$9,$10,$11,
+       VALUES ($1,$2,$3,'pending','pending',$4,$5,$6,$7,$8,$9,$10,
          (NOW() AT TIME ZONE 'Asia/Kolkata') + INTERVAL '5 days',
          (NOW() AT TIME ZONE 'Asia/Kolkata'),
          (NOW() AT TIME ZONE 'Asia/Kolkata'))`,
-      [orderId, orderNumber, req.userId, primarySellerId, totalAmount, shippingAmount, taxAmount, finalAmount,
+      [orderId, orderNumber, req.userId, totalAmount, shippingAmount, taxAmount, finalAmount,
        JSON.stringify(encryptedShippingAddress), paymentMethod, notes || '']
     );
 
@@ -457,13 +461,13 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
         [encryptMoney(newBalance), wallet.id]
       );
       await client.query(
-        `INSERT INTO wallet_transactions (wallet_id, user_id, type, amount, description, reference_id)
-         VALUES ($1,$2,'debit',$3,$4,$5)`,
-        [wallet.id, req.userId, finalAmount, `Payment for order ${orderNumber}`, orderId]
+        `INSERT INTO wallet_transactions (id, wallet_id, user_id, type, amount, description, reference_id)
+         VALUES ($1,$2,$3,'debit',$4,$5,$6)`,
+        [generateId(), wallet.id, req.userId, finalAmount, `Payment for order ${orderNumber}`, orderId]
       );
-      // Mark order payment as paid
+      // Mark order as paid and confirmed
       await client.query(
-        `UPDATE ${ORDERS} SET payment_status = 'paid' WHERE id = $1`,
+        `UPDATE ${ORDERS} SET payment_status = 'paid', status = 'confirmed', updated_at = NOW() WHERE id = $1`,
         [orderId]
       );
     }

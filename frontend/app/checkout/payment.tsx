@@ -12,7 +12,9 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import RazorpayCheckout from 'react-native-razorpay';
 import { orderService } from '../../services/order';
+import { paymentService } from '../../services/payment';
 import { walletService } from '../../services/wallet';
 
 export default function CheckoutPaymentScreen() {
@@ -91,6 +93,8 @@ export default function CheckoutPaymentScreen() {
                 paymentMethod: backendMethod,
                 cartItems: cartPayload,
                 notes: isInstant ? 'instant_delivery' : 'standard_delivery',
+                deliveryFee: isInstant ? 50 : 0,
+                couponDiscount,
             });
 
             if (!orderResponse.success || !orderResponse.data) {

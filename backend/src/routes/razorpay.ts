@@ -117,10 +117,10 @@ router.post('/verify', authenticate, async (req: AuthRequest, res: Response): Pr
       return;
     }
 
-    // Mark order as paid and store Razorpay payment ID
+    // Mark order as paid and confirmed, store Razorpay payment ID
     await client.query(
       `UPDATE ${ORDERS}
-       SET payment_status = 'paid', payment_id = $1, payment_method = 'razorpay', updated_at = NOW()
+       SET payment_status = 'paid', status = 'confirmed', payment_id = $1, payment_method = 'razorpay', updated_at = NOW()
        WHERE id = $2`,
       [razorpayPaymentId, appOrderId]
     );

@@ -9,6 +9,8 @@ export interface CreateOrderData {
     deliveryBoyId?: string;
     notes?: string;
     couponCode?: string;
+    deliveryFee?: number;
+    couponDiscount?: number;
 }
 
 export interface OrderListParams {
