@@ -182,11 +182,6 @@ export default function ProfileScreen() {
                             onPress={() => router.push('/profile/edit-profile')}
                         />
                         <ProfileOption
-                            label="Payment Methods"
-                            icon="credit-card"
-                            onPress={() => router.push('/profile/payment-methods')}
-                        />
-                        <ProfileOption
                             label="Saved Addresses"
                             icon="map-pin"
                             onPress={() => router.push('/profile/addresses')}

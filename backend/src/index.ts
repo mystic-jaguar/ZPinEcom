@@ -13,7 +13,6 @@ import cartRoutes from './routes/cart';
 import couponRoutes from './routes/coupons';
 import notificationRoutes from './routes/notifications';
 import orderRoutes from './routes/orders';
-import paymentMethodRoutes from './routes/paymentMethods';
 import productRoutes from './routes/products';
 import razorpayRoutes from './routes/razorpay';
 import userRoutes from './routes/users';
@@ -99,7 +98,6 @@ app.use('/api/v1/orders', orderRoutes);
 app.use('/api/v1/coupons', couponRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
 app.use('/api/v1/wallet', walletRoutes);
-app.use('/api/v1/payment-methods', paymentMethodRoutes);
 app.use('/api/v1/razorpay', razorpayRoutes);
 
 // Health check — excluded from rate limiting

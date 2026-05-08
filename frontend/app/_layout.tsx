@@ -6,7 +6,6 @@ import { AddressProvider } from "../context/AddressContext";
 import { CartProvider } from "../context/CartContext";
 import { CheckoutProvider } from "../context/CheckoutContext";
 import { OrderProvider } from "../context/OrderContext";
-import { PaymentProvider } from '../context/PaymentContext';
 import { SearchProvider } from "../context/SearchContext";
 import { UserProvider, useUser } from "../context/UserContext";
 import { WishlistProvider } from "../context/WishlistContext";
@@ -50,8 +49,6 @@ function RootLayoutNav() {
       <Stack.Screen name="profile/add-address" options={{ title: 'Add Address', headerShown: false }} />
       <Stack.Screen name="profile/edit-profile" options={{ title: 'Edit Profile', headerShown: false }} />
       <Stack.Screen name="profile/wishlist" options={{ title: 'Wishlist', headerShown: false }} />
-      <Stack.Screen name="profile/payment-methods" options={{ headerShown: false }} />
-      <Stack.Screen name="profile/add-payment-method" options={{ headerShown: false }} />
     </Stack>
   );
 }
@@ -64,13 +61,11 @@ export default function RootLayout() {
           <CartProvider>
             <WishlistProvider>
               <CheckoutProvider>
-                <PaymentProvider>
                   <AddressProvider>
                     <OrderProvider>
                       <RootLayoutNav />
                     </OrderProvider>
                   </AddressProvider>
-                </PaymentProvider>
               </CheckoutProvider>
             </WishlistProvider>
           </CartProvider>

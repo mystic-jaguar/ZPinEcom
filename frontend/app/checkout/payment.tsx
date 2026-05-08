@@ -5,7 +5,6 @@ import { useAddress } from '@/context/AddressContext';
 import { useCart } from '@/context/CartContext';
 import { useCheckout } from '@/context/CheckoutContext';
 import { useOrder } from '@/context/OrderContext';
-import { usePayment } from '@/context/PaymentContext';
 import { useUser } from '@/context/UserContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -23,7 +22,6 @@ export default function CheckoutPaymentScreen() {
     const { totalPrice, cartItems, clearCart, couponDiscount, totalSavings } = useCart();
     const { addresses } = useAddress();
     const { addOrder } = useOrder();
-    const { cards, upis } = usePayment();
     const { user } = useUser();
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [orderError, setOrderError] = useState<string | null>(null);
@@ -71,9 +69,7 @@ export default function CheckoutPaymentScreen() {
         setIsSubmitting(true);
 
         // Determine backend payment method
-        const isRazorpayMethod = ['net_banking', 'google_pay', 'phone_pe', 'upi', 'card'].includes(selectedPaymentMethod || '')
-            || (cards.some(c => c.id === selectedPaymentMethod))
-            || (upis.some(u => u.id === selectedPaymentMethod));
+        const isRazorpayMethod = ['net_banking', 'google_pay', 'phone_pe', 'upi', 'card'].includes(selectedPaymentMethod || '');
 
         const backendMethod: 'cod' | 'razorpay' | 'wallet' =
             selectedPaymentMethod === 'cod' ? 'cod'
@@ -136,13 +132,7 @@ export default function CheckoutPaymentScreen() {
                     throw new Error('Payment gateway is not available. Please ensure you are using a native build (not Expo Go).');
                 }
 
-                // If paying via a saved UPI ID, prefill the UPI method
-                const selectedUPI = upis.find(u => u.id === selectedPaymentMethod);
-                const upiOptions = selectedUPI
-                    ? { ...options, method: { upi: true }, prefill: { ...options.prefill, vpa: selectedUPI.upiId } }
-                    : options;
-
-                const rzpData = await RazorpayCheckout.open(upiOptions);
+                const rzpData = await RazorpayCheckout.open(options);
 
                 // Step 4: Verify payment with backend
                 await paymentService.verifyRazorpayPayment({
@@ -239,47 +229,9 @@ export default function CheckoutPaymentScreen() {
 
             <ScrollView style={styles.scrollContainer} contentContainerStyle={styles.contentContainer}>
 
-                <Text style={styles.sectionTitle}>UPI PAYMENTS</Text>
+                <Text style={styles.sectionTitle}>UPI / CARD PAYMENTS</Text>
                 <View style={styles.sectionContainer}>
-                    {upis.map((upi, index) => (
-                        <React.Fragment key={upi.id}>
-                            {index > 0 && <View style={styles.divider} />}
-                            {renderOption(
-                                upi.id,
-                                upi.label,
-                                upi.upiApp === 'Google Pay' ? 'logo-google' : 'phone-portrait-outline',
-                                upi.subLabel
-                            )}
-                        </React.Fragment>
-                    ))}
-
-                    {upis.length > 0 && <View style={styles.divider} />}
-                    <TouchableOpacity style={styles.addOption} onPress={() => router.push('/profile/add-payment-method')}>
-                        <Ionicons name="add-circle" size={24} color={Colors.light.tint} />
-                        <Text style={styles.addOptionText}>Add New UPI ID</Text>
-                    </TouchableOpacity>
-                </View>
-
-                <Text style={styles.sectionTitle}>CREDIT / DEBIT CARDS</Text>
-                <View style={styles.sectionContainer}>
-                    {cards.map((card, index) => (
-                        <React.Fragment key={card.id}>
-                            {index > 0 && <View style={styles.divider} />}
-                            {renderOption(
-                                card.id,
-                                `•••• •••• •••• ${card.cardNumber.slice(-4)}`,
-                                undefined,
-                                `Exp: ${card.expiryDate}`,
-                                true
-                            )}
-                        </React.Fragment>
-                    ))}
-
-                    {cards.length > 0 && <View style={styles.divider} />}
-                    <TouchableOpacity style={styles.addOption} onPress={() => router.push('/profile/add-payment-method')}>
-                        <Ionicons name="card" size={24} color={Colors.light.tint} />
-                        <Text style={styles.addOptionText}>Add New Card</Text>
-                    </TouchableOpacity>
+                    {renderOption('upi', 'UPI / Cards', 'wallet-outline', 'Pay via Razorpay')}
                 </View>
 
                 <Text style={styles.sectionTitle}>OTHER OPTIONS</Text>

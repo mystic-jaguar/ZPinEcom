@@ -36,7 +36,7 @@ export default function HelpCenterScreen() {
     const TOPICS = [
         { id: 'track', label: 'Track Order', icon: 'bus-outline', color: '#FFD54F', route: '/profile/track-order' },
         { id: 'returns', label: 'Returns & Refunds', icon: 'return-down-back-outline', color: '#FFF59D', route: '/profile/returns' },
-        { id: 'payment', label: 'Payment Issues', icon: 'wallet-outline', color: '#FFF176', route: '/profile/payment-methods' },
+        { id: 'payment', label: 'Payment Issues', icon: 'wallet-outline', color: '#FFF176', route: '/profile/orders' },
         { id: 'account', label: 'Account Settings', icon: 'person-outline', color: '#FFF9C4', route: '/profile/edit-profile' },
     ];
 
