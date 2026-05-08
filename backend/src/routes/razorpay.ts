@@ -9,10 +9,15 @@ import { safeIdentifier } from '../utils/sql';
 const router = Router();
 const ORDERS = safeIdentifier('orders');
 
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID!,
-  key_secret: process.env.RAZORPAY_KEY_SECRET!,
-});
+function getRazorpay() {
+  if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+    throw new Error('Razorpay credentials not configured');
+  }
+  return new Razorpay({
+    key_id: process.env.RAZORPAY_KEY_ID,
+    key_secret: process.env.RAZORPAY_KEY_SECRET,
+  });
+}
 
 // POST /api/v1/razorpay/create-order
 // Creates a Razorpay order for the given app order ID
@@ -46,7 +51,7 @@ router.post('/create-order', authenticate, async (req: AuthRequest, res: Respons
     // Razorpay amount is in paise (1 INR = 100 paise)
     const amountInPaise = Math.round(Number(order.final_amount) * 100);
 
-    const rzpOrder = await razorpay.orders.create({
+    const rzpOrder = await getRazorpay().orders.create({
       amount: amountInPaise,
       currency: 'INR',
       receipt: orderId,

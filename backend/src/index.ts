@@ -34,6 +34,8 @@ const REQUIRED_ENV = [
   'JWT_SECRET',
   'JWT_REFRESH_SECRET',
   'DATA_ENCRYPTION_KEY',
+  'RAZORPAY_KEY_ID',
+  'RAZORPAY_KEY_SECRET',
 ];
 const missing = REQUIRED_ENV.filter(k => !process.env[k]);
 if (missing.length > 0) {
