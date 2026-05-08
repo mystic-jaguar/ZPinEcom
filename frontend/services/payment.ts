@@ -50,21 +50,15 @@ export const paymentService = {
     },
 
     /**
-     * Request refund
+     * Request refund — credits the refund amount to the user's ZPIN wallet.
+     * The backend handles refunds via the wallet credit endpoint.
      */
-    async requestRefund(paymentId: string, amount?: number, reason?: string) {
+    async requestRefund(amount: number, description: string, referenceId?: string) {
         try {
-            const response = await apiClient.post<ApiSuccessResponse<{
-                refund: {
-                    id: string;
-                    paymentId: string;
-                    amount: number;
-                    status: string;
-                    gatewayRefundId: string;
-                    reason: string;
-                    createdAt: string;
-                };
-            }>>(`payments/${paymentId}/refund`, { amount, reason });
+            const response = await apiClient.post<{ success: boolean; data: { newBalance: number } }>(
+                'wallet/credit',
+                { amount, description: description || 'Refund', referenceId }
+            );
             return response.data;
         } catch (error) {
             throw new Error(handleApiError(error));

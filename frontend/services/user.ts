@@ -94,20 +94,11 @@ export const userService = {
     },
 
     /**
-     * Add customer profile details
+     * Add customer profile details — not yet implemented on the backend.
+     * Throws a clear error rather than hitting a 404.
      */
-    async addCustomerProfile(data: FormData) {
-        try {
-            // POST :- /api/v1/users/customer/profile
-            const response = await apiClient.post<ApiSuccessResponse<any>>('users/customer/profile', data, {
-                headers: {
-                    'Content-Type': 'multipart/form-data',
-                },
-            });
-            return response.data;
-        } catch (error) {
-            throw new Error(handleApiError(error));
-        }
+    async addCustomerProfile(_data: FormData): Promise<never> {
+        throw new Error('Customer profile creation is not yet available.');
     },
 
     /**

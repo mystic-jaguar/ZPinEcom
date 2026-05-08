@@ -62,7 +62,7 @@ export const PaymentProvider = ({ children }: { children: ReactNode }) => {
             expiryDate: updates.expiryDate,
             cardType: updates.cardType,
         });
-        setCards(prev => prev.map(c => c.id === id ? { ...c, ...updated } : c));
+        setCards(prev => prev.map(c => c.id === id ? { ...c, ...updated } as PaymentCardObject : c));
     };
 
     const deleteCard = async (id: string) => {

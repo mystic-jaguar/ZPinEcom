@@ -82,9 +82,9 @@ router.post('/credit', authenticate, async (req: AuthRequest, res: Response): Pr
       );
 
       await client.query(
-        `INSERT INTO wallet_transactions (wallet_id, user_id, type, amount, description, reference_id)
-         VALUES ($1,$2,'credit',$3,$4,$5)`,
-        [wallet.id, req.userId, amount, description || 'Wallet credit', referenceId || null]
+        `INSERT INTO wallet_transactions (id, wallet_id, user_id, type, amount, description, reference_id)
+         VALUES ($1,$2,$3,'credit',$4,$5,$6)`,
+        [generateId(), wallet.id, req.userId, amount, description || 'Wallet credit', referenceId || null]
       );
 
       await client.query('COMMIT');
@@ -138,9 +138,9 @@ router.post('/debit', authenticate, async (req: AuthRequest, res: Response): Pro
       );
 
       await client.query(
-        `INSERT INTO wallet_transactions (wallet_id, user_id, type, amount, description, reference_id)
-         VALUES ($1,$2,'debit',$3,$4,$5)`,
-        [wallet.id, req.userId, amount, description || 'Wallet payment', referenceId || null]
+        `INSERT INTO wallet_transactions (id, wallet_id, user_id, type, amount, description, reference_id)
+         VALUES ($1,$2,$3,'debit',$4,$5,$6)`,
+        [generateId(), wallet.id, req.userId, amount, description || 'Wallet payment', referenceId || null]
       );
 
       await client.query('COMMIT');

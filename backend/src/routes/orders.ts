@@ -839,9 +839,9 @@ router.patch('/:id/cancel', authenticate, async (req: AuthRequest, res: Response
         [encryptMoney(updatedBalance), wallet.id]
       );
       await pool.query(
-        `INSERT INTO wallet_transactions (wallet_id, user_id, type, amount, description, reference_id)
-         VALUES ($1,$2,'credit',$3,$4,$5)`,
-        [wallet.id, req.userId, refundAmount, `Refund for cancelled order`, req.params.id]
+        `INSERT INTO wallet_transactions (id, wallet_id, user_id, type, amount, description, reference_id)
+         VALUES ($1,$2,$3,'credit',$4,$5,$6)`,
+        [generateId(), wallet.id, req.userId, refundAmount, `Refund for cancelled order`, req.params.id]
       );
     }
 
