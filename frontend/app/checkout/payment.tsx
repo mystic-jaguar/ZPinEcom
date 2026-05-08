@@ -132,7 +132,17 @@ export default function CheckoutPaymentScreen() {
                 };
 
                 // Step 3: Open Razorpay checkout
-                const rzpData = await RazorpayCheckout.open(options);
+                if (!RazorpayCheckout) {
+                    throw new Error('Payment gateway is not available. Please ensure you are using a native build (not Expo Go).');
+                }
+
+                // If paying via a saved UPI ID, prefill the UPI method
+                const selectedUPI = upis.find(u => u.id === selectedPaymentMethod);
+                const upiOptions = selectedUPI
+                    ? { ...options, method: { upi: true }, prefill: { ...options.prefill, vpa: selectedUPI.upiId } }
+                    : options;
+
+                const rzpData = await RazorpayCheckout.open(upiOptions);
 
                 // Step 4: Verify payment with backend
                 await paymentService.verifyRazorpayPayment({
