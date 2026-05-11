@@ -6,6 +6,7 @@ import React, { useEffect, useState } from 'react';
 import { Dimensions, Image, Linking, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
+import LegalDocModal, { LegalDocType } from '../../components/common/LegalDocModal';
 import Header from '../../components/Header';
 import SearchBar from '../../components/SearchBar';
 import { useSearch } from '../../context/SearchContext';

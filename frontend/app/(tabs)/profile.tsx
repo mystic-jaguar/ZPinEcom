@@ -1,4 +1,5 @@
 import ActionModal from '@/components/common/ActionModal';
+import LegalDocModal, { LegalDocType } from '@/components/common/LegalDocModal';
 import { useCart } from '@/context/CartContext';
 import { useWishlist } from '@/context/WishlistContext';
 import { authService } from '@/services/auth';
