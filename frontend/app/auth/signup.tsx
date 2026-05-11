@@ -30,6 +30,13 @@ export default function SignupScreen() {
     const [loading, setLoading] = useState(false);
     const [showErrorModal, setShowErrorModal] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
+    const [legalModalVisible, setLegalModalVisible] = useState(false);
+    const [legalDocType, setLegalDocType] = useState<LegalDocType>('terms');
+
+    const openLegalDoc = (type: LegalDocType) => {
+        setLegalDocType(type);
+        setLegalModalVisible(true);
+    };
 
     const validateInputs = () => {
         if (!name.trim()) {
@@ -242,21 +249,23 @@ export default function SignupScreen() {
                         </View>
 
                         {/* Terms Checkbox */}
-                        <TouchableOpacity
-                            style={styles.checkboxContainer}
-                            onPress={() => setAgreedToTerms(!agreedToTerms)}
-                            disabled={loading}
-                        >
-                            <View style={[styles.checkbox, agreedToTerms && styles.checkboxChecked]}>
-                                {agreedToTerms && <Ionicons name="checkmark" size={16} color="#000" />}
-                            </View>
+                        <View style={styles.checkboxContainer}>
+                            <TouchableOpacity
+                                onPress={() => setAgreedToTerms(!agreedToTerms)}
+                                disabled={loading}
+                                style={styles.checkboxTouchable}
+                            >
+                                <View style={[styles.checkbox, agreedToTerms && styles.checkboxChecked]}>
+                                    {agreedToTerms && <Ionicons name="checkmark" size={16} color="#000" />}
+                                </View>
+                            </TouchableOpacity>
                             <Text style={styles.checkboxText}>
                                 I agree to the{' '}
-                                <Text style={styles.linkText}>Terms and Conditions</Text>
+                                <Text style={styles.linkText} onPress={() => openLegalDoc('terms')}>Terms and Conditions</Text>
                                 {' '}and{' '}
-                                <Text style={styles.linkText}>Privacy Policy</Text>
+                                <Text style={styles.linkText} onPress={() => openLegalDoc('privacy')}>Privacy Policy</Text>
                             </Text>
-                        </TouchableOpacity>
+                        </View>
 
                         {/* Signup Button */}
                         <TouchableOpacity
@@ -289,6 +298,13 @@ export default function SignupScreen() {
                 primaryButtonText="OK"
                 onPrimaryPress={() => setShowErrorModal(false)}
                 onClose={() => setShowErrorModal(false)}
+            />
+
+            {/* Legal Document Modal */}
+            <LegalDocModal
+                visible={legalModalVisible}
+                docType={legalDocType}
+                onClose={() => setLegalModalVisible(false)}
             />
         </SafeAreaView>
     );
@@ -380,13 +396,15 @@ const styles = StyleSheet.create({
         marginBottom: 24,
         marginTop: 8,
     },
+    checkboxTouchable: {
+        marginRight: 12,
+    },
     checkbox: {
         width: 20,
         height: 20,
         borderRadius: 4,
         borderWidth: 2,
         borderColor: '#E0E0E0',
-        marginRight: 12,
         justifyContent: 'center',
         alignItems: 'center',
     },

@@ -34,6 +34,13 @@ export default function ProfileScreen() {
     const [logoutModalVisible, setLogoutModalVisible] = useState(false);
     const [recommended, setRecommended] = useState<ProductObject[]>([]);
     const [refreshing, setRefreshing] = useState(false);
+    const [legalModalVisible, setLegalModalVisible] = useState(false);
+    const [legalDocType, setLegalDocType] = useState<LegalDocType>('terms');
+
+    const openLegalDoc = (type: LegalDocType) => {
+        setLegalDocType(type);
+        setLegalModalVisible(true);
+    };
 
     const loadRecommended = () =>
         productService.getPersonalizedRecommended(recentSearches, 8)
@@ -197,6 +204,16 @@ export default function ProfileScreen() {
                             onPress={() => router.push('/profile/help-center')}
                         />
                         <ProfileOption
+                            label="Terms & Conditions"
+                            icon="file-text"
+                            onPress={() => openLegalDoc('terms')}
+                        />
+                        <ProfileOption
+                            label="Privacy Policy"
+                            icon="shield"
+                            onPress={() => openLegalDoc('privacy')}
+                        />
+                        <ProfileOption
                             label="Logout"
                             icon="log-out"
                             onPress={() => setLogoutModalVisible(true)}
@@ -236,6 +253,13 @@ export default function ProfileScreen() {
                 secondaryButtonText="CANCEL"
                 onSecondaryPress={() => setLogoutModalVisible(false)}
                 onClose={() => setLogoutModalVisible(false)}
+            />
+
+            {/* Legal Document Modal */}
+            <LegalDocModal
+                visible={legalModalVisible}
+                docType={legalDocType}
+                onClose={() => setLegalModalVisible(false)}
             />
         </View>
     );

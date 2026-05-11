@@ -59,6 +59,13 @@ export default function HomeScreen() {
     const [isLoadingProducts, setIsLoadingProducts] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [refreshing, setRefreshing] = useState(false);
+    const [legalModalVisible, setLegalModalVisible] = useState(false);
+    const [legalDocType, setLegalDocType] = useState<LegalDocType>('privacy');
+
+    const openLegalDoc = (type: LegalDocType) => {
+        setLegalDocType(type);
+        setLegalModalVisible(true);
+    };
 
     const onRefresh = async () => {
         setRefreshing(true);
@@ -238,6 +245,13 @@ export default function HomeScreen() {
                     setLocationGranted(false);
                     fetchProducts();
                 }}
+            />
+
+            {/* Legal Document Modal */}
+            <LegalDocModal
+                visible={legalModalVisible}
+                docType={legalDocType}
+                onClose={() => setLegalModalVisible(false)}
             />
             <ScrollView
                 showsVerticalScrollIndicator={false}
@@ -428,7 +442,8 @@ export default function HomeScreen() {
                         <Text style={styles.footerLink}>About</Text>
                         <Text style={styles.footerLink}>Contact</Text>
                         <Text style={styles.footerLink}>Help</Text>
-                        <Text style={styles.footerLink}>Privacy</Text>
+                        <Text style={styles.footerLink} onPress={() => openLegalDoc('terms')}>Terms</Text>
+                        <Text style={styles.footerLink} onPress={() => openLegalDoc('privacy')}>Privacy</Text>
                     </View>
                     <Text style={styles.copyright}>© 2026 Zpin. All rights reserved.</Text>
                 </View>
