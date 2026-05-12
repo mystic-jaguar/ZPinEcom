@@ -2,11 +2,11 @@
 
 ## Executive Summary
 
-**Project Status:** 85% Complete | MVP-ready with one critical gap (payment gateway)
+**Project Status:** ~90% Complete | MVP-ready with partial payment gateway
 
-**Backend:** 9 API route modules | Express.js + TypeScript + PostgreSQL
+**Backend:** 10 API route modules | Express.js + TypeScript + PostgreSQL + Redis
 **Frontend:** Expo React Native | 20+ screens across auth, shopping, checkout, profile
-**Key Gap:** Payment gateway integration (Razorpay) — blocks full checkout completion
+**Key Gap:** Payment gateway integration (Razorpay) — partially implemented; create-order and verify endpoints exist but no webhook, retry, or refund routes
 
 ---
 
@@ -35,7 +35,7 @@
 #### Product Management
 | Feature | Status | Details |
 |---------|--------|---------|
-| Browse Products | ✅ | Paginated (20 default, up to 200), category-based filtering |
+| Browse Products | ✅ | Paginated (default 50, max 200), category-based filtering |
 | Product Search | ✅ | Normalized full-text search (handles "keychain" vs "key chain") |
 | Product Details | ✅ | Images, price, stock, size quantities, color attributes, ratings |
 | Product Images | ✅ | Multiple images per product with display order |
@@ -49,6 +49,7 @@
 | Review Images | ✅ | Array of image URLs per review, normalized and validated |
 | Verified Purchase Flag | ✅ | `is_verified_purchase` stored per review (defaults false; auto-set pending) |
 | Average Rating | ✅ | Calculated in product queries and returned on product cards |
+| Redis Caching | ✅ | 2h TTL for products, 30m for reviews |
 
 - Backend: `routes/products.ts` (13+ endpoints)
 - Frontend: `app/(tabs)/product-listing.tsx`, `app/product/[id].tsx`, `app/product-search.tsx`
@@ -131,6 +132,7 @@
 | Fixed Discounts | ✅ | e.g., ₹500 off |
 | Max Discount Cap | ✅ | Prevents excessive discounts on percentage coupons |
 | Usage Tracking | ✅ | Per-coupon usage count enforced |
+| Redis Caching | ✅ | 1h TTL |
 
 - Backend: `routes/coupons.ts`
 - Frontend: `app/profile/coupons.tsx`, `context/CheckoutContext.tsx`
@@ -154,36 +156,41 @@
 
 ---
 
+#### Payment Processing (Razorpay)
+| Feature | Status | Details |
+|---------|--------|---------|
+| Create Razorpay Order | ✅ | `POST /api/v1/razorpay/create-order` — creates Razorpay order for app order ID, verifies ownership, converts to paise |
+| Verify Payment | ✅ | `POST /api/v1/razorpay/verify` — HMAC-SHA256 signature verification, marks order paid + confirmed, sends payment_success notification |
+| Razorpay SDK (backend) | ✅ | `razorpay@2.9.6` installed and initialized from env vars |
+| Razorpay SDK (frontend) | ✅ | `react-native-razorpay@3.0.0` installed |
+| Frontend Service | ✅ | `services/payment.ts` — `createRazorpayOrder`, `verifyRazorpayPayment`, `requestRefund` (via wallet credit) |
+| Wallet Payment | ✅ | Debit atomically wired into order creation; balance validated before order commit |
+| COD | ⚠️ | Orders can be created with `payment_method: 'cod'` but no confirmation flow |
+| Webhook Handler | ❌ | No Razorpay webhook endpoint for server-side payment events |
+| Payment Retry | ❌ | No retry endpoint for failed payments |
+| Dedicated Refund Route | ❌ | Refunds handled via `wallet/credit` directly; no Razorpay refund API call |
+
+- Backend: `routes/razorpay.ts` (2 endpoints — `/create-order`, `/verify`)
+- Frontend: `services/payment.ts`
+- Env required: `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`
+
+---
+
 #### Notifications
 | Feature | Status | Details |
 |---------|--------|---------|
 | New Order Notifications (Seller) | ✅ | POST fetch with full order details + decrypted address |
 | Unread Count (Seller) | ✅ | GET count of unread `new_order` notifications |
 | Mark as Read | ✅ | Auto-marked read on fetch |
-| Notification Types | ✅ | `new_order` type implemented |
+| Payment Success Notification (Customer) | ✅ | Inserted into notifications table on successful Razorpay verify |
+| Notification Types | ✅ | `new_order`, `payment_success` types implemented |
 
-- Backend: `routes/notifications.ts` (2 endpoints — seller-facing only)
-- Note: Notifications are seller-side only; no customer-facing notification feed endpoint
+- Backend: `routes/notifications.ts` (2 endpoints — seller-facing fetch/count)
+- Note: Customer notifications are written to DB but no customer-facing read endpoint exists
 
 ---
 
 ### PARTIAL / INCOMPLETE
-
-#### Payment Processing (CRITICAL GAP)
-| Feature | Status | Details |
-|---------|--------|---------|
-| Create Payment | ❌ | No `POST /api/v1/payments/create` endpoint |
-| Verify Payment | ❌ | No `POST /api/v1/orders/:id/payment/verify` endpoint |
-| Retry Payment | ❌ | No `POST /api/v1/orders/:id/payment/retry` endpoint |
-| Payment Details | ❌ | No `GET /api/v1/payments/:id` endpoint |
-| Refund Processing | ❌ | No `POST /api/v1/payments/:id/refund` endpoint |
-| Razorpay Integration | ❌ | No SDK, no webhook handlers |
-| COD | ⚠️ | Orders can be created with `payment_method: 'cod'` but no confirmation flow |
-| Wallet Payment | ✅ | Debit atomically wired into order creation; balance validated before order commit |
-
-**Impact:** BLOCKING — users cannot complete checkout for non-COD orders. `frontend/services/payment.ts` has all methods defined but all calls will fail (no backend routes).
-
----
 
 #### Verified Purchase Automation
 | Feature | Status | Details |
@@ -207,9 +214,11 @@
 ### Backend Stack
 - Express.js + TypeScript
 - PostgreSQL with `pg` connection pool
+- Redis (ioredis) — product cache (2h), review cache (30m), coupon cache (1h)
 - JWT (jsonwebtoken) — 15m access / 30d refresh
 - bcrypt (12 rounds) for password hashing
 - AES-256-GCM encryption for addresses and wallet balances
+- Razorpay SDK (`razorpay@2.9.6`) for payment order creation and HMAC verification
 - Helmet, CORS, express-rate-limit, custom input sanitizer
 
 ### Database Schema (21 Active Tables)
@@ -230,7 +239,7 @@
 | `coupons` | Discount codes with usage tracking |
 | `wallets` | Encrypted user wallet balances |
 | `wallet_transactions` | Credit/debit history |
-| `notifications` | Seller new-order notifications |
+| `notifications` | Seller new-order + customer payment_success notifications |
 | `return_requests` | Return workflow with status history |
 | `order_cancellations` | Cancellation reasons and refund method |
 
@@ -250,7 +259,7 @@
 
 ### Security Implemented
 - HTTPS redirect (production)
-- Helmet security headers (HSTS 1yr, CSP, etc.)
+- Helmet security headers (HSTS 1yr, CSP disabled for API-only server)
 - CORS with origin validation
 - Input sanitization (null bytes, control chars, HTML tags, sensitive key protection)
 - SQL injection prevention (parameterized queries + `safeIdentifier` for dynamic identifiers)
@@ -261,7 +270,9 @@
 - Ownership enforcement on all user data endpoints
 - Role-based access (seller-only endpoints)
 - AES-256-GCM encryption for addresses and wallet balances at rest
+- HMAC-SHA256 signature verification for Razorpay payments
 - Structured security event logging with suspicious request detection
+- Fail-fast env var validation at startup (9 required vars checked)
 
 ### Migration Scripts
 - `scripts/runMigration.ts` — main schema migration
@@ -269,17 +280,21 @@
 - `scripts/runFixProductReviewsUserId.ts` — fixes `product_reviews.user_id` column
 - `scripts/seedProducts.ts` — seed product data
 - `scripts/deleteSeededProducts.ts` — cleanup seeded data
+- `scripts/runPaymentMethodsMigration.ts` — payment methods table migration
+- `scripts/runDropPaymentMethods.ts` — drop payment methods table
 
 ---
 
 ## FRONTEND ARCHITECTURE
 
 ### Stack
-- React Native + Expo (file-based routing via Expo Router)
+- React Native + Expo SDK 54 (file-based routing via Expo Router 6)
+- React 19.1.0 / React Native 0.81.5
 - Axios with auto token refresh on 401
 - React Navigation (bottom tabs)
-- Reanimated for animations
+- Reanimated 4 + Worklets for animations
 - AsyncStorage for local persistence
+- `react-native-razorpay@3.0.0` for payment UI
 
 ### Screen Map
 ```
@@ -325,14 +340,12 @@ Root (_layout.tsx)
 - `WishlistContext` — wishlisted items
 - `AddressContext` — shipping addresses
 - `CheckoutContext` — delivery type, payment method selection
-- `PaymentContext` — stored cards/UPI data
 - `OrderContext` — order history
-- `SearchContext` — search query/filter persistence
 
 ### Services Layer
 | File | Status |
 |------|--------|
-| `api.ts` | ✅ Axios wrapper with 401 token refresh |
+| `api.ts` | ✅ Axios wrapper with 401 token refresh, dev/prod URL resolution, Android emulator support |
 | `auth.ts` | ✅ Login, signup, OTP, password reset |
 | `product.ts` | ✅ Browse, search, recommendations |
 | `cart.ts` | ✅ Full CRUD |
@@ -342,7 +355,7 @@ Root (_layout.tsx)
 | `wallet.ts` | ✅ Balance + transactions |
 | `coupon.ts` | ✅ Validate + list |
 | `review.ts` | ✅ Full CRUD |
-| `payment.ts` | ❌ All methods defined but backend routes missing |
+| `payment.ts` | ✅ `createRazorpayOrder`, `verifyRazorpayPayment`, `requestRefund` — all backed by live endpoints |
 | `location.ts` | ✅ Location utilities |
 | `keepAlive.ts` | ✅ Token refresh mechanism |
 
@@ -357,7 +370,7 @@ Root (_layout.tsx)
 ## DEPLOYMENT READINESS
 
 ### Ready for MVP Launch
-- Core e-commerce flow (browse → cart → checkout with COD)
+- Core e-commerce flow (browse → cart → checkout with COD or Razorpay)
 - Full authentication with OTP and password reset
 - Product discovery (search, categories, recommendations)
 - Order lifecycle (create, track, cancel, return)
@@ -365,16 +378,23 @@ Root (_layout.tsx)
 - Product reviews (full CRUD)
 - Encrypted sensitive data at rest
 - Rate limiting and security hardening
+- Redis caching for products, reviews, and coupons
 
-### Blocking for Full Production
-- Payment gateway (Razorpay) — no backend routes exist
+### Remaining Gaps
+- Razorpay webhook handler — payment status updates without client-side verify call
+- Payment retry flow for failed Razorpay payments
+- Razorpay-side refund API (currently refunds go to ZPIN wallet only)
+- Auto-set `is_verified_purchase` when reviewer has a delivered order for the product
+- Customer-facing notification read endpoint (notifications are written but not readable by customers)
+- Email/SMS delivery for OTPs (generation exists; delivery mechanism not visible in codebase)
+- Encryption key rotation runbook
 
 ### Recommended Next Steps
-1. Create `backend/src/routes/payments.ts` with Razorpay order creation + webhook verification
-2. ~~Wire wallet debit into order creation flow~~ ✅ Done
-3. Auto-set `is_verified_purchase` when reviewer has a delivered order for the product
-4. Add customer-facing notification feed (currently only seller notifications exist)
-5. Email/SMS delivery for OTPs (current implementation generates OTPs but delivery mechanism not visible in codebase)
+1. Add Razorpay webhook endpoint (`POST /api/v1/razorpay/webhook`) for server-side payment confirmation
+2. Add payment retry endpoint for failed/pending Razorpay orders
+3. Auto-set `is_verified_purchase` on review submission by checking delivered orders
+4. Add `GET /api/v1/notifications` endpoint for customer-facing notification feed
+5. Wire up email/SMS OTP delivery
 6. Encryption key rotation runbook
 
 ---
@@ -384,13 +404,13 @@ Root (_layout.tsx)
 | Feature Area | Status | Endpoints | Notes |
 |---|---|---|---|
 | Authentication | ✅ 100% | 8 | Production-ready |
-| Products | ✅ 100% | 13+ | Production-ready |
+| Products | ✅ 100% | 13+ | Production-ready, Redis cached |
 | Cart | ✅ 100% | 6 | Production-ready |
 | Wishlist | ✅ 100% | 5 | Production-ready |
-| Orders | ✅ 95% | 10+ | Missing payment verification coupling |
+| Orders | ✅ 95% | 10+ | Missing payment retry coupling |
 | User Profile | ✅ 100% | 5 | Production-ready |
-| Coupons | ✅ 100% | 2 | Production-ready |
+| Coupons | ✅ 100% | 2 | Production-ready, Redis cached |
 | Wallet | ✅ 100% | 3 | Fully wired into checkout flow |
-| Notifications | ✅ 70% | 2 | Seller-only; no customer feed |
-| Payments | ❌ 0% | 0 | BLOCKING — no backend routes |
-| **Overall** | **~85%** | **54+** | MVP-ready with COD |
+| Notifications | ✅ 75% | 2 | Seller + payment_success written; no customer read endpoint |
+| Payments (Razorpay) | ✅ 70% | 2 | Create + verify working; no webhook/retry/Razorpay refund |
+| **Overall** | **~90%** | **56+** | MVP-ready with COD and Razorpay |
