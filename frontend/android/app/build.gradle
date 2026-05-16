@@ -87,9 +87,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace "com.anonymous.ZPinEcom"
+    namespace "com.zpin.ecom"
     defaultConfig {
-        applicationId "com.anonymous.ZPinEcom"
+        applicationId "com.zpin.ecom"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

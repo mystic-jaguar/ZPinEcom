@@ -1,4 +1,4 @@
-package com.anonymous.ZPinEcom
+package com.zpin.ecom
 
 import android.app.Application
 import android.content.res.Configuration
