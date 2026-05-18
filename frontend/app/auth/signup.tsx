@@ -16,7 +16,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
 import LegalDocModal, { LegalDocType } from '../../components/common/LegalDocModal';
-import { authService } from '../../services/auth';
+import { authService, googleAuthService } from '../../services/auth';
 
 export default function SignupScreen() {
     const router = useRouter();
@@ -71,8 +71,8 @@ export default function SignupScreen() {
             setShowErrorModal(true);
             return false;
         }
-        if (password.length < 6) {
-            setErrorMessage('Password must be at least 6 characters');
+        if (password.length < 8 || !/[a-zA-Z]/.test(password) || !/[0-9]/.test(password)) {
+            setErrorMessage('Password must be at least 8 characters and contain at least one letter and one number');
             setShowErrorModal(true);
             return false;
         }
@@ -110,12 +110,19 @@ export default function SignupScreen() {
 
         setLoading(true);
         try {
-            await authService.signup({
+            const response = await authService.signup({
                 name,
                 email,
                 mobile,
                 password
             });
+
+            // Backend returns tokens on signup — store them and go to OTP verification
+            if (response.accessToken) {
+                const { tokenManager, userDataManager } = await import('../../services/api');
+                await tokenManager.setTokens(response.accessToken, response.refreshToken);
+                if (response.user) await userDataManager.setUserData(response.user);
+            }
 
             // Navigate to OTP verification
             router.push({ pathname: '/auth/verify-otp', params: { mobile } });

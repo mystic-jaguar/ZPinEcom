@@ -17,7 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
 import { useUser } from '../../context/UserContext';
 import { userDataManager } from '../../services/api';
-import { authService } from '../../services/auth';
+import { authService, googleAuthService } from '../../services/auth';
 
 export default function LoginScreen() {
     const router = useRouter();
@@ -41,8 +41,8 @@ export default function LoginScreen() {
             setShowErrorModal(true);
             return false;
         }
-        if (password.length < 6) {
-            setErrorMessage('Password must be at least 6 characters');
+        if (password.length < 8 || !/[a-zA-Z]/.test(password) || !/[0-9]/.test(password)) {
+            setErrorMessage('Password must be at least 8 characters and contain at least one letter and one number');
             setShowErrorModal(true);
             return false;
         }

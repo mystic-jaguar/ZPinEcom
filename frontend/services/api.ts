@@ -1,78 +1,20 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios, { AxiosError, AxiosInstance } from 'axios';
-import Constants from 'expo-constants';
-import { Platform } from 'react-native';
 
-// API Configuration
-// URL is set via EXPO_PUBLIC_API_URL environment variable in .env
-// Never hardcode IPs or credentials here — use .env (gitignored)
-const ensureApiV1Base = (url: string): string => {
-    const trimmed = url.trim().replace(/\/+$/, '');
-    return trimmed.endsWith('/api/v1') ? `${trimmed}/` : `${trimmed}/api/v1/`;
-};
-
-const getExpoHostIp = (): string | null => {
-    const hostUri =
-        Constants.expoConfig?.hostUri ||
-        (Constants as any)?.manifest2?.extra?.expoGo?.debuggerHost ||
-        (Constants as any)?.manifest?.debuggerHost;
-
-    if (!hostUri || typeof hostUri !== 'string') {
-        return null;
-    }
-
-    return hostUri.split(':')[0] || null;
-};
-
-const isLocalAddress = (url: string): boolean => {
-    try {
-        const parsed = new URL(url);
-        const hostname = parsed.hostname.toLowerCase();
-
-        return (
-            hostname === 'localhost' ||
-            hostname === '127.0.0.1' ||
-            hostname === '10.0.2.2' ||
-            hostname.startsWith('10.') ||
-            hostname.startsWith('192.168.') ||
-            /^172\.(1[6-9]|2\d|3[0-1])\./.test(hostname)
-        );
-    } catch {
-        return false;
-    }
-};
+// Production backend URL — always use this
+const PRODUCTION_API_URL = 'http://195.35.20.40:5002/api/v1/';
 
 const resolveBaseUrl = (): string => {
-    const envUrl = process.env.EXPO_PUBLIC_API_URL;
-
-    const hostIp = getExpoHostIp();
-
+    // In dev, allow override via EXPO_PUBLIC_API_URL env var
     if (__DEV__) {
-        if (envUrl && !isLocalAddress(envUrl)) {
-            return ensureApiV1Base(envUrl);
+        const envUrl = process.env.EXPO_PUBLIC_API_URL;
+        if (envUrl && envUrl.trim()) {
+            const trimmed = envUrl.trim().replace(/\/+$/, '');
+            return trimmed.endsWith('/api/v1') ? `${trimmed}/` : `${trimmed}/api/v1/`;
         }
-
-        if (hostIp) {
-            return `http://${hostIp}:5002/api/v1/`;
-        }
-
-        if (envUrl) {
-            return ensureApiV1Base(envUrl);
-        }
-    } else if (envUrl) {
-        return ensureApiV1Base(envUrl);
     }
-
-    if (hostIp) {
-        return `http://${hostIp}:5002/api/v1/`;
-    }
-
-    // Android emulator can't reach localhost of host machine directly.
-    if (Platform.OS === 'android') {
-        return 'http://10.0.2.2:5002/api/v1/';
-    }
-
-    return 'http://localhost:5002/api/v1/';
+    // Production (and dev fallback): use the hardcoded production URL
+    return PRODUCTION_API_URL;
 };
 
 const BASE_URL = resolveBaseUrl();
@@ -216,8 +158,11 @@ export const handleApiError = (error: any): string => {
         const message = error.response.data?.message || error.response.data?.error;
         return message || 'An error occurred. Please try again.';
     } else if (error.request) {
-        // Request made but no response
-        return 'Network error. Please check your connection.';
+        // Request made but no response — server unreachable or network issue
+        if (__DEV__) {
+            console.error('[API] No response received. Check that the backend is running and reachable at:', BASE_URL);
+        }
+        return 'Unable to reach the server. Please check your internet connection and try again.';
     } else {
         // Something else happened
         return error.message || 'An unexpected error occurred.';

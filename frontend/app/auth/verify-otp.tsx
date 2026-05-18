@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
+import { authService } from '../../services/auth';
 
 export default function VerifyOTPScreen() {
     const router = useRouter();
@@ -78,16 +79,11 @@ export default function VerifyOTPScreen() {
 
         setLoading(true);
         try {
-            // TODO: Implement API call
-            // await authService.verifyOTP(mobile, code);
-
-            // Simulate API call
-            await new Promise(resolve => setTimeout(resolve, 1000));
-
+            await authService.verifyOTP(mobile, code);
             setModalMessage('Account verified successfully!');
             setShowSuccessModal(true);
-        } catch (error) {
-            setModalMessage('Invalid OTP. Please try again.');
+        } catch (error: any) {
+            setModalMessage(error.message || 'Invalid OTP. Please try again.');
             setShowErrorModal(true);
             setOtp(['', '', '', '', '', '']);
             inputRefs.current[0]?.focus();
@@ -100,18 +96,13 @@ export default function VerifyOTPScreen() {
         if (!canResend) return;
 
         try {
-            // TODO: Implement API call
-            // await authService.sendOTP(mobile);
-
-            // Simulate API call
-            await new Promise(resolve => setTimeout(resolve, 500));
-
+            await authService.sendOTP(mobile);
             setResendTimer(30);
             setCanResend(false);
             setModalMessage('A new OTP has been sent to your mobile');
             setShowSuccessModal(true);
-        } catch (error) {
-            setModalMessage('Failed to resend OTP. Please try again.');
+        } catch (error: any) {
+            setModalMessage(error.message || 'Failed to resend OTP. Please try again.');
             setShowErrorModal(true);
         }
     };
