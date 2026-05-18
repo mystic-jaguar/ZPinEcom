@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
+import LegalDocModal, { LegalDocType } from '../../components/common/LegalDocModal';
 import { authService } from '../../services/auth';
 
 export default function SignupScreen() {
@@ -128,7 +129,7 @@ export default function SignupScreen() {
                         </TouchableOpacity>
                         <View style={styles.logoContainer}>
                             <Image
-                                source={require('../../assets/images/icon.png')}
+                                source={require('../../assets/images/logo_display.png')}
                                 style={styles.logoImage}
                                 resizeMode="contain"
                             />
@@ -338,7 +339,7 @@ const styles = StyleSheet.create({
         marginBottom: 16,
     },
     logoImage: {
-        width: 80,
+        width: 160,
         height: 80,
     },
     title: {
