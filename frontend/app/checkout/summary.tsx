@@ -56,6 +56,11 @@ export default function CheckoutSummaryScreen() {
 
 
     const handleConfirmOrder = () => {
+        if (!selectedAddressId) {
+            setModalConfig({ title: 'No Address', message: 'Please select a delivery address first.', icon: 'alert-circle' });
+            setModalVisible(true);
+            return;
+        }
         router.push('/checkout/payment');
     };
 

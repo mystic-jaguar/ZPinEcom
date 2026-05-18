@@ -60,6 +60,11 @@ export default function CheckoutPaymentScreen() {
     const handleConfirm = async () => {
         if (cartItems.length === 0 || !selectedAddressId || isSubmitting) return;
 
+        if (!selectedPaymentMethod) {
+            setOrderError('Please select a payment method to continue.');
+            return;
+        }
+
         // Wallet balance check before submitting
         if (selectedPaymentMethod === 'wallet') {
             if (walletBalance === null || walletBalance < finalTotal) {

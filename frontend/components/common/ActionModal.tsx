@@ -25,6 +25,12 @@ export default function ActionModal({
     onClose,
     icon = 'check-circle'
 }: ActionModalProps) {
+    const iconColor = (() => {
+        if (['x-circle', 'alert-circle', 'alert-triangle'].includes(icon)) return '#EF4444';
+        if (['check-circle'].includes(icon)) return '#22C55E';
+        if (['log-out', 'trash-2'].includes(icon)) return '#EF4444';
+        return '#FBBF24';
+    })();
     return (
         <Modal
             animationType="fade"
@@ -35,7 +41,7 @@ export default function ActionModal({
             <View style={styles.overlay}>
                 <View style={styles.modalContainer}>
                     <View style={styles.iconContainer}>
-                        <Feather name={icon} size={32} color="#FBBF24" />
+                        <Feather name={icon} size={32} color={iconColor} />
                     </View>
 
                     <Text style={styles.title}>{title}</Text>

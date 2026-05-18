@@ -15,8 +15,12 @@ interface ProductImageCarouselProps {
 export default function ProductImageCarousel({ images, isLightningFast, onBack, isWishlisted, onToggleWishlist }: ProductImageCarouselProps) {
     const [activeIndex, setActiveIndex] = useState(0);
 
+    // Ensure we always have at least one image to render
+    const safeImages = images && images.length > 0 ? images : [null];
+
     const onScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
         const slideSize = event.nativeEvent.layoutMeasurement.width;
+        if (slideSize === 0) return;
         const index = event.nativeEvent.contentOffset.x / slideSize;
         const roundIndex = Math.round(index);
         setActiveIndex(roundIndex);
@@ -54,12 +58,16 @@ export default function ProductImageCarousel({ images, isLightningFast, onBack, 
                 scrollEventThrottle={16}
                 style={styles.scrollView}
             >
-                {images.map((img, index) => (
+                {safeImages.map((img, index) => (
                     <View key={index} style={styles.imageContainer}>
-                        <Image
-                            source={typeof img === 'string' ? { uri: img } : img}
-                            style={styles.image}
-                        />
+                        {img ? (
+                            <Image
+                                source={typeof img === 'string' ? { uri: img } : img}
+                                style={styles.image}
+                            />
+                        ) : (
+                            <View style={[styles.image, { backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' }]} />
+                        )}
                     </View>
                 ))}
             </ScrollView>
@@ -71,9 +79,10 @@ export default function ProductImageCarousel({ images, isLightningFast, onBack, 
                 </View>
             )}
 
-            {/* Pagination Dots */}
+            {/* Pagination Dots — only show if more than 1 image */}
+            {safeImages.length > 1 && (
             <View style={styles.pagination}>
-                {images.map((_, index) => (
+                {safeImages.map((_, index) => (
                     <View
                         key={index}
                         style={[
@@ -83,6 +92,7 @@ export default function ProductImageCarousel({ images, isLightningFast, onBack, 
                     />
                 ))}
             </View>
+            )}
         </View>
     );
 }

@@ -13,6 +13,8 @@ export default function CheckoutAddressScreen() {
     const { addresses, removeAddress } = useAddress();
     const { selectedAddressId, setSelectedAddressId } = useCheckout();
     const [showModal, setShowModal] = useState(false);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [addressToDelete, setAddressToDelete] = useState<string | null>(null);
 
     // Set default selection if none selected
     React.useEffect(() => {
@@ -76,7 +78,7 @@ export default function CheckoutAddressScreen() {
                     >
                         <Text style={styles.editText}>EDIT ADDRESS</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity onPress={() => removeAddress(item.id)}>
+                    <TouchableOpacity onPress={() => { setAddressToDelete(item.id); setShowDeleteModal(true); }}>
                         <Ionicons name="trash-outline" size={20} color="#9E9E9E" />
                     </TouchableOpacity>
                 </View>
@@ -131,6 +133,25 @@ export default function CheckoutAddressScreen() {
                 primaryButtonText="OK"
                 onPrimaryPress={() => setShowModal(false)}
                 onClose={() => setShowModal(false)}
+            />
+
+            <ActionModal
+                visible={showDeleteModal}
+                title="Delete Address"
+                message="Are you sure you want to delete this address?"
+                icon="trash-2"
+                primaryButtonText="Delete"
+                onPrimaryPress={() => {
+                    if (addressToDelete) {
+                        removeAddress(addressToDelete);
+                        if (selectedAddressId === addressToDelete) setSelectedAddressId(null);
+                    }
+                    setShowDeleteModal(false);
+                    setAddressToDelete(null);
+                }}
+                secondaryButtonText="Cancel"
+                onSecondaryPress={() => { setShowDeleteModal(false); setAddressToDelete(null); }}
+                onClose={() => { setShowDeleteModal(false); setAddressToDelete(null); }}
             />
         </View>
     );

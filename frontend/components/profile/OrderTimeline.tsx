@@ -99,8 +99,10 @@ function TimelineStep({ title, subtext, date, isCompleted, isActive, isLast, lin
 export default function OrderTimeline({ status, dates }: OrderTimelineProps) {
     const activeStep = statusToStep(status);
 
-    // One Animated.Value per connector line (3 lines for 4 steps)
+    // One Animated.Value per connector line (one less than steps count)
     const lineAnims = useRef(STEPS.slice(0, -1).map(() => new Animated.Value(0))).current;
+    // Stable fallback for the last step which has no line
+    const noopAnim = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
         // Animate lines sequentially — each fills after a 300ms delay
@@ -130,7 +132,7 @@ export default function OrderTimeline({ status, dates }: OrderTimelineProps) {
                         isCompleted={i < activeStep}
                         isActive={i === activeStep}
                         isLast={i === STEPS.length - 1}
-                        lineProgress={lineAnims[i] ?? new Animated.Value(0)}
+                        lineProgress={lineAnims[i] ?? noopAnim}
                     />
                 ))}
             </View>

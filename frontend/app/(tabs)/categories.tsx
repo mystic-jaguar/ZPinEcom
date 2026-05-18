@@ -200,6 +200,18 @@ const MainCategoryView = ({
     );
 };
 
+// Collect ALL nodes at every level for search (not just leaves)
+const getAllNodes = (nodes: CategoryNode[], parentName: string = ''): { name: string; category: string }[] => {
+    let results: { name: string; category: string }[] = [];
+    nodes.forEach(n => {
+        results.push({ name: n.name, category: parentName });
+        if (n.children) {
+            results = [...results, ...getAllNodes(n.children, n.name)];
+        }
+    });
+    return results;
+};
+
 export default function CategoriesScreen() {
     const router = useRouter();
     const params = useLocalSearchParams<{ categoryId?: string }>();
@@ -218,7 +230,7 @@ export default function CategoriesScreen() {
     const { addSearch } = useSearch();
 
     const handleLeafPress = (itemName: string, rootCategory: string) => {
-        addSearch(itemName); // track category navigation as a search
+        addSearch(itemName);
         router.push({
             pathname: '/product-listing',
             params: {
@@ -226,18 +238,6 @@ export default function CategoriesScreen() {
                 subCategoryName: itemName
             }
         });
-    };
-
-    // Collect ALL nodes at every level for search (not just leaves)
-    const getAllNodes = (nodes: CategoryNode[], parentName: string = ''): { name: string; category: string }[] => {
-        let results: { name: string; category: string }[] = [];
-        nodes.forEach(n => {
-            results.push({ name: n.name, category: parentName });
-            if (n.children) {
-                results = [...results, ...getAllNodes(n.children, n.name)];
-            }
-        });
-        return results;
     };
 
     const searchResults = React.useMemo(() => {
