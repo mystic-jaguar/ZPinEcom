@@ -252,6 +252,13 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
         return sum + ((originalPrice - item.product.price) * item.quantity);
     }, 0);
 
+    // Auto-remove coupon if cart total drops below minOrderValue
+    useEffect(() => {
+        if (appliedCoupon && totalPrice < appliedCoupon.minOrderValue) {
+            setAppliedCoupon(null);
+        }
+    }, [totalPrice, appliedCoupon]);
+
     // Calculate Coupon Discount
     const couponDiscount = React.useMemo(() => {
         if (!appliedCoupon) return 0;

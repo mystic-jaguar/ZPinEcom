@@ -19,6 +19,15 @@ import { useUser } from '../../context/UserContext';
 import { userDataManager } from '../../services/api';
 import { authService, googleAuthService } from '../../services/auth';
 
+// Google Sign-In requires a native build — not available in Expo Go
+let isGoogleSignInAvailable = false;
+try {
+    require('@react-native-google-signin/google-signin');
+    isGoogleSignInAvailable = true;
+} catch {
+    isGoogleSignInAvailable = false;
+}
+
 export default function LoginScreen() {
     const router = useRouter();
     const [email, setEmail] = useState('');
@@ -199,6 +208,7 @@ export default function LoginScreen() {
                         </View>
 
                         {/* Google Sign In */}
+                        {isGoogleSignInAvailable && (
                         <TouchableOpacity
                             style={styles.googleButton}
                             onPress={handleGoogleSignIn}
@@ -210,6 +220,7 @@ export default function LoginScreen() {
                             />
                             <Text style={styles.googleButtonText}>Continue with Google</Text>
                         </TouchableOpacity>
+                        )}
 
                         {/* Sign Up */}
                         <View style={styles.signupContainer}>

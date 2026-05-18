@@ -192,22 +192,39 @@ export const authService = {
  */
 export const googleAuthService = {
   async signIn(): Promise<{ idToken: string }> {
-    const { GoogleSignin } = await import('@react-native-google-signin/google-signin');
+    let GoogleSignin: any;
+    try {
+      const mod = await import('@react-native-google-signin/google-signin');
+      GoogleSignin = mod.GoogleSignin;
+    } catch {
+      throw new Error('Google Sign-In is not available in this build. Please use email/password login.');
+    }
+
     GoogleSignin.configure({
       webClientId: '736340596721-bvkv4iq88pqj4cpvdukf6io1k1tthrmd.apps.googleusercontent.com',
       androidClientId: '736340596721-9jtt15209tbto660bim55n3gs23svisp.apps.googleusercontent.com',
       offlineAccess: false,
     });
-    await GoogleSignin.hasPlayServices();
-    const userInfo = await GoogleSignin.signIn();
+
+    try {
+      await GoogleSignin.hasPlayServices();
+    } catch {
+      throw new Error('Google Play Services not available on this device.');
+    }
+
+    await GoogleSignin.signIn();
     const tokens = await GoogleSignin.getTokens();
     if (!tokens.idToken) throw new Error('Failed to get Google ID token');
     return { idToken: tokens.idToken };
   },
 
   async signOut() {
-    const { GoogleSignin } = await import('@react-native-google-signin/google-signin');
-    await GoogleSignin.signOut();
+    try {
+      const { GoogleSignin } = await import('@react-native-google-signin/google-signin');
+      await GoogleSignin.signOut();
+    } catch {
+      // ignore — native module may not be available
+    }
   },
 
   async authenticateWithBackend(idToken: string) {

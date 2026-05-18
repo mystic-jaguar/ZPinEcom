@@ -25,7 +25,7 @@ export default function AllOrdersScreen() {
         return orders.filter((order) => {
             // Filter by Status
             if (activeFilter !== 'All') {
-                if (activeFilter === 'In Progress' && order.status !== 'processing' && order.status !== 'shipped' && order.status !== 'confirmed') return false;
+                if (activeFilter === 'In Progress' && !['pending', 'processing', 'shipped', 'confirmed'].includes(order.status)) return false;
                 if (activeFilter === 'Completed' && order.status !== 'delivered') return false;
                 if (activeFilter === 'Cancelled' && order.status !== 'cancelled') return false;
             }

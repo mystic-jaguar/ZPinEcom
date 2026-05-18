@@ -34,14 +34,16 @@ export default function CheckoutPaymentScreen() {
         walletService.getWallet().then(data => setWalletBalance(data.balance)).catch(() => setWalletBalance(0));
     }, []);
 
-    // Guard: If cart is empty, redirect to cart immediately. 
-    // This prevents accessing payment with empty cart and handles "Back" navigation loops.
+    // Guard: If cart is empty AND no success modal, redirect to cart.
+    // Use a ref to avoid redirecting on the very first render before cart loads.
+    const hasRedirectedRef = React.useRef(false);
     useFocusEffect(
         useCallback(() => {
-            if (cartItems.length === 0 && !showSuccessModal) {
+            if (cartItems.length === 0 && !showSuccessModal && !hasRedirectedRef.current) {
+                hasRedirectedRef.current = true;
                 router.replace('/(tabs)/cart');
             }
-        }, [cartItems, showSuccessModal])
+        }, [cartItems.length, showSuccessModal])
     );
 
     //Calculate total including taxes/fees (matching summary logic)
@@ -145,8 +147,15 @@ export default function CheckoutPaymentScreen() {
 
             setShowSuccessModal(true);
         } catch (error: any) {
-            // Razorpay checkout dismissed by user
-            if (error?.code === 0 || error?.description === 'Payment cancelled by user') {
+            // Razorpay checkout dismissed or cancelled by user
+            const isCancelled =
+                error?.code === 0 ||
+                error?.code === 'PAYMENT_CANCELLED' ||
+                error?.description === 'Payment cancelled by user' ||
+                error?.message?.toLowerCase().includes('cancel') ||
+                error?.message?.toLowerCase().includes('dismiss');
+
+            if (isCancelled) {
                 setOrderError('Payment was cancelled. Your order has been saved — you can retry payment from your orders.');
             } else {
                 setOrderError(error.message || 'Failed to place order. Please try again.');

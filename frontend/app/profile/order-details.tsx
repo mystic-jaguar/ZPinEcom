@@ -196,7 +196,7 @@ export default function OrderDetailsScreen() {
                 </View>
 
                 {/* Contact Delivery Partner (only if order is out for delivery or in transit) */}
-                {['Out for Delivery', 'In Transit'].includes(order.status) && (
+                {['processing', 'shipped'].includes(order.status) && (
                     <TouchableOpacity
                         style={styles.contactButton}
                         onPress={handleContactDelivery}

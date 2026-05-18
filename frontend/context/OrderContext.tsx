@@ -85,7 +85,16 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
     };
 
     const addOrder = (order: OrderObject) => {
-        const safe = { ...order, items: Array.isArray(order.items) ? order.items : [] };
+        const safe: OrderObject = {
+            ...order,
+            items: Array.isArray(order.items) ? order.items : [],
+            status: order.status || 'pending',
+            paymentStatus: order.paymentStatus || 'pending',
+            totalAmount: Number(order.totalAmount || 0),
+            finalAmount: Number(order.finalAmount || 0),
+            shippingAmount: Number(order.shippingAmount || 0),
+            taxAmount: Number(order.taxAmount || 0),
+        };
         setOrders(prev => [safe, ...prev]);
     };
 

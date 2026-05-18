@@ -18,6 +18,15 @@ import ActionModal from '../../components/common/ActionModal';
 import LegalDocModal, { LegalDocType } from '../../components/common/LegalDocModal';
 import { authService, googleAuthService } from '../../services/auth';
 
+// Google Sign-In requires a native build — not available in Expo Go
+let isGoogleSignInAvailable = false;
+try {
+    require('@react-native-google-signin/google-signin');
+    isGoogleSignInAvailable = true;
+} catch {
+    isGoogleSignInAvailable = false;
+}
+
 export default function SignupScreen() {
     const router = useRouter();
     const [name, setName] = useState('');
@@ -303,6 +312,7 @@ export default function SignupScreen() {
                         </TouchableOpacity>
 
                         {/* Google Sign Up */}
+                        {isGoogleSignInAvailable && (
                         <TouchableOpacity
                             style={styles.googleButton}
                             onPress={handleGoogleSignUp}
@@ -314,6 +324,7 @@ export default function SignupScreen() {
                             />
                             <Text style={styles.googleButtonText}>Continue with Google</Text>
                         </TouchableOpacity>
+                        )}
 
                         {/* Login Link */}
                         <View style={styles.loginContainer}>
