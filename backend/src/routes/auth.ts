@@ -2,11 +2,12 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { Request, Response, Router } from 'express';
 import rateLimit from 'express-rate-limit';
+import { OAuth2Client } from 'google-auth-library';
 import jwt from 'jsonwebtoken';
 import { pool } from '../db';
 import { generateId } from '../utils/id';
-import { safeIdentifier } from '../utils/sql';
 import { logger } from '../utils/logger';
+import { safeIdentifier } from '../utils/sql';
 
 const router = Router();
 
@@ -485,6 +486,89 @@ router.post('/verification/verifyOTP', otpLimiter, async (req: Request, res: Res
   } catch (err) {
     console.error('verifyOTP error');
     res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// ─── POST /api/v1/auth/google ─────────────────────────────────────────────────
+
+const googleClient = new OAuth2Client(process.env.GOOGLE_WEB_CLIENT_ID);
+
+router.post('/google', loginLimiter, async (req: Request, res: Response): Promise<void> => {
+  const { idToken } = req.body;
+
+  if (!idToken) {
+    res.status(400).json({ success: false, message: 'Google ID token is required' });
+    return;
+  }
+
+  try {
+    // Verify the Google ID token
+    const ticket = await googleClient.verifyIdToken({
+      idToken,
+      audience: [
+        process.env.GOOGLE_WEB_CLIENT_ID!,
+        process.env.GOOGLE_ANDROID_CLIENT_ID!,
+      ],
+    });
+
+    const payload = ticket.getPayload();
+    if (!payload || !payload.email) {
+      res.status(401).json({ success: false, message: 'Invalid Google token' });
+      return;
+    }
+
+    const { email, name, sub: googleId } = payload;
+    const normalizedEmail = email.toLowerCase();
+
+    // Check if user already exists
+    let userResult = await pool.query(
+      `SELECT * FROM ${USERS} WHERE email = $1`,
+      [normalizedEmail]
+    );
+
+    let user = userResult.rows[0];
+
+    if (!user) {
+      // Create new user from Google account
+      const userId = generateId();
+      const userName = normalizedEmail.split('@')[0] + '_' + userId.slice(0, 4);
+      const insertResult = await pool.query(
+        `INSERT INTO ${USERS} (id, name, email, user_name, user_role, is_verified, google_id, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, 'customer', true, $5, NOW(), NOW())
+         RETURNING *`,
+        [userId, name || normalizedEmail, normalizedEmail, userName, googleId]
+      );
+      user = insertResult.rows[0];
+      logger.info('auth.google_signup', { userId, email: normalizedEmail, ip: req.ip || '' });
+    } else {
+      // Update google_id if not set
+      if (!user.google_id) {
+        await pool.query(
+          `UPDATE ${USERS} SET google_id = $1, is_verified = true, updated_at = NOW() WHERE id = $2`,
+          [googleId, user.id]
+        );
+      }
+      logger.info('auth.google_login', { userId: user.id, email: normalizedEmail, ip: req.ip || '' });
+    }
+
+    const { accessToken, refreshToken } = generateTokens(user.id, user.user_role);
+
+    await pool.query(
+      `INSERT INTO ${REFRESH_TOKENS} (id, user_id, token, expires_at, created_at)
+       VALUES ($1, $2, $3, NOW() + INTERVAL '30 days', NOW())`,
+      [generateId(), user.id, refreshToken]
+    );
+
+    res.json({
+      success: true,
+      message: 'Google authentication successful',
+      accessToken,
+      refreshToken,
+      user: normalizeUser(user),
+    });
+  } catch (err: any) {
+    logger.error('auth.google_error', { message: err.message, ip: req.ip || '' });
+    res.status(401).json({ success: false, message: 'Google authentication failed' });
   }
 });
 

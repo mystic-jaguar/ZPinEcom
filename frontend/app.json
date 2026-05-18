@@ -34,6 +34,12 @@
     "plugins": [
       "expo-router",
       [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.736340596721-9jtt15209tbto660bim55n3gs23svisp"
+        }
+      ],
+      [
         "expo-location",
         {
           "locationAlwaysAndWhenInUsePermission": "ZPIN uses your location to show nearby product availability.",

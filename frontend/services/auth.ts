@@ -186,3 +186,39 @@ export const authService = {
         return await userDataManager.getUserData();
     },
 };
+
+/**
+ * Google Sign-In
+ */
+export const googleAuthService = {
+  async signIn(): Promise<{ idToken: string }> {
+    const { GoogleSignin } = await import('@react-native-google-signin/google-signin');
+    GoogleSignin.configure({
+      webClientId: '736340596721-bvkv4iq88pqj4cpvdukf6io1k1tthrmd.apps.googleusercontent.com',
+      androidClientId: '736340596721-9jtt15209tbto660bim55n3gs23svisp.apps.googleusercontent.com',
+      offlineAccess: false,
+    });
+    await GoogleSignin.hasPlayServices();
+    const userInfo = await GoogleSignin.signIn();
+    const tokens = await GoogleSignin.getTokens();
+    if (!tokens.idToken) throw new Error('Failed to get Google ID token');
+    return { idToken: tokens.idToken };
+  },
+
+  async signOut() {
+    const { GoogleSignin } = await import('@react-native-google-signin/google-signin');
+    await GoogleSignin.signOut();
+  },
+
+  async authenticateWithBackend(idToken: string) {
+    const response = await apiClient.post('auth/google', { idToken });
+    const data = response.data;
+    if (data.accessToken) {
+      await tokenManager.setTokens(data.accessToken, data.refreshToken);
+    }
+    if (data.user) {
+      await userDataManager.setUserData(data.user);
+    }
+    return data;
+  },
+};

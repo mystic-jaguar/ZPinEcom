@@ -49,6 +49,22 @@ export default function LoginScreen() {
         return true;
     };
 
+    const handleGoogleSignIn = async () => {
+        setLoading(true);
+        try {
+            const { idToken } = await googleAuthService.signIn();
+            const response = await googleAuthService.authenticateWithBackend(idToken);
+            if (response.user) setUser(response.user);
+        } catch (error: any) {
+            if (error.code !== 'SIGN_IN_CANCELLED') {
+                setErrorMessage(error.message || 'Google sign-in failed');
+                setShowErrorModal(true);
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const handleLogin = async () => {
         if (!validateInputs()) return;
 
@@ -181,6 +197,19 @@ export default function LoginScreen() {
                             <Text style={styles.dividerText}>OR</Text>
                             <View style={styles.dividerLine} />
                         </View>
+
+                        {/* Google Sign In */}
+                        <TouchableOpacity
+                            style={styles.googleButton}
+                            onPress={handleGoogleSignIn}
+                            disabled={loading}
+                        >
+                            <Image
+                                source={{ uri: 'https://www.google.com/favicon.ico' }}
+                                style={styles.googleIcon}
+                            />
+                            <Text style={styles.googleButtonText}>Continue with Google</Text>
+                        </TouchableOpacity>
 
                         {/* Sign Up */}
                         <View style={styles.signupContainer}>
@@ -324,6 +353,27 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
+    },
+    googleButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#fff',
+        borderWidth: 1,
+        borderColor: '#E0E0E0',
+        borderRadius: 12,
+        height: 56,
+        marginBottom: 20,
+        gap: 12,
+    },
+    googleIcon: {
+        width: 20,
+        height: 20,
+    },
+    googleButtonText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#000',
     },
     signupText: {
         fontSize: 14,
