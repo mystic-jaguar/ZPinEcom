@@ -14,6 +14,7 @@ import {
     View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { authService } from '../../services/auth';
 
 export default function ForgotPasswordScreen() {
     const router = useRouter();
