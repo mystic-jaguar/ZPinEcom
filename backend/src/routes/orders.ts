@@ -396,11 +396,39 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
     );
     const shippingAmount = totalAmount > 500 ? 0 : 49;
     const taxAmount = Math.round(totalAmount * 0.18);
-    // Accept delivery fee and coupon discount from client (instant delivery, coupons)
-    // Clamp to safe values: deliveryFee >= 0, couponDiscount >= 0 and <= totalAmount
-    const deliveryFee = Math.max(0, Number(clientDeliveryFee) || 0);
-    const couponDiscount = Math.min(Math.max(0, Number(clientCouponDiscount) || 0), totalAmount);
-    const finalAmount = totalAmount + shippingAmount + taxAmount + deliveryFee - couponDiscount;
+    // Accept delivery fee from client (instant delivery toggle) — clamp to safe range
+    const deliveryFee = Math.max(0, Math.min(Number(clientDeliveryFee) || 0, 200)); // max ₹200 delivery fee
+
+    // SECURITY: Never trust client-supplied coupon discount.
+    // Validate the coupon code server-side if provided.
+    let couponDiscount = 0;
+    const couponCode = typeof req.body.couponCode === 'string' ? req.body.couponCode.trim().toUpperCase() : null;
+    if (couponCode) {
+      try {
+        const couponResult = await client.query(
+          `SELECT * FROM coupons WHERE UPPER(code) = $1 AND status = 'active' AND (expires_at IS NULL OR expires_at > NOW())`,
+          [couponCode]
+        );
+        if (couponResult.rows.length > 0) {
+          const coupon = couponResult.rows[0];
+          const minOrder = Number(coupon.min_order_value || 0);
+          if (totalAmount >= minOrder) {
+            if (coupon.discount_type === 'percentage') {
+              const pct = Math.min(Math.max(Number(coupon.discount_value), 0), 100);
+              couponDiscount = (totalAmount * pct) / 100;
+              if (coupon.max_discount) couponDiscount = Math.min(couponDiscount, Number(coupon.max_discount));
+            } else {
+              couponDiscount = Math.min(Number(coupon.discount_value), totalAmount);
+            }
+          }
+        }
+      } catch (couponErr) {
+        // Non-fatal — proceed without discount if coupon lookup fails
+        console.warn('Coupon validation error:', couponErr);
+      }
+    }
+    couponDiscount = Math.max(0, couponDiscount);
+    const finalAmount = Math.max(0, totalAmount + shippingAmount + taxAmount + deliveryFee - couponDiscount);
     const orderId = generateId();
     const orderNumber = `ZP-${orderId}`;
 
@@ -670,6 +698,16 @@ router.patch('/:id/return-status', authenticate, async (req: AuthRequest, res: R
 
   try {
     await ensureOrderSupportTables();
+
+    // Verify the order exists before updating return status
+    const orderCheck = await pool.query(
+      `SELECT id FROM ${ORDERS} WHERE id = $1`,
+      [req.params.id]
+    );
+    if (orderCheck.rows.length === 0) {
+      res.status(404).json({ success: false, message: 'Order not found' });
+      return;
+    }
 
     const returnResult = await pool.query(
       `SELECT id, order_id, status, status_history, picked_up_at, refunded_at

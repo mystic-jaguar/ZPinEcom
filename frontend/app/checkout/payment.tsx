@@ -19,7 +19,7 @@ import { walletService } from '../../services/wallet';
 export default function CheckoutPaymentScreen() {
     const router = useRouter();
     const { selectedPaymentMethod, setSelectedPaymentMethod, deliveryType, selectedAddressId } = useCheckout();
-    const { totalPrice, cartItems, clearCart, couponDiscount, totalSavings } = useCart();
+    const { totalPrice, cartItems, clearCart, couponDiscount, totalSavings, appliedCoupon } = useCart();
     const { addresses } = useAddress();
     const { addOrder } = useOrder();
     const { user } = useUser();
@@ -97,7 +97,8 @@ export default function CheckoutPaymentScreen() {
                 cartItems: cartPayload,
                 notes: isInstant ? 'instant_delivery' : 'standard_delivery',
                 deliveryFee: isInstant ? 50 : 0,
-                couponDiscount,
+                // Send coupon code — backend validates and calculates discount server-side
+                couponCode: appliedCoupon?.code,
             });
 
             if (!orderResponse.success || !orderResponse.data) {

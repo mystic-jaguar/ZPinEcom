@@ -3,14 +3,14 @@ import { NextFunction, Request, Response } from 'express';
 type Sanitizable = Record<string, unknown> | unknown[] | string | number | boolean | null | undefined;
 
 const SENSITIVE_KEY_PATTERNS = [
-  /password/i,
-  /token/i,
-  /secret/i,
-  /otp/i,
-  /pin/i,
-  /cvv/i,
-  /card(number)?/i,
-  /signature/i,
+  /^password$/i,
+  /^(access|refresh|reset|auth|id)token$/i,
+  /^secret$/i,
+  /^otp$/i,
+  /^pin$/i,
+  /^cvv$/i,
+  /^cardnumber$/i,
+  /^signature$/i,
 ];
 
 function isSensitiveKey(keyPath: string[]): boolean {

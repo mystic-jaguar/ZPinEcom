@@ -1,7 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios, { AxiosError, AxiosInstance } from 'axios';
 
-// Production backend URL — always use this
+// Production backend URL
+// NOTE: This is HTTP because the KVM server doesn't have a TLS certificate yet.
+// TODO: Set up a domain + Let's Encrypt SSL and switch to HTTPS before public launch.
 const PRODUCTION_API_URL = 'http://195.35.20.40:5002/api/v1/';
 
 const resolveBaseUrl = (): string => {
@@ -61,15 +63,12 @@ apiClient.interceptors.request.use(
 
         if (isPublicEndpoint) {
             // Explicitly remove any auth headers for public endpoints
-            config.headers.delete('Cookie');
             config.headers.delete('Authorization');
             config.headers.delete('x-auth-token');
         } else {
             const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
             if (token && token !== 'null' && token !== 'undefined') {
-                // Primary: Send as Cookie header (backend uses HttpOnly cookie auth)
-                config.headers.set('Cookie', `token=${token}`);
-                // Fallbacks for compatibility
+                // Use Authorization Bearer — the standard and most secure approach
                 config.headers.set('Authorization', `Bearer ${token}`);
                 config.headers.set('x-auth-token', token);
             }
@@ -119,7 +118,6 @@ apiClient.interceptors.response.use(
                 const accessToken = await refreshPromise;
 
                 // Retry original request with new token
-                originalRequest.headers.set('Cookie', `token=${accessToken}`);
                 originalRequest.headers.set('Authorization', `Bearer ${accessToken}`);
                 originalRequest.headers.set('x-auth-token', accessToken);
                 return apiClient(originalRequest);

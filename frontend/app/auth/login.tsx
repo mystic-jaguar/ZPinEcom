@@ -50,8 +50,9 @@ export default function LoginScreen() {
             setShowErrorModal(true);
             return false;
         }
-        if (password.length < 8 || !/[a-zA-Z]/.test(password) || !/[0-9]/.test(password)) {
-            setErrorMessage('Password must be at least 8 characters and contain at least one letter and one number');
+        // Note: no complexity check on login — let the server authenticate
+        if (password.length < 1) {
+            setErrorMessage('Please enter your password');
             setShowErrorModal(true);
             return false;
         }
@@ -80,9 +81,7 @@ export default function LoginScreen() {
         setLoading(true);
         try {
             const response = await authService.login(email, password);
-            if (__DEV__) {
-                console.log('Login response (login.tsx):', JSON.stringify(response, null, 2));
-            }
+            // Never log auth responses — they contain tokens
 
             if (response.success) {
                 const responseData = response.data || response;

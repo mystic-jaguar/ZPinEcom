@@ -74,6 +74,12 @@ router.post('/', authenticate, cartWriteLimiter, async (req: AuthRequest, res: R
     return;
   }
 
+  const parsedQty = Number(quantity);
+  if (!Number.isInteger(parsedQty) || parsedQty < 1 || parsedQty > 100) {
+    res.status(400).json({ success: false, message: 'Quantity must be between 1 and 100' });
+    return;
+  }
+
   if (typeof productId !== 'string' || !isValidShortId(productId)) {
     res.status(400).json({ success: false, message: 'Invalid productId' });
     return;
@@ -118,8 +124,9 @@ router.post('/', authenticate, cartWriteLimiter, async (req: AuthRequest, res: R
 // PUT /api/v1/cart/:productId
 router.put('/:productId', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
   const { quantity } = req.body;
-  if (!quantity || quantity < 1) {
-    res.status(400).json({ success: false, message: 'Valid quantity is required' });
+  const parsedQty = Number(quantity);
+  if (!parsedQty || !Number.isInteger(parsedQty) || parsedQty < 1 || parsedQty > 100) {
+    res.status(400).json({ success: false, message: 'Quantity must be between 1 and 100' });
     return;
   }
 

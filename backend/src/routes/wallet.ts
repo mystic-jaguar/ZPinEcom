@@ -56,10 +56,19 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response): Promise<v
   }
 });
 
-// ── POST /api/v1/wallet/credit — credit wallet (internal use: refunds) ────────
-// This is called internally by the cancel/return flow, not directly by the user
+// ── POST /api/v1/wallet/credit — credit wallet (internal use: refunds only) ──
+// SECURITY: This endpoint is restricted to server-side calls only.
+// Regular users cannot self-credit their wallet — only the cancel/return flow
+// calls this internally via the orders route using a service account pattern.
 router.post('/credit', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
   const { amount, description, referenceId } = req.body;
+
+  // Only delivery partners and admins can credit wallets via this endpoint.
+  // Customer refunds are handled internally by the orders cancel route.
+  if (req.userRole === 'customer') {
+    res.status(403).json({ success: false, message: 'Forbidden' });
+    return;
+  }
 
   if (!amount || Number(amount) <= 0) {
     res.status(400).json({ success: false, message: 'Valid amount is required' });
@@ -106,9 +115,17 @@ router.post('/credit', authenticate, async (req: AuthRequest, res: Response): Pr
   }
 });
 
-// ── POST /api/v1/wallet/debit — debit wallet (for wallet payments) ────────────
+// ── POST /api/v1/wallet/debit — debit wallet (internal: wallet payments via order flow) ──
+// SECURITY: Direct wallet debits are handled atomically inside the order creation transaction.
+// This endpoint exists for admin/delivery use cases only.
 router.post('/debit', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
   const { amount, description, referenceId } = req.body;
+
+  // Customers cannot directly debit their wallet — use the order flow instead
+  if (req.userRole === 'customer') {
+    res.status(403).json({ success: false, message: 'Forbidden' });
+    return;
+  }
 
   if (!amount || Number(amount) <= 0) {
     res.status(400).json({ success: false, message: 'Valid amount is required' });

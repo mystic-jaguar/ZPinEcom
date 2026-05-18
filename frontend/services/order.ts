@@ -10,7 +10,7 @@ export interface CreateOrderData {
     notes?: string;
     couponCode?: string;
     deliveryFee?: number;
-    couponDiscount?: number;
+    couponDiscount?: number; // kept for backward compat but ignored by backend
 }
 
 export interface OrderListParams {
