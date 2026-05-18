@@ -100,7 +100,7 @@ export default function ReturnsRefundsScreen() {
             ...item,
             orderId: order.id,
             orderNumber: order.orderNumber,
-            date: order.date,
+            date: order.createdAt,
             status: order.status,
         }));
     });

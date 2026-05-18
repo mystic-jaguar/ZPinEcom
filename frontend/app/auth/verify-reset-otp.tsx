@@ -31,6 +31,7 @@ export default function VerifyResetOTPScreen() {
     const [errorMessage, setErrorMessage] = useState('');
 
     const [resetToken, setResetToken] = useState('');
+    const inputRefs = useRef<Array<TextInput | null>>([]);
 
     useEffect(() => {
         // Start timer countdown

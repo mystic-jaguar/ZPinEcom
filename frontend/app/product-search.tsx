@@ -41,7 +41,6 @@ export default function ProductSearchScreen() {
         setSearchQuery(text);
         if (searchTimeout.current) clearTimeout(searchTimeout.current);
         if (text.trim().length >= 2) {
-            addSearch(text.trim());
             searchTimeout.current = setTimeout(() => runSearch(text), 400);
         } else {
             setSearchResults([]);
@@ -50,6 +49,7 @@ export default function ProductSearchScreen() {
     };
 
     const handleProductPress = (item: ProductObject) => {
+        if (searchQuery.trim().length >= 2) addSearch(searchQuery.trim());
         if (item.deepestCategoryName) addSearch(item.deepestCategoryName);
         router.push(`/product/${item.productId}`);
     };
