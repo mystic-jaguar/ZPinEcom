@@ -20,6 +20,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
+      "usesCleartextTraffic": true,
       "package": "com.zpin.ecom",
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
