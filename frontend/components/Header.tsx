@@ -15,7 +15,7 @@ export default function Header({ }: HeaderProps) {
             <View style={styles.logoContainer}>
                 {/* Logo fully visible as requested */}
                 <Image
-                    source={require('../assets/images/icon.png')}
+                    source={require('../assets/images/icon_backup.png')}
                     style={styles.logo}
                     resizeMode="contain"
                 />

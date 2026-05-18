@@ -165,7 +165,7 @@ export default function HomeScreen() {
                         id: String(i),
                         name: cat.name,
                         offer: 'New Arrival',
-                        image: cat.imageUrl ? { uri: cat.imageUrl } : require('../../assets/images/icon.png'),
+                        image: cat.imageUrl ? { uri: cat.imageUrl } : require('../../assets/images/icon_backup.png'),
                         color: CARD_COLORS[i % CARD_COLORS.length],
                         category: rootCat,
                         subCategory: cat.name,
@@ -190,7 +190,7 @@ export default function HomeScreen() {
                     name: cat.name,
                     image: cat.imageUrl
                         ? { uri: cat.imageUrl }
-                        : NEARBY_FALLBACK.find(n => n.name === cat.name)?.image || require('../../assets/images/icon.png'),
+                        : NEARBY_FALLBACK.find(n => n.name === cat.name)?.image || require('../../assets/images/icon_backup.png'),
                     category: cat.rootCategory,
                     subCategory: cat.subCategory,
                     count: cat.count,
