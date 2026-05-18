@@ -306,7 +306,7 @@ router.get('/:id/track', authenticate, async (req: AuthRequest, res: Response): 
 
 // POST /api/v1/orders
 router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res: Response): Promise<void> => {
-  const { shippingAddressId, paymentMethod, notes, cartItems: bodyCartItems, deliveryFee: clientDeliveryFee, couponDiscount: clientCouponDiscount } = req.body;
+  const { shippingAddressId, paymentMethod, notes, cartItems: bodyCartItems, couponDiscount: clientCouponDiscount } = req.body;
 
   if (!shippingAddressId || !paymentMethod) {
     res.status(400).json({ success: false, message: 'shippingAddressId and paymentMethod are required' });
@@ -396,8 +396,8 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
     );
     const shippingAmount = totalAmount > 500 ? 0 : 49;
     const taxAmount = Math.round(totalAmount * 0.18);
-    // Accept delivery fee from client (instant delivery toggle) — clamp to safe range
-    const deliveryFee = Math.max(0, Math.min(Number(clientDeliveryFee) || 0, 200)); // max ₹200 delivery fee
+    // Delivery fee is always computed server-side — never trusted from client
+    const deliveryFee = 0;
 
     // SECURITY: Never trust client-supplied coupon discount.
     // Validate the coupon code server-side if provided.
@@ -850,57 +850,94 @@ router.patch('/:id/cancel', authenticate, async (req: AuthRequest, res: Response
     return;
   }
 
+  const client = await pool.connect();
   try {
     await ensureOrderSupportTables();
+    await client.query('BEGIN');
 
-    const result = await pool.query(
-      `UPDATE ${ORDERS}
-       SET status = 'cancelled', payment_status = 'refunded', updated_at = NOW()
+    // Lock the order row and verify ownership + cancellable status
+    const result = await client.query(
+      `SELECT id, final_amount, payment_status, payment_method
+       FROM ${ORDERS}
        WHERE id = $1 AND user_id = $2 AND status IN ('pending','confirmed')
-       RETURNING final_amount`,
+       FOR UPDATE`,
       [req.params.id, req.userId]
     );
 
     if (result.rows.length === 0) {
+      await client.query('ROLLBACK');
       res.status(400).json({ success: false, message: 'Order cannot be cancelled' });
       return;
     }
 
-    const refundAmount = Number(result.rows[0].final_amount);
+    const order = result.rows[0];
+    const refundAmount = Number(order.final_amount);
 
-    // Credit wallet if user chose wallet refund
-    if (refundMethod === 'wallet' && refundAmount > 0) {
-      const wallet = await getOrCreateWallet(req.userId!);
+    // Only mark as refunded if the order was actually paid
+    const wasPaid = order.payment_status === 'paid';
+    const newPaymentStatus = wasPaid ? 'refunded' : order.payment_status;
+
+    await client.query(
+      `UPDATE ${ORDERS}
+       SET status = 'cancelled', payment_status = $1, updated_at = NOW()
+       WHERE id = $2`,
+      [newPaymentStatus, req.params.id]
+    );
+
+    // Credit wallet only if the order was paid and user chose wallet refund
+    if (wasPaid && refundMethod === 'wallet' && refundAmount > 0) {
+      const walletResult = await client.query(
+        'SELECT * FROM wallets WHERE user_id = $1 FOR UPDATE',
+        [req.userId]
+      );
+
+      let wallet = walletResult.rows[0];
+      if (!wallet) {
+        const walletId = generateId();
+        const created = await client.query(
+          `INSERT INTO wallets (id, user_id, balance) VALUES ($1,$2,$3) RETURNING *`,
+          [walletId, req.userId, encryptMoney(0)]
+        );
+        wallet = created.rows[0];
+      }
+
       const updatedBalance = decryptMoney(wallet.balance) + refundAmount;
-      await pool.query(
+      await client.query(
         `UPDATE wallets SET balance = $1, updated_at = NOW() WHERE id = $2`,
         [encryptMoney(updatedBalance), wallet.id]
       );
-      await pool.query(
+      await client.query(
         `INSERT INTO wallet_transactions (id, wallet_id, user_id, type, amount, description, reference_id)
          VALUES ($1,$2,$3,'credit',$4,$5,$6)`,
         [generateId(), wallet.id, req.userId, refundAmount, `Refund for cancelled order`, req.params.id]
       );
     }
 
-    await pool.query(
+    await client.query(
       `INSERT INTO ${ORDER_CANCELLATIONS} (id, order_id, user_id, reason, refund_method, created_at)
        VALUES ($1, $2, $3, $4, $5, NOW())`,
       [generateId(), req.params.id, req.userId, reason, refundMethod || 'original']
     );
 
+    await client.query('COMMIT');
+
     res.json({
       success: true,
       data: {
         message: 'Order cancelled',
-        refundAmount,
-        refundStatus: refundMethod === 'wallet' ? 'credited_to_wallet' : 'initiated',
+        refundAmount: wasPaid ? refundAmount : 0,
+        refundStatus: wasPaid
+          ? (refundMethod === 'wallet' ? 'credited_to_wallet' : 'initiated')
+          : 'not_applicable',
         refundMethod: refundMethod || 'original',
       },
     });
   } catch (err) {
+    try { await client.query('ROLLBACK'); } catch { /* ignore */ }
     console.error('cancelOrder error:', err);
     res.status(500).json({ success: false, message: 'Server error' });
+  } finally {
+    client.release();
   }
 });
 

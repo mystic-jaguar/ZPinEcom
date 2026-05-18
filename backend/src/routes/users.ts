@@ -205,6 +205,17 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response): Promis
 router.post('/shipping-address', authenticate, addressLimiter, async (req: AuthRequest, res: Response): Promise<void> => {
   const { name, phone, addressLine1, addressLine2, city, state, pincode, country, landmark, label, isDefault } = req.body;
 
+  if (!name || !phone || !addressLine1 || !city || !state || !pincode) {
+    res.status(400).json({ success: false, message: 'name, phone, addressLine1, city, state, and pincode are required' });
+    return;
+  }
+
+  // Basic phone validation — digits only, 7–15 chars
+  if (!/^\+?[\d\s\-]{7,15}$/.test(String(phone))) {
+    res.status(400).json({ success: false, message: 'Invalid phone number' });
+    return;
+  }
+
   try {
     const encryptedAddress = encryptAddressPayload({
       name,

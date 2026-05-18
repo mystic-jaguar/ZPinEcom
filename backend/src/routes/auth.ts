@@ -37,7 +37,23 @@ const otpLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-// 3 signup attempts per hour per IP (dev: relaxed)
+// 3 OTP verify attempts per 15 minutes per IP — prevents brute-force of 6-digit OTPs
+const otpVerifyLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: isProd ? 3 : 1000,
+  message: { success: false, message: 'Too many OTP verification attempts. Please request a new OTP.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// 10 token refresh attempts per 15 minutes per IP (dev: relaxed)
+const refreshLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: isProd ? 10 : 1000,
+  message: { success: false, message: 'Too many token refresh attempts. Please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 const signupLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: isProd ? 3 : 1000,
@@ -218,7 +234,7 @@ router.post('/login', loginLimiter, async (req: Request, res: Response): Promise
 
 // ─── POST /api/v1/auth/refresh-token ─────────────────────────────────────────
 
-router.post('/refresh-token', async (req: Request, res: Response): Promise<void> => {
+router.post('/refresh-token', refreshLimiter, async (req: Request, res: Response): Promise<void> => {
   const { refreshToken } = req.body;
   if (!refreshToken) {
     res.status(400).json({ success: false, message: 'Refresh token required' });
@@ -266,11 +282,14 @@ router.post('/logout', async (req: Request, res: Response): Promise<void> => {
   const { refreshToken } = req.body;
   if (refreshToken) {
     try {
-      const decoded = jwt.decode(refreshToken) as { userId?: string } | null;
+      // Verify the token signature before trusting the userId claim.
+      // Using jwt.decode() here would allow an attacker to forge a token
+      // with any userId and wipe that user's refresh tokens (session hijack).
+      const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET!) as { userId?: string };
       if (decoded?.userId) {
         await pool.query(`DELETE FROM ${REFRESH_TOKENS} WHERE user_id = $1`, [decoded.userId]);
       }
-    } catch { /* ignore */ }
+    } catch { /* ignore — invalid token, nothing to revoke */ }
   }
   res.json({ success: true, message: 'Logged out' });
 });
@@ -324,7 +343,7 @@ router.post('/forgetPassword/sendOTP', otpLimiter, async (req: Request, res: Res
 
 // ─── POST /api/v1/auth/forgetPassword/verifyOTP ──────────────────────────────
 
-router.post('/forgetPassword/verifyOTP', otpLimiter, async (req: Request, res: Response): Promise<void> => {
+router.post('/forgetPassword/verifyOTP', otpVerifyLimiter, async (req: Request, res: Response): Promise<void> => {
   const { email, otp } = req.body;
   if (!email || !otp) {
     res.status(400).json({ success: false, message: 'Email and OTP are required' });
@@ -364,7 +383,7 @@ router.post('/forgetPassword/verifyOTP', otpLimiter, async (req: Request, res: R
 
 // ─── POST /api/v1/auth/forgetPassword/resetPassword ──────────────────────────
 
-router.post('/forgetPassword/resetPassword', async (req: Request, res: Response): Promise<void> => {
+router.post('/forgetPassword/resetPassword', otpVerifyLimiter, async (req: Request, res: Response): Promise<void> => {
   const { resetToken, newPassword } = req.body;
   if (!resetToken || !newPassword) {
     res.status(400).json({ success: false, message: 'Reset token and new password are required' });
@@ -451,7 +470,7 @@ router.post('/verification/sendOTP', otpLimiter, async (req: Request, res: Respo
 
 // ─── POST /api/v1/auth/verification/verifyOTP ────────────────────────────────
 
-router.post('/verification/verifyOTP', otpLimiter, async (req: Request, res: Response): Promise<void> => {
+router.post('/verification/verifyOTP', otpVerifyLimiter, async (req: Request, res: Response): Promise<void> => {
   const { mobile, email, otp } = req.body;
 
   try {
@@ -573,3 +592,4 @@ router.post('/google', loginLimiter, async (req: Request, res: Response): Promis
 });
 
 export default router;
+

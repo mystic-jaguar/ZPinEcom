@@ -33,13 +33,19 @@ async function tableExists(db: Queryable, tableName: string): Promise<boolean> {
   return Boolean(result.rows[0]?.exists);
 }
 
+let _cachedKey: Buffer | null = null;
+
 function deriveKey(secret: string): Buffer {
   // Support both raw passphrase and base64-encoded 32-byte keys.
   const maybeBase64 = Buffer.from(secret, 'base64');
   if (maybeBase64.length === 32 && maybeBase64.toString('base64') === secret) {
     return maybeBase64;
   }
-  return crypto.createHash('sha256').update(secret).digest();
+  // Use PBKDF2 for passphrase-based keys — SHA-256 hashing is not a KDF
+  // and is vulnerable to brute-force. PBKDF2 adds cost via iterations.
+  // Salt is fixed (derived from a constant) so the same passphrase always
+  // produces the same key — this is intentional for deterministic encryption.
+  return crypto.pbkdf2Sync(secret, 'zpin-enc-salt-v1', 100_000, 32, 'sha256');
 }
 
 function getKey(): Buffer {
@@ -47,7 +53,11 @@ function getKey(): Buffer {
   if (!secret) {
     throw new Error('DATA_ENCRYPTION_KEY is required');
   }
-  return deriveKey(secret);
+  // Cache the derived key — PBKDF2 is intentionally slow and must not run per-call
+  if (!_cachedKey) {
+    _cachedKey = deriveKey(secret);
+  }
+  return _cachedKey;
 }
 
 export function isEncrypted(value: unknown): boolean {

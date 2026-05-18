@@ -695,6 +695,10 @@ router.post('/:id/reviews', authenticate, reviewLimiter, async (req: AuthRequest
     res.status(400).json({ success: false, message: 'Rating and comment are required' });
     return;
   }
+  if (parsedComment.length > 2000) {
+    res.status(400).json({ success: false, message: 'Comment must be 2000 characters or fewer' });
+    return;
+  }
 
   if (images !== undefined && !Array.isArray(images)) {
     res.status(400).json({ success: false, message: 'Images must be an array of strings' });
