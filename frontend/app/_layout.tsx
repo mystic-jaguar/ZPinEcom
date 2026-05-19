@@ -24,7 +24,7 @@ function AnimatedSplash() {
         }}
       >
         <Image
-          source={require('../assets/images/icon_backup.png')}
+          source={require('../assets/images/app_icon_1024.png')}
           style={{ width: 200, height: 200 }}
           resizeMode="contain"
         />
