@@ -4,7 +4,7 @@
     "slug": "zpin",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/ZPIN Logo Adobe.jpg",
+    "icon": "./assets/images/icon_backup.png",
     "scheme": "zpinecom",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -14,9 +14,9 @@
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#FFC800",
-        "foregroundImage": "./assets/images/ZPIN Logo Adobe.jpg",
-        "backgroundImage": "./assets/images/ZPIN Logo Adobe.jpg",
-        "monochromeImage": "./assets/images/ZPIN Logo Adobe.jpg"
+        "foregroundImage": "./assets/images/icon_backup.png",
+        "backgroundImage": "./assets/images/icon_backup.png",
+        "monochromeImage": "./assets/images/icon_backup.png"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
@@ -50,7 +50,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/images/icon_backup.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",
