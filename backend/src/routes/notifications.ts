@@ -1,26 +1,19 @@
-import { Request, Response, Router } from 'express';
+import { Response, Router } from 'express';
 import { pool } from '../db';
+import { authenticate, AuthRequest } from '../middleware/auth';
 import { decryptAddressPayload } from '../utils/encryption';
-import { isValidShortId } from '../utils/id';
 
 const router = Router();
 
 /**
  * POST /api/v1/notifications/new-order
  *
- * Called by the seller website to fetch new order notifications for a seller.
- * Body: { sellerId: string }
- *
- * Returns all unread new_order notifications for that seller,
- * along with the full order details from the orders + order_items tables.
+ * Called by the seller website to fetch new order notifications.
+ * Requires authentication — sellers can only read their own notifications.
  */
-router.post('/new-order', async (req: Request, res: Response): Promise<void> => {
-  const { sellerId } = req.body;
-
-  if (!sellerId || typeof sellerId !== 'string' || !isValidShortId(sellerId)) {
-    res.status(400).json({ success: false, message: 'sellerId is required' });
-    return;
-  }
+router.post('/new-order', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+  // Sellers can only fetch their own notifications — ignore any sellerId in body
+  const sellerId = req.userId!;
 
   try {
     // Fetch unread new_order notifications for this seller
@@ -109,16 +102,10 @@ router.post('/new-order', async (req: Request, res: Response): Promise<void> => 
 /**
  * GET /api/v1/notifications/new-order/count
  *
- * Returns the count of unread new_order notifications for a seller.
- * Query: ?sellerId=xxx
+ * Returns the count of unread new_order notifications for the authenticated seller.
  */
-router.get('/new-order/count', async (req: Request, res: Response): Promise<void> => {
-  const sellerId = req.query.sellerId as string;
-
-  if (!sellerId || !isValidShortId(sellerId)) {
-    res.status(400).json({ success: false, message: 'sellerId is required' });
-    return;
-  }
+router.get('/new-order/count', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+  const sellerId = req.userId!;
 
   try {
     const result = await pool.query(

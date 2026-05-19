@@ -122,6 +122,17 @@ router.post('/verify', authenticate, async (req: AuthRequest, res: Response): Pr
       return;
     }
 
+    // Replay attack prevention — ensure this razorpayPaymentId hasn't been used before
+    const replayCheck = await client.query(
+      `SELECT id FROM ${ORDERS} WHERE payment_id = $1`,
+      [razorpayPaymentId]
+    );
+    if (replayCheck.rows.length > 0) {
+      await client.query('ROLLBACK');
+      res.status(400).json({ success: false, message: 'Payment already used' });
+      return;
+    }
+
     // Mark order as paid and confirmed, store Razorpay payment ID
     await client.query(
       `UPDATE ${ORDERS}

@@ -11,9 +11,6 @@ import { UserProvider, useUser } from "../context/UserContext";
 import { WishlistProvider } from "../context/WishlistContext";
 import { startKeepAlive } from "../services/keepAlive";
 
-// Start keep-alive immediately when the app loads
-startKeepAlive();
-
 function AnimatedSplash() {
   return (
     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFFFFF' }}>
@@ -37,6 +34,11 @@ function RootLayoutNav() {
   const { isAuthenticated, isLoading } = useUser();
   const segments = useSegments();
   const router = useRouter();
+
+  useEffect(() => {
+    // Start keep-alive only once the user is authenticated
+    if (isAuthenticated) startKeepAlive();
+  }, [isAuthenticated]);
 
   useEffect(() => {
     if (isLoading) return;

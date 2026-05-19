@@ -147,22 +147,23 @@ router.put('/profileDetails', authenticate, async (req: AuthRequest, res: Respon
     const setClauses: string[] = [];
     const values: any[] = [];
 
+    // NOTE: uses $N placeholders — values.length after push gives the correct index
     const push = (col: string, val: any) => {
       values.push(val);
       setClauses.push(`${safeIdentifier(col)} = $${values.length}`);
     };
 
-    if (name)                              push('name', name);
-    if (userName)                          push('user_name', userName);
-    if (dob)                               push('dob', dob);
-    if (gender)                            push('gender', gender);
-    if (profileImage !== undefined)        push('profile_image', profileImage);
+    if (name)                                  push('name', name);
+    if (userName)                              push('user_name', userName);
+    if (dob)                                   push('dob', dob);
+    if (gender)                                push('gender', gender);
+    if (profileImage !== undefined)            push('profile_image', profileImage);
     if (receivePushNotifications !== undefined) push('receive_push_notifications', receivePushNotifications);
-    if (receiveEmailUpdates !== undefined) push('receive_email_updates', receiveEmailUpdates);
-    if (receiveOrderUpdates !== undefined) push('receive_order_updates', receiveOrderUpdates);
+    if (receiveEmailUpdates !== undefined)     push('receive_email_updates', receiveEmailUpdates);
+    if (receiveOrderUpdates !== undefined)     push('receive_order_updates', receiveOrderUpdates);
 
-    values.push(req.userId);
     setClauses.push(`updated_at = NOW()`);
+    values.push(req.userId);
 
     await pool.query(
       `UPDATE ${USERS} SET ${setClauses.join(', ')} WHERE id = $${values.length}`,
@@ -216,6 +217,12 @@ router.post('/shipping-address', authenticate, addressLimiter, async (req: AuthR
     return;
   }
 
+  // Pincode validation — 6 digits for India
+  if (!/^\d{6}$/.test(String(pincode))) {
+    res.status(400).json({ success: false, message: 'Invalid pincode — must be 6 digits' });
+    return;
+  }
+
   try {
     const encryptedAddress = encryptAddressPayload({
       name,
@@ -265,4 +272,3 @@ router.post('/shipping-address', authenticate, addressLimiter, async (req: AuthR
 });
 
 export default router;
-

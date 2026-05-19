@@ -459,10 +459,26 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
          VALUES ($1,$2,$3,$4,$5,$6,$7,(NOW() AT TIME ZONE 'Asia/Kolkata'))`,
         [generateId(), orderId, item.product_id, item.product_name, item.quantity, item.price, item.image || '']
       );
+      // Decrement inventory — set in_stock=false when quantity reaches 0
+      await client.query(
+        `UPDATE products
+         SET quantity = GREATEST(quantity - $1, 0),
+             in_stock = CASE WHEN quantity - $1 <= 0 THEN false ELSE in_stock END,
+             updated_at = NOW()
+         WHERE id = $2`,
+        [item.quantity, item.product_id]
+      );
+    }
+
+    // Increment coupon usage count if a coupon was applied
+    if (couponCode && couponDiscount > 0) {
+      await client.query(
+        `UPDATE coupons SET usage_count = usage_count + 1 WHERE UPPER(code) = $1`,
+        [couponCode]
+      );
     }
 
     await client.query(`DELETE FROM ${CART} WHERE user_id = $1`, [req.userId]);
-
     // ── Wallet payment: debit atomically within the same transaction ──────────
     if (paymentMethod === 'wallet') {
       const walletResult = await client.query(
@@ -943,14 +959,19 @@ router.patch('/:id/cancel', authenticate, async (req: AuthRequest, res: Response
 
 // PATCH /api/v1/orders/:id/confirm — Vendor accepts the order
 router.patch('/:id/confirm', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+  // Only admins and delivery partners can confirm orders
+  if (req.userRole === 'customer') {
+    res.status(403).json({ success: false, message: 'Forbidden' });
+    return;
+  }
+
   try {
-    // Only the seller of this order can confirm it
     const result = await pool.query(
       `UPDATE ${ORDERS}
        SET status = 'confirmed', updated_at = NOW()
-       WHERE id = $1 AND seller_id = $2 AND status = 'pending'
-       RETURNING id, order_number, status`,
-      [req.params.id, req.userId]
+       WHERE id = $1 AND status = 'pending'
+       RETURNING id, order_number, status, user_id`,
+      [req.params.id]
     );
 
     if (result.rows.length === 0) {
@@ -961,23 +982,17 @@ router.patch('/:id/confirm', authenticate, async (req: AuthRequest, res: Respons
     const order = result.rows[0];
 
     // Notify the customer
-    const customerResult = await pool.query(
-      `SELECT user_id FROM ${ORDERS} WHERE id = $1`,
-      [req.params.id]
+    await pool.query(
+      `INSERT INTO notifications (id, user_id, type, title, message, data, created_at)
+       VALUES ($1,$2,'order_update',$3,$4,$5, NOW())`,
+      [
+        generateId(),
+        order.user_id,
+        `Order Confirmed: ${order.order_number}`,
+        `Your order ${order.order_number} has been accepted and is being prepared.`,
+        JSON.stringify({ orderId: order.id, orderNumber: order.order_number, status: 'confirmed' }),
+      ]
     );
-    if (customerResult.rows.length > 0) {
-      await pool.query(
-        `INSERT INTO notifications (id, user_id, type, title, message, data, created_at)
-         VALUES ($1,$2,'order_update',$3,$4,$5, NOW())`,
-        [
-          generateId(),
-          customerResult.rows[0].user_id,
-          `Order Confirmed: ${order.order_number}`,
-          `Your order ${order.order_number} has been accepted by the vendor and is being prepared.`,
-          JSON.stringify({ orderId: order.id, orderNumber: order.order_number, status: 'confirmed' }),
-        ]
-      );
-    }
 
     res.json({
       success: true,
