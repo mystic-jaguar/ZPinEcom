@@ -201,8 +201,7 @@ export const googleAuthService = {
     }
 
     GoogleSignin.configure({
-      webClientId: '736340596721-bvkv4iq88pqj4cpvdukf6io1k1tthrmd.apps.googleusercontent.com',
-      androidClientId: '736340596721-9jtt15209tbto660bim55n3gs23svisp.apps.googleusercontent.com',
+      webClientId: '19891056241-au7693pc9k001li0d1968i7gfbrs2vkl.apps.googleusercontent.com',
       offlineAccess: false,
     });
 
