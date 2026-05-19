@@ -45,6 +45,7 @@ const apiClient: AxiosInstance = axios.create({
 const PUBLIC_ENDPOINTS = [
     'auth/login',
     'auth/signup',
+    'auth/google',
     'auth/forgetPassword',
     'auth/verification',
     'public/',
