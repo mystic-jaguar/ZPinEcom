@@ -510,7 +510,16 @@ router.post('/verification/verifyOTP', otpVerifyLimiter, async (req: Request, re
 
 // ─── POST /api/v1/auth/google ─────────────────────────────────────────────────
 
-const googleClient = new OAuth2Client(process.env.GOOGLE_WEB_CLIENT_ID);
+const parseClientIds = (value?: string) =>
+  (value || '')
+    .split(',')
+    .map((id) => id.trim())
+    .filter(Boolean);
+
+const googleWebClientIds = parseClientIds(process.env.GOOGLE_WEB_CLIENT_ID);
+const googleAndroidClientIds = parseClientIds(process.env.GOOGLE_ANDROID_CLIENT_ID);
+const googleAudience = Array.from(new Set([...googleWebClientIds, ...googleAndroidClientIds]));
+const googleClient = new OAuth2Client();
 
 router.post('/google', loginLimiter, async (req: Request, res: Response): Promise<void> => {
   const { idToken } = req.body;
@@ -522,12 +531,15 @@ router.post('/google', loginLimiter, async (req: Request, res: Response): Promis
 
   try {
     // Verify the Google ID token
+    if (googleAudience.length === 0) {
+      logger.error('auth.google_config_missing', { message: 'Missing Google OAuth client IDs' });
+      res.status(500).json({ success: false, message: 'Google authentication is not configured' });
+      return;
+    }
+
     const ticket = await googleClient.verifyIdToken({
       idToken,
-      audience: [
-        process.env.GOOGLE_WEB_CLIENT_ID!,
-        process.env.GOOGLE_ANDROID_CLIENT_ID!,
-      ],
+      audience: googleAudience,
     });
 
     const payload = ticket.getPayload();

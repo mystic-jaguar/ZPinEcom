@@ -1,5 +1,42 @@
 import apiClient, { handleApiError, tokenManager, userDataManager } from './api';
 
+const GOOGLE_WEB_CLIENT_ID = (process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
+  '19891056241-9sbuoqioho8e4r9jbpuau3dcna7js0i4.apps.googleusercontent.com').trim();
+const GOOGLE_ANDROID_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID?.trim();
+const GOOGLE_IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID?.trim();
+
+const getGoogleSignInConfig = () => {
+  if (!GOOGLE_WEB_CLIENT_ID) {
+    throw new Error('Google Sign-In is not configured. Set EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID and rebuild the app.');
+  }
+
+  const config: Record<string, any> = {
+    webClientId: GOOGLE_WEB_CLIENT_ID,
+    offlineAccess: false,
+  };
+
+  if (GOOGLE_ANDROID_CLIENT_ID) config.androidClientId = GOOGLE_ANDROID_CLIENT_ID;
+  if (GOOGLE_IOS_CLIENT_ID) config.iosClientId = GOOGLE_IOS_CLIENT_ID;
+
+  return config;
+};
+
+const normalizeGoogleSignInError = (error: any, statusCodes?: Record<string, string>) => {
+  const code = error?.code;
+  const developerError =
+    code === 10 ||
+    code === 'DEVELOPER_ERROR' ||
+    (statusCodes?.DEVELOPER_ERROR && code === statusCodes.DEVELOPER_ERROR);
+
+  if (!developerError) return error;
+
+  const friendly = new Error(
+    'Google Sign-In is misconfigured for this build. Add the Play App Signing SHA-1 to the OAuth Android client for com.zpin.ecom, then rebuild the app.'
+  );
+  (friendly as any).code = code;
+  return friendly;
+};
+
 export interface SignupData {
     name: string;
     email: string;
@@ -193,17 +230,16 @@ export const authService = {
 export const googleAuthService = {
   async signIn(): Promise<{ idToken: string }> {
     let GoogleSignin: any;
+    let statusCodes: Record<string, string> | undefined;
     try {
       const mod = await import('@react-native-google-signin/google-signin');
       GoogleSignin = mod.GoogleSignin;
+      statusCodes = mod.statusCodes;
     } catch {
       throw new Error('Google Sign-In is not available in this build. Please use email/password login.');
     }
 
-    GoogleSignin.configure({
-      webClientId: '19891056241-9sbuoqioho8e4r9jbpuau3dcna7js0i4.apps.googleusercontent.com',
-      offlineAccess: false,
-    });
+    GoogleSignin.configure(getGoogleSignInConfig());
 
     try {
       await GoogleSignin.hasPlayServices();
@@ -211,7 +247,11 @@ export const googleAuthService = {
       throw new Error('Google Play Services not available on this device.');
     }
 
-    await GoogleSignin.signIn();
+    try {
+      await GoogleSignin.signIn();
+    } catch (error: any) {
+      throw normalizeGoogleSignInError(error, statusCodes);
+    }
     const tokens = await GoogleSignin.getTokens();
     if (!tokens.idToken) throw new Error('Failed to get Google ID token');
     return { idToken: tokens.idToken };
