@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
 
 interface AvatarInitialsProps {
     name: string;
@@ -7,6 +7,7 @@ interface AvatarInitialsProps {
     fontSize?: number;
     borderWidth?: number;
     borderColor?: string;
+    profileImage?: string | null;
 }
 
 function getInitials(name: string): string {
@@ -22,6 +23,7 @@ export default function AvatarInitials({
     fontSize,
     borderWidth = 3,
     borderColor = '#fff',
+    profileImage,
 }: AvatarInitialsProps) {
     const initials = getInitials(name);
     const computedFontSize = fontSize ?? Math.floor(size * 0.35);
@@ -35,11 +37,19 @@ export default function AvatarInitials({
                 borderRadius: size / 2,
                 borderWidth,
                 borderColor,
+                overflow: 'hidden', // Ensures the image respects the border radius
             }
         ]}>
-            <Text style={[styles.text, { fontSize: computedFontSize }]}>
-                {initials}
-            </Text>
+            {profileImage ? (
+                <Image
+                    source={{ uri: profileImage }}
+                    style={{ width: '100%', height: '100%', resizeMode: 'cover' }}
+                />
+            ) : (
+                <Text style={[styles.text, { fontSize: computedFontSize }]}>
+                    {initials}
+                </Text>
+            )}
         </View>
     );
 }

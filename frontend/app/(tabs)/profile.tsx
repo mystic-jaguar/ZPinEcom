@@ -123,6 +123,7 @@ export default function ProfileScreen() {
                                 size={80}
                                 borderWidth={3}
                                 borderColor="#000"
+                                profileImage={user.profileImage}
                             />
                             <View style={styles.onlineBadge} />
                         </View>

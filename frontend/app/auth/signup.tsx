@@ -16,6 +16,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
 import LegalDocModal, { LegalDocType } from '../../components/common/LegalDocModal';
+import { useUser } from '../../context/UserContext';
 import { authService, googleAuthService } from '../../services/auth';
 
 // Google Sign-In requires a native build — not available in Expo Go
@@ -29,6 +30,7 @@ try {
 
 export default function SignupScreen() {
     const router = useRouter();
+    const { setUser } = useUser();
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [mobile, setMobile] = useState('');
@@ -101,8 +103,11 @@ export default function SignupScreen() {
     const handleGoogleSignUp = async () => {
         setLoading(true);
         try {
-            const { idToken } = await googleAuthService.signIn();
-            await googleAuthService.authenticateWithBackend(idToken);
+            const { idToken, accessToken } = await googleAuthService.signIn();
+            const response = await googleAuthService.authenticateWithBackend(idToken, accessToken);
+            if (response.user) {
+                setUser(response.user);
+            }
             router.replace('/(tabs)');
         } catch (error: any) {
             if (error.code !== 'SIGN_IN_CANCELLED') {

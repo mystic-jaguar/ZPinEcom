@@ -13,6 +13,10 @@ const getGoogleSignInConfig = () => {
   const config: Record<string, any> = {
     webClientId: GOOGLE_WEB_CLIENT_ID,
     offlineAccess: false,
+    scopes: [
+      'https://www.googleapis.com/auth/user.birthday.read',
+      'https://www.googleapis.com/auth/user.gender.read',
+    ],
   };
 
   if (GOOGLE_ANDROID_CLIENT_ID) config.androidClientId = GOOGLE_ANDROID_CLIENT_ID;
@@ -228,7 +232,7 @@ export const authService = {
  * Google Sign-In
  */
 export const googleAuthService = {
-  async signIn(): Promise<{ idToken: string }> {
+  async signIn(): Promise<{ idToken: string; accessToken: string }> {
     let GoogleSignin: any;
     let statusCodes: Record<string, string> | undefined;
     try {
@@ -254,7 +258,7 @@ export const googleAuthService = {
     }
     const tokens = await GoogleSignin.getTokens();
     if (!tokens.idToken) throw new Error('Failed to get Google ID token');
-    return { idToken: tokens.idToken };
+    return { idToken: tokens.idToken, accessToken: tokens.accessToken || '' };
   },
 
   async signOut() {
@@ -266,8 +270,8 @@ export const googleAuthService = {
     }
   },
 
-  async authenticateWithBackend(idToken: string) {
-    const response = await apiClient.post('auth/google', { idToken });
+  async authenticateWithBackend(idToken: string, accessToken?: string) {
+    const response = await apiClient.post('auth/google', { idToken, accessToken });
     const data = response.data;
     if (data.accessToken) {
       await tokenManager.setTokens(data.accessToken, data.refreshToken);

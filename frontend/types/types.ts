@@ -47,6 +47,11 @@ export interface UserObject {
     profileImage?: any;            // From User_Details entity (Cloudinary URL) or local require
     timeStamp: string;             // From Users entity (ISO 8601)
     isPro?: boolean;               // Pro member status
+    dob?: string | null;
+    gender?: string | null;
+    receivePushNotifications?: boolean;
+    receiveEmailUpdates?: boolean;
+    receiveOrderUpdates?: boolean;
 }
 
 /**

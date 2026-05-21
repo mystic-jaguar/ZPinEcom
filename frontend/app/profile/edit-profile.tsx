@@ -15,12 +15,12 @@ export default function EditProfileScreen() {
 
     const [form, setForm] = useState({
         name: user.name || '',
-        dob: (user as any).dob || '',
-        gender: (user as any).gender || '',
+        dob: user.dob || '',
+        gender: user.gender || '',
         preferences: {
-            receivePushNotifications: (user as any).receivePushNotifications ?? true,
-            receiveEmailUpdates: (user as any).receiveEmailUpdates ?? false,
-            receiveOrderUpdates: (user as any).receiveOrderUpdates ?? true,
+            receivePushNotifications: user.receivePushNotifications ?? true,
+            receiveEmailUpdates: user.receiveEmailUpdates ?? false,
+            receiveOrderUpdates: user.receiveOrderUpdates ?? true,
         },
     });
     const [isFetching, setIsFetching] = useState(true);
@@ -131,6 +131,7 @@ export default function EditProfileScreen() {
                         size={100}
                         borderWidth={3}
                         borderColor="#F3F4F6"
+                        profileImage={user.profileImage}
                     />
                 </View>
 

@@ -129,7 +129,7 @@ export default function CheckoutPaymentScreen() {
                     order_id: razorpayOrderId,
                     prefill: {
                         email: user?.email || '',
-                        contact: user?.phone || '',
+                        contact: user?.mobile || '',
                         name: user?.name || '',
                     },
                     theme: { color: Colors.light.tint },

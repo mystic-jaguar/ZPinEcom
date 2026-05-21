@@ -97,6 +97,12 @@ function normalizeUser(row: any) {
     userName: row.user_name,
     userRole: row.user_role,
     isVerified: row.is_verified,
+    dob: row.dob || null,
+    gender: row.gender || null,
+    profileImage: row.profile_image || null,
+    receivePushNotifications: row.receive_push_notifications,
+    receiveEmailUpdates: row.receive_email_updates,
+    receiveOrderUpdates: row.receive_order_updates,
     timeStamp: row.created_at,
   };
 }
@@ -522,7 +528,7 @@ const googleAudience = Array.from(new Set([...googleWebClientIds, ...googleAndro
 const googleClient = new OAuth2Client();
 
 router.post('/google', loginLimiter, async (req: Request, res: Response): Promise<void> => {
-  const { idToken } = req.body;
+  const { idToken, accessToken } = req.body;
 
   if (!idToken) {
     res.status(400).json({ success: false, message: 'Google ID token is required' });
@@ -548,8 +554,48 @@ router.post('/google', loginLimiter, async (req: Request, res: Response): Promis
       return;
     }
 
-    const { email, name, sub: googleId } = payload;
+    const { email, name, sub: googleId, picture } = payload;
     const normalizedEmail = email.toLowerCase();
+
+    let dob: string | null = null;
+    let gender: string | null = null;
+
+    if (accessToken) {
+      try {
+        const peopleResponse = await googleClient.request({
+          url: 'https://people.googleapis.com/v1/people/me?personFields=birthdays,genders',
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
+        const data = peopleResponse.data as any;
+
+        if (data.birthdays && data.birthdays.length > 0) {
+          const birthday = data.birthdays.find((b: any) => b.date && b.date.year && b.date.month && b.date.day);
+          if (birthday) {
+            const { year, month, day } = birthday.date;
+            dob = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+          }
+        }
+
+        if (data.genders && data.genders.length > 0) {
+          const genderObj = data.genders.find((g: any) => g.value);
+          if (genderObj) {
+            const val = genderObj.value.toLowerCase();
+            if (val === 'male') {
+              gender = 'Male';
+            } else if (val === 'female') {
+              gender = 'Female';
+            } else {
+              gender = 'Do not wish to specify';
+            }
+          }
+        }
+      } catch (err: any) {
+        logger.error('auth.google_people_api_error', { message: err.message });
+      }
+    }
 
     // Check if user already exists
     let userResult = await pool.query(
@@ -564,25 +610,49 @@ router.post('/google', loginLimiter, async (req: Request, res: Response): Promis
       const userId = generateId();
       const userName = normalizedEmail.split('@')[0] + '_' + userId.slice(0, 4);
       const insertResult = await pool.query(
-        `INSERT INTO ${USERS} (id, name, email, user_name, user_role, is_verified, google_id, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, 'customer', true, $5, NOW(), NOW())
+        `INSERT INTO ${USERS} (id, name, email, user_name, user_role, is_verified, google_id, dob, gender, profile_image, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, 'customer', true, $5, $6, $7, $8, NOW(), NOW())
          RETURNING *`,
-        [userId, name || normalizedEmail, normalizedEmail, userName, googleId]
+        [userId, name || normalizedEmail, normalizedEmail, userName, googleId, dob, gender, picture || null]
       );
       user = insertResult.rows[0];
       logger.info('auth.google_signup', { userId, email: normalizedEmail, ip: req.ip || '' });
     } else {
-      // Update google_id if not set
+      // Update google_id and other details if not set
+      const updateFields: string[] = [];
+      const updateParams: any[] = [];
+
       if (!user.google_id) {
+        updateParams.push(googleId);
+        updateFields.push(`google_id = $${updateParams.length}`);
+      }
+      if (!user.dob && dob) {
+        updateParams.push(dob);
+        updateFields.push(`dob = $${updateParams.length}`);
+      }
+      if (!user.gender && gender) {
+        updateParams.push(gender);
+        updateFields.push(`gender = $${updateParams.length}`);
+      }
+      if (!user.profile_image && picture) {
+        updateParams.push(picture);
+        updateFields.push(`profile_image = $${updateParams.length}`);
+      }
+
+      if (updateFields.length > 0) {
+        updateParams.push(user.id);
         await pool.query(
-          `UPDATE ${USERS} SET google_id = $1, is_verified = true, updated_at = NOW() WHERE id = $2`,
-          [googleId, user.id]
+          `UPDATE ${USERS} SET ${updateFields.join(', ')}, is_verified = true, updated_at = NOW() WHERE id = $${updateParams.length}`,
+          updateParams
         );
+        // Refresh user row
+        const refreshed = await pool.query(`SELECT * FROM ${USERS} WHERE id = $1`, [user.id]);
+        user = refreshed.rows[0];
       }
       logger.info('auth.google_login', { userId: user.id, email: normalizedEmail, ip: req.ip || '' });
     }
 
-    const { accessToken, refreshToken } = generateTokens(user.id, user.user_role);
+    const { accessToken: apiAccessToken, refreshToken } = generateTokens(user.id, user.user_role);
 
     await pool.query(
       `INSERT INTO ${REFRESH_TOKENS} (id, user_id, token, expires_at, created_at)
@@ -593,7 +663,7 @@ router.post('/google', loginLimiter, async (req: Request, res: Response): Promis
     res.json({
       success: true,
       message: 'Google authentication successful',
-      accessToken,
+      accessToken: apiAccessToken,
       refreshToken,
       user: normalizeUser(user),
     });

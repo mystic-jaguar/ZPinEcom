@@ -62,8 +62,8 @@ export default function LoginScreen() {
     const handleGoogleSignIn = async () => {
         setLoading(true);
         try {
-            const { idToken } = await googleAuthService.signIn();
-            const response = await googleAuthService.authenticateWithBackend(idToken);
+            const { idToken, accessToken } = await googleAuthService.signIn();
+            const response = await googleAuthService.authenticateWithBackend(idToken, accessToken);
             if (response.user) setUser(response.user);
         } catch (error: any) {
             if (error.code !== 'SIGN_IN_CANCELLED') {
