@@ -253,6 +253,13 @@ export const googleAuthService = {
       throw new Error('Google Play Services not available on this device.');
     }
 
+    // Sign out first to clear any cached account, so the account picker always appears
+    try {
+      await GoogleSignin.signOut();
+    } catch {
+      // ignore — may not be signed in
+    }
+
     try {
       await GoogleSignin.signIn();
     } catch (error: any) {
