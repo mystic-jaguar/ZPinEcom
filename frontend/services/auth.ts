@@ -253,7 +253,14 @@ export const googleAuthService = {
       throw new Error('Google Play Services not available on this device.');
     }
 
-    // Sign out first to clear any cached account, so the account picker always appears
+    // Revoke access then sign out to fully clear the cached session.
+    // revokeAccess() must come before signOut() — this is what forces
+    // the account picker to appear on the next signIn() call.
+    try {
+      await GoogleSignin.revokeAccess();
+    } catch {
+      // ignore — access may not have been granted yet
+    }
     try {
       await GoogleSignin.signOut();
     } catch {
