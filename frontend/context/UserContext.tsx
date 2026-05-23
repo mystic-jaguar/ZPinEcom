@@ -68,7 +68,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
                 const serverUser: UserObject = {
                     ...raw,
                     id: raw.id || raw._id || '',
-                    dob: raw.dob || '',
+                    dob: raw.dob ? raw.dob.split('T')[0] : '',
                     gender: raw.gender || '',
                     profileImage: raw.profileImage || raw.profile_image || null,
                     receivePushNotifications: raw.receivePushNotifications ?? raw.receive_push_notifications ?? true,
@@ -115,6 +115,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
                 const parsedUser: UserObject = {
                     ...rawUser,
                     id: rawUser.id || rawUser._id || '',
+                    dob: rawUser.dob ? rawUser.dob.split('T')[0] : '',
                 };
                 setUserState(parsedUser);
                 setIsAuthenticated(true);
@@ -146,6 +147,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         const user: UserObject = {
             ...rawUser,
             id: rawUser.id || rawUser._id || '',
+            dob: rawUser.dob ? rawUser.dob.split('T')[0] : '',
         };
         setUserState(user);
         setIsAuthenticated(true);

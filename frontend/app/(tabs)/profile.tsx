@@ -129,6 +129,26 @@ export default function ProfileScreen() {
                         </View>
                         <Text style={styles.userName}>{user.name}</Text>
 
+                        {(user.dob || user.gender) && (
+                            <View style={styles.detailsRow}>
+                                {user.gender ? (
+                                    <View style={styles.detailItem}>
+                                        <Feather name="user" size={11} color="#374151" style={{ marginRight: 4 }} />
+                                        <Text style={styles.detailText}>{user.gender}</Text>
+                                    </View>
+                                ) : null}
+                                {user.gender && user.dob ? (
+                                    <Text style={styles.bulletSeparator}>•</Text>
+                                ) : null}
+                                {user.dob ? (
+                                    <View style={styles.detailItem}>
+                                        <Feather name="calendar" size={11} color="#374151" style={{ marginRight: 4 }} />
+                                        <Text style={styles.detailText}>{user.dob}</Text>
+                                    </View>
+                                ) : null}
+                            </View>
+                        )}
+
                         {user.isPro && (
                             <View style={styles.proBadge}>
                                 <Feather name="star" size={12} color="#333" style={{ marginRight: 4 }} />
@@ -333,7 +353,32 @@ const styles = StyleSheet.create({
         fontSize: 20,
         fontWeight: 'bold',
         color: '#1a1a1a',
-        marginBottom: 8
+        marginBottom: 4
+    },
+    detailsRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 2,
+        marginBottom: 8,
+    },
+    detailItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255, 255, 255, 0.45)',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 12,
+    },
+    detailText: {
+        fontSize: 12,
+        color: '#374151',
+        fontWeight: '600',
+    },
+    bulletSeparator: {
+        fontSize: 14,
+        color: '#4B5563',
+        marginHorizontal: 6,
     },
     proBadge: {
         flexDirection: 'row',
