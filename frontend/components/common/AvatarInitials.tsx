@@ -7,7 +7,7 @@ interface AvatarInitialsProps {
     fontSize?: number;
     borderWidth?: number;
     borderColor?: string;
-    profileImage?: string | null;
+    profileImage?: any;
 }
 
 function getInitials(name: string): string {
@@ -42,7 +42,7 @@ export default function AvatarInitials({
         ]}>
             {profileImage ? (
                 <Image
-                    source={{ uri: profileImage }}
+                    source={typeof profileImage === 'string' ? { uri: profileImage } : profileImage}
                     style={{ width: '100%', height: '100%', resizeMode: 'cover' }}
                 />
             ) : (
