@@ -266,7 +266,17 @@ export const googleAuthService = {
   async signOut() {
     try {
       const { GoogleSignin } = await import('@react-native-google-signin/google-signin');
-      await GoogleSignin.signOut();
+      GoogleSignin.configure(getGoogleSignInConfig());
+      try {
+        await GoogleSignin.signOut();
+      } catch (e) {
+        // ignore if not signed in
+      }
+      try {
+        await GoogleSignin.revokeAccess();
+      } catch (e) {
+        // ignore if access not granted
+      }
     } catch {
       // ignore — native module may not be available
     }
