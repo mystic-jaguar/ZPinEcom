@@ -136,6 +136,8 @@ export const authService = {
      */
     async logout() {
         try {
+            // Clear Google Sign-In session if active
+            await googleAuthService.signOut();
         } catch (error: any) {
             // Ignore 401 errors - token may have expired, which is fine for logout
             // Only log other unexpected errors
