@@ -237,10 +237,14 @@ export const googleAuthService = {
   async signIn(): Promise<{ idToken: string; accessToken: string }> {
     let GoogleSignin: any;
     let statusCodes: Record<string, string> | undefined;
+    let isSuccessResponse: ((r: any) => boolean) | undefined;
+    let isCancelledResponse: ((r: any) => boolean) | undefined;
     try {
       const mod = await import('@react-native-google-signin/google-signin');
       GoogleSignin = mod.GoogleSignin;
       statusCodes = mod.statusCodes;
+      isSuccessResponse = mod.isSuccessResponse;
+      isCancelledResponse = mod.isCancelledResponse;
     } catch {
       throw new Error('Google Sign-In is not available in this build. Please use email/password login.');
     }
@@ -253,28 +257,47 @@ export const googleAuthService = {
       throw new Error('Google Play Services not available on this device.');
     }
 
-    // Revoke access then sign out to fully clear the cached session.
-    // revokeAccess() must come before signOut() — this is what forces
-    // the account picker to appear on the next signIn() call.
+    // Fully clear any cached Google session so the account picker always appears.
+    // revokeAccess() invalidates the OAuth grant; signOut() clears the local session.
+    // Both must succeed (or be safely ignored) before calling signIn().
     try {
       await GoogleSignin.revokeAccess();
     } catch {
-      // ignore — access may not have been granted yet
+      // ignore — no access was previously granted
     }
     try {
       await GoogleSignin.signOut();
     } catch {
-      // ignore — may not be signed in
+      // ignore — no active session
     }
 
+    let response: any;
     try {
-      await GoogleSignin.signIn();
+      response = await GoogleSignin.signIn();
     } catch (error: any) {
       throw normalizeGoogleSignInError(error, statusCodes);
     }
-    const tokens = await GoogleSignin.getTokens();
-    if (!tokens.idToken) throw new Error('Failed to get Google ID token');
-    return { idToken: tokens.idToken, accessToken: tokens.accessToken || '' };
+
+    // v13+ returns a typed response object — check it before calling getTokens()
+    if (isCancelledResponse && isCancelledResponse(response)) {
+      const err: any = new Error('SIGN_IN_CANCELLED');
+      err.code = 'SIGN_IN_CANCELLED';
+      throw err;
+    }
+
+    if (isSuccessResponse && !isSuccessResponse(response)) {
+      throw new Error('Google sign-in did not return a successful response.');
+    }
+
+    // Extract idToken directly from the response data (v13+ API) to avoid
+    // getTokens() returning stale cached tokens from a previous session.
+    const idToken: string | undefined =
+      response?.data?.idToken ?? response?.idToken;
+    const accessToken: string =
+      response?.data?.accessToken ?? response?.accessToken ?? '';
+
+    if (!idToken) throw new Error('Failed to get Google ID token');
+    return { idToken, accessToken };
   },
 
   async signOut() {
@@ -282,14 +305,14 @@ export const googleAuthService = {
       const { GoogleSignin } = await import('@react-native-google-signin/google-signin');
       GoogleSignin.configure(getGoogleSignInConfig());
       try {
-        await GoogleSignin.signOut();
-      } catch (e) {
-        // ignore if not signed in
+        await GoogleSignin.revokeAccess();
+      } catch {
+        // ignore if access not granted
       }
       try {
-        await GoogleSignin.revokeAccess();
-      } catch (e) {
-        // ignore if access not granted
+        await GoogleSignin.signOut();
+      } catch {
+        // ignore if not signed in
       }
     } catch {
       // ignore — native module may not be available
