@@ -89,6 +89,12 @@ function isStrongPassword(password: string): boolean {
 }
 
 function normalizeUser(row: any) {
+  // dob comes back from Postgres as a full ISO timestamp — strip the time part
+  const rawDob = row.dob;
+  const dob = rawDob
+    ? (typeof rawDob === 'string' ? rawDob.split('T')[0] : new Date(rawDob).toISOString().split('T')[0])
+    : null;
+
   return {
     id: row.id,
     name: row.name,
@@ -97,12 +103,12 @@ function normalizeUser(row: any) {
     userName: row.user_name,
     userRole: row.user_role,
     isVerified: row.is_verified,
-    dob: row.dob || null,
+    dob,
     gender: row.gender || null,
     profileImage: row.profile_image || null,
-    receivePushNotifications: row.receive_push_notifications,
-    receiveEmailUpdates: row.receive_email_updates,
-    receiveOrderUpdates: row.receive_order_updates,
+    receivePushNotifications: row.receive_push_notifications ?? true,
+    receiveEmailUpdates: row.receive_email_updates ?? false,
+    receiveOrderUpdates: row.receive_order_updates ?? true,
     timeStamp: row.created_at,
   };
 }

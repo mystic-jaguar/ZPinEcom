@@ -148,6 +148,11 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
             ...rawUser,
             id: rawUser.id || rawUser._id || '',
             dob: rawUser.dob ? rawUser.dob.split('T')[0] : '',
+            gender: rawUser.gender || '',
+            profileImage: rawUser.profileImage || rawUser.profile_image || null,
+            receivePushNotifications: rawUser.receivePushNotifications ?? rawUser.receive_push_notifications ?? true,
+            receiveEmailUpdates: rawUser.receiveEmailUpdates ?? rawUser.receive_email_updates ?? false,
+            receiveOrderUpdates: rawUser.receiveOrderUpdates ?? rawUser.receive_order_updates ?? true,
         };
         setUserState(user);
         setIsAuthenticated(true);
