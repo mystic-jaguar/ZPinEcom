@@ -175,7 +175,12 @@ router.put('/profileDetails', authenticate, async (req: AuthRequest, res: Respon
       values
     );
 
-    res.json({ success: true, message: 'Profile updated successfully' });
+    // Re-fetch updated user so the frontend can sync its local state
+    const updated = await pool.query(
+      `SELECT * FROM ${USERS} WHERE id = $1`, [req.userId]
+    );
+
+    res.json({ success: true, message: 'Profile updated successfully', data: normalizeUser(updated.rows[0]) });
   } catch (err) {
     console.error('updateProfile error:', err);
     res.status(500).json({ success: false, message: 'Server error' });

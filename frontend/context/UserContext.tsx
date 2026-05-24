@@ -162,6 +162,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     const updateUser = async (updates: Partial<UserObject>) => {
         const previousUser = user;
         try {
+            // Optimistically update local state
             setUserState(prev => {
                 const newUser = { ...prev, ...updates };
                 AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(newUser)).catch(console.error);
@@ -172,7 +173,25 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
             const apiFields = ['name', 'userName', 'dob', 'gender', 'receivePushNotifications', 'receiveEmailUpdates', 'receiveOrderUpdates'] as const;
             const hasApiFields = apiFields.some(f => (updates as any)[f] !== undefined);
             if (hasApiFields) {
-                await userService.updateProfileJson(updates as any);
+                const result = await userService.updateProfileJson(updates as any);
+
+                // If the backend returned the updated user, sync local state with
+                // the actual DB values rather than relying on the optimistic update.
+                if (result?.data) {
+                    const raw = result.data as any;
+                    const serverUser: UserObject = {
+                        ...raw,
+                        id: raw.id || '',
+                        dob: raw.dob ? String(raw.dob).split('T')[0] : '',
+                        gender: raw.gender || '',
+                        profileImage: raw.profileImage || null,
+                        receivePushNotifications: raw.receivePushNotifications ?? true,
+                        receiveEmailUpdates: raw.receiveEmailUpdates ?? false,
+                        receiveOrderUpdates: raw.receiveOrderUpdates ?? true,
+                    } as any;
+                    setUserState(serverUser);
+                    await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(serverUser));
+                }
             }
         } catch (error) {
             console.error('Error updating user profile:', error);

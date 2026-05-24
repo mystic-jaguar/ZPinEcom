@@ -138,31 +138,37 @@ export const authService = {
         try {
             // Clear Google Sign-In session if active
             await googleAuthService.signOut();
-        } catch (error: any) {
-            // Ignore 401 errors - token may have expired, which is fine for logout
-            // Only log other unexpected errors
-            // Ignore errors during logout - if server is unreachable or token expired,
-            // we still want to clear local data and log the user out locally.
-            // console.warn('Logout API warning:', error.message);
-        } finally {
-            // Always clear local data - Clear all AsyncStorage keys for complete logout
-            await tokenManager.clearTokens();
-            await userDataManager.clearUserData();
+        } catch {
+            // Ignore — Google module may not be available or no active session
+        }
 
-            // Clear all app data contexts
-            try {
-                const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
-                await AsyncStorage.multiRemove([
-                    '@ZPinEcom:cart',
-                    '@ZPinEcom:wishlist',
-                    '@ZPinEcom:paymentCards',
-                    '@ZPinEcom:paymentUPIs',
-                    '@ZPinEcom:recentSearches',
-                    '@ZPinEcom:userPreferences'
-                ]);
-            } catch (storageError) {
-                console.error('Error clearing AsyncStorage:', storageError);
+        try {
+            // Notify the backend so it can invalidate the refresh token server-side
+            const refreshToken = await tokenManager.getRefreshToken();
+            if (refreshToken) {
+                await apiClient.post('auth/logout', { refreshToken }).catch(() => {});
             }
+        } catch {
+            // Ignore — if server is unreachable, we still clear locally
+        }
+
+        // Always clear local data regardless of server response
+        await tokenManager.clearTokens();
+        await userDataManager.clearUserData();
+
+        // Clear all app data contexts
+        try {
+            const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+            await AsyncStorage.multiRemove([
+                '@ZPinEcom:cart',
+                '@ZPinEcom:wishlist',
+                '@ZPinEcom:paymentCards',
+                '@ZPinEcom:paymentUPIs',
+                '@ZPinEcom:recentSearches',
+                '@ZPinEcom:userPreferences'
+            ]);
+        } catch (storageError) {
+            console.error('Error clearing AsyncStorage:', storageError);
         }
     },
 
@@ -257,14 +263,10 @@ export const googleAuthService = {
       throw new Error('Google Play Services not available on this device.');
     }
 
-    // Fully clear any cached Google session so the account picker always appears.
-    // revokeAccess() invalidates the OAuth grant; signOut() clears the local session.
-    // Both must succeed (or be safely ignored) before calling signIn().
-    try {
-      await GoogleSignin.revokeAccess();
-    } catch {
-      // ignore — no access was previously granted
-    }
+    // Clear the local Google session so the account picker always appears.
+    // Only signOut() is needed here — revokeAccess() is too aggressive and can
+    // leave internal state inconsistent (e.g. when offline), causing the picker
+    // to be skipped on the subsequent signIn() call.
     try {
       await GoogleSignin.signOut();
     } catch {
@@ -289,14 +291,24 @@ export const googleAuthService = {
       throw new Error('Google sign-in did not return a successful response.');
     }
 
-    // Extract idToken directly from the response data (v13+ API) to avoid
-    // getTokens() returning stale cached tokens from a previous session.
+    // Extract idToken from the signIn() response (v13+ API)
     const idToken: string | undefined =
       response?.data?.idToken ?? response?.idToken;
-    const accessToken: string =
-      response?.data?.accessToken ?? response?.accessToken ?? '';
 
     if (!idToken) throw new Error('Failed to get Google ID token');
+
+    // signIn() does NOT return the OAuth accessToken — we must call getTokens()
+    // to obtain it. The backend needs this to call the Google People API for
+    // fetching the user's birthday and gender.
+    let accessToken = '';
+    try {
+      const tokens = await GoogleSignin.getTokens();
+      accessToken = tokens.accessToken || '';
+    } catch {
+      // If getTokens() fails, proceed without accessToken — the backend will
+      // simply skip the People API call (dob/gender won't be auto-filled).
+    }
+
     return { idToken, accessToken };
   },
 
@@ -304,11 +316,10 @@ export const googleAuthService = {
     try {
       const { GoogleSignin } = await import('@react-native-google-signin/google-signin');
       GoogleSignin.configure(getGoogleSignInConfig());
-      try {
-        await GoogleSignin.revokeAccess();
-      } catch {
-        // ignore if access not granted
-      }
+      // Only call signOut() to clear the local session. Avoid revokeAccess()
+      // here — it makes a network call that can fail and leave internal state
+      // inconsistent, which prevents the account picker from appearing on the
+      // next sign-in attempt.
       try {
         await GoogleSignin.signOut();
       } catch {

@@ -34,7 +34,7 @@ export default function EditProfileScreen() {
                     const raw = response.data as any;
                     setForm({
                         name: raw.name || '',
-                        dob: raw.dob || '',
+                        dob: raw.dob ? String(raw.dob).split('T')[0] : '',
                         gender: raw.gender || '',
                         preferences: {
                             receivePushNotifications: raw.receivePushNotifications ?? raw.receive_push_notifications ?? true,
