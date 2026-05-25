@@ -7,6 +7,7 @@ import jwt from 'jsonwebtoken';
 import { pool } from '../db';
 import { generateId } from '../utils/id';
 import { logger } from '../utils/logger';
+import { sendOTPEmail } from '../utils/mailer';
 import { safeIdentifier } from '../utils/sql';
 
 const router = Router();
@@ -339,11 +340,7 @@ router.post('/forgetPassword/sendOTP', otpLimiter, async (req: Request, res: Res
       [generateId(), userId, otp]
     );
 
-    // TODO: Send OTP via email service (e.g. SendGrid, AWS SES)
-    // For development only — remove in production:
-    if (process.env.NODE_ENV !== 'production') {
-      console.log(`[DEV ONLY] Password reset OTP: ${otp}`);
-    }
+    await sendOTPEmail(email.toLowerCase(), otp, 'password_reset');
 
     // Never return OTP in response
     res.json({ success: true, message: 'If that email exists, an OTP has been sent' });
@@ -467,9 +464,8 @@ router.post('/verification/sendOTP', otpLimiter, async (req: Request, res: Respo
       [generateId(), mobile || '', email || '', otp]
     );
 
-    // TODO: Send OTP via SMS/email service
-    if (process.env.NODE_ENV !== 'production') {
-      console.log(`[DEV ONLY] Verification OTP: ${otp}`);
+    if (email) {
+      await sendOTPEmail(email.toLowerCase(), otp, 'verification');
     }
 
     // Never return OTP in response
