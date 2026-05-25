@@ -11,7 +11,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
-import { authService } from '../../services/auth';
 
 export default function VerifyOTPScreen() {
     const router = useRouter();
@@ -79,7 +78,15 @@ export default function VerifyOTPScreen() {
 
         setLoading(true);
         try {
-            await authService.verifyOTP(mobile, code);
+            // Confirm OTP with Firebase — returns Firebase ID token
+            const firebaseIdToken = await confirmFirebaseOTP(code);
+
+            // Send Firebase ID token to our backend to mark user as verified
+            await apiClient.post('auth/verification/verifyFirebaseOTP', {
+                firebaseIdToken,
+                mobile,
+            });
+
             setModalMessage('Account verified successfully!');
             setShowSuccessModal(true);
         } catch (error: any) {
@@ -96,7 +103,7 @@ export default function VerifyOTPScreen() {
         if (!canResend) return;
 
         try {
-            await authService.sendOTP(mobile);
+            await sendFirebaseOTP(`+91${mobile}`);
             setResendTimer(30);
             setCanResend(false);
             setModalMessage('A new OTP has been sent to your mobile');

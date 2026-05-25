@@ -145,6 +145,9 @@ export default function SignupScreen() {
                 if (response.user) await userDataManager.setUserData(response.user);
             }
 
+            // Trigger Firebase Phone Auth OTP
+            await sendFirebaseOTP(`+91${mobile}`);
+
             // Navigate to OTP verification
             router.push({ pathname: '/auth/verify-otp', params: { mobile } });
         } catch (error: any) {

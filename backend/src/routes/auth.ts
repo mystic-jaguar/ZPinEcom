@@ -5,6 +5,7 @@ import rateLimit from 'express-rate-limit';
 import { OAuth2Client } from 'google-auth-library';
 import jwt from 'jsonwebtoken';
 import { pool } from '../db';
+import { verifyFirebaseToken } from '../utils/firebaseAdmin';
 import { generateId } from '../utils/id';
 import { logger } from '../utils/logger';
 import { sendOTPEmail } from '../utils/mailer';
@@ -672,6 +673,41 @@ router.post('/google', loginLimiter, async (req: Request, res: Response): Promis
   } catch (err: any) {
     logger.error('auth.google_error', { message: err.message, ip: req.ip || '' });
     res.status(401).json({ success: false, message: 'Google authentication failed' });
+  }
+});
+
+// ─── POST /api/v1/auth/verification/verifyFirebaseOTP ────────────────────────
+// Called after Firebase Phone Auth confirms the OTP on the frontend.
+// The frontend sends the Firebase ID token; we verify it and mark the user verified.
+
+router.post('/verification/verifyFirebaseOTP', otpVerifyLimiter, async (req: Request, res: Response): Promise<void> => {
+  const { firebaseIdToken, mobile } = req.body;
+  if (!firebaseIdToken || !mobile) {
+    res.status(400).json({ success: false, message: 'firebaseIdToken and mobile are required' });
+    return;
+  }
+
+  try {
+    const decoded = await verifyFirebaseToken(firebaseIdToken);
+
+    // Ensure the phone number in the token matches the claimed mobile
+    const normalizedMobile = mobile.replace(/\D/g, '').slice(-10); // last 10 digits
+    const tokenPhone = (decoded.phone_number || '').replace(/\D/g, '').slice(-10);
+
+    if (tokenPhone !== normalizedMobile) {
+      res.status(400).json({ success: false, message: 'Phone number mismatch' });
+      return;
+    }
+
+    await pool.query(
+      `UPDATE ${USERS} SET is_verified = true, updated_at = NOW() WHERE mobile = $1`,
+      [normalizedMobile]
+    );
+
+    res.json({ success: true, message: 'Mobile verified successfully' });
+  } catch (err: any) {
+    console.error('verifyFirebaseOTP error:', err.message);
+    res.status(400).json({ success: false, message: 'Invalid or expired Firebase token' });
   }
 });
 
