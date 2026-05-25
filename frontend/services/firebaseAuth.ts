@@ -7,7 +7,12 @@ let confirmationResult: FirebaseAuthTypes.ConfirmationResult | null = null;
  * phoneNumber must include country code e.g. "+919876543210"
  */
 export async function sendFirebaseOTP(phoneNumber: string): Promise<void> {
-  confirmationResult = await auth().signInWithPhoneNumber(phoneNumber);
+  try {
+    confirmationResult = await auth().signInWithPhoneNumber(phoneNumber);
+  } catch (error: any) {
+    console.error('[Firebase OTP Error]', error?.code, error?.message);
+    throw error;
+  }
 }
 
 /**
