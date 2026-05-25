@@ -64,7 +64,17 @@ export default function LoginScreen() {
         try {
             const { idToken, accessToken } = await googleAuthService.signIn();
             const response = await googleAuthService.authenticateWithBackend(idToken, accessToken);
-            if (response.user) setUser(response.user);
+            if (response.user) {
+                setUser(response.user);
+                // If DOB or gender is missing, redirect to complete-profile
+                // so the user can provide this information
+                const userData = response.user;
+                if (!userData.dob || !userData.gender) {
+                    router.replace('/auth/complete-profile');
+                    return;
+                }
+            }
+            // If profile is complete, _layout.tsx auto-redirects to /(tabs)
         } catch (error: any) {
             if (error.code !== 'SIGN_IN_CANCELLED') {
                 setErrorMessage(error.message || 'Google sign-in failed');

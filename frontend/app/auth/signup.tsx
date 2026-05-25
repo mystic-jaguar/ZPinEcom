@@ -107,6 +107,13 @@ export default function SignupScreen() {
             const response = await googleAuthService.authenticateWithBackend(idToken, accessToken);
             if (response.user) {
                 setUser(response.user);
+                // If DOB or gender is missing, redirect to complete-profile
+                // so the user can provide this information
+                const userData = response.user;
+                if (!userData.dob || !userData.gender) {
+                    router.replace('/auth/complete-profile');
+                    return;
+                }
             }
             router.replace('/(tabs)');
         } catch (error: any) {

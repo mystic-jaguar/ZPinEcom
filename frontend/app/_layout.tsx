@@ -48,7 +48,13 @@ function RootLayoutNav() {
     if (!isAuthenticated && !inAuthGroup) {
       router.replace('/auth/login');
     } else if (isAuthenticated && inAuthGroup) {
-      router.replace('/(tabs)');
+      // Allow the complete-profile screen to remain accessible for
+      // authenticated users who need to fill in missing DOB/gender
+      // after Google Sign-In.
+      const onCompleteProfile = segments.join('/').includes('complete-profile');
+      if (!onCompleteProfile) {
+        router.replace('/(tabs)');
+      }
     }
   }, [isAuthenticated, segments, isLoading]);
 
