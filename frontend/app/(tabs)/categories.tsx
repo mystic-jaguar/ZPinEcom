@@ -17,6 +17,21 @@ if (Platform.OS === 'android') {
 
 const { width } = Dimensions.get('window');
 
+// Calculate layout sizes dynamically based on screen width to prevent circles from overlapping on smaller mobile devices
+const SIDEBAR_WIDTH = 100;
+const LEVEL2_MARGIN = 15;
+const LEVEL3_PADDING = 15;
+const NUM_COLUMNS = 3;
+
+const maxGridWidth = width - SIDEBAR_WIDTH - (LEVEL2_MARGIN * 2) - (LEVEL3_PADDING * 2);
+const columnWidth = maxGridWidth / NUM_COLUMNS;
+
+// Dynamic dimensions for category circles and rectangles
+const CIRCLE_SIZE = Math.min(70, Math.floor(columnWidth - 12));
+const CIRCLE_RADIUS = CIRCLE_SIZE / 2;
+const RECT_WIDTH = CIRCLE_SIZE;
+const RECT_HEIGHT = Math.floor(CIRCLE_SIZE * (85 / 70));
+
 // --- Sidebar Component ---
 const Sidebar = ({
     categories,
@@ -93,7 +108,7 @@ const CategoryGridSection = ({
                                     <Image source={item.image} style={styles.gridImage} />
                                 ) : (
                                     <View style={[styles.gridImage, { backgroundColor: '#f0f0f0', alignItems: 'center', justifyContent: 'center' }]}>
-                                        <Text style={{ fontSize: 13, fontWeight: '700', color: '#888', textAlign: 'center', paddingHorizontal: 4 }} numberOfLines={2}>
+                                        <Text style={{ fontSize: Math.max(10, Math.floor(CIRCLE_SIZE * 0.2)), fontWeight: '700', color: '#888', textAlign: 'center', paddingHorizontal: 4 }} numberOfLines={2}>
                                             {item.name.charAt(0).toUpperCase()}
                                         </Text>
                                     </View>
@@ -170,7 +185,7 @@ const MainCategoryView = ({
                                                     onPress={() => handleNodePress(grandChild)}
                                                 >
                                                     <View style={[styles.circleImage, styles.highlightedBorder, styles.leafCircle]}>
-                                                        <View style={{ backgroundColor: '#f0f0f0', flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 35 }}>
+                                                        <View style={{ backgroundColor: '#f0f0f0', flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 20 }}>
                                                             <Text style={{ fontSize: 12, fontWeight: '700', color: '#888' }}>
                                                                 {grandChild.name.charAt(0).toUpperCase()}
                                                             </Text>
@@ -469,9 +484,9 @@ const styles = StyleSheet.create({
         overflow: 'hidden',
     },
     circleImage: {
-        width: 70,
-        height: 70,
-        borderRadius: 35,
+        width: CIRCLE_SIZE,
+        height: CIRCLE_SIZE,
+        borderRadius: CIRCLE_RADIUS,
         borderWidth: 2,
         borderColor: '#fff' // Default
     },
@@ -480,8 +495,8 @@ const styles = StyleSheet.create({
         borderWidth: 2
     },
     rectImage: {
-        width: 70,
-        height: 85,
+        width: RECT_WIDTH,
+        height: RECT_HEIGHT,
         borderRadius: 12,
     },
     gridImage: {
