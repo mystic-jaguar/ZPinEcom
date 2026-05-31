@@ -63,3 +63,5 @@ claude.md
 /.idea/caches
 .idea/caches/deviceStreaming.xml
 .idea/misc.xml
+test_api.js
+user_stories.md
