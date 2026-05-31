@@ -1,6 +1,20 @@
 ﻿# ZPIN E-Commerce — Design Documentation
 ### For Software Testers | Version 1.0 | April 2026
 
+### Command to run the script file:
+From the project root, with your backend already running:
+
+BASE_URL=http://localhost:5002 node test_api.js
+On Windows (PowerShell or CMD), set the env var separately:
+
+$env:BASE_URL="http://localhost:5002"; node test_api.js
+Make sure the backend is running first in a separate terminal:
+
+
+
+cd backend && npm run dev
+
+
 ---
 
 ## Table of Contents
