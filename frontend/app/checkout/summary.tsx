@@ -101,7 +101,7 @@ export default function CheckoutSummaryScreen() {
     };
 
     return (
-        <View style={styles.container}>
+        <SafeAreaView style={styles.container} edges={['top']}>
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
                     <Ionicons name="chevron-back" size={24} color="#000" />
@@ -296,7 +296,7 @@ export default function CheckoutSummaryScreen() {
                 onPrimaryPress={() => setModalVisible(false)}
                 onClose={() => setModalVisible(false)}
             />
-        </View>
+        </SafeAreaView>
     );
 }
 
@@ -309,7 +309,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: 16,
-        paddingTop: 50,
+        paddingTop: 15,
         paddingBottom: 15,
         backgroundColor: '#fff',
     },
