@@ -1,7 +1,6 @@
 import { Stack, useRouter, useSegments } from "expo-router";
 import { useEffect } from "react";
 import { Image, View } from "react-native";
-import { SafeAreaProvider } from "react-native-safe-area-context";
 import ErrorBoundary from "../components/common/ErrorBoundary";
 import { AddressProvider } from "../context/AddressContext";
 import { CartProvider } from "../context/CartContext";
@@ -77,24 +76,22 @@ function RootLayoutNav() {
 
 export default function RootLayout() {
   return (
-    <SafeAreaProvider>
-      <ErrorBoundary>
-        <SearchProvider>
-          <UserProvider>
-            <CartProvider>
-              <WishlistProvider>
-                <CheckoutProvider>
-                  <AddressProvider>
-                    <OrderProvider>
-                      <RootLayoutNav />
-                    </OrderProvider>
-                  </AddressProvider>
-                </CheckoutProvider>
-              </WishlistProvider>
-            </CartProvider>
-          </UserProvider>
-        </SearchProvider>
-      </ErrorBoundary>
-    </SafeAreaProvider>
+    <ErrorBoundary>
+      <SearchProvider>
+        <UserProvider>
+          <CartProvider>
+            <WishlistProvider>
+              <CheckoutProvider>
+                <AddressProvider>
+                  <OrderProvider>
+                    <RootLayoutNav />
+                  </OrderProvider>
+                </AddressProvider>
+              </CheckoutProvider>
+            </WishlistProvider>
+          </CartProvider>
+        </UserProvider>
+      </SearchProvider>
+    </ErrorBoundary>
   );
 }
