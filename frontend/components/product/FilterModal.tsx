@@ -9,7 +9,6 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 export interface FilterState {
     sortBy: 'relevance' | 'new' | 'price_low' | 'price_high' | 'rating' | 'discount';
@@ -68,6 +67,7 @@ const DISCOUNTS = [
 export default function FilterModal({ visible, onClose, onApply, initialFilters, availableBrands }: FilterModalProps) {
     const [activeTab, setActiveTab] = useState<string>('sort');
     const [tempFilters, setTempFilters] = useState<FilterState>(initialFilters);
+    const insets = useSafeAreaInsets();
 
     // Reset temp filters when modal opens
     useEffect(() => {
@@ -221,7 +221,7 @@ export default function FilterModal({ visible, onClose, onApply, initialFilters,
             transparent={true}
             onRequestClose={onClose}
         >
-            <SafeAreaView style={styles.modalContainer}>
+            <View style={[styles.modalContainer, { paddingTop: insets.top }]}>
                 {/* Header */}
                 <View style={styles.header}>
                     <Text style={styles.headerTitle}>Filters</Text>
@@ -270,7 +270,7 @@ export default function FilterModal({ visible, onClose, onApply, initialFilters,
                         </TouchableOpacity>
                     </View>
                 </View>
-            </SafeAreaView>
+            </View>
         </Modal>
     );
 }
