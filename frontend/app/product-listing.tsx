@@ -14,12 +14,12 @@ import {
     View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import FilterModal, { FilterState } from '../../components/product/FilterModal';
-import SkeletonCard from '../../components/product/SkeletonCard';
-import { CATEGORY_DATA, CategoryNode } from '../../constants/categories';
-import { useWishlist } from '../../context/WishlistContext';
-import { productService } from '../../services/product';
-import { CategoryPathItem, ProductObject } from '../../types/types';
+import FilterModal, { FilterState } from '../components/product/FilterModal';
+import SkeletonCard from '../components/product/SkeletonCard';
+import { CATEGORY_DATA, CategoryNode } from '../constants/categories';
+import { useWishlist } from '../context/WishlistContext';
+import { productService } from '../services/product';
+import { CategoryPathItem, ProductObject } from '../types/types';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width / 2) - 20;

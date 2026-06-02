@@ -70,6 +70,7 @@ function RootLayoutNav() {
       <Stack.Screen name="profile/add-address" options={{ title: 'Add Address', headerShown: false }} />
       <Stack.Screen name="profile/edit-profile" options={{ title: 'Edit Profile', headerShown: false }} />
       <Stack.Screen name="profile/wishlist" options={{ title: 'Wishlist', headerShown: false }} />
+      <Stack.Screen name="product-listing" options={{ headerShown: false }} />
     </Stack>
   );
 }
