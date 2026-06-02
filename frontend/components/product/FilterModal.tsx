@@ -222,9 +222,9 @@ export default function FilterModal({ visible, onClose, onApply, initialFilters,
             transparent={true}
             onRequestClose={onClose}
         >
-            <View style={[styles.modalContainer, { paddingTop: insets.top }]}>
+            <View style={styles.modalContainer}>
                 {/* Header */}
-                <View style={styles.header}>
+                <View style={[styles.header, { paddingTop: insets.top + 15 }]}>
                     <Text style={styles.headerTitle}>Filters</Text>
                     <TouchableOpacity onPress={handleClearAll} style={styles.clearButton}>
                         <Text style={styles.clearButtonText}>Clear All</Text>
@@ -309,7 +309,8 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         paddingHorizontal: 20,
-        paddingVertical: 15,
+        paddingTop: 15, // will be overridden dynamically with insets.top
+        paddingBottom: 15,
         borderBottomWidth: 1,
         borderBottomColor: '#eee',
         backgroundColor: '#fff',
