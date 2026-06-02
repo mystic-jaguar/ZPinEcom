@@ -9,6 +9,7 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export interface FilterState {
     sortBy: 'relevance' | 'new' | 'price_low' | 'price_high' | 'rating' | 'discount';
