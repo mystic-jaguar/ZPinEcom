@@ -12,6 +12,7 @@ import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import RazorpayCheckout from 'react-native-razorpay';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { orderService } from '../../services/order';
 import { paymentService } from '../../services/payment';
 import { walletService } from '../../services/wallet';
@@ -29,6 +30,8 @@ export default function CheckoutPaymentScreen() {
     const [walletBalance, setWalletBalance] = useState<number | null>(null);
 
     const [redirectCategory, setRedirectCategory] = useState<string | null>(null);
+    // Store the confirmed final amount returned by the backend after order creation
+    const [confirmedFinalAmount, setConfirmedFinalAmount] = useState<number | null>(null);
 
     useEffect(() => {
         walletService.getWallet().then(data => setWalletBalance(data.balance)).catch(() => setWalletBalance(0));
@@ -46,12 +49,15 @@ export default function CheckoutPaymentScreen() {
         }, [cartItems.length, showSuccessModal])
     );
 
-    //Calculate total including taxes/fees (matching summary logic)
-    const shippingFee = 0;
+    // Calculate estimated total for display (matches backend formula)
     const isInstant = deliveryType === 'Instant';
-    const deliveryFee = isInstant ? 50.00 : 0; // Updated to ₹50
-    const gst = totalPrice * 0.18; // 18% GST
-    const finalTotal = totalPrice + shippingFee + deliveryFee + gst - couponDiscount;
+    const deliveryFee = isInstant ? 50.00 : 0;
+    const taxAmount = Math.round(totalPrice * 0.18); // backend uses Math.round
+    const shippingAmount = totalPrice > 500 ? 0 : 49; // backend logic
+    const estimatedTotal = totalPrice + shippingAmount + taxAmount + deliveryFee - couponDiscount;
+
+    // Use backend-confirmed amount after order creation, fall back to estimate for display
+    const finalTotal = confirmedFinalAmount ?? estimatedTotal;
 
     const handlePaymentSelect = (method: string) => {
         setSelectedPaymentMethod(method);
@@ -107,6 +113,11 @@ export default function CheckoutPaymentScreen() {
 
             const appOrder = orderResponse.data.order;
             addOrder(appOrder as any);
+
+            // Use the backend-calculated final amount for display and payment
+            if (appOrder.finalAmount) {
+                setConfirmedFinalAmount(Number(appOrder.finalAmount));
+            }
 
             // Step 2: For Razorpay methods, open the payment gateway
             if (backendMethod === 'razorpay') {
@@ -232,7 +243,7 @@ export default function CheckoutPaymentScreen() {
     };
 
     return (
-        <SafeAreaView style={styles.container} edges={['top']}>
+        <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
                     <Ionicons name="chevron-back" size={24} color="#000" />

@@ -256,7 +256,7 @@ export default function FilterModal({ visible, onClose, onApply, initialFilters,
                 </View>
 
                 {/* Footer */}
-                <View style={styles.footerContainer}>
+                <View style={[styles.footerContainer, { paddingBottom: insets.bottom }]}>
                     {activeFilterCount > 0 && (
                         <View style={styles.filterCountContainer}>
                             <Text style={styles.filterCountText}>{activeFilterCount} Filters Applied</Text>
