@@ -22,7 +22,7 @@ export default function CheckoutPaymentScreen() {
     const { selectedPaymentMethod, setSelectedPaymentMethod, deliveryType, selectedAddressId } = useCheckout();
     const { totalPrice, cartItems, clearCart, couponDiscount, totalSavings, appliedCoupon } = useCart();
     const { addresses } = useAddress();
-    const { addOrder } = useOrder();
+    const { addOrder, refreshOrders } = useOrder();
     const { user } = useUser();
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [orderError, setOrderError] = useState<string | null>(null);
@@ -112,7 +112,6 @@ export default function CheckoutPaymentScreen() {
             }
 
             const appOrder = orderResponse.data.order;
-            addOrder(appOrder as any);
 
             // Use the backend-calculated final amount for display and payment
             if (appOrder.finalAmount) {
@@ -160,6 +159,12 @@ export default function CheckoutPaymentScreen() {
                     razorpaySignature: rzpData.razorpay_signature,
                     appOrderId: appOrder.id,
                 });
+
+                // Refresh orders from API so the paid status is accurately reflected
+                await refreshOrders();
+            } else {
+                // COD / Wallet — order is immediately confirmed, add to local list
+                addOrder(appOrder as any);
             }
 
             setShowSuccessModal(true);
@@ -173,6 +178,8 @@ export default function CheckoutPaymentScreen() {
                 error?.message?.toLowerCase().includes('dismiss');
 
             if (isCancelled) {
+                // Order was created but not paid — refresh so it shows with pending status in orders list
+                refreshOrders().catch(() => {});
                 setOrderError('Payment was cancelled. Your order has been saved — you can retry payment from your orders.');
             } else {
                 setOrderError(error.message || 'Failed to place order. Please try again.');

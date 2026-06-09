@@ -1,22 +1,74 @@
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useState } from 'react';
-import { Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
 import DeliveryStatusCard from '../../components/profile/DeliveryStatusCard';
 import OrderItemRow from '../../components/profile/OrderItemRow';
 import PriceBreakdown from '../../components/profile/PriceBreakdown';
 import { useOrder } from '../../context/OrderContext';
+import { orderService } from '../../services/order';
+import { OrderObject } from '../../types/types';
 
 export default function OrderDetailsScreen() {
     const router = useRouter();
     const params = useLocalSearchParams();
     const { orderId } = params;
-    const { getOrderById } = useOrder();
+    const { getOrderById, refreshOrders } = useOrder();
     const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+    const [fetchedOrder, setFetchedOrder] = useState<OrderObject | null>(null);
+    const [isFetching, setIsFetching] = useState(true);
 
-    const order = getOrderById(orderId as string);
+    // Always fetch fresh data from API for accurate order details
+    useEffect(() => {
+        const fetchOrder = async () => {
+            try {
+                setIsFetching(true);
+                const response = await orderService.getOrderById(orderId as string);
+                const o = (response as any)?.data?.order || (response as any)?.data;
+                if (o) {
+                    setFetchedOrder({
+                        id: o.id,
+                        userId: o.userId,
+                        sellerId: o.sellerId || '',
+                        orderNumber: o.orderNumber,
+                        status: o.status,
+                        paymentStatus: o.paymentStatus,
+                        totalAmount: Number(o.totalAmount || 0),
+                        shippingAmount: Number(o.shippingAmount || 0),
+                        taxAmount: Number(o.taxAmount || 0),
+                        finalAmount: Number(o.finalAmount || 0),
+                        shippingAddress: o.shippingAddress || {},
+                        paymentMethod: o.paymentMethod || 'cod',
+                        paymentId: o.paymentId,
+                        items: Array.isArray(o.items) ? o.items.map((item: any) => ({
+                            orderItemId: item.orderItemId || item.id,
+                            productId: item.productId,
+                            productName: item.productName,
+                            quantity: item.quantity,
+                            price: Number(item.price || 0),
+                            image: item.image || '',
+                            variant: item.variant,
+                        })) : [],
+                        estimatedDelivery: o.estimatedDelivery || '',
+                        trackingNumber: o.trackingNumber,
+                        notes: o.notes,
+                        createdAt: o.createdAt,
+                        updatedAt: o.updatedAt,
+                    } as OrderObject);
+                }
+            } catch {
+                // Fall back to context cache if API fails
+            } finally {
+                setIsFetching(false);
+            }
+        };
+        if (orderId) fetchOrder();
+    }, [orderId]);
+
+    // Use fresh API data, fall back to context cache
+    const order = fetchedOrder ?? getOrderById(orderId as string);
     const isInstantDelivery = order?.notes === 'instant_delivery';
 
     let couponCode: string | undefined;
@@ -56,6 +108,23 @@ export default function OrderDetailsScreen() {
         const phoneNumber = '+919876543210'; // Mock delivery partner number
         Linking.openURL(`tel:${phoneNumber}`);
     };
+
+    if (isFetching && !order) {
+        return (
+            <SafeAreaView style={styles.container}>
+                <View style={styles.header}>
+                    <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+                        <Feather name="chevron-left" size={28} color="#1a1a1a" />
+                    </TouchableOpacity>
+                    <Text style={styles.headerTitle}>Order Details</Text>
+                    <View style={{ width: 28 }} />
+                </View>
+                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                    <ActivityIndicator size="large" color="#FBBF24" />
+                </View>
+            </SafeAreaView>
+        );
+    }
 
     if (!order) {
         return (
@@ -133,8 +202,18 @@ export default function OrderDetailsScreen() {
                                     : order.paymentMethod}
                             </Text>
                         </View>
-                        <View style={styles.paidBadge}>
-                            <Text style={styles.paidText}>
+                        <View style={[
+                            styles.paidBadge,
+                            order.paymentStatus === 'paid' ? styles.paidBadgePaid
+                            : order.paymentMethod === 'cod' ? styles.paidBadgeCod
+                            : styles.paidBadgePending
+                        ]}>
+                            <Text style={[
+                                styles.paidText,
+                                order.paymentStatus === 'paid' ? styles.paidTextPaid
+                                : order.paymentMethod === 'cod' ? styles.paidTextCod
+                                : styles.paidTextPending
+                            ]}>
                                 {order.paymentStatus === 'paid' ? 'PAID'
                                     : order.paymentStatus === 'refunded' ? 'REFUNDED'
                                     : order.paymentMethod === 'cod' ? 'COD'
@@ -352,10 +431,28 @@ const styles = StyleSheet.create({
         paddingVertical: 4,
         borderRadius: 4,
     },
+    paidBadgePaid: {
+        backgroundColor: '#DCFCE7',
+    },
+    paidBadgePending: {
+        backgroundColor: '#FEE2E2',
+    },
+    paidBadgeCod: {
+        backgroundColor: '#FEF3C7',
+    },
     paidText: {
         fontSize: 10,
         fontWeight: '700',
         color: '#166534',
+    },
+    paidTextPaid: {
+        color: '#166534',
+    },
+    paidTextPending: {
+        color: '#991B1B',
+    },
+    paidTextCod: {
+        color: '#92400E',
     },
     itemsCard: {
         backgroundColor: '#fff',

@@ -1,6 +1,7 @@
 import { Feather } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import OrderCard, { OrderStatus } from '../../components/profile/OrderCard';
@@ -14,6 +15,13 @@ export default function AllOrdersScreen() {
     const [searchQuery, setSearchQuery] = useState('');
     const [activeFilter, setActiveFilter] = useState('All');
     const [refreshing, setRefreshing] = useState(false);
+
+    // Refresh orders every time the screen comes into focus
+    useFocusEffect(
+        useCallback(() => {
+            refreshOrders();
+        }, [])
+    );
 
     const onRefresh = async () => {
         setRefreshing(true);
