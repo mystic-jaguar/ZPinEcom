@@ -90,6 +90,9 @@ export default function CheckoutPaymentScreen() {
             : isRazorpayMethod ? 'razorpay'
             : 'cod';
 
+        // Hoist so the catch block can cancel the order on payment failure
+        let createdOrderId: string | null = null;
+
         try {
             const cartPayload = cartItems.map(item => ({
                 productId: item.productId,
@@ -112,6 +115,7 @@ export default function CheckoutPaymentScreen() {
             }
 
             const appOrder = orderResponse.data.order;
+            createdOrderId = appOrder.id;
 
             // Use the backend-calculated final amount for display and payment
             if (appOrder.finalAmount) {
@@ -177,12 +181,18 @@ export default function CheckoutPaymentScreen() {
                 error?.message?.toLowerCase().includes('cancel') ||
                 error?.message?.toLowerCase().includes('dismiss');
 
+            // Auto-cancel the order so it doesn't pollute the orders list
+            if (createdOrderId) {
+                orderService.cancelOrder(createdOrderId, {
+                    reason: isCancelled ? 'Payment cancelled by user' : 'Payment failed',
+                    refundMethod: 'original',
+                }).catch(() => { /* best-effort */ });
+            }
+
             if (isCancelled) {
-                // Order was created but not paid — refresh so it shows with pending status in orders list
-                refreshOrders().catch(() => {});
-                setOrderError('Payment was cancelled. Your order has been saved — you can retry payment from your orders.');
+                setOrderError('Payment was cancelled. Please try again.');
             } else {
-                setOrderError(error.message || 'Failed to place order. Please try again.');
+                setOrderError(error.message || 'Payment failed. Please try again.');
             }
         } finally {
             setIsSubmitting(false);

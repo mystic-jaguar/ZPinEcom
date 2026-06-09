@@ -74,7 +74,8 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
                     updatedAt: o.updatedAt,
                     date: o.createdAt,
                 }));
-                setOrders(normalized);
+                // Filter out pending+unpaid orders (failed/abandoned payments)
+                setOrders(normalized.filter(o => !(o.status === 'pending' && o.paymentStatus === 'pending')));
             }
         } catch (error: any) {
             console.error('Failed to load orders:', error);

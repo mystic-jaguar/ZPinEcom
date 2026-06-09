@@ -73,8 +73,10 @@ router.get('/orders', authenticate, async (req: AuthRequest, res: Response): Pro
   const offset = (page - 1) * limit;
 
   try {
+    // Exclude orders that are pending with unpaid status — these are failed/abandoned payments
     const countResult = await pool.query(
-      `SELECT COUNT(*) FROM ${ORDERS} WHERE user_id = $1`, [req.userId]
+      `SELECT COUNT(*) FROM ${ORDERS} WHERE user_id = $1 AND NOT (status = 'pending' AND payment_status = 'pending')`,
+      [req.userId]
     );
     const total = Number(countResult.rows[0].count);
 
@@ -89,7 +91,7 @@ router.get('/orders', authenticate, async (req: AuthRequest, res: Response): Pro
         )) FILTER (WHERE oi.id IS NOT NULL), '[]') as items
        FROM ${ORDERS} o
        LEFT JOIN ${ORDER_ITEMS} oi ON oi.order_id = o.id
-       WHERE o.user_id = $1
+       WHERE o.user_id = $1 AND NOT (o.status = 'pending' AND o.payment_status = 'pending')
        GROUP BY o.id
        ORDER BY o.created_at DESC
        LIMIT $2 OFFSET $3`,

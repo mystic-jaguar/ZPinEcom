@@ -430,7 +430,7 @@ router.get('/category/:categoryName', productListLimiter, async (req: Request, r
 
     const result = await pool.query(
       `SELECT p.*,
-        COALESCE(json_agg(pi.image_url) FILTER (WHERE pi.image_url IS NOT NULL), '[]') as images,
+        COALESCE(json_agg(DISTINCT pi.image_url) FILTER (WHERE pi.image_url IS NOT NULL), '[]') as images,
         COALESCE(AVG(pr.rating), 0) as average_rating
        FROM products p
        LEFT JOIN product_images pi ON pi.product_id = p.id
