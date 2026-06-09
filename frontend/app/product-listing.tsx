@@ -301,7 +301,8 @@ export default function ProductListing() {
                         </TouchableOpacity>
                     ),
                     headerShadowVisible: false,
-                    headerTitleStyle: { fontWeight: '700', fontSize: 20 },
+                    headerTitleStyle: { fontWeight: '700', fontSize: 14 },
+                    headerTitleContainerStyle: { maxWidth: width * 0.5 },
                     headerTitleAlign: 'center',
                 }} />
                 <View style={styles.skeletonGrid}>
@@ -341,7 +342,8 @@ export default function ProductListing() {
                     </View>
                 ),
                 headerShadowVisible: false,
-                headerTitleStyle: { fontWeight: '700', fontSize: 20 },
+                headerTitleStyle: { fontWeight: '700', fontSize: 14 },
+                headerTitleContainerStyle: { maxWidth: width * 0.5 },
                 headerTitleAlign: 'center' // Android center
             }} />
 
