@@ -18,9 +18,9 @@ if (Platform.OS === 'android') {
 const { width } = Dimensions.get('window');
 
 // Calculate layout sizes dynamically based on screen width to prevent circles from overlapping on smaller mobile devices
-const SIDEBAR_WIDTH = 100;
-const LEVEL2_MARGIN = 15;
-const LEVEL3_PADDING = 15;
+const SIDEBAR_WIDTH = Math.round(width * 0.25);
+const LEVEL2_MARGIN = Math.round(width * 0.038);
+const LEVEL3_PADDING = Math.round(width * 0.038);
 const NUM_COLUMNS = 3;
 
 const maxGridWidth = width - SIDEBAR_WIDTH - (LEVEL2_MARGIN * 2) - (LEVEL3_PADDING * 2);
@@ -336,7 +336,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#fff',
     },
     searchContainer: {
-        marginBottom: 10
+        marginBottom: 10,
     },
     contentContainer: {
         flex: 1,
@@ -346,138 +346,138 @@ const styles = StyleSheet.create({
     },
     // Sidebar
     sidebar: {
-        width: 100, // Slightly wider
-        backgroundColor: '#fff', // White sidebar per design
+        width: width * 0.25,
+        backgroundColor: '#fff',
         borderRightWidth: 1,
         borderRightColor: '#f0f0f0',
     },
     sidebarContent: {
         paddingBottom: 20,
-        paddingTop: 10
+        paddingTop: 10,
     },
     sidebarItem: {
         alignItems: 'center',
-        paddingVertical: 20,
-        paddingHorizontal: 4,
-        marginBottom: 5
+        paddingVertical: width * 0.05,
+        paddingHorizontal: '2%',
+        marginBottom: 5,
     },
     sidebarItemSelected: {
         backgroundColor: 'transparent',
     },
     sidebarIcon: {
-        width: 50,
-        height: 50,
+        width: width * 0.125,
+        height: width * 0.125,
         borderRadius: 16,
         backgroundColor: '#f5f5f5',
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 8
+        marginBottom: 8,
     },
     sidebarIconSelected: {
-        backgroundColor: Colors.light.tint, // Yellow bg
+        backgroundColor: Colors.light.tint,
     },
     sidebarText: {
-        fontSize: 10,
+        fontSize: width * 0.025,
         textAlign: 'center',
         color: '#888',
         fontWeight: '600',
-        letterSpacing: 0.5
+        letterSpacing: 0.5,
     },
     sidebarTextSelected: {
         color: '#000',
-        fontWeight: '800'
+        fontWeight: '800',
     },
     activeIndicator: {
         position: 'absolute',
         left: 0,
-        top: 25,
-        bottom: 25,
+        top: '30%',
+        bottom: '30%',
         width: 3,
         backgroundColor: Colors.light.tint,
         borderTopRightRadius: 3,
-        borderBottomRightRadius: 3
+        borderBottomRightRadius: 3,
     },
     // Main Content
     mainContent: {
         flex: 1,
-        backgroundColor: '#FEFEFE'
+        backgroundColor: '#FEFEFE',
     },
     categoryHeader: {
-        paddingTop: 20,
-        paddingHorizontal: 20,
-        paddingBottom: 10,
+        paddingTop: width * 0.05,
+        paddingHorizontal: width * 0.05,
+        paddingBottom: width * 0.025,
     },
     categoryTitle: {
-        fontSize: 28,
+        fontSize: width * 0.07,
         fontWeight: '800',
         color: '#1a1a1a',
         letterSpacing: -0.5,
-        marginBottom: 4
+        marginBottom: 4,
     },
     categorySubtitle: {
-        fontSize: 14,
+        fontSize: width * 0.035,
         color: '#888',
-        fontWeight: '500'
+        fontWeight: '500',
     },
     rightScroll: {
         paddingBottom: 50,
-        paddingHorizontal: 0
+        paddingHorizontal: 0,
     },
     // Accordion / Sections
     level2Container: {
         marginBottom: 10,
         backgroundColor: '#F8F9FB',
-        marginHorizontal: 15,
+        marginHorizontal: width * 0.038,
         borderRadius: 20,
         overflow: 'hidden',
-        paddingBottom: 10
+        paddingBottom: 10,
     },
     level2Header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        padding: 20,
+        padding: width * 0.05,
     },
     level2Title: {
-        fontSize: 18,
+        fontSize: width * 0.045,
         fontWeight: '800',
-        color: '#000'
+        color: '#000',
     },
     level3Container: {
-        paddingHorizontal: 15
+        paddingHorizontal: width * 0.038,
     },
 
     // Grid Section
     gridSection: {
-        marginBottom: 20
+        marginBottom: 20,
     },
     sectionHeaderRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
         marginBottom: 15,
-        paddingHorizontal: 5
+        paddingHorizontal: 5,
     },
     gridSectionTitle: {
-        fontSize: 12,
+        fontSize: width * 0.03,
         fontWeight: '700',
         color: '#888',
-        letterSpacing: 1
+        letterSpacing: 1,
     },
     seeAllText: {
-        fontSize: 12,
+        fontSize: width * 0.03,
         color: Colors.light.tint,
-        fontWeight: '700'
+        fontWeight: '700',
     },
     gridContainer: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        justifyContent: 'flex-start'
+        justifyContent: 'flex-start',
     },
     gridItemContainer: {
         width: '33.33%',
         alignItems: 'center',
-        marginBottom: 15
+        marginBottom: 15,
     },
     gridImageContainer: {
         marginBottom: 8,
@@ -488,11 +488,11 @@ const styles = StyleSheet.create({
         height: CIRCLE_SIZE,
         borderRadius: CIRCLE_RADIUS,
         borderWidth: 2,
-        borderColor: '#fff' // Default
+        borderColor: '#fff',
     },
     highlightedBorder: {
         borderColor: Colors.light.tint,
-        borderWidth: 2
+        borderWidth: 2,
     },
     rectImage: {
         width: RECT_WIDTH,
@@ -502,48 +502,49 @@ const styles = StyleSheet.create({
     gridImage: {
         width: '100%',
         height: '100%',
-        resizeMode: 'cover'
+        resizeMode: 'cover',
     },
     gridItemText: {
-        fontSize: 11,
+        fontSize: width * 0.028,
         color: '#333',
         fontWeight: '600',
-        textAlign: 'center'
+        textAlign: 'center',
+        paddingHorizontal: 2,
     },
     // Search
-    searchScroll: { padding: 20 },
+    searchScroll: { padding: width * 0.05 },
     searchItem: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        padding: 15,
+        padding: width * 0.038,
         backgroundColor: '#f8f9fa',
         borderRadius: 12,
-        marginBottom: 10
+        marginBottom: 10,
     },
-    searchItemName: { fontSize: 14, fontWeight: '600', color: '#333' },
-    searchItemContext: { fontSize: 10, color: '#999', marginTop: 2 },
+    searchItemName: { fontSize: width * 0.035, fontWeight: '600', color: '#333' },
+    searchItemContext: { fontSize: width * 0.025, color: '#999', marginTop: 2 },
     noResults: { alignItems: 'center', marginTop: 50 },
     noResultsText: { color: '#999' },
-    // Leaf row (for grandchildren without children)
+    // Leaf row
     leafRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: 10,
+        paddingVertical: width * 0.025,
         paddingHorizontal: 5,
         borderBottomWidth: 1,
         borderBottomColor: '#f5f5f5',
     },
     leafCircle: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        marginRight: 12,
+        width: width * 0.1,
+        height: width * 0.1,
+        borderRadius: width * 0.05,
+        marginRight: width * 0.03,
         overflow: 'hidden',
     },
     leafRowText: {
         flex: 1,
-        fontSize: 13,
+        fontSize: width * 0.033,
         fontWeight: '600',
         color: '#333',
     },

@@ -2,8 +2,8 @@ import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ExpoLocation from 'expo-location';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
-import { Dimensions, Image, Linking, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { AppState, AppStateStatus, Dimensions, Image, Linking, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
 import LegalDocModal, { LegalDocType } from '../../components/common/LegalDocModal';
@@ -62,6 +62,8 @@ export default function HomeScreen() {
     const [refreshing, setRefreshing] = useState(false);
     const [legalModalVisible, setLegalModalVisible] = useState(false);
     const [legalDocType, setLegalDocType] = useState<LegalDocType>('privacy');
+    const appState = useRef(AppState.currentState);
+    const awaitingSettingsReturn = useRef(false);
 
     const openLegalDoc = (type: LegalDocType) => {
         setLegalDocType(type);
@@ -70,7 +72,9 @@ export default function HomeScreen() {
 
     const onRefresh = async () => {
         setRefreshing(true);
-        if (locationGranted) {
+        const { status } = await ExpoLocation.getForegroundPermissionsAsync();
+        if (status === 'granted') {
+            setLocationGranted(true);
             try {
                 const loc = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced });
                 await fetchProducts(loc.coords.latitude, loc.coords.longitude);
@@ -100,6 +104,28 @@ export default function HomeScreen() {
         });
     }, []);
 
+    // Re-check permission when user returns from system settings
+    useEffect(() => {
+        const subscription = AppState.addEventListener('change', async (nextState: AppStateStatus) => {
+            if (appState.current.match(/inactive|background/) && nextState === 'active') {
+                if (awaitingSettingsReturn.current) {
+                    awaitingSettingsReturn.current = false;
+                    const { status } = await ExpoLocation.getForegroundPermissionsAsync();
+                    if (status === 'granted') {
+                        setLocationGranted(true);
+                        setShowLocationModal(false);
+                        requestLocationAndFetch();
+                    } else {
+                        setLocationGranted(false);
+                        fetchProducts();
+                    }
+                }
+            }
+            appState.current = nextState;
+        });
+        return () => subscription.remove();
+    }, []);
+
     const requestLocationAndFetch = async () => {
         let lat: number | undefined;
         let lng: number | undefined;
@@ -111,13 +137,10 @@ export default function HomeScreen() {
             if (currentStatus === 'denied') {
                 // Already denied — open system settings so user can manually grant
                 setLocationGranted(false);
+                awaitingSettingsReturn.current = true;
                 await Linking.openSettings();
-                // After returning from settings, re-check
-                const { status: recheckStatus } = await ExpoLocation.getForegroundPermissionsAsync();
-                if (recheckStatus !== 'granted') {
-                    await fetchProducts();
-                    return;
-                }
+                // AppState listener will handle the re-check when app comes back
+                return;
             }
 
             const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
@@ -226,11 +249,9 @@ export default function HomeScreen() {
                     const { status } = await ExpoLocation.getForegroundPermissionsAsync();
                     if (status === 'denied') {
                         // Already denied — go straight to settings
+                        awaitingSettingsReturn.current = true;
                         await Linking.openSettings();
-                        const { status: recheckStatus } = await ExpoLocation.getForegroundPermissionsAsync();
-                        setLocationGranted(recheckStatus === 'granted');
-                        if (recheckStatus === 'granted') requestLocationAndFetch();
-                        else fetchProducts();
+                        // AppState listener will handle re-check when app returns
                     } else {
                         requestLocationAndFetch();
                     }
@@ -274,20 +295,34 @@ export default function HomeScreen() {
                 />
 
                 {/* Categories Carousel */}
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoriesContainer} contentContainerStyle={styles.categoriesContent}>
-                    {CATEGORIES.map((cat) => (
-                        <TouchableOpacity
-                            key={cat.id}
-                            style={styles.categoryItem}
-                            onPress={() => router.push({ pathname: '/(tabs)/categories', params: { categoryId: cat.id } })}
-                        >
-                            <View style={styles.categoryImageContainer}>
-                                <Image source={typeof cat.image === 'string' ? { uri: cat.image } : cat.image} style={styles.categoryImage} />
-                            </View>
-                            <Text style={styles.categoryText}>{cat.name}</Text>
-                        </TouchableOpacity>
-                    ))}
-                </ScrollView>
+                <View style={styles.categoriesWrapper}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoriesContainer} contentContainerStyle={styles.categoriesContent}>
+                        {CATEGORIES.map((cat) => (
+                            <TouchableOpacity
+                                key={cat.id}
+                                style={styles.categoryItem}
+                                onPress={() => router.push({ pathname: '/(tabs)/categories', params: { categoryId: cat.id } })}
+                            >
+                                <View style={styles.categoryImageContainer}>
+                                    <Image source={typeof cat.image === 'string' ? { uri: cat.image } : cat.image} style={styles.categoryImage} />
+                                </View>
+                                <Text style={styles.categoryText} numberOfLines={2}>{cat.name}</Text>
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
+                    {/* Fade + arrow indicator hinting more content to the right */}
+                    <View style={styles.categoriesFadeRight} pointerEvents="none">
+                        <LinearGradient
+                            colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.85)', '#ffffff']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                            style={styles.categoriesFadeGradient}
+                        />
+                        <View style={styles.categoriesArrow}>
+                            <Feather name="chevron-right" size={16} color="#999" />
+                        </View>
+                    </View>
+                </View>
 
                 {/* Hero */}
                 <View style={styles.heroSection}>
@@ -448,8 +483,6 @@ export default function HomeScreen() {
                     </View>
                     <Text style={styles.copyright}>© 2026 Zpin. All rights reserved.</Text>
                 </View>
-
-                <View style={{ height: 20 }} />
             </ScrollView>
         </SafeAreaView>
     );
@@ -458,73 +491,213 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#fff' },
     scrollContent: { paddingBottom: 20 },
-    categoriesContainer: { paddingLeft: 20, marginBottom: 20 },
-    categoriesContent: { paddingRight: 20 },
-    categoryItem: { alignItems: 'center', marginRight: 20 },
-    categoryImageContainer: { width: 65, height: 65, borderRadius: 32.5, backgroundColor: '#f5f5f5', marginBottom: 8, overflow: 'hidden', borderWidth: 1, borderColor: '#f0f0f0' },
+
+    // Categories carousel with fade indicator
+    categoriesWrapper: {
+        marginBottom: width * 0.05,
+        position: 'relative',
+    },
+    categoriesContainer: { paddingLeft: width * 0.05 },
+    categoriesContent: { paddingRight: width * 0.12 },
+    categoryItem: { alignItems: 'center', marginRight: width * 0.05, width: width * 0.16 },
+    categoryImageContainer: {
+        width: width * 0.16,
+        height: width * 0.16,
+        borderRadius: width * 0.08,
+        backgroundColor: '#f5f5f5',
+        marginBottom: 8,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: '#f0f0f0',
+    },
     categoryImage: { width: '100%', height: '100%' },
-    categoryText: { fontSize: 12, color: '#555', fontWeight: '500' },
-    heroSection: { backgroundColor: '#FFFBE6', marginHorizontal: 20, borderRadius: 20, padding: 20, flexDirection: 'row', justifyContent: 'space-between', marginBottom: 25, overflow: 'hidden' },
-    heroContent: { flex: 1, paddingRight: 10 },
-    heroTitle: { fontSize: 24, fontWeight: '800', color: '#1A1A1A', lineHeight: 30 },
+    categoryText: { fontSize: 11, color: '#555', fontWeight: '500', textAlign: 'center' },
+    categoriesFadeRight: {
+        position: 'absolute',
+        right: 0,
+        top: 0,
+        bottom: 0,
+        width: width * 0.14,
+        justifyContent: 'center',
+        alignItems: 'flex-end',
+    },
+    categoriesFadeGradient: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        top: 0,
+        bottom: 0,
+    },
+    categoriesArrow: {
+        width: 26,
+        height: 26,
+        borderRadius: 13,
+        backgroundColor: '#fff',
+        borderWidth: 1,
+        borderColor: '#e8e8e8',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 6,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.08,
+        shadowRadius: 3,
+        elevation: 2,
+    },
+
+    // Hero
+    heroSection: {
+        backgroundColor: '#FFFBE6',
+        marginHorizontal: width * 0.05,
+        borderRadius: 20,
+        padding: width * 0.05,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: width * 0.06,
+        overflow: 'hidden',
+    },
+    heroContent: { flex: 1, paddingRight: width * 0.02 },
+    heroTitle: { fontSize: width * 0.06, fontWeight: '800', color: '#1A1A1A', lineHeight: width * 0.076 },
     heroTitleItalic: { color: '#FBBF24', fontStyle: 'italic' },
-    heroSubtitle: { fontSize: 12, color: '#666', marginTop: 8, marginBottom: 15, lineHeight: 16 },
+    heroSubtitle: { fontSize: width * 0.03, color: '#666', marginTop: 8, marginBottom: 15, lineHeight: width * 0.042 },
     heroStats: { flexDirection: 'row', marginBottom: 15, alignItems: 'center' },
-    heroStatValue: { fontWeight: '800', fontSize: 16, color: '#333' },
-    heroStatLabel: { fontSize: 10, color: '#888' },
+    heroStatValue: { fontWeight: '800', fontSize: width * 0.04, color: '#333' },
+    heroStatLabel: { fontSize: width * 0.025, color: '#888' },
     heroStatDivider: { width: 1, height: 25, backgroundColor: '#ddd', marginHorizontal: 10 },
-    heroButton: { backgroundColor: '#FBBF24', paddingVertical: 10, paddingHorizontal: 15, borderRadius: 25, flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start' },
-    heroButtonText: { fontSize: 12, fontWeight: '700', color: '#1a1a1a', marginRight: 5 },
-    heroImageContainer: { width: 120, height: 160, borderRadius: 15, overflow: 'hidden' },
+    heroButton: {
+        backgroundColor: '#FBBF24',
+        paddingVertical: width * 0.025,
+        paddingHorizontal: width * 0.04,
+        borderRadius: 25,
+        flexDirection: 'row',
+        alignItems: 'center',
+        alignSelf: 'flex-start',
+    },
+    heroButtonText: { fontSize: width * 0.03, fontWeight: '700', color: '#1a1a1a', marginRight: 5 },
+    heroImageContainer: { width: width * 0.3, height: width * 0.4, borderRadius: 15, overflow: 'hidden' },
     heroImage: { width: '100%', height: '100%' },
-    priceTag: { position: 'absolute', bottom: 10, left: 10, right: 10, backgroundColor: 'rgba(50,50,50,0.8)', padding: 8, borderRadius: 10 },
-    priceTagText: { color: '#aaa', fontSize: 10 },
-    priceTagPrice: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
-    promoBannerContainer: { marginHorizontal: 20, borderRadius: 20, overflow: 'hidden', marginBottom: 25, height: 150 },
-    promoBanner: { flex: 1, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20 },
+    priceTag: {
+        position: 'absolute',
+        bottom: 10,
+        left: 10,
+        right: 10,
+        backgroundColor: 'rgba(50,50,50,0.8)',
+        padding: 8,
+        borderRadius: 10,
+    },
+    priceTagText: { color: '#aaa', fontSize: width * 0.025 },
+    priceTagPrice: { color: '#fff', fontWeight: 'bold', fontSize: width * 0.035 },
+
+    // Promo Banner
+    promoBannerContainer: {
+        marginHorizontal: width * 0.05,
+        borderRadius: 20,
+        overflow: 'hidden',
+        marginBottom: width * 0.06,
+        height: width * 0.375,
+    },
+    promoBanner: { flex: 1, flexDirection: 'row', alignItems: 'center', paddingHorizontal: width * 0.05 },
     promoContent: { flex: 1 },
-    promoLabel: { color: '#fff', fontSize: 10, letterSpacing: 1, marginBottom: 5 },
-    promoTitle: { color: '#fff', fontSize: 24, fontWeight: '900', fontStyle: 'italic' },
-    promoSubtitle: { color: '#fff', fontSize: 18, fontWeight: '700', marginBottom: 5 },
-    promoFooter: { color: '#eee', fontSize: 10 },
-    promoImage: { width: 100, height: 150, resizeMode: 'cover', opacity: 0.9 },
-    sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', paddingHorizontal: 20, marginBottom: 15 },
-    sectionTitle: { fontSize: 18, fontWeight: '800', color: '#1a1a1a' },
-    viewAllText: { color: '#FBBF24', fontSize: 12, fontWeight: '600' },
-    horizontalList: { paddingLeft: 20, paddingRight: 10, marginBottom: 30 },
-    recommendCard: { width: 140, marginRight: 15 },
-    recommendImageContainer: { height: 140, backgroundColor: '#f9f9f9', borderRadius: 15, marginBottom: 10, overflow: 'hidden', shadowColor: '#AAA', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 5, elevation: 5 },
+    promoLabel: { color: '#fff', fontSize: width * 0.025, letterSpacing: 1, marginBottom: 5 },
+    promoTitle: { color: '#fff', fontSize: width * 0.06, fontWeight: '900', fontStyle: 'italic' },
+    promoSubtitle: { color: '#fff', fontSize: width * 0.045, fontWeight: '700', marginBottom: 5 },
+    promoFooter: { color: '#eee', fontSize: width * 0.025 },
+    promoImage: { width: width * 0.25, height: width * 0.375, resizeMode: 'cover', opacity: 0.9 },
+
+    // Section header
+    sectionHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'baseline',
+        paddingHorizontal: width * 0.05,
+        marginBottom: 15,
+    },
+    sectionTitle: { fontSize: width * 0.045, fontWeight: '800', color: '#1a1a1a' },
+    viewAllText: { color: '#FBBF24', fontSize: width * 0.03, fontWeight: '600' },
+    locationLabel: { fontSize: width * 0.028, color: '#888', marginTop: 2 },
+
+    // Horizontal lists
+    horizontalList: { paddingLeft: width * 0.05, paddingRight: width * 0.025, marginBottom: 30 },
+
+    // Recommended
+    recommendCard: { width: width * 0.35, marginRight: width * 0.038 },
+    recommendImageContainer: {
+        height: width * 0.35,
+        backgroundColor: '#f9f9f9',
+        borderRadius: 15,
+        marginBottom: 10,
+        overflow: 'hidden',
+        shadowColor: '#AAA',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 5,
+        elevation: 5,
+    },
     recommendImage: { width: '100%', height: '100%', resizeMode: 'cover' },
-    recommendName: { fontWeight: '700', color: '#333', fontSize: 14, textAlign: 'center' },
-    recommendDesc: { color: '#888', fontSize: 10, textAlign: 'center' },
-    freshCard: { width: 160, height: 220, borderRadius: 15, marginRight: 15, overflow: 'hidden' },
+    recommendName: { fontWeight: '700', color: '#333', fontSize: width * 0.035, textAlign: 'center' },
+    recommendDesc: { color: '#888', fontSize: width * 0.025, textAlign: 'center' },
+
+    // Fresh Arrivals
+    freshCard: { width: width * 0.4, height: width * 0.55, borderRadius: 15, marginRight: width * 0.038, overflow: 'hidden' },
     freshImage: { width: '100%', height: '100%' },
-    freshInfo: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(255,255,255,0.9)', padding: 10 },
-    freshName: { fontWeight: '700', fontSize: 12, color: '#333', textAlign: 'center' },
-    freshOffer: { color: '#666', fontSize: 10, textAlign: 'center' },
-    nearbyGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 15, justifyContent: 'space-between', marginBottom: 30 },
-    nearbyItem: { width: (width - 50) / 2, marginBottom: 15, alignItems: 'center' },
-    nearbyImageContainer: { width: '100%', height: 120, borderRadius: 15, backgroundColor: '#f5f5f5', marginBottom: 8, overflow: 'hidden', position: 'relative' },
+    freshInfo: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        backgroundColor: 'rgba(255,255,255,0.9)',
+        padding: 10,
+    },
+    freshName: { fontWeight: '700', fontSize: width * 0.03, color: '#333', textAlign: 'center' },
+    freshOffer: { color: '#666', fontSize: width * 0.025, textAlign: 'center' },
+
+    // Nearby grid
+    nearbyGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        paddingHorizontal: width * 0.038,
+        justifyContent: 'space-between',
+        marginBottom: 30,
+    },
+    nearbyItem: { width: '47%', marginBottom: 15, alignItems: 'center' },
+    nearbyImageContainer: {
+        width: '100%',
+        aspectRatio: 1.4,
+        borderRadius: 15,
+        backgroundColor: '#f5f5f5',
+        marginBottom: 8,
+        overflow: 'hidden',
+        position: 'relative',
+    },
     nearbyImage: { width: '100%', height: '100%' },
-    nearbyBadge: { position: 'absolute', top: 8, right: 8, backgroundColor: '#FBBF24', borderRadius: 10, paddingHorizontal: 7, paddingVertical: 2 },
-    nearbyBadgeText: { fontSize: 10, fontWeight: '800', color: '#1a1a1a' },
-    nearbyName: { fontWeight: '600', fontSize: 14, color: '#333' },
-    nearbyCount: { fontSize: 11, color: '#888', marginTop: 2 },
-    locationLabel: { fontSize: 11, color: '#888', marginTop: 2 },
+    nearbyBadge: {
+        position: 'absolute',
+        top: 8,
+        right: 8,
+        backgroundColor: '#FBBF24',
+        borderRadius: 10,
+        paddingHorizontal: 7,
+        paddingVertical: 2,
+    },
+    nearbyBadgeText: { fontSize: width * 0.025, fontWeight: '800', color: '#1a1a1a' },
+    nearbyName: { fontWeight: '600', fontSize: width * 0.035, color: '#333' },
+    nearbyCount: { fontSize: width * 0.028, color: '#888', marginTop: 2 },
+
+    // Location disclaimer
     locationDisclaimer: {
-        marginHorizontal: 15,
+        marginHorizontal: width * 0.038,
         marginBottom: 30,
         backgroundColor: '#FFFBE6',
         borderRadius: 16,
-        padding: 24,
+        padding: width * 0.06,
         alignItems: 'center',
         borderWidth: 1,
         borderColor: '#FEF3C7',
     },
     locationDisclaimerIcon: {
-        width: 56,
-        height: 56,
-        borderRadius: 28,
+        width: width * 0.14,
+        height: width * 0.14,
+        borderRadius: width * 0.07,
         backgroundColor: '#FFF',
         justifyContent: 'center',
         alignItems: 'center',
@@ -536,43 +709,59 @@ const styles = StyleSheet.create({
         elevation: 3,
     },
     locationDisclaimerTitle: {
-        fontSize: 16,
+        fontSize: width * 0.04,
         fontWeight: '800',
         color: '#1a1a1a',
         marginBottom: 6,
         textAlign: 'center',
     },
     locationDisclaimerText: {
-        fontSize: 13,
+        fontSize: width * 0.033,
         color: '#6B7280',
         textAlign: 'center',
-        lineHeight: 20,
+        lineHeight: width * 0.05,
         marginBottom: 16,
-        paddingHorizontal: 10,
+        paddingHorizontal: '5%',
     },
     locationDisclaimerButton: {
         backgroundColor: '#FBBF24',
-        paddingVertical: 12,
-        paddingHorizontal: 28,
+        paddingVertical: width * 0.03,
+        paddingHorizontal: width * 0.07,
         borderRadius: 25,
     },
     locationDisclaimerButtonText: {
-        fontSize: 14,
+        fontSize: width * 0.035,
         fontWeight: '800',
         color: '#1a1a1a',
     },
-    discountCard: { width: 200, marginRight: 15 },
-    discountImage: { width: 200, height: 120, borderRadius: 15, backgroundColor: '#eee' },
+
+    // Big Discounts
+    discountCard: { width: width * 0.5, marginRight: width * 0.038 },
+    discountImage: { width: '100%', height: width * 0.3, borderRadius: 15, backgroundColor: '#eee' },
     discountOverlay: { position: 'absolute', top: 10, left: 10 },
     discountBadge: { backgroundColor: 'rgba(255,255,255,0.9)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 5 },
-    discountBadgeText: { fontSize: 10, fontWeight: '700', color: '#0082c8' },
+    discountBadgeText: { fontSize: width * 0.025, fontWeight: '700', color: '#0082c8' },
     discountInfo: { marginTop: 8 },
-    discountName: { fontWeight: '700', color: '#333' },
-    discountDesc: { color: '#888', fontSize: 11 },
-    footer: { alignItems: 'center', paddingTop: 40, paddingBottom: 20, backgroundColor: '#FFFCF5', marginTop: 20 },
-    footerLogo: { fontSize: 24, fontWeight: '900', color: '#FBBF24', marginBottom: 10 },
-    footerTagline: { color: '#888', fontSize: 10, textAlign: 'center', marginBottom: 20, paddingHorizontal: 50 },
+    discountName: { fontWeight: '700', color: '#333', fontSize: width * 0.035 },
+    discountDesc: { color: '#888', fontSize: width * 0.028 },
+
+    // Footer
+    footer: {
+        alignItems: 'center',
+        paddingTop: width * 0.1,
+        paddingBottom: 8,
+        backgroundColor: '#FFFCF5',
+        marginTop: 20,
+    },
+    footerLogo: { fontSize: width * 0.06, fontWeight: '900', color: '#FBBF24', marginBottom: 10 },
+    footerTagline: {
+        color: '#888',
+        fontSize: width * 0.025,
+        textAlign: 'center',
+        marginBottom: 20,
+        paddingHorizontal: '12%',
+    },
     footerLinks: { flexDirection: 'row', marginBottom: 20 },
-    footerLink: { marginHorizontal: 15, color: '#555', fontSize: 12, fontWeight: '500' },
-    copyright: { color: '#ccc', fontSize: 10 },
+    footerLink: { marginHorizontal: width * 0.038, color: '#555', fontSize: width * 0.03, fontWeight: '500' },
+    copyright: { color: '#ccc', fontSize: width * 0.025 },
 });

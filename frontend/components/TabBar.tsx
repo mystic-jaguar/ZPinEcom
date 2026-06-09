@@ -4,14 +4,15 @@ import React from 'react';
 import { Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
+const TAB_HEIGHT = Math.max(60, height * 0.082);
 
 // Interactive Tab Bar implementing the design from Home Screen
 export default function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
     const insets = useSafeAreaInsets();
 
     return (
-        <View style={[styles.bottomNav, { paddingBottom: 2 + insets.bottom, height: 70 + insets.bottom }]}>
+        <View style={[styles.bottomNav, { paddingBottom: 2 + insets.bottom, height: TAB_HEIGHT + insets.bottom }]}>
             {state.routes.map((route, index) => {
                 const { options } = descriptors[route.key];
                 const isFocused = state.index === index;
@@ -74,7 +75,7 @@ export default function TabBar({ state, descriptors, navigation }: BottomTabBarP
 const styles = StyleSheet.create({
     bottomNav: {
         flexDirection: 'row',
-        height: 70,
+        height: TAB_HEIGHT,
         backgroundColor: '#fff',
         borderTopWidth: 1,
         borderTopColor: '#f0f0f0',
@@ -92,7 +93,7 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     navText: {
-        fontSize: 10,
+        fontSize: width * 0.025,
         marginTop: 4,
         fontWeight: '600',
     },

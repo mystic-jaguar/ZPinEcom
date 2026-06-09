@@ -1,7 +1,9 @@
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
-import { Image, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Dimensions, Image, StyleSheet, TouchableOpacity, View } from 'react-native';
+
+const { width } = Dimensions.get('window');
 
 interface HeaderProps {
     // Add props if needed in future (e.g., title for other screens)
@@ -40,14 +42,13 @@ const styles = StyleSheet.create({
         paddingRight: '5%',
         paddingStart: '1%',
         paddingVertical: 1,
-        backgroundColor: '#fff'
+        backgroundColor: '#fff',
     },
     logoContainer: {
-        height: 70,
-        // Width can be flexible or fixed depending on logo aspect ratio
-        width: 140,
+        height: width * 0.175,
+        width: width * 0.35,
         justifyContent: 'center',
-        alignItems: 'flex-start'
+        alignItems: 'flex-start',
     },
     logo: {
         width: '100%',
@@ -57,6 +58,6 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
     },
     iconButton: {
-        marginLeft: 15,
+        marginLeft: width * 0.038,
     },
 });

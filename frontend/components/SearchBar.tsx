@@ -1,6 +1,8 @@
 import { Feather } from '@expo/vector-icons';
 import React from 'react';
-import { StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { Dimensions, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+
+const { width } = Dimensions.get('window');
 
 interface SearchBarProps {
     placeholder?: string;
@@ -51,25 +53,25 @@ export default function SearchBar({
 
 const styles = StyleSheet.create({
     searchContainer: {
-        paddingHorizontal: 20,
-        paddingBottom: 15,
-        backgroundColor: '#fff'
+        paddingHorizontal: '5%',
+        paddingBottom: '4%',
+        backgroundColor: '#fff',
     },
     searchBar: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: '#F7F7F7',
         borderRadius: 25,
-        paddingHorizontal: 15,
-        height: 45,
+        paddingHorizontal: '4%',
+        height: width * 0.112,
         borderWidth: 1,
-        borderColor: '#EEEEEE'
+        borderColor: '#EEEEEE',
     },
     searchInput: {
         flex: 1,
-        marginLeft: 10,
-        marginRight: 10,
-        fontSize: 14,
+        marginLeft: '2.5%',
+        marginRight: '2.5%',
+        fontSize: width * 0.035,
         color: '#333',
     },
 });

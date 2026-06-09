@@ -22,7 +22,7 @@ import { productService } from '../services/product';
 import { CategoryPathItem, ProductObject } from '../types/types';
 
 const { width } = Dimensions.get('window');
-const CARD_WIDTH = (width / 2) - 20;
+const CARD_WIDTH = (width / 2) - width * 0.05;
 
 export default function ProductListing() {
     const router = useRouter();
@@ -438,7 +438,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         flexWrap: 'wrap',
         justifyContent: 'space-between',
-        paddingHorizontal: 15,
+        paddingHorizontal: width * 0.038,
         paddingTop: 20,
     },
     errorText: { color: 'red', fontSize: 16, marginBottom: 10 },
@@ -452,39 +452,39 @@ const styles = StyleSheet.create({
         backgroundColor: '#fff',
     },
     filterScroll: {
-        paddingHorizontal: 15,
-        gap: 15
+        paddingHorizontal: width * 0.038,
+        gap: width * 0.038,
     },
     filterItem: {
         alignItems: 'center',
-        marginRight: 15
+        marginRight: width * 0.038,
     },
     filterCircle: {
-        width: 60,
-        height: 60, // Fixed size circles
-        borderRadius: 30,
+        width: width * 0.15,
+        height: width * 0.15,
+        borderRadius: width * 0.075,
         overflow: 'hidden',
         borderWidth: 2,
         borderColor: 'transparent',
         marginBottom: 4,
-        backgroundColor: '#f5f5f5'
+        backgroundColor: '#f5f5f5',
     },
     filterCircleActive: {
-        borderColor: Colors.light.tint // Active yellow border
+        borderColor: Colors.light.tint,
     },
     filterImage: {
         width: '100%',
         height: '100%',
-        resizeMode: 'cover'
+        resizeMode: 'cover',
     },
     filterText: {
-        fontSize: 12,
+        fontSize: width * 0.03,
         color: '#888',
-        fontWeight: '500'
+        fontWeight: '500',
     },
     filterTextActive: {
         color: '#000',
-        fontWeight: '700'
+        fontWeight: '700',
     },
 
     // Sort Bar
@@ -492,117 +492,116 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingHorizontal: 20,
+        paddingHorizontal: width * 0.05,
         paddingBottom: 15,
-        marginTop: 5
+        marginTop: 5,
     },
     productCount: {
-        fontSize: 14,
+        fontSize: width * 0.035,
         fontWeight: '600',
-        color: '#555'
+        color: '#555',
     },
     sortButton: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: '#f5f5f5',
-        paddingHorizontal: 12,
+        paddingHorizontal: width * 0.03,
         paddingVertical: 6,
-        borderRadius: 20
+        borderRadius: 20,
     },
     sortButtonText: {
-        fontSize: 12,
+        fontSize: width * 0.03,
         fontWeight: '600',
-        color: '#000'
+        color: '#000',
     },
 
     // Grid
-    listContent: { paddingHorizontal: 15, paddingBottom: 20 },
+    listContent: { paddingHorizontal: width * 0.038, paddingBottom: 20 },
     columnWrapper: { justifyContent: 'space-between' },
 
     // Product Card
     productCard: {
         width: CARD_WIDTH,
         marginBottom: 20,
-        // No border/shadow for clean, flat 'Uniqlo/Zara' look or card look
     },
     imageContainer: {
-        height: CARD_WIDTH * 1.3, // 4:5 Aspect Ratio approx
+        height: CARD_WIDTH * 1.3,
         borderRadius: 12,
         overflow: 'hidden',
         backgroundColor: '#f0f0f0',
         marginBottom: 10,
-        position: 'relative'
+        position: 'relative',
     },
     productImage: {
         width: '100%',
         height: '100%',
-        resizeMode: 'cover'
+        resizeMode: 'cover',
     },
     placeholderImage: {
         flex: 1,
         alignItems: 'center',
-        justifyContent: 'center'
+        justifyContent: 'center',
     },
     favoriteButton: {
         position: 'absolute',
         top: 10,
         right: 10,
-        width: 32,
-        height: 32,
-        borderRadius: 16,
+        width: width * 0.08,
+        height: width * 0.08,
+        borderRadius: width * 0.04,
         backgroundColor: '#fff',
         justifyContent: 'center',
         alignItems: 'center',
         shadowColor: '#000',
         shadowOpacity: 0.1,
         shadowRadius: 4,
-        elevation: 3
+        elevation: 3,
     },
     newBadge: {
         position: 'absolute',
         bottom: 10,
         left: 10,
-        backgroundColor: Colors.light.tint, // Yellow
+        backgroundColor: Colors.light.tint,
         paddingHorizontal: 8,
         paddingVertical: 4,
-        borderRadius: 4
+        borderRadius: 4,
     },
     newBadgeText: {
-        fontSize: 10,
+        fontSize: width * 0.025,
         fontWeight: '800',
-        color: '#000'
+        color: '#000',
     },
     productInfo: {
-        paddingHorizontal: 4
+        paddingHorizontal: '2%',
     },
     productBrand: {
-        fontSize: 10,
+        fontSize: width * 0.025,
         fontWeight: '700',
-        color: '#9CA3AF', // Gray-400
+        color: '#9CA3AF',
         marginBottom: 2,
-        letterSpacing: 0.5
+        letterSpacing: 0.5,
     },
     productName: {
-        fontSize: 14,
+        fontSize: width * 0.035,
         fontWeight: '700',
-        color: '#111827', // Gray-900
+        color: '#111827',
         marginBottom: 4,
-        lineHeight: 20
+        lineHeight: width * 0.05,
     },
     priceRow: {
         flexDirection: 'row',
         alignItems: 'baseline',
-        gap: 6
+        gap: 6,
     },
     price: {
-        fontSize: 15,
+        fontSize: width * 0.038,
         fontWeight: '800',
-        color: '#000'
+        color: '#000',
     },
     originalPrice: {
-        fontSize: 12,
+        fontSize: width * 0.03,
         color: '#9CA3AF',
-        textDecorationLine: 'line-through'
+        textDecorationLine: 'line-through',
     },
 
     // Empty
