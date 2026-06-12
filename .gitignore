@@ -50,9 +50,7 @@ backend/.env
 features_analysis
 technical_analysis
 database.md
-ZPIN_ECOM_Design_Documentation
-ZPIN_Use_Case_Specifications
-zpin_use_case
+
 
 #claude files
 claude.md
@@ -69,3 +67,7 @@ claude.md
 test_api.js
 user_stories.md
 .idea/caches/deviceStreaming.xml
+ZPIN_ECOM_Design_Documentation.md
+ZPIN_Use_Case_Specifications.pdf
+zpin_use_case.md
+/backend/src/tests
