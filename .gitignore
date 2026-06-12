@@ -46,29 +46,17 @@ app-example
 backend/.env
 /.claw
 
-#docs
-features_analysis
-technical_analysis
-database.md
+# archive folder (stale docs, legacy migrations, dev tools)
+_archive/
 
+# IDE
+/.idea
+.idea/
 
-#claude files
-claude.md
+# AI/dev tool artifacts
 .claude
 .claude-flow
-.idea/caches/deviceStreaming.xml
-/.idea
-/.idea
-.idea/caches/deviceStreaming.xml
-/.idea
-/.idea/caches
-.idea/caches/deviceStreaming.xml
-.idea/misc.xml
-test_api.js
-user_stories.md
-.idea/caches/deviceStreaming.xml
-ZPIN_ECOM_Design_Documentation.md
+/.claw
+
+# legacy root-level files (now in _archive)
 ZPIN_Use_Case_Specifications.pdf
-zpin_use_case.md
-/backend/src/tests
-TEST_CASES.md
