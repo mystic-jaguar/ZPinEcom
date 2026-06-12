@@ -40,10 +40,9 @@ router.post('/new-order', authenticate, async (req: AuthRequest, res: Response):
       .filter(Boolean);
 
     // Fetch full order details for each order.
-    // We intentionally do NOT filter by o.seller_id here because the orders table
-    // only stores the primary seller, but a seller can have notifications for orders
-    // where they are not the primary seller (multi-seller cart). The orderIds already
-    // come from that seller's own notifications so the trust boundary is maintained.
+    // The orderIds come from this seller's own notifications, which provides the primary
+    // trust boundary. We add a secondary check: only return items belonging to this seller,
+    // preventing data leakage if a notification is ever created with a wrong orderId.
     const ordersResult = await pool.query(
       `SELECT o.*,
         json_agg(json_build_object(
@@ -53,13 +52,19 @@ router.post('/new-order', authenticate, async (req: AuthRequest, res: Response):
           'quantity', oi.quantity,
           'price', oi.price,
           'image', oi.image
-        )) FILTER (WHERE oi.id IS NOT NULL) as items
+        )) FILTER (WHERE oi.id IS NOT NULL AND p.user_id = $2) as items
        FROM orders o
        LEFT JOIN order_items oi ON oi.order_id = o.id
+       LEFT JOIN products p ON p.id = oi.product_id
        WHERE o.id = ANY($1)
+         AND EXISTS (
+           SELECT 1 FROM order_items oi2
+           JOIN products p2 ON p2.id = oi2.product_id
+           WHERE oi2.order_id = o.id AND p2.user_id = $2
+         )
        GROUP BY o.id
        ORDER BY o.created_at DESC`,
-      [orderIds]
+      [orderIds, sellerId]
     );
 
     // Mark notifications as read

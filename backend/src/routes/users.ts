@@ -283,4 +283,100 @@ router.post('/shipping-address', authenticate, addressLimiter, async (req: AuthR
   }
 });
 
+// ── PUT /api/v1/users/shipping-address/:addressId ────────────────────────────
+
+router.put('/shipping-address/:addressId', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+  const { name, phone, addressLine1, addressLine2, city, state, pincode, country, landmark, label, isDefault } = req.body;
+
+  try {
+    // Ownership check — verify address belongs to this user before any mutation
+    const existing = await pool.query(
+      `SELECT * FROM ${ADDRESSES} WHERE id = $1 AND user_id = $2`,
+      [req.params.addressId, req.userId]
+    );
+    if (existing.rows.length === 0) {
+      res.status(404).json({ success: false, message: 'Address not found' });
+      return;
+    }
+
+    const current = decryptAddressPayload(existing.rows[0]);
+    const setClauses: string[] = [];
+    const values: any[] = [];
+
+    const push = (col: string, val: any) => {
+      values.push(val);
+      setClauses.push(`${col} = $${values.length}`);
+    };
+
+    // Re-encrypt all address fields if any field is being updated
+    const hasAddressField = name || phone || addressLine1 || addressLine2 !== undefined
+      || city || state || pincode || country || landmark !== undefined;
+
+    if (hasAddressField) {
+      const merged = encryptAddressPayload({
+        name:          name          ?? current.name,
+        phone:         phone         ?? current.phone,
+        address_line1: addressLine1  ?? current.address_line1,
+        address_line2: addressLine2  !== undefined ? addressLine2 : current.address_line2,
+        city:          city          ?? current.city,
+        state:         state         ?? current.state,
+        pincode:       pincode       ?? current.pincode,
+        country:       country       ?? current.country ?? 'India',
+        landmark:      landmark      !== undefined ? landmark : current.landmark,
+      });
+      for (const [col, val] of Object.entries(merged)) {
+        push(col, val);
+      }
+    }
+
+    if (label !== undefined) push('label', label);
+
+    if (setClauses.length === 0 && isDefault === undefined) {
+      res.status(400).json({ success: false, message: 'No fields to update' });
+      return;
+    }
+
+    if (isDefault) {
+      await pool.query(`UPDATE ${ADDRESSES} SET is_default = false WHERE user_id = $1`, [req.userId]);
+      push('is_default', true);
+    }
+
+    setClauses.push('updated_at = NOW()');
+    values.push(req.params.addressId);
+    values.push(req.userId);
+
+    const result = await pool.query(
+      `UPDATE ${ADDRESSES} SET ${setClauses.join(', ')}
+       WHERE id = $${values.length - 1} AND user_id = $${values.length}
+       RETURNING *`,
+      values
+    );
+
+    res.json({ success: true, data: normalizeAddress(result.rows[0]) });
+  } catch (err) {
+    console.error('updateAddress error:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// ── DELETE /api/v1/users/shipping-address/:addressId ─────────────────────────
+
+router.delete('/shipping-address/:addressId', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    // Ownership enforced in WHERE clause — cannot delete another user's address
+    const result = await pool.query(
+      `DELETE FROM ${ADDRESSES} WHERE id = $1 AND user_id = $2 RETURNING id`,
+      [req.params.addressId, req.userId]
+    );
+    if (result.rows.length === 0) {
+      res.status(404).json({ success: false, message: 'Address not found' });
+      return;
+    }
+    res.json({ success: true, message: 'Address deleted' });
+  } catch (err) {
+    console.error('deleteAddress error:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 export default router;

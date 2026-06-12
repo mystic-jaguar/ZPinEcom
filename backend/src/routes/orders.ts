@@ -716,11 +716,27 @@ router.patch('/:id/return-status', authenticate, async (req: AuthRequest, res: R
   try {
     await ensureOrderSupportTables();
 
-    // Verify the order exists before updating return status
-    const orderCheck = await pool.query(
-      `SELECT id FROM ${ORDERS} WHERE id = $1`,
-      [req.params.id]
-    );
+    // Verify the order exists and enforce seller ownership:
+    // sellers may only update return status for orders containing their products.
+    // Admins and delivery partners may update any order's return status.
+    let orderCheckQuery: string;
+    let orderCheckParams: any[];
+
+    if (req.userRole === 'seller') {
+      // Seller must own at least one product in this order
+      orderCheckQuery = `
+        SELECT DISTINCT o.id
+        FROM ${ORDERS} o
+        JOIN ${ORDER_ITEMS} oi ON oi.order_id = o.id
+        JOIN products p ON p.id = oi.product_id
+        WHERE o.id = $1 AND p.user_id = $2`;
+      orderCheckParams = [req.params.id, req.userId];
+    } else {
+      orderCheckQuery = `SELECT id FROM ${ORDERS} WHERE id = $1`;
+      orderCheckParams = [req.params.id];
+    }
+
+    const orderCheck = await pool.query(orderCheckQuery, orderCheckParams);
     if (orderCheck.rows.length === 0) {
       res.status(404).json({ success: false, message: 'Order not found' });
       return;
@@ -967,6 +983,23 @@ router.patch('/:id/confirm', authenticate, async (req: AuthRequest, res: Respons
   }
 
   try {
+    // Sellers may only confirm orders that contain their own products.
+    // Admins and delivery partners may confirm any order.
+    if (req.userRole === 'seller') {
+      const ownershipCheck = await pool.query(
+        `SELECT DISTINCT o.id
+         FROM ${ORDERS} o
+         JOIN ${ORDER_ITEMS} oi ON oi.order_id = o.id
+         JOIN products p ON p.id = oi.product_id
+         WHERE o.id = $1 AND p.user_id = $2 AND o.status = 'pending'`,
+        [req.params.id, req.userId]
+      );
+      if (ownershipCheck.rows.length === 0) {
+        res.status(404).json({ success: false, message: 'Order not found or cannot be confirmed' });
+        return;
+      }
+    }
+
     const result = await pool.query(
       `UPDATE ${ORDERS}
        SET status = 'confirmed', updated_at = NOW()
