@@ -17,14 +17,18 @@
 #### Authentication System
 | Feature | Status | Details |
 |---------|--------|---------|
-| User Registration | ✅ | Email + password, bcrypt (12 rounds), rate-limited (3/hour) |
-| User Login | ✅ | Email or username, timing-attack prevention, 10 attempts/15min |
+| User Registration | ✅ | Email + password, bcrypt (12 rounds), rate-limited (3/hour), auto-sends verification OTP |
+| User Login | ✅ | Email or username, timing-attack prevention, 10 attempts/15min, email verification enforced |
 | JWT Token System | ✅ | 15-min access tokens + 30-day refresh tokens with rotation |
-| OTP Verification | ✅ | Cryptographically secure 6-digit OTP for email verification |
-| Password Reset | ✅ | OTP-based flow: sendOTP → verifyOTP → resetPassword |
+| OTP Verification | ✅ | Cryptographically secure 6-digit OTP, hashed with bcrypt (10 rounds) before DB storage |
+| Password Reset | ✅ | OTP-based flow: sendOTP → verifyOTP → resetPassword; OTPs stored hashed |
 | Logout | ✅ | Token invalidation and cleanup |
-| Role-Based Access | ✅ | `user` vs `seller` roles enforced via middleware |
+| Role-Based Access | ✅ | `customer` vs `seller` roles enforced via middleware |
 | User Enumeration Prevention | ✅ | Same response for missing users and wrong passwords |
+| Email Verification Enforcement | ✅ | Login blocked with `EMAIL_NOT_VERIFIED` code until OTP verified |
+| Password Policy | ✅ | Min 8 chars, uppercase, lowercase, digit, and special char — backend and frontend in sync |
+| OTP Hashing | ✅ | All OTPs (signup + password reset) hashed with bcrypt before DB storage |
+| Google OAuth Refresh Rotation | ✅ | Old refresh tokens deleted before issuing new on Google login |
 
 - Backend: `routes/auth.ts`
 - Frontend: `app/auth/` (login, signup, forgot-password, verify-otp, verify-reset-otp, reset-password)
@@ -265,14 +269,19 @@
 - SQL injection prevention (parameterized queries + `safeIdentifier` for dynamic identifiers)
 - Timing-attack prevention on login (dummy bcrypt hash on missing user)
 - User enumeration prevention
-- Password strength validation (8+ chars, letter + number)
+- Password strength validation: 8+ chars, uppercase, lowercase, digit, and special character (`!@#$%^&*`) — backend and frontend policy in sync
+- Email verification enforced on login: unverified accounts receive `403 EMAIL_NOT_VERIFIED`
+- Signup auto-dispatches a verification OTP immediately after account creation
+- OTPs stored as bcrypt hashes (10 rounds) — plaintext OTP never persisted to DB
 - JWT expiration + refresh token rotation (old tokens invalidated on use)
+- Google OAuth login now rotates refresh tokens (deletes existing before issuing new)
 - Ownership enforcement on all user data endpoints
 - Role-based access (seller-only endpoints)
 - AES-256-GCM encryption for addresses and wallet balances at rest
 - HMAC-SHA256 signature verification for Razorpay payments
 - Structured security event logging with suspicious request detection
 - Fail-fast env var validation at startup (9 required vars checked)
+- No hardcoded credentials or server IPs in frontend code (all via `EXPO_PUBLIC_*` env vars)
 
 ### Migration Scripts
 - `scripts/runMigration.ts` — main schema migration

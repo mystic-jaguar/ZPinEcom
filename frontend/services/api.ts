@@ -1,22 +1,27 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios, { AxiosError, AxiosInstance } from 'axios';
 
-// Production backend URL
-// NOTE: This is HTTP because the KVM server doesn't have a TLS certificate yet.
-// TODO: Set up a domain + Let's Encrypt SSL and switch to HTTPS before public launch.
-const PRODUCTION_API_URL = 'http://195.35.20.40:5002/api/v1/';
+// Production backend URL — must be set via EXPO_PUBLIC_API_URL in .env
+// Never hardcode IPs or HTTP URLs here; use HTTPS in production.
+const PRODUCTION_API_URL = process.env.EXPO_PUBLIC_API_URL
+  ? process.env.EXPO_PUBLIC_API_URL.trim().replace(/\/+$/, '') + '/'
+  : '';
 
 const resolveBaseUrl = (): string => {
-    // In dev, allow override via EXPO_PUBLIC_API_URL env var
-    if (__DEV__) {
-        const envUrl = process.env.EXPO_PUBLIC_API_URL;
-        if (envUrl && envUrl.trim()) {
-            const trimmed = envUrl.trim().replace(/\/+$/, '');
-            return trimmed.endsWith('/api/v1') ? `${trimmed}/` : `${trimmed}/api/v1/`;
+    const envUrl = process.env.EXPO_PUBLIC_API_URL;
+    if (envUrl && envUrl.trim()) {
+        const trimmed = envUrl.trim().replace(/\/+$/, '');
+        const base = trimmed.endsWith('/api/v1') ? `${trimmed}/` : `${trimmed}/api/v1/`;
+        if (__DEV__) {
+            console.log(`[API] Using env URL: ${base}`);
         }
+        return base;
     }
-    // Production (and dev fallback): use the hardcoded production URL
-    return PRODUCTION_API_URL;
+    // No URL configured — log a clear error rather than silently failing
+    if (__DEV__) {
+        console.error('[API] EXPO_PUBLIC_API_URL is not set. Set it in your .env file.');
+    }
+    throw new Error('EXPO_PUBLIC_API_URL is required. Set it in your .env file before running the app.');
 };
 
 const BASE_URL = resolveBaseUrl();

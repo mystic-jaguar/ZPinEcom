@@ -85,9 +85,19 @@ function generateOTP(): string {
   return (crypto.randomInt(100000, 999999)).toString();
 }
 
-// Password strength: min 8 chars, at least one letter and one number
+/**
+ * Password strength: min 8 chars, at least one uppercase, one lowercase,
+ * one digit, and one special character.
+ * Kept in sync with the frontend validatePassword utility.
+ */
 function isStrongPassword(password: string): boolean {
-  return password.length >= 8 && /[a-zA-Z]/.test(password) && /[0-9]/.test(password);
+  return (
+    password.length >= 8 &&
+    /[A-Z]/.test(password) &&
+    /[a-z]/.test(password) &&
+    /[0-9]/.test(password) &&
+    /[!@#$%^&*]/.test(password)
+  );
 }
 
 function normalizeUser(row: any) {
@@ -128,7 +138,7 @@ router.post('/signup', signupLimiter, async (req: Request, res: Response): Promi
   if (!isStrongPassword(password)) {
     res.status(400).json({
       success: false,
-      message: 'Password must be at least 8 characters and contain at least one letter and one number',
+      message: 'Password must be at least 8 characters and contain uppercase, lowercase, a number, and a special character (!@#$%^&*)',
     });
     return;
   }
@@ -166,7 +176,29 @@ router.post('/signup', signupLimiter, async (req: Request, res: Response): Promi
       [generateId(), user.id, refreshToken]
     );
 
-    res.status(201).json({ success: true, message: 'Account created successfully', accessToken, refreshToken, user });
+    // Send verification OTP immediately after signup
+    const otp = generateOTP();
+    const otpHash = await bcrypt.hash(otp, 10);
+    await pool.query(
+      `INSERT INTO ${AUTH_TOKENS} (id, user_id, email, token, token_type, is_used, expires_at, created_at)
+       VALUES ($1,$2,$3,$4,'signup_verification',false,NOW() + INTERVAL '10 minutes',NOW())`,
+      [generateId(), user.id, email.toLowerCase(), otpHash]
+    );
+    try {
+      await sendOTPEmail(email.toLowerCase(), otp, 'verification');
+    } catch (mailErr) {
+      logger.warn('auth.signup_otp_email_failed', { userId: user.id });
+    }
+
+    // Return tokens so the user can proceed — email verification is enforced at
+    // sensitive endpoints (orders, checkout) via the isVerified flag on the user object.
+    res.status(201).json({
+      success: true,
+      message: 'Account created. Please verify your email with the OTP we just sent.',
+      accessToken,
+      refreshToken,
+      user,
+    });
     logger.authSuccess(user.id, req.ip || '', 'signup');
   } catch (err: any) {
     console.error('Signup error:', err.code);
@@ -225,6 +257,16 @@ router.post('/login', loginLimiter, async (req: Request, res: Response): Promise
     if (!passwordMatch) {
       logger.authFailure(req.ip || '', 'login', 'wrong_password', row.id);
       res.status(401).json({ success: false, message: 'Invalid email or password' });
+      return;
+    }
+
+    if (!row.is_verified) {
+      logger.authFailure(req.ip || '', 'login', 'email_not_verified', row.id);
+      res.status(403).json({
+        success: false,
+        message: 'Email not verified. Please check your inbox for the verification OTP.',
+        code: 'EMAIL_NOT_VERIFIED',
+      });
       return;
     }
 
@@ -331,6 +373,9 @@ router.post('/forgetPassword/sendOTP', otpLimiter, async (req: Request, res: Res
     const otp = generateOTP(); // cryptographically secure
     const userId = userResult.rows[0].id;
 
+    // Hash the OTP before storing — prevents plaintext exposure if DB is compromised
+    const otpHash = await bcrypt.hash(otp, 10);
+
     await pool.query(
       `DELETE FROM ${AUTH_TOKENS} WHERE user_id = $1 AND token_type = 'password_reset'`,
       [userId]
@@ -338,7 +383,7 @@ router.post('/forgetPassword/sendOTP', otpLimiter, async (req: Request, res: Res
     await pool.query(
       `INSERT INTO ${AUTH_TOKENS} (id, user_id, token, token_type, is_used, expires_at, created_at)
        VALUES ($1,$2,$3,'password_reset',false,NOW() + INTERVAL '15 minutes',NOW())`,
-      [generateId(), userId, otp]
+      [generateId(), userId, otpHash]
     );
 
     await sendOTPEmail(email.toLowerCase(), otp, 'password_reset');
@@ -361,15 +406,16 @@ router.post('/forgetPassword/verifyOTP', otpVerifyLimiter, async (req: Request, 
   }
 
   try {
+    // Fetch all unexpired, unused tokens for this email — then bcrypt.compare
+    // each one. This is necessary because the OTP is stored hashed.
     const result = await pool.query(
       `SELECT at.* FROM ${AUTH_TOKENS} at
        JOIN ${USERS} u ON u.id = at.user_id
        WHERE u.email = $1
-         AND at.token = $2
          AND at.token_type = 'password_reset'
          AND at.expires_at > NOW()
          AND at.is_used = false`,
-      [email.toLowerCase(), otp]
+      [email.toLowerCase()]
     );
 
     if (result.rows.length === 0) {
@@ -377,9 +423,21 @@ router.post('/forgetPassword/verifyOTP', otpVerifyLimiter, async (req: Request, 
       return;
     }
 
+    // Compare the submitted OTP against each stored hash
+    let matchedRow: any = null;
+    for (const row of result.rows) {
+      const isMatch = await bcrypt.compare(otp, row.token);
+      if (isMatch) { matchedRow = row; break; }
+    }
+
+    if (!matchedRow) {
+      res.status(400).json({ success: false, message: 'Invalid or expired OTP' });
+      return;
+    }
+
     // Return a signed short-lived reset token instead of the raw OTP
     const resetToken = jwt.sign(
-      { tokenId: result.rows[0].id, purpose: 'password_reset' },
+      { tokenId: matchedRow.id, purpose: 'password_reset' },
       process.env.JWT_SECRET!,
       { expiresIn: '10m' }
     );
@@ -403,7 +461,7 @@ router.post('/forgetPassword/resetPassword', otpVerifyLimiter, async (req: Reque
   if (!isStrongPassword(newPassword)) {
     res.status(400).json({
       success: false,
-      message: 'Password must be at least 8 characters and contain at least one letter and one number',
+      message: 'Password must be at least 8 characters and contain uppercase, lowercase, a number, and a special character (!@#$%^&*)',
     });
     return;
   }
@@ -452,6 +510,7 @@ router.post('/forgetPassword/resetPassword', otpVerifyLimiter, async (req: Reque
 router.post('/verification/sendOTP', otpLimiter, async (req: Request, res: Response): Promise<void> => {
   const { mobile, email } = req.body;
   const otp = generateOTP(); // cryptographically secure
+  const otpHash = await bcrypt.hash(otp, 10); // hash before storing
 
   try {
     await pool.query(
@@ -462,7 +521,7 @@ router.post('/verification/sendOTP', otpLimiter, async (req: Request, res: Respo
     await pool.query(
       `INSERT INTO ${AUTH_TOKENS} (id, mobile, email, token, token_type, is_used, expires_at, created_at)
        VALUES ($1,$2,$3,$4,'signup_verification',false,NOW() + INTERVAL '10 minutes',NOW())`,
-      [generateId(), mobile || '', email || '', otp]
+      [generateId(), mobile || '', email || '', otpHash]
     );
 
     if (email) {
@@ -483,14 +542,14 @@ router.post('/verification/verifyOTP', otpVerifyLimiter, async (req: Request, re
   const { mobile, email, otp } = req.body;
 
   try {
+    // Fetch unexpired, unused candidates — then bcrypt.compare (OTP is stored hashed)
     const result = await pool.query(
       `SELECT * FROM ${AUTH_TOKENS}
        WHERE token_type = 'signup_verification'
          AND (mobile = $1 OR email = $2)
-         AND token = $3
          AND expires_at > NOW()
          AND is_used = false`,
-      [mobile || '', email || '', otp]
+      [mobile || '', email || '']
     );
 
     if (result.rows.length === 0) {
@@ -498,9 +557,20 @@ router.post('/verification/verifyOTP', otpVerifyLimiter, async (req: Request, re
       return;
     }
 
+    let matchedRow: any = null;
+    for (const row of result.rows) {
+      const isMatch = await bcrypt.compare(otp, row.token);
+      if (isMatch) { matchedRow = row; break; }
+    }
+
+    if (!matchedRow) {
+      res.status(400).json({ success: false, message: 'Invalid or expired OTP' });
+      return;
+    }
+
     await pool.query(
       `UPDATE ${AUTH_TOKENS} SET is_used = true WHERE id = $1`,
-      [result.rows[0].id]
+      [matchedRow.id]
     );
 
     if (email) {
@@ -657,6 +727,8 @@ router.post('/google', loginLimiter, async (req: Request, res: Response): Promis
 
     const { accessToken: apiAccessToken, refreshToken } = generateTokens(user.id, user.user_role);
 
+    // Rotate: delete any existing refresh tokens for this user before issuing a new one
+    await pool.query(`DELETE FROM ${REFRESH_TOKENS} WHERE user_id = $1`, [user.id]);
     await pool.query(
       `INSERT INTO ${REFRESH_TOKENS} (id, user_id, token, expires_at, created_at)
        VALUES ($1, $2, $3, NOW() + INTERVAL '30 days', NOW())`,
