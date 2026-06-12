@@ -25,11 +25,12 @@ Author: Business Analyst / Product Owner
 1   AUTHENTICATION & ONBOARDING
 
 1.1  Brief Description
-This use case covers all activities related to user registration, email verification, login, session management, password reset, and logout on the ZPIN e-commerce platform. It ensures that only verified and authenticated customers can access their accounts and perform shopping activities.
+This use case covers all activities related to user registration, email verification, login, session management, password reset, and logout on the ZPIN e-commerce platform. It also covers alternative sign-in methods including Google OAuth and Firebase phone authentication. It ensures that only verified and authenticated customers can access their accounts and perform shopping activities.
 
 1.2  Actors
 •Customer — the primary user who registers, logs in, and manages their account
 •System — handles OTP generation, token management, and session validation
+•Google / Firebase — third-party identity providers for social and phone-based sign-in
 
 1.3  Flow of Events
 1.3.1  Basic Flow
@@ -37,42 +38,53 @@ This use case covers all activities related to user registration, email verifica
 1)The customer navigates to the Sign Up screen.
 2)The system requests the customer to enter their name, email address, mobile number, and a password (minimum 8 characters containing at least one letter and one number).
 3)The customer submits the registration form.
-4)The system validates the input, creates the account, sends a 6-digit OTP to the registered email, and navigates the customer to the OTP Verification screen.
+4)The system validates the input, creates the account, issues an access token and a refresh token, and navigates the customer to the OTP Verification screen. A 6-digit OTP is sent to the registered email address for verification.
 1.3.1.2  Email OTP Verification
 1)The system presents the OTP Verification screen.
-2)The customer enters the 6-digit OTP received in their email.
-3)The system validates the OTP, marks the account as verified, issues an access token (15-minute TTL) and a refresh token (30-day TTL), stores them in AsyncStorage, and redirects the customer to the Home screen.
+2)The customer enters the 6-digit OTP received in their email. The OTP expires after 10 minutes.
+3)The system validates the OTP, marks the account as verified, and redirects the customer to the Home screen. Tokens were already issued at registration and are stored in AsyncStorage on the device.
 1.3.1.3  User Login
 1)The customer navigates to the Login screen.
-2)The system requests the customer to enter their email and password.
+2)The system requests the customer to enter their email address (or username) and password.
 3)The customer submits the credentials.
 4)The system validates the credentials, issues access and refresh tokens, and redirects the customer to the Home screen.
-1.3.1.4  Persistent Session and Token Refresh
+1.3.1.4  Google Sign-In
+1)The customer taps Sign in with Google on the Login or Sign Up screen.
+2)The system initiates the Google OAuth flow using the Google Sign-In SDK.
+3)After the customer authenticates with Google, the frontend sends the Google ID token to the backend.
+4)The backend verifies the token using the Google Auth Library, creates or retrieves the matching account, and issues ZPIN access and refresh tokens.
+5)The customer is redirected to the Home screen. If the account is new, the customer may be directed to complete their profile (name, DOB, gender, phone).
+1.3.1.5  Firebase Phone Authentication
+1)The customer enters their mobile number on the phone verification screen.
+2)The system sends an OTP to the mobile number via Firebase.
+3)The customer enters the OTP. The frontend verifies it with Firebase and obtains a Firebase ID token.
+4)The frontend sends the Firebase ID token to the backend, which verifies it and issues ZPIN access and refresh tokens.
+1.3.1.6  Persistent Session and Token Refresh
 1)When the customer reopens the app, the system silently checks for a stored refresh token.
 2)If a valid refresh token exists, the system exchanges it for a new access token without requiring the customer to log in again.
 3)If an API call is made mid-session while the access token has expired, the Axios interceptor automatically uses the refresh token to obtain a new access token and retries the original request.
 4)On each successful token exchange, the old refresh token is deleted and a new one is issued (token rotation).
-1.3.1.5  Forgot Password / Password Reset
+1.3.1.7  Forgot Password / Password Reset
 1)The customer navigates to the Forgot Password screen and enters their registered email address.
-2)The system sends a 6-digit OTP to the email and navigates the customer to the Verify Reset OTP screen.
-3)The customer enters the correct OTP and receives a signed single-use reset token.
-4)The customer enters a new password meeting strength requirements. The system updates the password, invalidates the reset token, and redirects the customer to the Login screen.
-1.3.1.6  Logout
+2)The system sends a 6-digit OTP to the email (valid for 15 minutes) and navigates the customer to the Verify Reset OTP screen.
+3)The customer enters the correct OTP and receives a signed single-use reset token (valid for 10 minutes).
+4)The customer enters a new password meeting strength requirements. The system updates the password, invalidates the reset token, invalidates all existing refresh tokens to force a fresh login, and redirects the customer to the Login screen.
+1.3.1.8  Logout
 1)The customer taps Logout in their profile.
 2)The system calls the logout API to invalidate the refresh token in the database.
 3)The system removes the access token and refresh token from AsyncStorage and redirects the customer to the Login screen.
 
 1.3.2  Alternative Flows
 1.3.2.1  Duplicate Email or Mobile on Registration
-If the customer enters an email or mobile number already registered, the system displays a generic error message without revealing whether the specific account exists, to prevent user enumeration.
+If the customer enters an email address that is already registered, the system returns a conflict error indicating the email is taken. If the mobile number is already in use, a separate conflict error is returned for the mobile number. Username conflicts are also returned specifically. These specific messages are only surfaced at registration time; login and password reset flows still use generic responses to prevent enumeration.
 1.3.2.2  Weak Password
 If the customer enters a password shorter than 8 characters or one without the required letter and number combination, the system displays an inline validation error and does not submit the form.
 1.3.2.3  Registration Rate Limit Exceeded
-If the customer submits the registration form 4 or more times within one hour from the same IP address, the system returns a rate-limit error (429) and asks the customer to try again later.
+If the customer submits the registration form more than 3 times within one hour from the same IP address, the system returns a rate-limit error (429) and asks the customer to try again later.
 1.3.2.4  Incorrect OTP
 If the customer enters an incorrect OTP, the system displays an error and clears the OTP field for re-entry.
 1.3.2.5  Expired OTP
-If the OTP has expired, the system displays an OTP expired message and provides a Resend OTP option. If the customer requests more than 5 resends within 15 minutes, a rate-limit error is shown.
+If the OTP has expired, the system displays an OTP expired message and provides a Resend OTP option. OTP requests are rate-limited to a maximum of 5 per 15-minute window per IP. OTP verification attempts are also rate-limited to 3 per 15 minutes to prevent brute-force attacks on the 6-digit code.
 1.3.2.6  Invalid Login Credentials
 If the customer enters an incorrect password or a non-existent email, the system shows a generic Invalid credentials error (same message in both cases) to prevent user enumeration.
 1.3.2.7  Login Rate Limit Exceeded
@@ -80,32 +92,40 @@ If the customer fails login 10 times within 15 minutes from the same IP, subsequ
 1.3.2.8  Unverified Account Login
 If the customer attempts to log in with an account where is_verified is false, the system redirects the customer to the OTP Verification screen instead of the Home screen.
 1.3.2.9  Deactivated Account Login
-If the customer's account is deactivated (is_active = false), the system displays an Account disabled error.
-1.3.2.10  Session Expiry
+If the customer's account is deactivated (is_active = false), the system displays an Account is deactivated error.
+1.3.2.10  Social Login Account Uses Password Login
+If a customer who registered via Google OAuth attempts to log in using email and password, the system displays an error informing them to sign in with Google instead, since no password hash exists for social login accounts.
+1.3.2.11  Session Expiry
 If both the access token and the refresh token have expired or been invalidated, the system logs the customer out and redirects them to the Login screen with a Session expired message.
-1.3.2.11  Expired or Used Reset Token
+1.3.2.12  Expired or Used Reset Token
 If the customer attempts to use an already-used or expired reset token, the system returns an Invalid or expired token error and does not update the password.
-1.3.2.12  Logout with Network Failure
+1.3.2.13  Logout with Network Failure
 If the logout API call fails due to a network error, the system still clears the tokens from AsyncStorage locally and redirects the customer to the Login screen.
 
 1.4  Special Requirements
 •Access token TTL: 15 minutes; Refresh token TTL: 30 days.
 •Token rotation must be implemented: each refresh token is single-use and a new one is issued on every exchange.
 •All tokens must be stored in AsyncStorage on the mobile client.
-•OTP resend rate limit: maximum 5 resends within 15 minutes.
+•Signup OTP TTL: 10 minutes. Password reset OTP TTL: 15 minutes. Reset token TTL (post-OTP verification): 10 minutes.
+•OTP resend rate limit: maximum 5 requests per 15-minute window per IP.
+•OTP verification rate limit: maximum 3 attempts per 15-minute window per IP.
 •Registration rate limit: maximum 3 attempts per hour per IP.
 •Login rate limit: 10 failed attempts per 15-minute window per IP results in lockout.
-•User enumeration prevention must be applied across registration, login, and forgot password flows.
+•User enumeration prevention must be applied on login and forgot password flows.
+•Social login accounts (Google OAuth) do not have a password hash; password login must be rejected for these accounts with a clear message.
 
 1.5  Preconditions
 •The email OTP service (mailer) must be operational before registration or password reset begins.
 •For login, the customer must have a registered account in the system.
+•For Google sign-in, the Google Sign-In SDK must be configured with a valid client ID.
+•For Firebase phone auth, the Firebase project must be active and the phone auth provider must be enabled.
 •For token refresh, the customer must have a valid non-expired refresh token stored on the device.
 
 1.6  Postconditions
-•After successful registration and OTP verification, the customer account is active and the customer is logged in with valid tokens.
-•After successful login, the customer is redirected to the Home screen with active session tokens.
-•After password reset, the old reset token is invalidated and the customer is redirected to the Login screen.
+•After successful registration, the customer account is created, tokens are issued, and a verification OTP is sent to the registered email.
+•After OTP verification, the customer account is marked as verified and the customer is on the Home screen.
+•After successful login (email/password or social), the customer is redirected to the Home screen with active session tokens.
+•After password reset, the old reset token is invalidated, all refresh tokens are revoked, and the customer is redirected to the Login screen.
 •After logout, all session tokens are invalidated on the server and cleared from the device.
 
 
@@ -122,12 +142,13 @@ This use case covers how a customer discovers products on the ZPIN platform. It 
 2.3.1  Basic Flow
 2.3.1.1  Home Screen Feed
 1)The customer opens the Home screen.
-2)The system fetches personalized recommended products from the recommendations endpoint.
-3)The system also displays a Fresh Categories section showing the top 5 categories with the most recently added products.
-4)The customer taps a product card and is navigated to the Product Detail screen.
+2)The system fires three requests in parallel: fresh categories, personalized recommendations, and nearby categories (if location is available).
+3)The Home screen displays the following sections: a horizontal category carousel (Fashion, Footwear, Accessories, Beauty, Home & Living), a Recommended section with personalized product cards, a Fresh Arrivals section showing the top 5 categories with the most recently added products, a Nearby Availabilities section showing category product counts filtered by the customer's location, and a Big Discounts section.
+4)The customer taps a product card or category and is navigated to the relevant Product Listing or Product Detail screen.
+5)If location permission has not been granted, the Nearby Availabilities section shows a prompt asking the customer to enable location access. The app shows a pre-prompt explanation modal before triggering the native OS location dialog.
 2.3.1.2  Category Browse
 1)The customer navigates to the Categories tab.
-2)The system displays the full category tree (Men, Women, Kids, Makeup) with live product counts.
+2)The system displays the full category tree (Fashion, Footwear, Accessories, Beauty, Home & Living, and sub-categories such as Men, Women, Kids, Makeup) with live product counts.
 3)The customer taps a category. The system navigates to the Product Listing screen and fetches all products in that category.
 4)The customer can open a filter modal to sort by price (low to high, high to low) and filter by price range, brand, rating, and discount percentage.
 5)The product grid updates immediately using client-side filtering without a new API call.
@@ -151,7 +172,7 @@ This use case covers how a customer discovers products on the ZPIN platform. It 
 
 2.3.2  Alternative Flows
 2.3.2.1  Backend Unreachable
-If the backend is unreachable when the customer opens the Home screen, the system displays the static fallback product list from the local constants file and shows a subtle offline indicator.
+If the backend is unreachable when the customer opens the Home screen, the system falls back to static local data for the recommended, fresh arrivals, and nearby sections and continues to render the screen normally.
 2.3.2.2  New Customer with No History
 If the customer has no purchase, wishlist, or search history, the recommendations section falls back to displaying the latest products available on the platform.
 2.3.2.3  Category with No Products
@@ -166,8 +187,10 @@ If the customer taps Add to Cart without selecting a required size, the system d
 2.4  Special Requirements
 •Search input must be debounced to avoid excessive API calls on every keystroke.
 •Category filtering must be performed client-side on the already-fetched product list, without a new API call.
-•A static fallback product list must be maintained locally for offline scenarios.
+•Static fallback data must be maintained locally for the home screen sections in case the backend is unreachable.
 •Size variants with zero stock must be shown as disabled or greyed out on the Product Detail screen.
+•Home screen product data (recommendations, fresh categories, nearby) must be fetched in parallel to minimize load time.
+•The Nearby Availabilities section requires location permission. The app must show an explanation modal before requesting the native OS permission dialog, and must handle the denied state gracefully.
 
 2.5  Preconditions
 •The customer must be logged into the system.
@@ -175,7 +198,7 @@ If the customer taps Add to Cart without selecting a required size, the system d
 
 2.6  Postconditions
 •After browsing and selecting a product, the customer is on the Product Detail screen ready to add the item to the cart or wishlist.
-•Recommendation scores are updated as the customer interacts with products.
+•Recommendation signals are updated as the customer interacts with products (purchases, wishlists, searches).
 
 
 3   CART & WISHLIST
@@ -426,7 +449,7 @@ If the original payment was COD and the customer selects wallet refund upon canc
 6.4  Special Requirements
 •Wallet balance must be stored encrypted in the database.
 •All wallet debit operations during order creation must be performed within an atomic database transaction to prevent race conditions.
-•Razorpay payment verification must use HMAC-SHA256 signature validation on the backend.
+•Razorpay payment verification must use HMAC-SHA256 signature validation on the backend. The backend must also verify that the payment ID has not been used before, to prevent replay attacks.
 •The Rs 50 Instant Trial fee must always be excluded from any refund calculation.
 
 6.5  Preconditions
@@ -556,6 +579,7 @@ If a product has no reviews, the reviews section displays an empty state encoura
 •Verified purchase status (is_verified_purchase) must be determined automatically by the system by checking whether the customer has a delivered order containing the reviewed product.
 •The product's average rating must be recalculated whenever a review is created, updated, or deleted.
 •Reviews are paginated to prevent performance issues when a product has a large number of reviews.
+•Review submission is rate-limited to 5 per hour per customer to prevent spam.
 
 8.5  Preconditions
 •The customer must be logged into the system.

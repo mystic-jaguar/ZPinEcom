@@ -50,6 +50,9 @@ backend/.env
 features_analysis
 technical_analysis
 database.md
+ZPIN_ECOM_Design_Documentation
+ZPIN_Use_Case_Specifications
+zpin_use_case
 
 #claude files
 claude.md
