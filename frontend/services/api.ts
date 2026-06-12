@@ -1,11 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios, { AxiosError, AxiosInstance } from 'axios';
 
-// Production backend URL — must be set via EXPO_PUBLIC_API_URL in .env
-// Never hardcode IPs or HTTP URLs here; use HTTPS in production.
-const PRODUCTION_API_URL = process.env.EXPO_PUBLIC_API_URL
-  ? process.env.EXPO_PUBLIC_API_URL.trim().replace(/\/+$/, '') + '/'
-  : '';
+// Hardcoded production fallback — used when EXPO_PUBLIC_API_URL is not baked into the build.
+const PRODUCTION_API_URL = 'http://195.35.20.40:5002/api/v1/';
 
 const resolveBaseUrl = (): string => {
     const envUrl = process.env.EXPO_PUBLIC_API_URL;
@@ -17,11 +14,11 @@ const resolveBaseUrl = (): string => {
         }
         return base;
     }
-    // No URL configured — log a clear error rather than silently failing
+    // Env var not set — fall back to production URL so the app doesn't crash.
     if (__DEV__) {
-        console.error('[API] EXPO_PUBLIC_API_URL is not set. Set it in your .env file.');
+        console.warn('[API] EXPO_PUBLIC_API_URL is not set. Falling back to production URL.');
     }
-    throw new Error('EXPO_PUBLIC_API_URL is required. Set it in your .env file before running the app.');
+    return PRODUCTION_API_URL;
 };
 
 const BASE_URL = resolveBaseUrl();

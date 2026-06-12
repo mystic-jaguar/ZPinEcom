@@ -1,5 +1,4 @@
 import { Stack, useRouter, useSegments } from "expo-router";
-import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
 import { Image, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -12,8 +11,6 @@ import { SearchProvider } from "../context/SearchContext";
 import { UserProvider, useUser } from "../context/UserContext";
 import { WishlistProvider } from "../context/WishlistContext";
 import { startKeepAlive } from "../services/keepAlive";
-
-SplashScreen.preventAutoHideAsync();
 
 function AnimatedSplash() {
   return (
@@ -43,12 +40,6 @@ function RootLayoutNav() {
     // Start keep-alive only once the user is authenticated
     if (isAuthenticated) startKeepAlive();
   }, [isAuthenticated]);
-
-  useEffect(() => {
-    if (!isLoading) {
-      SplashScreen.hideAsync();
-    }
-  }, [isLoading]);
 
   useEffect(() => {
     if (isLoading) return;
