@@ -21,10 +21,10 @@ export default function CheckoutSummaryScreen() {
     const [modalVisible, setModalVisible] = useState(false);
     const [modalConfig, setModalConfig] = useState({ title: '', message: '', icon: 'check-circle' as any });
 
-    // Delivery fees logic
-    const shippingFee = 0; // FREE
-    const instantTrialFee = 50.00; // Updated to ₹50
-    const gst = totalPrice * 0.18; // 18% GST on product total
+    // Delivery fees logic — must match backend (orders.ts) and payment.tsx
+    const instantTrialFee = 50.00;
+    const shippingFee = totalPrice > 500 ? 0 : 49;
+    const gst = Math.round(totalPrice * 0.18);
 
     const isInstant = deliveryType === 'Instant';
     const deliveryFee = isInstant ? instantTrialFee : 0;
@@ -259,7 +259,9 @@ export default function CheckoutSummaryScreen() {
                         </View>
                         <View style={styles.breakdownRow}>
                             <Text style={styles.breakdownLabel}>Shipping Fee</Text>
-                            <Text style={[styles.breakdownValue, { color: '#4CAF50' }]}>FREE</Text>
+                            <Text style={[styles.breakdownValue, shippingFee === 0 && { color: '#4CAF50' }]}>
+                                {shippingFee === 0 ? 'FREE' : `₹${shippingFee.toFixed(2)}`}
+                            </Text>
                         </View>
                         {isInstant && (
                             <View style={styles.breakdownRow}>

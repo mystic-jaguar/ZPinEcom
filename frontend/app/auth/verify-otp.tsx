@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
+import { sendFirebaseOTP } from '../../services/firebaseAuth';
 
 export default function VerifyOTPScreen() {
     const router = useRouter();

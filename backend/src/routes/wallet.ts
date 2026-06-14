@@ -82,7 +82,10 @@ router.post('/credit', authenticate, async (req: AuthRequest, res: Response): Pr
     try {
       await client.query('BEGIN');
       const wallet = await getOrCreateWallet(req.userId!, client);
-      const currentBalance = decryptMoney(wallet.balance);
+
+      // Lock the wallet row to prevent concurrent balance modifications
+      const locked = await client.query('SELECT * FROM wallets WHERE id = $1 FOR UPDATE', [wallet.id]);
+      const currentBalance = decryptMoney(locked.rows[0].balance);
       newBalance = currentBalance + Number(amount);
 
       await client.query(
@@ -139,7 +142,10 @@ router.post('/debit', authenticate, async (req: AuthRequest, res: Response): Pro
     try {
       await client.query('BEGIN');
       const wallet = await getOrCreateWallet(req.userId!, client);
-      const currentBalance = decryptMoney(wallet.balance);
+
+      // Lock the wallet row to prevent concurrent balance modifications
+      const locked = await client.query('SELECT * FROM wallets WHERE id = $1 FOR UPDATE', [wallet.id]);
+      const currentBalance = decryptMoney(locked.rows[0].balance);
 
       if (currentBalance < Number(amount)) {
         await client.query('ROLLBACK');

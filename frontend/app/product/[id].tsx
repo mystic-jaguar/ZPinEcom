@@ -108,7 +108,7 @@ export default function ProductDetails() {
             const activeCoupons = (couponsRes.data?.data || []).filter((c: any) => c.status === 'active');
             if (activeCoupons.length > 0) setActiveCoupon(activeCoupons[0]);
             if (data.colors && data.colors.length > 0) setSelectedColor(data.colors[0]);
-            if (data.sizes && data.sizes.length > 0) setSelectedSize(data.sizes[2] || data.sizes[0]);
+            if (data.sizes && data.sizes.length > 0) setSelectedSize(data.sizes[0]);
         } catch (err: any) {
             setError(err.message || 'Failed to load product details');
         } finally {

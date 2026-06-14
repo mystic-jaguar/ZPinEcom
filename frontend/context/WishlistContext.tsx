@@ -153,7 +153,7 @@ export const WishlistProvider = ({ children }: { children: ReactNode }) => {
 
     const clearWishlist = async () => {
         setWishlistItems([]);
-        AsyncStorage.removeItem(WISHLIST_STORAGE_KEY);
+        await AsyncStorage.removeItem(WISHLIST_STORAGE_KEY);
 
         try {
             const token = await tokenManager.getAccessToken();

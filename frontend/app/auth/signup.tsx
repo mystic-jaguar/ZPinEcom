@@ -18,6 +18,7 @@ import ActionModal from '../../components/common/ActionModal';
 import LegalDocModal, { LegalDocType } from '../../components/common/LegalDocModal';
 import { useUser } from '../../context/UserContext';
 import { authService, googleAuthService } from '../../services/auth';
+import { sendFirebaseOTP } from '../../services/firebaseAuth';
 
 // Google Sign-In requires a native build — not available in Expo Go
 let isGoogleSignInAvailable = false;
