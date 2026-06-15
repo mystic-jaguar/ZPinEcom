@@ -394,14 +394,56 @@ router.get('/fresh-categories', async (req: Request, res: Response): Promise<voi
   }
 });
 
+// Whitelist of sort keys → SQL ORDER BY clause (prevents SQL injection via sort param).
+// Every clause ends with `p.id ASC` as a stable tiebreaker so OFFSET-based pagination
+// is deterministic — without it, rows that tie on the sort column (e.g. many products
+// sharing the same created_at after a bulk seed) get reordered between pages, causing
+// duplicate/skipped products as the user scrolls.
+const CATEGORY_SORT: Record<string, string> = {
+  relevance: 'p.created_at DESC, p.id ASC',
+  new: 'p.created_at DESC, p.id ASC',
+  price_low: 'p.price ASC, p.id ASC',
+  price_high: 'p.price DESC, p.id ASC',
+  rating: 'COALESCE(AVG(pr.rating), 0) DESC, p.id ASC',
+};
+
+// Parse "0-500,500-1000,5000-" → [{ min: 0, max: 500 }, ...]. A blank bound means open-ended.
+function parsePriceBands(raw: string): { min: number | null; max: number | null }[] {
+  if (!raw) return [];
+  return raw
+    .split(',')
+    .map((band) => {
+      const [lo, hi] = band.split('-');
+      const min = lo !== undefined && lo !== '' && Number.isFinite(Number(lo)) ? Number(lo) : null;
+      const max = hi !== undefined && hi !== '' && Number.isFinite(Number(hi)) ? Number(hi) : null;
+      return { min, max };
+    })
+    .filter((b) => b.min !== null || b.max !== null);
+}
+
 // GET /api/v1/products/category/:categoryName — filter by category name
+// Supports server-side pagination (page, limit), sorting (sort), and filtering by
+// price (priceBands), customer rating (minRating), and brand/deepest category (brands).
 router.get('/category/:categoryName', productListLimiter, async (req: Request, res: Response): Promise<void> => {
-  const page = Number(req.query.page) || 1;
-  const limit = Math.min(Number(req.query.limit) || 100, 500); // default 100, max 500
+  const page = Math.max(Number(req.query.page) || 1, 1);
+  const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 100); // default 20, max 100
   const offset = (page - 1) * limit;
   const { categoryName } = req.params;
 
-  const cacheKey = `products:category:${categoryName.toLowerCase()}:p${page}:l${limit}`;
+  // Parse and normalize filter/sort inputs
+  const sortKey = String(req.query.sort || 'relevance');
+  const orderBy = CATEGORY_SORT[sortKey] || CATEGORY_SORT.relevance;
+  const minRating = Math.min(Math.max(Number(req.query.minRating) || 0, 0), 5);
+  const brands = String(req.query.brands || '')
+    .split(',')
+    .map((b) => b.trim().toLowerCase())
+    .filter(Boolean);
+  const priceBandsRaw = String(req.query.priceBands || '').trim();
+  const priceBands = parsePriceBands(priceBandsRaw);
+
+  const cacheKey =
+    `products:category:${categoryName.toLowerCase()}:p${page}:l${limit}` +
+    `:s${sortKey}:r${minRating}:b${brands.join('|')}:pb${priceBandsRaw}`;
   const cached = await cacheGet(cacheKey);
   if (cached) { res.json(cached); return; }
 
@@ -409,33 +451,64 @@ router.get('/category/:categoryName', productListLimiter, async (req: Request, r
   // and a JSON element match for category_path to avoid substring false-positives
   // e.g. "shirts" should NOT match "t-shirts" or "sweatshirts"
   try {
+    // $1 is always the category name. Subsequent filter params are appended dynamically.
+    const params: any[] = [categoryName];
+    let where = `p.in_stock = true
+      AND (
+        LOWER(p.deepest_category_name) = LOWER($1)
+        OR EXISTS (
+          SELECT 1 FROM jsonb_array_elements(
+            CASE WHEN p.category_path IS NOT NULL
+                 THEN p.category_path::jsonb
+                 ELSE '[]'::jsonb
+            END
+          ) AS elem
+          WHERE LOWER(elem->>'name') = LOWER($1)
+        )
+      )`;
+
+    // Price bands → OR group, e.g. (price >= 0 AND price < 500) OR (price >= 5000)
+    if (priceBands.length > 0) {
+      const bandConds = priceBands.map((b) => {
+        const parts: string[] = [];
+        if (b.min !== null) { params.push(b.min); parts.push(`p.price >= $${params.length}`); }
+        if (b.max !== null) { params.push(b.max); parts.push(`p.price < $${params.length}`); }
+        return `(${parts.join(' AND ')})`;
+      });
+      where += ` AND (${bandConds.join(' OR ')})`;
+    }
+
+    // Brand filter — brand maps to the product's deepest category name
+    if (brands.length > 0) {
+      params.push(brands);
+      where += ` AND LOWER(p.deepest_category_name) = ANY($${params.length})`;
+    }
+
+    // minRating is applied as a HAVING clause on the aggregated rating
+    const having = minRating > 0 ? `HAVING COALESCE(AVG(pr.rating), 0) >= ${minRating}` : '';
+
+    // Count distinct matching products (grouped so HAVING/rating filter is honored)
     const countResult = await pool.query(
-      `SELECT COUNT(*) FROM products
-       WHERE in_stock = true
-         AND (
-           LOWER(deepest_category_name) = LOWER($1)
-           OR EXISTS (
-             SELECT 1 FROM jsonb_array_elements(
-               CASE WHEN category_path IS NOT NULL
-                    THEN category_path::jsonb
-                    ELSE '[]'::jsonb
-               END
-             ) AS elem
-             WHERE LOWER(elem->>'name') = LOWER($1)
-           )
-         )`,
-      [categoryName]
+      `SELECT COUNT(*) FROM (
+         SELECT p.id
+         FROM products p
+         LEFT JOIN product_reviews pr ON pr.product_id = p.id
+         WHERE ${where}
+         GROUP BY p.id
+         ${having}
+       ) sub`,
+      params
     );
     const total = Number(countResult.rows[0].count);
 
-    const result = await pool.query(
-      `SELECT p.*,
-        COALESCE(json_agg(DISTINCT pi.image_url) FILTER (WHERE pi.image_url IS NOT NULL), '[]') as images,
-        COALESCE(AVG(pr.rating), 0) as average_rating
+    // Distinct brands (deepest category names) available within this category,
+    // ignoring the active brand/price/rating filters so the filter UI stays complete.
+    const brandsResult = await pool.query(
+      `SELECT DISTINCT p.deepest_category_name AS name
        FROM products p
-       LEFT JOIN product_images pi ON pi.product_id = p.id
-       LEFT JOIN product_reviews pr ON pr.product_id = p.id
        WHERE p.in_stock = true
+         AND p.deepest_category_name IS NOT NULL
+         AND p.deepest_category_name <> ''
          AND (
            LOWER(p.deepest_category_name) = LOWER($1)
            OR EXISTS (
@@ -448,15 +521,30 @@ router.get('/category/:categoryName', productListLimiter, async (req: Request, r
              WHERE LOWER(elem->>'name') = LOWER($1)
            )
          )
+       ORDER BY p.deepest_category_name ASC`,
+      [categoryName]
+    );
+
+    const pageParams = [...params, limit, offset];
+    const result = await pool.query(
+      `SELECT p.*,
+        COALESCE(json_agg(DISTINCT pi.image_url) FILTER (WHERE pi.image_url IS NOT NULL), '[]') as images,
+        COALESCE(AVG(pr.rating), 0) as average_rating
+       FROM products p
+       LEFT JOIN product_images pi ON pi.product_id = p.id
+       LEFT JOIN product_reviews pr ON pr.product_id = p.id
+       WHERE ${where}
        GROUP BY p.id
-       ORDER BY p.created_at DESC
-       LIMIT $2 OFFSET $3`,
-      [categoryName, limit, offset]
+       ${having}
+       ORDER BY ${orderBy}
+       LIMIT $${pageParams.length - 1} OFFSET $${pageParams.length}`,
+      pageParams
     );
 
     const response = {
       success: true,
       products: result.rows.map(normalizeProduct),
+      brands: brandsResult.rows.map((r: any) => r.name),
       pagination: {
         currentPage: page,
         totalPages: Math.ceil(total / limit),
@@ -497,7 +585,7 @@ router.get('/', productListLimiter, async (req: Request, res: Response): Promise
        LEFT JOIN product_reviews pr ON pr.product_id = p.id
        WHERE p.in_stock = true
        GROUP BY p.id
-       ORDER BY p.created_at DESC
+       ORDER BY p.created_at DESC, p.id ASC
        LIMIT $1 OFFSET $2`,
       [limit, offset]
     );

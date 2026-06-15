@@ -1,8 +1,9 @@
 import { Colors } from '@/constants/Colors';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+    ActivityIndicator,
     Dimensions,
     FlatList,
     Image,
@@ -18,11 +19,21 @@ import FilterModal, { FilterState } from '../components/product/FilterModal';
 import SkeletonCard from '../components/product/SkeletonCard';
 import { CATEGORY_DATA, CategoryNode } from '../constants/categories';
 import { useWishlist } from '../context/WishlistContext';
-import { productService } from '../services/product';
-import { CategoryPathItem, ProductObject } from '../types/types';
+import { productService, ProductListParams } from '../services/product';
+import { ProductObject } from '../types/types';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width / 2) - width * 0.05;
+const PAGE_SIZE = 20;
+
+// Maps the FilterModal price-range labels to backend "min-max" bands (max is exclusive).
+const PRICE_BAND_MAP: Record<string, string> = {
+    'Under ₹500': '0-500',
+    '₹500 - ₹1000': '500-1000',
+    '₹1000 - ₹2000': '1000-2000',
+    '₹2000 - ₹5000': '2000-5000',
+    'Above ₹5000': '5000-',
+};
 
 export default function ProductListing() {
     const router = useRouter();
@@ -32,10 +43,21 @@ export default function ProductListing() {
 
     // Products State
     const [products, setProducts] = useState<ProductObject[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(true);          // first page / hard reload
+    const [loadingMore, setLoadingMore] = useState(false); // appending next page
     const [error, setError] = useState<string | null>(null);
+    const [refreshing, setRefreshing] = useState(false);
 
+    // Pagination State
+    const [page, setPage] = useState(1);
+    const [hasNextPage, setHasNextPage] = useState(false);
+    const [totalItems, setTotalItems] = useState(0);
+
+    // Sub-category tab — drives which category name is queried
     const [activeFilter, setActiveFilter] = useState<string>('All');
+
+    // Brands available in this category (returned by the API, used by the filter modal)
+    const [availableBrands, setAvailableBrands] = useState<string[]>([]);
 
     // Filter Modal State
     const [filterModalVisible, setFilterModalVisible] = useState(false);
@@ -46,45 +68,110 @@ export default function ProductListing() {
         ratings: [],
         discounts: []
     });
-    const [refreshing, setRefreshing] = useState(false);
+
+    const rootTarget = (subCategoryName as string) || (categoryName as string) || '';
+    // The 'All' tab queries the root category; a selected tab queries that sub-category directly.
+    const effectiveCategory = activeFilter === 'All' ? rootTarget : activeFilter;
+
+    // Translate the filter modal state into backend query params.
+    const buildParams = useCallback((pageNum: number): ProductListParams => {
+        const params: ProductListParams = {
+            page: pageNum,
+            limit: PAGE_SIZE,
+            sort: filterState.sortBy === 'discount' ? 'relevance' : filterState.sortBy,
+        };
+        // Multiple rating checkboxes are OR'd — the lowest threshold is the least restrictive.
+        if (filterState.ratings.length > 0) {
+            params.minRating = Math.min(...filterState.ratings.map(r => parseFloat(r)));
+        }
+        if (filterState.brands.length > 0) {
+            params.brands = filterState.brands.join(',');
+        }
+        if (filterState.priceRanges.length > 0) {
+            params.priceBands = filterState.priceRanges
+                .map(r => PRICE_BAND_MAP[r])
+                .filter(Boolean)
+                .join(',');
+        }
+        return params;
+    }, [filterState]);
+
+    // Guards against out-of-order responses when filters/tabs change quickly.
+    const requestIdRef = useRef(0);
+    // Synchronous in-flight lock — prevents duplicate loads when onEndReached fires
+    // repeatedly before the async `loading`/`loadingMore` state has committed.
+    const fetchingRef = useRef(false);
+    // Latest pagination cursor, kept in a ref so onEndReached never reads stale state.
+    const pageRef = useRef(1);
+    const hasNextRef = useRef(false);
+
+    const loadProducts = useCallback(async (pageNum: number, append: boolean) => {
+        if (!effectiveCategory) {
+            setProducts([]);
+            setLoading(false);
+            return;
+        }
+        // Dedupe only the "load more" path; a filter/tab change (append=false) must
+        // always proceed and supersede any in-flight load via the request id.
+        if (append && fetchingRef.current) return;
+        fetchingRef.current = true;
+        const reqId = ++requestIdRef.current;
+        try {
+            if (append) setLoadingMore(true);
+            else { setLoading(true); setError(null); }
+
+            const response = await productService.getProductsByCategory(effectiveCategory, buildParams(pageNum));
+            if (reqId !== requestIdRef.current) return; // a newer request superseded this one
+
+            const items = response.products || [];
+            setProducts(prev => {
+                if (!append) return items;
+                // Defensive dedupe — never render the same productId twice across pages.
+                const seen = new Set(prev.map(p => p.productId));
+                return [...prev, ...items.filter(p => !seen.has(p.productId))];
+            });
+            pageRef.current = pageNum;
+            hasNextRef.current = !!response.pagination?.hasNextPage;
+            setPage(pageNum);
+            setHasNextPage(hasNextRef.current);
+            setTotalItems(response.pagination?.totalItems ?? items.length);
+            if (!append) {
+                setAvailableBrands((response.brands || []).map(b => b.toUpperCase()));
+            }
+        } catch (err: any) {
+            if (reqId !== requestIdRef.current) return;
+            if (!append) setError(err.message || 'Failed to load products');
+        } finally {
+            // Only the latest request clears the lock/spinners — a superseded request
+            // must not unlock while a newer one is still running.
+            if (reqId === requestIdRef.current) {
+                setLoading(false);
+                setLoadingMore(false);
+                fetchingRef.current = false;
+            }
+        }
+    }, [effectiveCategory, buildParams]);
+
+    // Reload from page 1 whenever the category tab or any filter/sort changes.
+    useEffect(() => {
+        loadProducts(1, false);
+    }, [loadProducts]);
 
     const onRefresh = async () => {
         setRefreshing(true);
-        await loadProducts();
+        await loadProducts(1, false);
         setRefreshing(false);
     };
 
-    // Fetch Products — use all descendant category names for server-side filtering
-    useEffect(() => {
-        loadProducts();
-    }, [categoryName, subCategoryName]);
+    const onEndReached = () => {
+        if (fetchingRef.current || !hasNextRef.current) return;
+        loadProducts(pageRef.current + 1, true);
+    };
 
-    const loadProducts = async () => {
-        try {
-            setLoading(true);
-            setError(null);
-
-            const subCat = subCategoryName as string;
-            const rootCat = categoryName as string;
-            const targetName = subCat || rootCat;
-
-            if (targetName) {
-                const response = await productService.getProductsByCategory(targetName, { limit: 500 });
-                const items = (response as any).products || (response as any).data || [];
-
-                setProducts(items.map((p: ProductObject) => ({
-                    ...p,
-                    productId: p.productId || (p as any).id,
-                })));
-            } else {
-                const response = await productService.getProducts({ limit: 200 });
-                setProducts(response.products);
-            }
-        } catch (err: any) {
-            setError(err.message || 'Failed to load products');
-        } finally {
-            setLoading(false);
-        }
+    // Switching sub-category tabs resets the brand filter (brands differ per category).
+    const onSelectTab = (name: string) => {
+        setActiveFilter(name);
+        setFilterState(prev => (prev.brands.length ? { ...prev, brands: [] } : prev));
     };
 
     // Helper to find a node by name in the tree
@@ -99,135 +186,11 @@ export default function ProductListing() {
         return null;
     };
 
-    // Find the current category node from the tree
+    // Find the current (root) category node from the tree — drives the sub-category tabs
     const currentCategoryNode = useMemo(() => {
-        const targetName = (subCategoryName as string) || (categoryName as string);
-        if (!targetName) return null;
-        return findNode(CATEGORY_DATA, targetName);
-    }, [categoryName, subCategoryName]);
-
-    // Get all descendant names from a node (used for sub-filter tabs)
-    const collectLabels = (node: CategoryNode): string[] => {
-        const labels: string[] = [node.name];
-        if (node.children) {
-            node.children.forEach(child => {
-                labels.push(...collectLabels(child));
-            });
-        }
-        return labels;
-    };
-
-    // 4. Advanced Filter & Sort Logic
-    const filteredProducts = useMemo(() => {
-        if (!products.length) return [];
-        if (activeFilter === 'All') return products;
-
-        const selectedChildNode = currentCategoryNode?.children?.find(c => c.name === activeFilter);
-        if (!selectedChildNode) return products;
-
-        const childLabels = collectLabels(selectedChildNode);
-        return products.filter(p => {
-            if (p.deepestCategoryName && childLabels.some(l => l.toLowerCase() === p.deepestCategoryName!.toLowerCase())) return true;
-            if (Array.isArray(p.categoryPath)) {
-                return p.categoryPath.some((cat: CategoryPathItem) =>
-                    cat.name && childLabels.some(l => l.toLowerCase() === cat.name.toLowerCase())
-                );
-            }
-            return false;
-        });
-    }, [products, activeFilter, currentCategoryNode]);
-
-    // 4. Advanced Filter & Sort Logic (Applied on top of Category Filter)
-    const finalFilteredProducts = useMemo(() => {
-        let result = [...filteredProducts];
-
-        // A. Filter by Brand
-        if (filterState.brands.length > 0) {
-            result = result.filter(p => {
-                const brand = p.subtitle ? p.subtitle.toUpperCase() : 'CLASSIC';
-                return filterState.brands.includes(brand);
-            });
-        }
-
-        // B. Filter by Price Range
-        if (filterState.priceRanges.length > 0) {
-            result = result.filter(p => {
-                return filterState.priceRanges.some(range => {
-                    if (range === 'Under ₹500') return p.price < 500;
-                    if (range === '₹500 - ₹1000') return p.price >= 500 && p.price <= 1000;
-                    if (range === '₹1000 - ₹2000') return p.price >= 1000 && p.price <= 2000;
-                    if (range === '₹2000 - ₹5000') return p.price >= 2000 && p.price <= 5000;
-                    if (range === 'Above ₹5000') return p.price > 5000;
-                    return false;
-                });
-            });
-        }
-
-        // C. Filter by Rating
-        if (filterState.ratings.length > 0) {
-            result = result.filter(p => {
-                return filterState.ratings.some(r => {
-                    const minRating = parseFloat(r);
-                    return (p.rating || 0) >= minRating;
-                });
-            });
-        }
-
-        // D. Filter by Discount
-        if (filterState.discounts.length > 0) {
-            result = result.filter(p => {
-                return filterState.discounts.some(d => {
-                    const minDiscount = parseInt(d);
-                    return (p.discount || 0) >= minDiscount;
-                });
-            });
-        }
-
-        // E. Sort
-        switch (filterState.sortBy) {
-            case 'price_low':
-                result.sort((a, b) => a.price - b.price);
-                break;
-            case 'price_high':
-                result.sort((a, b) => b.price - a.price);
-                break;
-            case 'new':
-                // Mock: using ID or timestamp if available. 
-                // Let's assume higher ID is newer for this mock - or use timeStamp if valid string
-                result.sort((a, b) => {
-                    const timeA = a.timeStamp ? new Date(a.timeStamp).getTime() : 0;
-                    const timeB = b.timeStamp ? new Date(b.timeStamp).getTime() : 0;
-                    // Handle invalid dates (NaN)
-                    const validA = Number.isNaN(timeA) ? 0 : timeA;
-                    const validB = Number.isNaN(timeB) ? 0 : timeB;
-                    return validB - validA;
-                });
-                break;
-            case 'rating':
-                result.sort((a, b) => (b.rating || 0) - (a.rating || 0));
-                break;
-            case 'discount':
-                result.sort((a, b) => (b.discount || 0) - (a.discount || 0));
-                break;
-            case 'relevance':
-            default:
-                // Keep default order
-                break;
-        }
-
-        return result;
-    }, [filteredProducts, filterState]);
-
-    // Extract available brands for the current category context for the filter modal
-    const availableBrands = useMemo(() => {
-        const brands = new Set<string>();
-        filteredProducts.forEach(p => {
-            if (p.deepestCategoryName) brands.add(p.deepestCategoryName.toUpperCase());
-            else if (p.subtitle) brands.add(p.subtitle.toUpperCase());
-            else brands.add('CLASSIC');
-        });
-        return Array.from(brands).sort();
-    }, [filteredProducts]);
+        if (!rootTarget) return null;
+        return findNode(CATEGORY_DATA, rootTarget);
+    }, [rootTarget]);
 
 
     // Render Item
@@ -317,7 +280,7 @@ export default function ProductListing() {
         return (
             <SafeAreaView style={styles.centerContainer} edges={['bottom', 'left', 'right']}>
                 <Text style={styles.errorText}>{error}</Text>
-                <TouchableOpacity onPress={loadProducts} style={styles.retryButton}>
+                <TouchableOpacity onPress={() => loadProducts(1, false)} style={styles.retryButton}>
                     <Text style={styles.retryText}>Retry</Text>
                 </TouchableOpacity>
             </SafeAreaView>
@@ -352,7 +315,7 @@ export default function ProductListing() {
                         {/* 'All' Option */}
                         <TouchableOpacity
                             style={styles.filterItem}
-                            onPress={() => setActiveFilter('All')}
+                            onPress={() => onSelectTab('All')}
                         >
                             <View style={[styles.filterCircle, activeFilter === 'All' && styles.filterCircleActive]}>
                                 <View style={{ flex: 1, backgroundColor: '#f5f5f5', alignItems: 'center', justifyContent: 'center' }}>
@@ -367,7 +330,7 @@ export default function ProductListing() {
                             <TouchableOpacity
                                 key={child.id}
                                 style={styles.filterItem}
-                                onPress={() => setActiveFilter(child.name)}
+                                onPress={() => onSelectTab(child.name)}
                             >
                                 <View style={[styles.filterCircle, activeFilter === child.name && styles.filterCircleActive]}>
                                     {child.image ? (
@@ -387,7 +350,7 @@ export default function ProductListing() {
 
             {/* Count & Sort Bar */}
             <View style={styles.sortBar}>
-                <Text style={styles.productCount}>{finalFilteredProducts.length} Products</Text>
+                <Text style={styles.productCount}>{totalItems} Products</Text>
                 <TouchableOpacity style={styles.sortButton} onPress={() => setFilterModalVisible(true)}>
                     <Feather name="sliders" size={14} color="#000" style={{ marginRight: 6 }} />
                     <Text style={styles.sortButtonText}>Sort & Filter</Text>
@@ -396,13 +359,16 @@ export default function ProductListing() {
 
             {/* Product Grid */}
             <FlatList
-                data={finalFilteredProducts}
+                data={products}
                 renderItem={renderProductItem}
                 keyExtractor={item => item.productId}
                 numColumns={2}
                 columnWrapperStyle={styles.columnWrapper}
                 contentContainerStyle={styles.listContent}
                 showsVerticalScrollIndicator={false}
+                onEndReached={onEndReached}
+                onEndReachedThreshold={0.8}
+                initialNumToRender={PAGE_SIZE}
                 refreshControl={
                     <RefreshControl
                         refreshing={refreshing}
@@ -410,6 +376,13 @@ export default function ProductListing() {
                         colors={['#FBBF24']}
                         tintColor="#FBBF24"
                     />
+                }
+                ListFooterComponent={
+                    loadingMore ? (
+                        <View style={styles.footerLoader}>
+                            <ActivityIndicator size="small" color={Colors.light.tint} />
+                        </View>
+                    ) : null
                 }
                 ListEmptyComponent={
                     <View style={styles.emptyState}>
@@ -518,6 +491,7 @@ const styles = StyleSheet.create({
     // Grid
     listContent: { paddingHorizontal: width * 0.038, paddingBottom: 20 },
     columnWrapper: { justifyContent: 'space-between' },
+    footerLoader: { paddingVertical: 20, alignItems: 'center' },
 
     // Product Card
     productCard: {

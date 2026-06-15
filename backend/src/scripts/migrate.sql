@@ -220,3 +220,12 @@ CREATE TABLE IF NOT EXISTS product_reviews (
 );
 CREATE INDEX IF NOT EXISTS idx_product_reviews_product_id ON product_reviews(product_id);
 CREATE INDEX IF NOT EXISTS idx_product_reviews_user_id    ON product_reviews(user_id);
+
+-- Performance indexes for product listing/filtering/sorting (category route).
+-- The products/product_images tables are seeded externally but exist before this
+-- migration runs (other tables FK to products), so IF NOT EXISTS is safe here.
+CREATE INDEX IF NOT EXISTS idx_products_created_at        ON products(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_products_price             ON products(price);
+CREATE INDEX IF NOT EXISTS idx_products_in_stock          ON products(in_stock);
+CREATE INDEX IF NOT EXISTS idx_products_deepest_cat_lower ON products(LOWER(deepest_category_name));
+CREATE INDEX IF NOT EXISTS idx_product_images_product_id  ON product_images(product_id);

@@ -32,7 +32,6 @@ const SIDEBAR_ITEMS = [
     { id: 'price', label: 'Price' },
     { id: 'brand', label: 'Brand' },
     { id: 'rating', label: 'Customer Rating' },
-    { id: 'discount', label: 'Discount' },
 ];
 
 const SORT_OPTIONS = [
@@ -41,7 +40,6 @@ const SORT_OPTIONS = [
     { id: 'price_low', label: 'Price: Low to High' },
     { id: 'price_high', label: 'Price: High to Low' },
     { id: 'rating', label: 'Customer Rating' },
-    { id: 'discount', label: 'Discount' },
 ];
 
 const PRICE_RANGES = [
@@ -56,13 +54,6 @@ const RATINGS = [
     '4.0 & above',
     '3.0 & above',
     '2.0 & above',
-];
-
-const DISCOUNTS = [
-    '10% or more',
-    '30% or more',
-    '50% or more',
-    '70% or more',
 ];
 
 export default function FilterModal({ visible, onClose, onApply, initialFilters, availableBrands }: FilterModalProps) {
@@ -185,25 +176,6 @@ export default function FilterModal({ visible, onClose, onApply, initialFilters,
                         ))}
                     </View>
                 );
-            case 'discount':
-                return (
-                    <View style={styles.optionsContainer}>
-                        {DISCOUNTS.map(discount => (
-                            <TouchableOpacity
-                                key={discount}
-                                style={styles.checkboxOption}
-                                onPress={() => toggleFilter('discounts', discount)}
-                            >
-                                <View style={[styles.checkbox, tempFilters.discounts.includes(discount) && styles.checkboxSelected]}>
-                                    {tempFilters.discounts.includes(discount) && <Ionicons name="checkmark" size={14} color="#000" />}
-                                </View>
-                                <Text style={[styles.optionLabel, tempFilters.discounts.includes(discount) && styles.optionLabelSelected]}>
-                                    {discount}
-                                </Text>
-                            </TouchableOpacity>
-                        ))}
-                    </View>
-                );
             default:
                 return null;
         }
@@ -212,8 +184,7 @@ export default function FilterModal({ visible, onClose, onApply, initialFilters,
     const activeFilterCount =
         tempFilters.priceRanges.length +
         tempFilters.brands.length +
-        tempFilters.ratings.length +
-        tempFilters.discounts.length;
+        tempFilters.ratings.length;
 
     return (
         <Modal

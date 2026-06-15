@@ -1,4 +1,4 @@
-import { ApiPaginatedResponse, LocationInfo, PaginationObject, ProductObject } from '../types/types';
+import { LocationInfo, PaginationObject, ProductObject } from '../types/types';
 import apiClient, { handleApiError } from './api';
 
 export interface ProductListParams {
@@ -9,6 +9,12 @@ export interface ProductListParams {
     city?: string;     // Fallback location filter
     state?: string;    // Fallback location filter
     pincode?: string;  // Fallback location filter
+
+    // Server-side sort/filter (category listing)
+    sort?: 'relevance' | 'new' | 'price_low' | 'price_high' | 'rating';
+    minRating?: number;   // 0-5; only products with avg rating >= this are returned
+    brands?: string;      // comma-separated deepest-category names
+    priceBands?: string;  // comma-separated "min-max" bands, e.g. "0-500,5000-"
 }
 
 export const productService = {
@@ -152,10 +158,27 @@ export const productService = {
     async getProductsByCategory(categoryId: string, params?: ProductListParams) {
         try {
             // GET :- /api/v1/products/category/:categoryId
-            const response = await apiClient.get<ApiPaginatedResponse<ProductObject>>(`products/category/${categoryId}`, {
+            const response = await apiClient.get<{
+                success: boolean;
+                products: ProductObject[];
+                brands: string[];
+                pagination: PaginationObject;
+            }>(`products/category/${encodeURIComponent(categoryId)}`, {
                 params,
             });
-            return response.data;
+
+            const products = (response.data.products || []).map((p: any) => ({
+                ...p,
+                productId: p.productId || p.id || p._id,
+                price: Number(p.price) || 0,
+                categoryPath: p.categoryPath || 'All',
+            }));
+
+            return {
+                ...response.data,
+                products,
+                brands: response.data.brands || [],
+            };
         } catch (error) {
             throw new Error(handleApiError(error));
         }

@@ -17,15 +17,6 @@ if (Platform.OS === 'android') {
 
 const { width } = Dimensions.get('window');
 
-// Distinct badge background colour derived from the category name, so
-// subcategories sharing a first letter (e.g. Sunscreen vs Serums) are visually distinguishable.
-const BADGE_COLORS = ['#F59E0B', '#10B981', '#3B82F6', '#EF4444', '#8B5CF6', '#EC4899', '#14B8A6', '#F97316'];
-const badgeColor = (name: string) => {
-    let hash = 0;
-    for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-    return BADGE_COLORS[Math.abs(hash) % BADGE_COLORS.length];
-};
-
 // Calculate layout sizes dynamically based on screen width to prevent circles from overlapping on smaller mobile devices
 const SIDEBAR_WIDTH = Math.round(width * 0.25);
 const LEVEL2_MARGIN = Math.round(width * 0.038);
@@ -116,8 +107,8 @@ const CategoryGridSection = ({
                                 {item.image ? (
                                     <Image source={item.image} style={styles.gridImage} />
                                 ) : (
-                                    <View style={[styles.gridImage, { backgroundColor: badgeColor(item.name), alignItems: 'center', justifyContent: 'center' }]}>
-                                        <Text style={{ fontSize: Math.max(10, Math.floor(CIRCLE_SIZE * 0.2)), fontWeight: '700', color: '#fff', textAlign: 'center', paddingHorizontal: 4 }} numberOfLines={2}>
+                                    <View style={[styles.gridImage, { backgroundColor: '#f0f0f0', alignItems: 'center', justifyContent: 'center' }]}>
+                                        <Text style={{ fontSize: Math.max(10, Math.floor(CIRCLE_SIZE * 0.2)), fontWeight: '700', color: '#888', textAlign: 'center', paddingHorizontal: 4 }} numberOfLines={2}>
                                             {item.name.charAt(0).toUpperCase()}
                                         </Text>
                                     </View>
@@ -194,8 +185,8 @@ const MainCategoryView = ({
                                                     onPress={() => handleNodePress(grandChild)}
                                                 >
                                                     <View style={[styles.circleImage, styles.highlightedBorder, styles.leafCircle]}>
-                                                        <View style={{ backgroundColor: badgeColor(grandChild.name), flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 20 }}>
-                                                            <Text style={{ fontSize: 12, fontWeight: '700', color: '#fff' }}>
+                                                        <View style={{ backgroundColor: '#f0f0f0', flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 20 }}>
+                                                            <Text style={{ fontSize: 12, fontWeight: '700', color: '#888' }}>
                                                                 {grandChild.name.charAt(0).toUpperCase()}
                                                             </Text>
                                                         </View>
