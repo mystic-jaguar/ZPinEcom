@@ -244,8 +244,10 @@ export default function ProfileScreen() {
                         />
                     </View>
 
-                    {/* Refer Banner */}
-                    <View style={styles.referBanner}>
+                    {/* Refer Banner — hidden until the referral feature is implemented.
+                        The "Invite Now" button has no backend referral flow yet, so the
+                        whole banner is commented out rather than shown as a dead control. */}
+                    {/* <View style={styles.referBanner}>
                         <View style={styles.referContent}>
                             <Text style={styles.referTitle}>Refer a Friend</Text>
                             <Text style={styles.referSubtitle}>Earn ₹100 for every friend you refer to ZPIN.</Text>
@@ -253,7 +255,7 @@ export default function ProfileScreen() {
                                 <Text style={styles.inviteButtonText}>Invite Now</Text>
                             </TouchableOpacity>
                         </View>
-                    </View>
+                    </View> */}
 
                     <View style={{ height: 100 }} />
                 </View>

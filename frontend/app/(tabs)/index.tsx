@@ -349,7 +349,7 @@ export default function HomeScreen() {
                             </TouchableOpacity>
                         ))}
                     </ScrollView>
-                    {/* Fade + arrow indicator hinting more content to the right */}
+                    {/* Fade indicator hinting more content to the right */}
                     <View style={styles.categoriesFadeRight} pointerEvents="none">
                         <LinearGradient
                             colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.85)', '#ffffff']}
@@ -357,9 +357,6 @@ export default function HomeScreen() {
                             end={{ x: 1, y: 0 }}
                             style={styles.categoriesFadeGradient}
                         />
-                        <View style={styles.categoriesArrow}>
-                            <Feather name="chevron-right" size={16} color="#999" />
-                        </View>
                     </View>
                 </View>
 
@@ -574,22 +571,6 @@ const styles = StyleSheet.create({
         right: 0,
         top: 0,
         bottom: 0,
-    },
-    categoriesArrow: {
-        width: 26,
-        height: 26,
-        borderRadius: 13,
-        backgroundColor: '#fff',
-        borderWidth: 1,
-        borderColor: '#e8e8e8',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 6,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.08,
-        shadowRadius: 3,
-        elevation: 2,
     },
 
     // Hero

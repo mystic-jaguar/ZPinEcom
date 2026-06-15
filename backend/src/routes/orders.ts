@@ -406,18 +406,25 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
     const couponCode = typeof req.body.couponCode === 'string' ? req.body.couponCode.trim().toUpperCase() : null;
     if (couponCode) {
       try {
+        // Column names must match the canonical coupons schema used by the
+        // /api/v1/coupons endpoints (is_active, valid_until, min_order_amount,
+        // max_discount_amount, usage_limit) — NOT status/expires_at/min_order_value.
         const couponResult = await client.query(
-          `SELECT * FROM coupons WHERE UPPER(code) = $1 AND status = 'active' AND (expires_at IS NULL OR expires_at > NOW())`,
+          `SELECT * FROM coupons
+           WHERE UPPER(code) = $1
+             AND is_active = true
+             AND (valid_until IS NULL OR valid_until > NOW())
+             AND (usage_limit IS NULL OR usage_count < usage_limit)`,
           [couponCode]
         );
         if (couponResult.rows.length > 0) {
           const coupon = couponResult.rows[0];
-          const minOrder = Number(coupon.min_order_value || 0);
+          const minOrder = Number(coupon.min_order_amount || 0);
           if (totalAmount >= minOrder) {
             if (coupon.discount_type === 'percentage') {
               const pct = Math.min(Math.max(Number(coupon.discount_value), 0), 100);
               couponDiscount = (totalAmount * pct) / 100;
-              if (coupon.max_discount) couponDiscount = Math.min(couponDiscount, Number(coupon.max_discount));
+              if (coupon.max_discount_amount) couponDiscount = Math.min(couponDiscount, Number(coupon.max_discount_amount));
             } else {
               couponDiscount = Math.min(Number(coupon.discount_value), totalAmount);
             }

@@ -183,6 +183,25 @@ CREATE TABLE IF NOT EXISTS wallet_transactions (
 CREATE INDEX IF NOT EXISTS idx_wallet_transactions_wallet_id ON wallet_transactions(wallet_id);
 CREATE INDEX IF NOT EXISTS idx_wallet_transactions_user_id ON wallet_transactions(user_id);
 
+-- ── 12b. notifications ────────────────────────────────────────────────────────
+-- Written by the order-creation, razorpay-verify, and order-confirm flows, and
+-- read by the seller notification endpoints. `data` is stored as TEXT holding a
+-- JSON-stringified payload (the route handlers call JSON.parse/JSON.stringify),
+-- so it must NOT be JSONB. Created here so fresh deployments can place orders.
+CREATE TABLE IF NOT EXISTS notifications (
+  id         VARCHAR(7)  PRIMARY KEY,
+  user_id    VARCHAR(7)  NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  type       VARCHAR(50) NOT NULL,
+  title      TEXT        NOT NULL,
+  message    TEXT        NOT NULL,
+  data       TEXT        NOT NULL DEFAULT '{}',
+  is_read    BOOLEAN     NOT NULL DEFAULT false,
+  created_at TIMESTAMP   NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_type_unread
+  ON notifications(user_id, type, is_read);
+
 -- ── 13-15. products, product_images, product_reviews ──────────────────────────
 -- products and product_images tables are managed separately (seeded externally).
 -- product_reviews is created here to ensure it exists on fresh DB deployments.

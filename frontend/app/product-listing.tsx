@@ -302,7 +302,6 @@ export default function ProductListing() {
                     ),
                     headerShadowVisible: false,
                     headerTitleStyle: { fontWeight: '700', fontSize: 14 },
-                    headerTitleContainerStyle: { maxWidth: width * 0.5 },
                     headerTitleAlign: 'center',
                 }} />
                 <View style={styles.skeletonGrid}>
@@ -338,12 +337,11 @@ export default function ProductListing() {
                 headerRight: () => (
                     <View style={{ flexDirection: 'row', gap: 15, marginRight: '10%' }}>
                         <TouchableOpacity onPress={() => router.push('/product-search')}><Feather name="search" size={24} color="#000" /></TouchableOpacity>
-                        <TouchableOpacity><Feather name="shopping-bag" size={24} color="#000" /></TouchableOpacity>
+                        <TouchableOpacity onPress={() => router.push('/(tabs)/cart')}><Feather name="shopping-bag" size={24} color="#000" /></TouchableOpacity>
                     </View>
                 ),
                 headerShadowVisible: false,
                 headerTitleStyle: { fontWeight: '700', fontSize: 14 },
-                headerTitleContainerStyle: { maxWidth: width * 0.5 },
                 headerTitleAlign: 'center' // Android center
             }} />
 

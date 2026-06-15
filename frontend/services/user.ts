@@ -1,4 +1,4 @@
-import { ApiPaginatedResponse, ApiSuccessResponse, OrderObject, UserDetailsObject, UserObject } from '../types/types';
+import { ApiPaginatedResponse, ApiSuccessResponse, OrderObject, UserDetailsObject } from '../types/types';
 import apiClient, { handleApiError } from './api';
 
 export interface UpdateProfileData {
@@ -14,21 +14,6 @@ export interface UpdateProfileData {
 }
 
 export const userService = {
-    /**
-     * Get all users (admin/public endpoint)
-     */
-    async getUsers(page?: number, limit?: number) {
-        try {
-            // GET :- /api/v1/users
-            const response = await apiClient.get<ApiPaginatedResponse<UserObject>>('users', {
-                params: { page, limit },
-            });
-            return response.data;
-        } catch (error) {
-            throw new Error(handleApiError(error));
-        }
-    },
-
     /**
      * Get specific user by ID
      */
