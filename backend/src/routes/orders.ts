@@ -917,6 +917,22 @@ router.patch('/:id/cancel', authenticate, async (req: AuthRequest, res: Response
       [newPaymentStatus, req.params.id]
     );
 
+    // Restore inventory for each cancelled order item
+    const cancelledItems = await client.query(
+      `SELECT product_id, quantity FROM ${ORDER_ITEMS} WHERE order_id = $1`,
+      [req.params.id]
+    );
+    for (const item of cancelledItems.rows) {
+      await client.query(
+        `UPDATE products
+         SET quantity = quantity + $1,
+             in_stock = true,
+             updated_at = NOW()
+         WHERE id = $2`,
+        [item.quantity, item.product_id]
+      );
+    }
+
     // Credit wallet only if the order was paid and user chose wallet refund
     if (wasPaid && refundMethod === 'wallet' && refundAmount > 0) {
       const walletResult = await client.query(

@@ -1,9 +1,9 @@
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ExpoLocation from 'expo-location';
-import { useRouter } from 'expo-router';
-import React, { useEffect, useRef, useState } from 'react';
-import { AppState, AppStateStatus, Dimensions, Image, Linking, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Alert, AppState, AppStateStatus, Dimensions, Image, Linking, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
 import LegalDocModal, { LegalDocType } from '../../components/common/LegalDocModal';
@@ -39,7 +39,7 @@ const FRESH_ARRIVALS = [
 const NEARBY_FALLBACK = [
     { id: '1', name: 'Men',    image: require('../../assets/images/men_icon.jpg'),    category: 'Fashion', subCategory: 'Men',    count: null as number | null },
     { id: '2', name: 'Women',  image: require('../../assets/images/women_icon.jpg'),  category: 'Fashion', subCategory: 'Women',  count: null as number | null },
-    { id: '3', name: 'Kids',   image: 'https://images.unsplash.com/photo-1519457431-44ccd64a579b?auto=format&fit=crop&w=200&q=80', category: 'Fashion', subCategory: 'Men', count: null as number | null },
+    { id: '3', name: 'Kids',   image: 'https://images.unsplash.com/photo-1519457431-44ccd64a579b?auto=format&fit=crop&w=200&q=80', category: 'Fashion', subCategory: 'Kids', count: 0 as number | null },
     { id: '4', name: 'Makeup', image: require('../../assets/images/makeup_icon.jpg'), category: 'Beauty',  subCategory: 'Makeup', count: null as number | null },
 ];
 
@@ -227,11 +227,30 @@ export default function HomeScreen() {
         }
     };
 
+    const hasMountedRef = useRef(false);
+    useFocusEffect(
+        useCallback(() => {
+            if (!hasMountedRef.current) {
+                hasMountedRef.current = true;
+                return;
+            }
+            onRefresh();
+        }, [])
+    );
+
     const handleProductNav = (category: string, subCategory?: string) => {
         router.push({
             pathname: '/product-listing',
             params: { categoryName: category, subCategoryName: subCategory },
         });
+    };
+
+    const handleNearbyNav = (item: any) => {
+        if (item.count != null && item.count <= 0) {
+            Alert.alert('Coming Soon', `${item.name} products will be available in your area soon!`);
+            return;
+        }
+        handleProductNav(item.category, item.subCategory);
     };
 
     return (
@@ -434,12 +453,17 @@ export default function HomeScreen() {
                 {locationGranted ? (
                     <View style={styles.nearbyGrid}>
                         {nearby.map((item) => (
-                            <TouchableOpacity key={item.id} style={styles.nearbyItem} onPress={() => handleProductNav(item.category, item.subCategory)}>
+                            <TouchableOpacity key={item.id} style={[styles.nearbyItem, item.count != null && item.count <= 0 && styles.nearbyItemDisabled]} onPress={() => handleNearbyNav(item)}>
                                 <View style={styles.nearbyImageContainer}>
                                     <Image source={typeof item.image === 'string' ? { uri: item.image } : item.image} style={styles.nearbyImage} />
                                     {item.count != null && item.count > 0 && (
                                         <View style={styles.nearbyBadge}>
                                             <Text style={styles.nearbyBadgeText}>{item.count}+</Text>
+                                        </View>
+                                    )}
+                                    {item.count != null && item.count <= 0 && (
+                                        <View style={styles.comingSoonOverlay}>
+                                            <Text style={styles.comingSoonText}>Coming Soon</Text>
                                         </View>
                                     )}
                                 </View>
@@ -518,11 +542,11 @@ const styles = StyleSheet.create({
     },
     categoriesContainer: { paddingLeft: width * 0.05 },
     categoriesContent: { paddingRight: width * 0.12 },
-    categoryItem: { alignItems: 'center', marginRight: width * 0.05, width: width * 0.16 },
+    categoryItem: { alignItems: 'center', marginRight: width * 0.04, width: width * 0.18 },
     categoryImageContainer: {
-        width: width * 0.16,
-        height: width * 0.16,
-        borderRadius: width * 0.08,
+        width: width * 0.15,
+        height: width * 0.15,
+        borderRadius: width * 0.075,
         backgroundColor: '#f5f5f5',
         marginBottom: 8,
         overflow: 'hidden',
@@ -530,7 +554,7 @@ const styles = StyleSheet.create({
         borderColor: '#f0f0f0',
     },
     categoryImage: { width: '100%', height: '100%' },
-    categoryText: { fontSize: 11, color: '#555', fontWeight: '500', textAlign: 'center' },
+    categoryText: { fontSize: 11, color: '#555', fontWeight: '500', textAlign: 'center', lineHeight: 14 },
     categoriesFadeRight: {
         position: 'absolute',
         right: 0,
@@ -621,7 +645,7 @@ const styles = StyleSheet.create({
     promoTitle: { color: '#fff', fontSize: width * 0.06, fontWeight: '900', fontStyle: 'italic' },
     promoSubtitle: { color: '#fff', fontSize: width * 0.045, fontWeight: '700', marginBottom: 5 },
     promoFooter: { color: '#eee', fontSize: width * 0.025 },
-    promoImage: { width: width * 0.25, height: width * 0.375, resizeMode: 'cover', opacity: 0.9 },
+    promoImage: { width: width * 0.3, height: '100%', resizeMode: 'cover', borderTopRightRadius: 20, borderBottomRightRadius: 20, opacity: 0.85 },
 
     // Section header
     sectionHeader: {
@@ -636,7 +660,7 @@ const styles = StyleSheet.create({
     locationLabel: { fontSize: width * 0.028, color: '#888', marginTop: 2 },
 
     // Horizontal lists
-    horizontalList: { paddingLeft: width * 0.05, paddingRight: width * 0.025, marginBottom: 30 },
+    horizontalList: { paddingLeft: width * 0.05, paddingRight: width * 0.025, marginBottom: 20 },
 
     // Recommended
     recommendCard: { width: width * 0.35, marginRight: width * 0.038 },
@@ -676,7 +700,7 @@ const styles = StyleSheet.create({
         flexWrap: 'wrap',
         paddingHorizontal: width * 0.038,
         justifyContent: 'space-between',
-        marginBottom: 30,
+        marginBottom: 20,
     },
     nearbyItem: { width: '47%', marginBottom: 15, alignItems: 'center' },
     nearbyImageContainer: {
@@ -701,6 +725,24 @@ const styles = StyleSheet.create({
     nearbyBadgeText: { fontSize: width * 0.025, fontWeight: '800', color: '#1a1a1a' },
     nearbyName: { fontWeight: '600', fontSize: width * 0.035, color: '#333' },
     nearbyCount: { fontSize: width * 0.028, color: '#888', marginTop: 2 },
+    nearbyItemDisabled: { opacity: 0.75 },
+    comingSoonOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0,0,0,0.35)',
+        borderRadius: 15,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    comingSoonText: {
+        color: '#fff',
+        fontSize: width * 0.035,
+        fontWeight: '800',
+        letterSpacing: 0.5,
+    },
 
     // Location disclaimer
     locationDisclaimer: {
