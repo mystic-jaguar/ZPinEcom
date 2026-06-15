@@ -2,13 +2,13 @@ import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import {
     Modal,
-    SafeAreaView,
     ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
     View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const PRIVACY_POLICY = `PRIVACY POLICY - ZPIN
 Last Updated: April 2025
@@ -326,7 +326,7 @@ export default function LegalDocModal({ visible, docType, onClose }: LegalDocMod
             presentationStyle="pageSheet"
             onRequestClose={onClose}
         >
-            <SafeAreaView style={styles.container}>
+            <SafeAreaView style={styles.container} edges={['top', 'bottom', 'left', 'right']}>
                 {/* Header */}
                 <View style={styles.header}>
                     <Text style={styles.title}>{title}</Text>

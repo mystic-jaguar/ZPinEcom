@@ -102,11 +102,11 @@ export const authService = {
     /**
      * Send OTP for verification
      */
-    async sendOTP(mobile: string) {
+    async sendOTP(email: string) {
         try {
             // POST :- /api/v1/auth/verification/sendOTP
             const response = await apiClient.post('auth/verification/sendOTP', {
-                mobile,
+                email,
             });
             return response.data;
         } catch (error) {
@@ -117,11 +117,11 @@ export const authService = {
     /**
      * Verify OTP
      */
-    async verifyOTP(mobile: string, otp: string) {
+    async verifyOTP(email: string, otp: string) {
         try {
             // POST :- /api/v1/auth/verification/verifyOTP
             const response = await apiClient.post('auth/verification/verifyOTP', {
-                mobile,
+                email,
                 otp,
             });
             return response.data;

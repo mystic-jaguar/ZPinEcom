@@ -18,7 +18,6 @@ import ActionModal from '../../components/common/ActionModal';
 import LegalDocModal, { LegalDocType } from '../../components/common/LegalDocModal';
 import { useUser } from '../../context/UserContext';
 import { authService, googleAuthService } from '../../services/auth';
-import { sendFirebaseOTP } from '../../services/firebaseAuth';
 
 // Google Sign-In requires a native build — not available in Expo Go
 let isGoogleSignInAvailable = false;
@@ -146,11 +145,9 @@ export default function SignupScreen() {
                 if (response.user) await userDataManager.setUserData(response.user);
             }
 
-            // Trigger Firebase Phone Auth OTP
-            await sendFirebaseOTP(`+91${mobile}`);
-
-            // Navigate to OTP verification
-            router.push({ pathname: '/auth/verify-otp', params: { mobile } });
+            // Backend already emails a verification OTP during signup.
+            // Navigate to OTP verification — verified against the user's email.
+            router.push({ pathname: '/auth/verify-otp', params: { email, mobile } });
         } catch (error: any) {
             setErrorMessage(error.message || 'An error occurred. Please try again.');
             setShowErrorModal(true);

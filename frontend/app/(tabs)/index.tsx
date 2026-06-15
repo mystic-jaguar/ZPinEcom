@@ -389,7 +389,7 @@ export default function HomeScreen() {
                     <View style={styles.heroImageContainer}>
                         <Image source={{ uri: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=400&q=80' }} style={styles.heroImage} />
                         <View style={styles.priceTag}>
-                            <Text style={styles.priceTagText}>Premium</Text>
+                            <Text style={styles.priceTagText}>PREMIUM</Text>
                             <Text style={styles.priceTagPrice}>₹2,999</Text>
                         </View>
                     </View>
@@ -403,6 +403,10 @@ export default function HomeScreen() {
                             <Text style={styles.promoTitle}>DRESS FEST</Text>
                             <Text style={styles.promoSubtitle}>UP TO 50% OFF</Text>
                             <Text style={styles.promoFooter}>BRIGHTS, PRINTS & MORE</Text>
+                            <TouchableOpacity style={styles.promoCta} onPress={() => handleProductNav('Fashion')} activeOpacity={0.85}>
+                                <Text style={styles.promoCtaText}>Shop Now</Text>
+                                <Feather name="arrow-right" size={12} color="#0082c8" />
+                            </TouchableOpacity>
                         </View>
                         <Image source={{ uri: 'https://images.unsplash.com/photo-1496747611176-843222e1e57c?auto=format&fit=crop&w=300&q=80' }} style={styles.promoImage} />
                     </LinearGradient>
@@ -621,15 +625,20 @@ const styles = StyleSheet.create({
     heroImage: { width: '100%', height: '100%' },
     priceTag: {
         position: 'absolute',
-        bottom: 10,
-        left: 10,
-        right: 10,
-        backgroundColor: 'rgba(50,50,50,0.8)',
-        padding: 8,
-        borderRadius: 10,
+        top: 8,
+        left: 8,
+        backgroundColor: 'rgba(255,255,255,0.95)',
+        paddingHorizontal: 8,
+        paddingVertical: 5,
+        borderRadius: 8,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.15,
+        shadowRadius: 3,
+        elevation: 2,
     },
-    priceTagText: { color: '#aaa', fontSize: width * 0.025 },
-    priceTagPrice: { color: '#fff', fontWeight: 'bold', fontSize: width * 0.035 },
+    priceTagText: { color: '#9CA3AF', fontSize: width * 0.022, fontWeight: '700', letterSpacing: 0.5 },
+    priceTagPrice: { color: '#1a1a1a', fontWeight: '800', fontSize: width * 0.032 },
 
     // Promo Banner
     promoBannerContainer: {
@@ -637,7 +646,7 @@ const styles = StyleSheet.create({
         borderRadius: 20,
         overflow: 'hidden',
         marginBottom: width * 0.06,
-        height: width * 0.375,
+        height: width * 0.44,
     },
     promoBanner: { flex: 1, flexDirection: 'row', alignItems: 'center', paddingHorizontal: width * 0.05 },
     promoContent: { flex: 1 },
@@ -645,6 +654,17 @@ const styles = StyleSheet.create({
     promoTitle: { color: '#fff', fontSize: width * 0.06, fontWeight: '900', fontStyle: 'italic' },
     promoSubtitle: { color: '#fff', fontSize: width * 0.045, fontWeight: '700', marginBottom: 5 },
     promoFooter: { color: '#eee', fontSize: width * 0.025 },
+    promoCta: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        alignSelf: 'flex-start',
+        backgroundColor: '#fff',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 20,
+        marginTop: 10,
+    },
+    promoCtaText: { color: '#0082c8', fontWeight: '800', fontSize: width * 0.028, marginRight: 4 },
     promoImage: { width: width * 0.3, height: '100%', resizeMode: 'cover', borderTopRightRadius: 20, borderBottomRightRadius: 20, opacity: 0.85 },
 
     // Section header

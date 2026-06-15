@@ -11,11 +11,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
-import { sendFirebaseOTP } from '../../services/firebaseAuth';
+import { authService } from '../../services/auth';
 
 export default function VerifyOTPScreen() {
     const router = useRouter();
     const params = useLocalSearchParams();
+    const email = params.email as string || '';
     const mobile = params.mobile as string || '';
 
     const [otp, setOtp] = useState(['', '', '', '', '', '']);
@@ -79,14 +80,8 @@ export default function VerifyOTPScreen() {
 
         setLoading(true);
         try {
-            // Confirm OTP with Firebase — returns Firebase ID token
-            const firebaseIdToken = await confirmFirebaseOTP(code);
-
-            // Send Firebase ID token to our backend to mark user as verified
-            await apiClient.post('auth/verification/verifyFirebaseOTP', {
-                firebaseIdToken,
-                mobile,
-            });
+            // Verify the email OTP with our backend — marks the user as verified
+            await authService.verifyOTP(email, code);
 
             setModalMessage('Account verified successfully!');
             setShowSuccessModal(true);
@@ -104,10 +99,10 @@ export default function VerifyOTPScreen() {
         if (!canResend) return;
 
         try {
-            await sendFirebaseOTP(`+91${mobile}`);
+            await authService.sendOTP(email);
             setResendTimer(30);
             setCanResend(false);
-            setModalMessage('A new OTP has been sent to your mobile');
+            setModalMessage('A new OTP has been sent to your email');
             setShowSuccessModal(true);
         } catch (error: any) {
             setModalMessage(error.message || 'Failed to resend OTP. Please try again.');
@@ -130,7 +125,7 @@ export default function VerifyOTPScreen() {
                     <Text style={styles.title}>Verify OTP</Text>
                     <Text style={styles.subtitle}>
                         Enter the 6-digit code sent to{'\n'}
-                        <Text style={styles.mobileNumber}>+91 {mobile}</Text>
+                        <Text style={styles.mobileNumber}>{email}</Text>
                     </Text>
                 </View>
 
@@ -187,7 +182,7 @@ export default function VerifyOTPScreen() {
                     style={styles.changeNumberButton}
                     onPress={() => router.back()}
                 >
-                    <Text style={styles.changeNumberText}>Change Mobile Number</Text>
+                    <Text style={styles.changeNumberText}>Change Email Address</Text>
                 </TouchableOpacity>
             </View>
 
