@@ -62,6 +62,7 @@ export default function HomeScreen() {
     const [refreshing, setRefreshing] = useState(false);
     const [legalModalVisible, setLegalModalVisible] = useState(false);
     const [legalDocType, setLegalDocType] = useState<LegalDocType>('privacy');
+    const [contactModalVisible, setContactModalVisible] = useState(false);
     const appState = useRef(AppState.currentState);
     const awaitingSettingsReturn = useRef(false);
 
@@ -267,6 +268,25 @@ export default function HomeScreen() {
                     setLocationGranted(false);
                     fetchProducts();
                 }}
+            />
+
+            {/* Contact Modal */}
+            <ActionModal
+                visible={contactModalVisible}
+                icon="phone"
+                title="Contact Us"
+                message="How would you like to reach us?"
+                primaryButtonText="Call Us"
+                onPrimaryPress={() => {
+                    setContactModalVisible(false);
+                    Linking.openURL('tel:8789582754');
+                }}
+                secondaryButtonText="Email Us"
+                onSecondaryPress={() => {
+                    setContactModalVisible(false);
+                    Linking.openURL('mailto:zpinpvtltd@gmail.com?subject=Contact Zpin');
+                }}
+                onClose={() => setContactModalVisible(false)}
             />
 
             {/* Legal Document Modal */}
@@ -475,9 +495,8 @@ export default function HomeScreen() {
                     <Text style={styles.footerLogo}>ZPIN</Text>
                     <Text style={styles.footerTagline}>Style at your door, in just 12 hours. Because waiting is so last season.</Text>
                     <View style={styles.footerLinks}>
-                        <Text style={styles.footerLink}>About</Text>
-                        <Text style={styles.footerLink}>Contact</Text>
-                        <Text style={styles.footerLink}>Help</Text>
+                        <Text style={styles.footerLink} onPress={() => setContactModalVisible(true)}>Contact</Text>
+                        <Text style={styles.footerLink} onPress={() => router.push('/profile/help-center')}>Help</Text>
                         <Text style={styles.footerLink} onPress={() => openLegalDoc('terms')}>Terms</Text>
                         <Text style={styles.footerLink} onPress={() => openLegalDoc('privacy')}>Privacy</Text>
                     </View>
