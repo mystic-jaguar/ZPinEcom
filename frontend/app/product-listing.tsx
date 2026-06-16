@@ -72,6 +72,8 @@ export default function ProductListing() {
     const rootTarget = (subCategoryName as string) || (categoryName as string) || '';
     // The 'All' tab queries the root category; a selected tab queries that sub-category directly.
     const effectiveCategory = activeFilter === 'All' ? rootTarget : activeFilter;
+    // No category passed in (e.g. home "Shop Latest Looks") → show ALL products, newest first.
+    const isAllMode = !rootTarget;
 
     // Translate the filter modal state into backend query params.
     const buildParams = useCallback((pageNum: number): ProductListParams => {
@@ -106,11 +108,6 @@ export default function ProductListing() {
     const hasNextRef = useRef(false);
 
     const loadProducts = useCallback(async (pageNum: number, append: boolean) => {
-        if (!effectiveCategory) {
-            setProducts([]);
-            setLoading(false);
-            return;
-        }
         // Dedupe only the "load more" path; a filter/tab change (append=false) must
         // always proceed and supersede any in-flight load via the request id.
         if (append && fetchingRef.current) return;
@@ -120,7 +117,10 @@ export default function ProductListing() {
             if (append) setLoadingMore(true);
             else { setLoading(true); setError(null); }
 
-            const response = await productService.getProductsByCategory(effectiveCategory, buildParams(pageNum));
+            // No category → all products newest-first (GET /products); otherwise the category listing.
+            const response = isAllMode
+                ? await productService.getProducts(buildParams(pageNum))
+                : await productService.getProductsByCategory(effectiveCategory, buildParams(pageNum));
             if (reqId !== requestIdRef.current) return; // a newer request superseded this one
 
             const items = response.products || [];
@@ -136,7 +136,8 @@ export default function ProductListing() {
             setHasNextPage(hasNextRef.current);
             setTotalItems(response.pagination?.totalItems ?? items.length);
             if (!append) {
-                setAvailableBrands((response.brands || []).map(b => b.toUpperCase()));
+                const brands = (response as { brands?: string[] }).brands || [];
+                setAvailableBrands(brands.map(b => b.toUpperCase()));
             }
         } catch (err: any) {
             if (reqId !== requestIdRef.current) return;
@@ -150,7 +151,7 @@ export default function ProductListing() {
                 fetchingRef.current = false;
             }
         }
-    }, [effectiveCategory, buildParams]);
+    }, [effectiveCategory, isAllMode, buildParams]);
 
     // Reload from page 1 whenever the category tab or any filter/sort changes.
     useEffect(() => {
@@ -191,6 +192,10 @@ export default function ProductListing() {
         if (!rootTarget) return null;
         return findNode(CATEGORY_DATA, rootTarget);
     }, [rootTarget]);
+
+    const screenTitle = isAllMode
+        ? 'Latest Arrivals'
+        : (currentCategoryNode?.name || (subCategoryName as string) || (categoryName as string) || 'Products');
 
 
     // Render Item
@@ -257,7 +262,7 @@ export default function ProductListing() {
             <SafeAreaView style={styles.container} edges={['bottom', 'left', 'right']}>
                 <Stack.Screen options={{
                     headerShown: true,
-                    title: (subCategoryName as string) || (categoryName as string) || 'Products',
+                    title: screenTitle,
                     headerLeft: () => (
                         <TouchableOpacity onPress={() => router.back()} style={{ marginRight: 10, marginLeft: '10%' }}>
                             <Feather name="chevron-left" size={28} color="#000" />
@@ -291,7 +296,7 @@ export default function ProductListing() {
         <SafeAreaView style={styles.container} edges={['bottom', 'left', 'right']}>
             <Stack.Screen options={{
                 headerShown: true,
-                title: currentCategoryNode?.name || 'Products',
+                title: screenTitle,
                 headerLeft: () => (
                     <TouchableOpacity onPress={() => router.back()} style={{ marginRight: 10, marginLeft: '10%' }}>
                         <Feather name="chevron-left" size={28} color="#000" />
@@ -351,10 +356,13 @@ export default function ProductListing() {
             {/* Count & Sort Bar */}
             <View style={styles.sortBar}>
                 <Text style={styles.productCount}>{totalItems} Products</Text>
-                <TouchableOpacity style={styles.sortButton} onPress={() => setFilterModalVisible(true)}>
-                    <Feather name="sliders" size={14} color="#000" style={{ marginRight: 6 }} />
-                    <Text style={styles.sortButtonText}>Sort & Filter</Text>
-                </TouchableOpacity>
+                {/* Sort & Filter applies to category listings; the all-products feed is always newest-first */}
+                {!isAllMode && (
+                    <TouchableOpacity style={styles.sortButton} onPress={() => setFilterModalVisible(true)}>
+                        <Feather name="sliders" size={14} color="#000" style={{ marginRight: 6 }} />
+                        <Text style={styles.sortButtonText}>Sort & Filter</Text>
+                    </TouchableOpacity>
+                )}
             </View>
 
             {/* Product Grid */}
