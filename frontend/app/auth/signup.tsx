@@ -1,7 +1,8 @@
 import { Colors } from '@/constants/Colors';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import * as AppleAuthentication from 'expo-apple-authentication';
+import React, { useEffect, useState } from 'react';
 import {
     Image,
     KeyboardAvoidingView,
@@ -17,7 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
 import LegalDocModal, { LegalDocType } from '../../components/common/LegalDocModal';
 import { useUser } from '../../context/UserContext';
-import { authService, googleAuthService } from '../../services/auth';
+import { appleAuthService, authService, googleAuthService } from '../../services/auth';
 
 // Google Sign-In requires a native build — not available in Expo Go
 let isGoogleSignInAvailable = false;
@@ -44,6 +45,36 @@ export default function SignupScreen() {
     const [errorMessage, setErrorMessage] = useState('');
     const [legalModalVisible, setLegalModalVisible] = useState(false);
     const [legalDocType, setLegalDocType] = useState<LegalDocType>('terms');
+    const [appleAvailable, setAppleAvailable] = useState(false);
+
+    useEffect(() => {
+        appleAuthService.isAvailable().then(setAppleAvailable);
+    }, []);
+
+    const handleAppleSignUp = async () => {
+        setLoading(true);
+        try {
+            const { identityToken, rawNonce, fullName } = await appleAuthService.signIn();
+            const response = await appleAuthService.authenticateWithBackend(identityToken, rawNonce, fullName);
+            if (response.user) {
+                setUser(response.user);
+                // Apple never supplies dob/gender — route to complete-profile if missing
+                if (!response.user.dob || !response.user.gender) {
+                    router.replace('/auth/complete-profile');
+                    return;
+                }
+            }
+            router.replace('/(tabs)');
+        } catch (error: any) {
+            // User cancelling the native sheet is not an error
+            if (error.code !== 'ERR_REQUEST_CANCELED') {
+                setErrorMessage(error.message || 'Apple sign-in failed');
+                setShowErrorModal(true);
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const openLegalDoc = (type: LegalDocType) => {
         setLegalDocType(type);
@@ -324,6 +355,17 @@ export default function SignupScreen() {
                             </Text>
                         </TouchableOpacity>
 
+                        {/* Sign in with Apple — iOS only, placed first per Apple HIG */}
+                        {appleAvailable && (
+                            <AppleAuthentication.AppleAuthenticationButton
+                                buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_UP}
+                                buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+                                cornerRadius={12}
+                                style={styles.appleButton}
+                                onPress={handleAppleSignUp}
+                            />
+                        )}
+
                         {/* Google Sign Up */}
                         {isGoogleSignInAvailable && (
                         <TouchableOpacity
@@ -508,6 +550,11 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
+    },
+    appleButton: {
+        width: '100%',
+        height: 52,
+        marginBottom: 12,
     },
     googleButton: {
         flexDirection: 'row',

@@ -1,7 +1,8 @@
 import { Colors } from '@/constants/Colors';
 import { Ionicons } from '@expo/vector-icons';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     Image,
     KeyboardAvoidingView,
@@ -17,7 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
 import { useUser } from '../../context/UserContext';
 import { userDataManager } from '../../services/api';
-import { authService, googleAuthService } from '../../services/auth';
+import { appleAuthService, authService, googleAuthService } from '../../services/auth';
 
 // Google Sign-In requires a native build — not available in Expo Go
 let isGoogleSignInAvailable = false;
@@ -36,8 +37,38 @@ export default function LoginScreen() {
     const [loading, setLoading] = useState(false);
     const [showErrorModal, setShowErrorModal] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
+    const [appleAvailable, setAppleAvailable] = useState(false);
 
     const { updateUser, setUser } = useUser();
+
+    useEffect(() => {
+        appleAuthService.isAvailable().then(setAppleAvailable);
+    }, []);
+
+    const handleAppleSignIn = async () => {
+        setLoading(true);
+        try {
+            const { identityToken, rawNonce, fullName } = await appleAuthService.signIn();
+            const response = await appleAuthService.authenticateWithBackend(identityToken, rawNonce, fullName);
+            if (response.user) {
+                setUser(response.user);
+                // Apple never supplies dob/gender — route to complete-profile if missing
+                if (!response.user.dob || !response.user.gender) {
+                    router.replace('/auth/complete-profile');
+                    return;
+                }
+            }
+            // _layout.tsx auto-redirects to /(tabs) once profile is complete
+        } catch (error: any) {
+            // User cancelling the native sheet is not an error
+            if (error.code !== 'ERR_REQUEST_CANCELED') {
+                setErrorMessage(error.message || 'Apple sign-in failed');
+                setShowErrorModal(true);
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const validateInputs = () => {
         if (!email.trim()) {
@@ -216,6 +247,17 @@ export default function LoginScreen() {
                             <View style={styles.dividerLine} />
                         </View>
 
+                        {/* Sign in with Apple — iOS only, placed first per Apple HIG */}
+                        {appleAvailable && (
+                            <AppleAuthentication.AppleAuthenticationButton
+                                buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+                                buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+                                cornerRadius={12}
+                                style={styles.appleButton}
+                                onPress={handleAppleSignIn}
+                            />
+                        )}
+
                         {/* Google Sign In */}
                         {isGoogleSignInAvailable && (
                         <TouchableOpacity
@@ -373,6 +415,11 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
+    },
+    appleButton: {
+        width: '100%',
+        height: 56,
+        marginBottom: 12,
     },
     googleButton: {
         flexDirection: 'row',

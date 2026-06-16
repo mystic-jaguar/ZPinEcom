@@ -12,6 +12,8 @@ CREATE TABLE IF NOT EXISTS users (
   email                      VARCHAR(255) UNIQUE NOT NULL,
   mobile                     VARCHAR(20)  UNIQUE,
   password_hash              VARCHAR(255),
+  google_id                  VARCHAR(255),
+  apple_id                   VARCHAR(255),
   user_role                  VARCHAR(50)  NOT NULL DEFAULT 'customer',
   is_verified                BOOLEAN      NOT NULL DEFAULT false,
   is_active                  BOOLEAN      NOT NULL DEFAULT true,

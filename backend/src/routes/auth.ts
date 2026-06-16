@@ -1,3 +1,4 @@
+import appleSignin from 'apple-signin-auth';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { Request, Response, Router } from 'express';
@@ -745,6 +746,127 @@ router.post('/google', loginLimiter, async (req: Request, res: Response): Promis
   } catch (err: any) {
     logger.error('auth.google_error', { message: err.message, ip: req.ip || '' });
     res.status(401).json({ success: false, message: 'Google authentication failed' });
+  }
+});
+
+// ─── POST /api/v1/auth/apple ──────────────────────────────────────────────────
+
+// Audience = the iOS bundle identifier(s) the identity token was issued for.
+const appleAudience = (() => {
+  const ids = parseClientIds(process.env.APPLE_CLIENT_IDS);
+  return ids.length > 0 ? ids : ['com.zpin.ecom'];
+})();
+
+// The apple_id column is new (not present on already-deployed databases). Ensure
+// it exists once, idempotently, before the first Apple sign-in touches it.
+let appleColumnReady = false;
+async function ensureAppleColumn() {
+  if (appleColumnReady) return;
+  await pool.query(`ALTER TABLE ${USERS} ADD COLUMN IF NOT EXISTS apple_id VARCHAR(255)`);
+  appleColumnReady = true;
+}
+
+function composeAppleName(fullName: any): string | null {
+  if (!fullName) return null;
+  const parts = [fullName.givenName, fullName.familyName].filter(Boolean);
+  return parts.length > 0 ? parts.join(' ') : null;
+}
+
+router.post('/apple', loginLimiter, async (req: Request, res: Response): Promise<void> => {
+  const { identityToken, rawNonce, fullName } = req.body;
+
+  if (!identityToken) {
+    res.status(400).json({ success: false, message: 'Apple identity token is required' });
+    return;
+  }
+
+  try {
+    await ensureAppleColumn();
+
+    // Verify signature against Apple's public keys + audience + expiry.
+    const claims = await appleSignin.verifyIdToken(identityToken, {
+      audience: appleAudience,
+      ignoreExpiration: false,
+    });
+
+    // Bind the token to this sign-in attempt: token.nonce must equal the SHA256
+    // of the raw nonce the client kept secret. Prevents replay of a stolen token.
+    if (rawNonce) {
+      const expectedNonce = crypto.createHash('sha256').update(String(rawNonce)).digest('hex');
+      if (claims.nonce !== expectedNonce) {
+        res.status(401).json({ success: false, message: 'Invalid Apple token (nonce mismatch)' });
+        return;
+      }
+    }
+
+    const appleId = claims.sub;
+    const email = claims.email ? String(claims.email).toLowerCase() : null;
+
+    if (!appleId) {
+      res.status(401).json({ success: false, message: 'Invalid Apple token' });
+      return;
+    }
+
+    // Match by apple_id first, then fall back to a matching email (so an
+    // existing email/password or Google account gets linked, not duplicated).
+    let userResult = await pool.query(`SELECT * FROM ${USERS} WHERE apple_id = $1`, [appleId]);
+    let user = userResult.rows[0];
+
+    if (!user && email) {
+      userResult = await pool.query(`SELECT * FROM ${USERS} WHERE email = $1`, [email]);
+      user = userResult.rows[0];
+    }
+
+    if (!user) {
+      // First-ever sign-in: Apple only returns the email (and name) once, here.
+      if (!email) {
+        res.status(401).json({ success: false, message: 'Apple did not provide an email. Please try again.' });
+        return;
+      }
+      const userId = generateId();
+      const name = composeAppleName(fullName) || email.split('@')[0];
+      const userName = email.split('@')[0] + '_' + userId.slice(0, 4);
+      const insertResult = await pool.query(
+        `INSERT INTO ${USERS} (id, name, email, user_name, user_role, is_verified, apple_id, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, 'customer', true, $5, NOW(), NOW())
+         RETURNING *`,
+        [userId, name, email, userName, appleId]
+      );
+      user = insertResult.rows[0];
+      logger.info('auth.apple_signup', { userId, email, ip: req.ip || '' });
+    } else if (!user.apple_id) {
+      // Existing account (matched by email) — link the Apple identity to it.
+      await pool.query(
+        `UPDATE ${USERS} SET apple_id = $1, is_verified = true, updated_at = NOW() WHERE id = $2`,
+        [appleId, user.id]
+      );
+      const refreshed = await pool.query(`SELECT * FROM ${USERS} WHERE id = $1`, [user.id]);
+      user = refreshed.rows[0];
+      logger.info('auth.apple_link', { userId: user.id, email, ip: req.ip || '' });
+    } else {
+      logger.info('auth.apple_login', { userId: user.id, email, ip: req.ip || '' });
+    }
+
+    const { accessToken: apiAccessToken, refreshToken } = generateTokens(user.id, user.user_role);
+
+    // Rotate: drop existing refresh tokens before issuing a new one.
+    await pool.query(`DELETE FROM ${REFRESH_TOKENS} WHERE user_id = $1`, [user.id]);
+    await pool.query(
+      `INSERT INTO ${REFRESH_TOKENS} (id, user_id, token, expires_at, created_at)
+       VALUES ($1, $2, $3, NOW() + INTERVAL '30 days', NOW())`,
+      [generateId(), user.id, refreshToken]
+    );
+
+    res.json({
+      success: true,
+      message: 'Apple authentication successful',
+      accessToken: apiAccessToken,
+      refreshToken,
+      user: normalizeUser(user),
+    });
+  } catch (err: any) {
+    logger.error('auth.apple_error', { message: err.message, ip: req.ip || '' });
+    res.status(401).json({ success: false, message: 'Apple authentication failed' });
   }
 });
 

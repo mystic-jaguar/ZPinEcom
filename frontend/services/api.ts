@@ -54,6 +54,7 @@ const PUBLIC_ENDPOINTS = [
     'auth/login',
     'auth/signup',
     'auth/google',
+    'auth/apple',
     'auth/forgetPassword',
     'auth/verification',
     'public/',

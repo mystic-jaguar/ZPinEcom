@@ -1,3 +1,6 @@
+import * as AppleAuthentication from 'expo-apple-authentication';
+import * as Crypto from 'expo-crypto';
+import { Platform } from 'react-native';
 import apiClient, { handleApiError, tokenManager, userDataManager } from './api';
 
 const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID?.trim() || '';
@@ -370,6 +373,83 @@ export const googleAuthService = {
 
   async authenticateWithBackend(idToken: string, accessToken?: string) {
     const response = await apiClient.post('auth/google', { idToken, accessToken });
+    const data = response.data;
+    if (data.accessToken) {
+      await tokenManager.setTokens(data.accessToken, data.refreshToken);
+    }
+    if (data.user) {
+      await userDataManager.setUserData(data.user);
+    }
+    return data;
+  },
+};
+
+/**
+ * Sign in with Apple (iOS only) — App Store guideline 4.8.
+ */
+async function generateAppleNonce(length = 32): Promise<string> {
+  const bytes = await Crypto.getRandomBytesAsync(length);
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+export const appleAuthService = {
+  /** True only on a device/build where Sign in with Apple is supported. */
+  async isAvailable(): Promise<boolean> {
+    if (Platform.OS !== 'ios') return false;
+    try {
+      return await AppleAuthentication.isAvailableAsync();
+    } catch {
+      return false;
+    }
+  },
+
+  async signIn(): Promise<{
+    identityToken: string;
+    rawNonce: string;
+    fullName: AppleAuthentication.AppleAuthenticationCredential['fullName'];
+  }> {
+    // Send Apple the SHA256 hash of a random nonce; keep the raw value to prove
+    // possession to our backend (replay protection).
+    const rawNonce = await generateAppleNonce();
+    const hashedNonce = await Crypto.digestStringAsync(
+      Crypto.CryptoDigestAlgorithm.SHA256,
+      rawNonce
+    );
+
+    const credential = await AppleAuthentication.signInAsync({
+      requestedScopes: [
+        AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+        AppleAuthentication.AppleAuthenticationScope.EMAIL,
+      ],
+      nonce: hashedNonce,
+    });
+
+    if (!credential.identityToken) {
+      throw new Error('Failed to get Apple identity token');
+    }
+
+    return {
+      identityToken: credential.identityToken,
+      rawNonce,
+      // fullName + email are only returned on the FIRST authorization.
+      fullName: credential.fullName ?? null,
+    };
+  },
+
+  async authenticateWithBackend(
+    identityToken: string,
+    rawNonce: string,
+    fullName: AppleAuthentication.AppleAuthenticationCredential['fullName']
+  ) {
+    const response = await apiClient.post('auth/apple', {
+      identityToken,
+      rawNonce,
+      fullName: fullName
+        ? { givenName: fullName.givenName, familyName: fullName.familyName }
+        : undefined,
+    });
     const data = response.data;
     if (data.accessToken) {
       await tokenManager.setTokens(data.accessToken, data.refreshToken);

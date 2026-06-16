@@ -18,7 +18,9 @@
       "fallbackToCacheTimeout": 0
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.zpin.ecom",
+      "usesAppleSignIn": true
     },
     "android": {
       "googleServicesFile": "./android/app/google-services.json",
@@ -67,7 +69,8 @@
         }
       ],
       "expo-web-browser",
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-apple-authentication"
     ],
     "experiments": {
       "typedRoutes": true,

@@ -44,10 +44,20 @@ jest.mock('../utils/redis', () => ({
   default: { get: jest.fn(), set: jest.fn(), del: jest.fn() },
 }));
 
+// Apple identity-token verification fetches Apple's public JWKS over the network —
+// mock it so tests exercise our route logic, not Apple's servers.
+jest.mock('apple-signin-auth', () => ({
+  __esModule: true,
+  default: { verifyIdToken: jest.fn() },
+}));
+
 const getDbMock = () => require('../db').__mockQuery as jest.Mock;
+const getAppleVerifyMock = () =>
+  (require('apple-signin-auth').default.verifyIdToken) as jest.Mock;
 
 beforeEach(() => {
   getDbMock().mockReset();
+  getAppleVerifyMock().mockReset();
 });
 
 // ─── 1.1  POST /signup ─────────────────────────────────────────────────────────
@@ -571,6 +581,106 @@ describe('Authentication middleware', () => {
     const res = await request(app)
       .get('/api/v1/cart')
       .set('Authorization', `Bearer ${expiredToken}`);
+    expect(res.status).toBe(401);
+  });
+});
+
+// ─── 1.10  POST /auth/apple (Sign in with Apple) ──────────────────────────────
+
+describe('POST /auth/apple', () => {
+  const crypto = require('crypto');
+  const BASE_APPLE = `${BASE}/apple`;
+  const rawNonce = 'a1b2c3d4e5f6';
+  const hashedNonce = crypto.createHash('sha256').update(rawNonce).digest('hex');
+
+  const appleUserRow = {
+    id: 'USR0007', user_name: 'jane_usr0', name: 'Jane Doe',
+    email: 'jane@privaterelay.appleid.com', mobile: null,
+    user_role: 'customer', is_verified: true, is_active: true,
+    dob: null, gender: null, profile_image: null,
+    receive_push_notifications: true, receive_email_updates: false,
+    receive_order_updates: true, created_at: new Date(),
+  };
+
+  it('returns 400 when identity token is missing', async () => {
+    const res = await request(app).post(BASE_APPLE).send({ rawNonce });
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 401 when the nonce does not match the token', async () => {
+    getAppleVerifyMock().mockResolvedValueOnce({ sub: 'APPLE_SUB_1', email: 'jane@x.com', nonce: 'tampered' });
+    getDbMock().mockResolvedValue({ rows: [] }); // ALTER column guard etc.
+
+    const res = await request(app)
+      .post(BASE_APPLE)
+      .send({ identityToken: 'tok', rawNonce });
+    expect(res.status).toBe(401);
+    expect(res.body.message).toMatch(/nonce/i);
+  });
+
+  it('creates a new user on first Apple sign-in and issues tokens', async () => {
+    getAppleVerifyMock().mockResolvedValueOnce({
+      sub: 'APPLE_SUB_1',
+      email: 'Jane@privaterelay.appleid.com',
+      nonce: hashedNonce,
+    });
+
+    getDbMock().mockImplementation((sql: string) => {
+      if (/ALTER TABLE/i.test(sql)) return Promise.resolve({ rows: [] });
+      if (/SELECT .* WHERE apple_id/i.test(sql)) return Promise.resolve({ rows: [] });
+      if (/SELECT .* WHERE email/i.test(sql)) return Promise.resolve({ rows: [] });
+      if (/INSERT INTO "users"/i.test(sql)) return Promise.resolve({ rows: [appleUserRow] });
+      return Promise.resolve({ rows: [] }); // refresh-token delete/insert
+    });
+
+    const res = await request(app)
+      .post(BASE_APPLE)
+      .send({ identityToken: 'tok', rawNonce, fullName: { givenName: 'Jane', familyName: 'Doe' } });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.accessToken).toBeTruthy();
+    expect(res.body.refreshToken).toBeTruthy();
+    expect(res.body.user.email).toBe('jane@privaterelay.appleid.com');
+
+    const sqls = getDbMock().mock.calls.map((c: any[]) => String(c[0]));
+    expect(sqls.some(s => /INSERT INTO "users"/i.test(s))).toBe(true);
+  });
+
+  it('links Apple to an existing account matched by email (no duplicate)', async () => {
+    getAppleVerifyMock().mockResolvedValueOnce({
+      sub: 'APPLE_SUB_2',
+      email: 'jane@privaterelay.appleid.com',
+      nonce: hashedNonce,
+    });
+
+    getDbMock().mockImplementation((sql: string) => {
+      if (/ALTER TABLE/i.test(sql)) return Promise.resolve({ rows: [] });
+      if (/SELECT .* WHERE apple_id/i.test(sql)) return Promise.resolve({ rows: [] });
+      // Existing account found by email, with no apple_id yet
+      if (/SELECT .* WHERE email/i.test(sql)) return Promise.resolve({ rows: [{ ...appleUserRow, apple_id: null }] });
+      if (/SELECT \* FROM "users" WHERE id/i.test(sql)) return Promise.resolve({ rows: [appleUserRow] });
+      return Promise.resolve({ rows: [] }); // UPDATE link + refresh tokens
+    });
+
+    const res = await request(app)
+      .post(BASE_APPLE)
+      .send({ identityToken: 'tok', rawNonce });
+
+    expect(res.status).toBe(200);
+    const sqls = getDbMock().mock.calls.map((c: any[]) => String(c[0]));
+    // linked via UPDATE, NOT a new INSERT
+    expect(sqls.some(s => /UPDATE "users" SET apple_id/i.test(s))).toBe(true);
+    expect(sqls.some(s => /INSERT INTO "users"/i.test(s))).toBe(false);
+  });
+
+  it('returns 401 when token verification fails', async () => {
+    getAppleVerifyMock().mockRejectedValueOnce(new Error('jwt audience invalid'));
+    getDbMock().mockResolvedValue({ rows: [] });
+
+    const res = await request(app)
+      .post(BASE_APPLE)
+      .send({ identityToken: 'bad', rawNonce });
     expect(res.status).toBe(401);
   });
 });
