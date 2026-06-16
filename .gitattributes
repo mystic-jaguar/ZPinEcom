@@ -1,0 +1,53 @@
+# ZPIN repo line-ending policy
+# Store text files as LF in the repository; Git converts on checkout per platform.
+
+* text=auto eol=lf
+
+# Source / config (explicit LF)
+*.ts    text eol=lf
+*.tsx   text eol=lf
+*.js    text eol=lf
+*.jsx   text eol=lf
+*.json  text eol=lf
+*.md    text eol=lf
+*.sql   text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.css   text eol=lf
+*.scss  text eol=lf
+*.html  text eol=lf
+*.svg   text eol=lf
+*.xml   text eol=lf
+*.kt    text eol=lf
+*.java  text eol=lf
+*.gradle text eol=lf
+*.properties text eol=lf
+gradlew text eol=lf
+
+# Windows-only scripts must stay CRLF
+*.bat   text eol=crlf
+*.cmd   text eol=crlf
+gradlew.bat text eol=crlf
+
+# Binary assets — never normalize or diff
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.webp  binary
+*.bmp   binary
+*.ttf   binary
+*.otf   binary
+*.woff  binary
+*.woff2 binary
+*.pdf   binary
+*.xlsx  binary
+*.xls   binary
+*.zip   binary
+*.jar   binary
+*.keystore binary
+*.jks   binary
+*.p12   binary
+*.mp4   binary
+*.webm  binary
