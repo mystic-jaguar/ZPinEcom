@@ -4,6 +4,7 @@ import { pool } from '../db';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { productListLimiter, reviewLimiter } from '../middleware/rateLimits';
 import { generateId } from '../utils/id';
+import { AUTO_HIDE_THRESHOLD, ensureModerationSchema } from '../utils/moderationSchema';
 import { cacheDel, cacheDelPattern, cacheGet, cacheSet } from '../utils/redis';
 
 // TTLs (seconds)
@@ -658,6 +659,7 @@ router.get('/:id/reviews', async (req: Request, res: Response): Promise<void> =>
   }
 
   try {
+    await ensureModerationSchema();
     const page = Math.max(Number(req.query.page) || 1, 1);
     const limit = Math.min(Math.max(Number(req.query.limit) || 10, 1), 100);
     const offset = (page - 1) * limit;
@@ -707,12 +709,27 @@ router.get('/:id/reviews', async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
-    // Serve from cache for public (non-mine) requests
+    // For the public list, identify the (optional) requester so we can hide
+    // reviews written by users they've blocked. This view is per-user, so it
+    // bypasses the shared cache; only anonymous public requests are cached.
+    let requesterId: string | null = null;
     if (!mineOnly) {
+      const token = extractToken(req);
+      requesterId = token ? getUserIdFromToken(token) : null;
+    }
+    const canUseCache = !mineOnly && !requesterId;
+
+    if (canUseCache) {
       const cacheKey = `product:${productUUID}:reviews:p${page}:l${limit}`;
       const cached = await cacheGet(cacheKey);
       if (cached) { res.json(cached); return; }
     }
+
+    // Shared public WHERE clause: never show hidden (moderated) reviews, and
+    // exclude any authors the requester has blocked.
+    const blockedFilter = requesterId
+      ? ` AND pr.user_id::text NOT IN (SELECT blocked_user_id FROM user_blocks WHERE blocker_user_id = $2)`
+      : '';
 
     const result = await pool.query(
       mineOnly
@@ -725,17 +742,25 @@ router.get('/:id/reviews', async (req: Request, res: Response): Promise<void> =>
         : `SELECT pr.*, u.name as user_name, NULL::text as user_profile_image
            FROM product_reviews pr
            JOIN users u ON u.id = pr.user_id::text
-           WHERE pr.product_id = $1
+           WHERE pr.product_id = $1 AND pr.is_hidden = false${blockedFilter}
            ORDER BY pr.created_at DESC
-           LIMIT $2 OFFSET $3`,
-      mineOnly ? [productUUID, mineUserId, limit, offset] : [productUUID, limit, offset]
+           LIMIT $${requesterId ? 3 : 2} OFFSET $${requesterId ? 4 : 3}`,
+      mineOnly
+        ? [productUUID, mineUserId, limit, offset]
+        : requesterId
+          ? [productUUID, requesterId, limit, offset]
+          : [productUUID, limit, offset]
     );
 
     const countResult = await pool.query(
       mineOnly
         ? 'SELECT COUNT(*) FROM product_reviews WHERE product_id = $1 AND user_id::text = $2'
-        : 'SELECT COUNT(*) FROM product_reviews WHERE product_id = $1',
-      mineOnly ? [productUUID, mineUserId] : [productUUID]
+        : `SELECT COUNT(*) FROM product_reviews pr WHERE pr.product_id = $1 AND pr.is_hidden = false${blockedFilter}`,
+      mineOnly
+        ? [productUUID, mineUserId]
+        : requesterId
+          ? [productUUID, requesterId]
+          : [productUUID]
     );
     const total = Number(countResult.rows[0].count);
 
@@ -752,8 +777,8 @@ router.get('/:id/reviews', async (req: Request, res: Response): Promise<void> =>
       },
     };
 
-    // Only cache public (non-mine) review pages
-    if (!mineOnly) {
+    // Only cache anonymous public review pages (per-user block views aren't shared)
+    if (canUseCache) {
       await cacheSet(`product:${productUUID}:reviews:p${page}:l${limit}`, response, TTL_REVIEWS);
     }
 
@@ -967,6 +992,67 @@ router.delete('/:id/reviews/:reviewId', authenticate, async (req: AuthRequest, r
     res.json({ success: true, message: 'Review deleted' });
   } catch (err) {
     console.error('deleteReview error:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// POST /api/v1/products/:id/reviews/:reviewId/report
+// Report a review as abusive/objectionable (App Store guideline 1.2). After
+// AUTO_HIDE_THRESHOLD distinct reports the review is auto-hidden pending
+// manual moderation, which the team commits to completing within 24 hours.
+router.post('/:id/reviews/:reviewId/report', authenticate, reviewLimiter, async (req: AuthRequest, res: Response): Promise<void> => {
+  const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim().slice(0, 500) : '';
+
+  try {
+    await ensureModerationSchema();
+
+    const reviewRes = await pool.query(
+      'SELECT id, product_id, user_id::text as user_id FROM product_reviews WHERE id = $1',
+      [req.params.reviewId]
+    );
+    if (reviewRes.rows.length === 0) {
+      res.status(404).json({ success: false, message: 'Review not found' });
+      return;
+    }
+    const review = reviewRes.rows[0];
+
+    if (review.user_id === req.userId) {
+      res.status(400).json({ success: false, message: 'You cannot report your own review' });
+      return;
+    }
+
+    // Idempotent: re-reporting just refreshes the reason, never double-counts.
+    await pool.query(
+      `INSERT INTO review_reports (id, review_id, reporter_user_id, reason, created_at)
+       VALUES ($1, $2, $3, $4, NOW())
+       ON CONFLICT (review_id, reporter_user_id)
+       DO UPDATE SET reason = EXCLUDED.reason, created_at = NOW()`,
+      [generateId(), req.params.reviewId, req.userId, reason || null]
+    );
+
+    const countRes = await pool.query(
+      'SELECT COUNT(*)::int AS count FROM review_reports WHERE review_id = $1',
+      [req.params.reviewId]
+    );
+    const reportCount = Number(countRes.rows[0].count);
+
+    let hidden = false;
+    if (reportCount >= AUTO_HIDE_THRESHOLD) {
+      await pool.query(
+        'UPDATE product_reviews SET is_hidden = true, updated_at = NOW() WHERE id = $1',
+        [req.params.reviewId]
+      );
+      hidden = true;
+      await cacheDelPattern(`product:${review.product_id}:reviews:*`);
+    }
+
+    res.json({
+      success: true,
+      message: 'Thanks for reporting. Our team reviews reports within 24 hours.',
+      hidden,
+    });
+  } catch (err) {
+    console.error('reportReview error:', err);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });

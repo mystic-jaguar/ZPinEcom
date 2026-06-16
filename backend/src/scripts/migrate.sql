@@ -216,12 +216,33 @@ CREATE TABLE IF NOT EXISTS product_reviews (
   comment              TEXT          NOT NULL,
   images               TEXT          NOT NULL DEFAULT '[]',
   is_verified_purchase BOOLEAN       NOT NULL DEFAULT false,
+  is_hidden            BOOLEAN       NOT NULL DEFAULT false,
   created_at           TIMESTAMP     NOT NULL DEFAULT NOW(),
   updated_at           TIMESTAMP     NOT NULL DEFAULT NOW(),
   UNIQUE(product_id, user_id)
 );
 CREATE INDEX IF NOT EXISTS idx_product_reviews_product_id ON product_reviews(product_id);
 CREATE INDEX IF NOT EXISTS idx_product_reviews_user_id    ON product_reviews(user_id);
+
+-- ── 16. UGC moderation (App Store 1.2): review reports + user blocks ───────────
+CREATE TABLE IF NOT EXISTS review_reports (
+  id               VARCHAR(7) PRIMARY KEY,
+  review_id        VARCHAR(7) NOT NULL REFERENCES product_reviews(id) ON DELETE CASCADE,
+  reporter_user_id VARCHAR(7) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  reason           TEXT,
+  created_at       TIMESTAMP  NOT NULL DEFAULT NOW(),
+  UNIQUE(review_id, reporter_user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_review_reports_review_id ON review_reports(review_id);
+
+CREATE TABLE IF NOT EXISTS user_blocks (
+  id              VARCHAR(7) PRIMARY KEY,
+  blocker_user_id VARCHAR(7) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  blocked_user_id VARCHAR(7) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at      TIMESTAMP  NOT NULL DEFAULT NOW(),
+  UNIQUE(blocker_user_id, blocked_user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_user_blocks_blocker ON user_blocks(blocker_user_id);
 
 -- Performance indexes for product listing/filtering/sorting (category route).
 -- The products/product_images tables are seeded externally but exist before this

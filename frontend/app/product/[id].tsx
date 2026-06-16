@@ -14,6 +14,7 @@ import { useWishlist } from '../../context/WishlistContext';
 import apiClient, { tokenManager } from '../../services/api';
 import { productService } from '../../services/product';
 import { reviewService } from '../../services/review';
+import { userService } from '../../services/user';
 import { ProductObject, ReviewObject } from '../../types/types';
 
 export default function ProductDetails() {
@@ -32,6 +33,10 @@ export default function ProductDetails() {
     const [reviewComment, setReviewComment] = useState('');
     const [reviewSubmitting, setReviewSubmitting] = useState(false);
     const [reviewToDelete, setReviewToDelete] = useState<ReviewObject | null>(null);
+    // UGC moderation (App Store 1.2): report a review / block its author
+    const [reviewToReport, setReviewToReport] = useState<ReviewObject | null>(null);
+    const [reviewToBlock, setReviewToBlock] = useState<ReviewObject | null>(null);
+    const [moderationBusy, setModerationBusy] = useState(false);
 
     // Product State
     const [product, setProduct] = useState<ProductObject | null>(null);
@@ -169,6 +174,40 @@ export default function ProductDetails() {
             setReviewFeedback(err.message || 'Failed to delete review.');
         } finally {
             setReviewSubmitting(false);
+        }
+    };
+
+    const handleReportReview = async () => {
+        if (!product || !reviewToReport) return;
+        try {
+            setModerationBusy(true);
+            const res = await reviewService.reportProductReview(product.productId, reviewToReport.id);
+            setReviewToReport(null);
+            setReviewFeedback(res?.data?.hidden
+                ? 'Thanks for reporting. This review has been removed pending review.'
+                : 'Thanks for reporting. Our team reviews reports within 24 hours.');
+            await loadReviews(product.productId);
+        } catch (err: any) {
+            setReviewToReport(null);
+            setReviewFeedback(err.message || 'Failed to report review.');
+        } finally {
+            setModerationBusy(false);
+        }
+    };
+
+    const handleBlockUser = async () => {
+        if (!product || !reviewToBlock?.userId) return;
+        try {
+            setModerationBusy(true);
+            await userService.blockUser(reviewToBlock.userId);
+            setReviewToBlock(null);
+            setReviewFeedback("User blocked. You won't see their reviews anymore.");
+            await loadReviews(product.productId);
+        } catch (err: any) {
+            setReviewToBlock(null);
+            setReviewFeedback(err.message || 'Failed to block user.');
+        } finally {
+            setModerationBusy(false);
         }
     };
 
@@ -454,6 +493,12 @@ export default function ProductDetails() {
                                         </TouchableOpacity>
                                     )}
                                 </View>
+
+                                <Text style={styles.reviewEula}>
+                                    By posting, you agree to our zero-tolerance policy on objectionable,
+                                    abusive, or offensive content. Violating reviews are removed and repeat
+                                    offenders may have their account suspended.
+                                </Text>
                             </View>
                         ) : (
                             <View style={styles.reviewLockedCard}>
@@ -480,6 +525,18 @@ export default function ProductDetails() {
                                             </Text>
                                         </View>
                                         <Text style={styles.reviewComment}>{r.comment}</Text>
+                                        {r.userId !== user.id && (
+                                            <View style={styles.reviewModerationRow}>
+                                                <TouchableOpacity style={styles.reviewModerationBtn} onPress={() => setReviewToReport(r)}>
+                                                    <Feather name="flag" size={12} color="#9CA3AF" />
+                                                    <Text style={styles.reviewModerationText}>Report</Text>
+                                                </TouchableOpacity>
+                                                <TouchableOpacity style={styles.reviewModerationBtn} onPress={() => setReviewToBlock(r)}>
+                                                    <Feather name="slash" size={12} color="#9CA3AF" />
+                                                    <Text style={styles.reviewModerationText}>Block user</Text>
+                                                </TouchableOpacity>
+                                            </View>
+                                        )}
                                     </View>
                                 ))
                             )}
@@ -568,6 +625,30 @@ export default function ProductDetails() {
                     setShowDeleteReviewModal(false);
                     setReviewToDelete(null);
                 }}
+            />
+
+            <ActionModal
+                visible={!!reviewToReport}
+                title="Report review?"
+                message="Report this review as abusive, offensive, or objectionable? Our team reviews reports within 24 hours."
+                icon="flag"
+                primaryButtonText={moderationBusy ? 'Reporting...' : 'Report'}
+                onPrimaryPress={handleReportReview}
+                secondaryButtonText="Cancel"
+                onSecondaryPress={() => setReviewToReport(null)}
+                onClose={() => setReviewToReport(null)}
+            />
+
+            <ActionModal
+                visible={!!reviewToBlock}
+                title="Block user?"
+                message={`Block ${reviewToBlock?.user?.name || 'this user'}? You will no longer see their reviews.`}
+                icon="slash"
+                primaryButtonText={moderationBusy ? 'Blocking...' : 'Block'}
+                onPrimaryPress={handleBlockUser}
+                secondaryButtonText="Cancel"
+                onSecondaryPress={() => setReviewToBlock(null)}
+                onClose={() => setReviewToBlock(null)}
             />
         </View>
     );
@@ -993,5 +1074,26 @@ const styles = StyleSheet.create({
         fontSize: 11,
         color: '#059669',
         fontWeight: '700',
+    },
+    reviewEula: {
+        fontSize: 11,
+        color: '#9CA3AF',
+        lineHeight: 16,
+        marginTop: 10,
+    },
+    reviewModerationRow: {
+        flexDirection: 'row',
+        gap: 18,
+        marginTop: 8,
+    },
+    reviewModerationBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    reviewModerationText: {
+        fontSize: 11,
+        color: '#9CA3AF',
+        fontWeight: '600',
     },
 });

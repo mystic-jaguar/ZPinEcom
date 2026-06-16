@@ -4,6 +4,7 @@ import { authenticate, AuthRequest } from '../middleware/auth';
 import { addressLimiter } from '../middleware/rateLimits';
 import { decryptAddressPayload, encryptAddressPayload } from '../utils/encryption';
 import { generateId } from '../utils/id';
+import { ensureModerationSchema } from '../utils/moderationSchema';
 import { safeIdentifier } from '../utils/sql';
 
 const router = Router();
@@ -445,6 +446,62 @@ router.delete('/shipping-address/:addressId', authenticate, async (req: AuthRequ
     res.json({ success: true, message: 'Address deleted' });
   } catch (err) {
     console.error('deleteAddress error:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// ── POST /api/v1/users/block ─────────────────────────────────────────────────
+// Block another user (App Store 1.2). The blocker stops seeing the blocked
+// user's product reviews. Idempotent.
+
+router.post('/block', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+  const blockedUserId = typeof req.body?.userId === 'string' ? req.body.userId.trim() : '';
+
+  if (!blockedUserId) {
+    res.status(400).json({ success: false, message: 'userId is required' });
+    return;
+  }
+  if (blockedUserId === req.userId) {
+    res.status(400).json({ success: false, message: 'You cannot block yourself' });
+    return;
+  }
+
+  try {
+    await ensureModerationSchema();
+
+    const target = await pool.query(`SELECT id FROM ${USERS} WHERE id = $1`, [blockedUserId]);
+    if (target.rows.length === 0) {
+      res.status(404).json({ success: false, message: 'User not found' });
+      return;
+    }
+
+    await pool.query(
+      `INSERT INTO user_blocks (id, blocker_user_id, blocked_user_id, created_at)
+       VALUES ($1, $2, $3, NOW())
+       ON CONFLICT (blocker_user_id, blocked_user_id) DO NOTHING`,
+      [generateId(), req.userId, blockedUserId]
+    );
+
+    res.json({ success: true, message: 'User blocked' });
+  } catch (err) {
+    console.error('blockUser error:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// ── DELETE /api/v1/users/block/:userId ───────────────────────────────────────
+// Unblock a previously blocked user.
+
+router.delete('/block/:userId', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    await ensureModerationSchema();
+    await pool.query(
+      'DELETE FROM user_blocks WHERE blocker_user_id = $1 AND blocked_user_id = $2',
+      [req.userId, req.params.userId]
+    );
+    res.json({ success: true, message: 'User unblocked' });
+  } catch (err) {
+    console.error('unblockUser error:', err);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });

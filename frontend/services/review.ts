@@ -72,4 +72,20 @@ export const reviewService = {
             throw new Error(handleApiError(error));
         }
     },
+
+    /**
+     * Report a review as abusive/objectionable (App Store 1.2).
+     */
+    async reportProductReview(productId: string, reviewId: string, reason?: string) {
+        try {
+            // POST :- /api/v1/products/:id/reviews/:reviewId/report
+            const response = await apiClient.post<ApiSuccessResponse<{ message: string; hidden: boolean }>>(
+                `products/${productId}/reviews/${reviewId}/report`,
+                { reason }
+            );
+            return response.data;
+        } catch (error) {
+            throw new Error(handleApiError(error));
+        }
+    },
 };

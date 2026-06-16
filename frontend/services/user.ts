@@ -123,4 +123,30 @@ export const userService = {
             throw new Error(handleApiError(error));
         }
     },
+
+    /**
+     * Block another user — hides their product reviews from you (App Store 1.2).
+     */
+    async blockUser(userId: string) {
+        try {
+            // POST :- /api/v1/users/block
+            const response = await apiClient.post('users/block', { userId });
+            return response.data;
+        } catch (error) {
+            throw new Error(handleApiError(error));
+        }
+    },
+
+    /**
+     * Unblock a previously blocked user.
+     */
+    async unblockUser(userId: string) {
+        try {
+            // DELETE :- /api/v1/users/block/:userId
+            const response = await apiClient.delete(`users/block/${userId}`);
+            return response.data;
+        } catch (error) {
+            throw new Error(handleApiError(error));
+        }
+    },
 };

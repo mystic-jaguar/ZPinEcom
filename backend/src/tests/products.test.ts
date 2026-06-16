@@ -24,6 +24,12 @@ jest.mock('../utils/redis', () => ({
   default: { get: jest.fn(), set: jest.fn(), del: jest.fn() },
 }));
 
+// No-op the moderation schema bootstrap so it doesn't consume mocked DB calls.
+jest.mock('../utils/moderationSchema', () => ({
+  ensureModerationSchema: jest.fn().mockResolvedValue(undefined),
+  AUTO_HIDE_THRESHOLD: 3,
+}));
+
 const getDbMock = () => require('../db').__mockQuery as jest.Mock;
 const token = makeAccessToken('USR0001');
 
@@ -341,6 +347,51 @@ describe('Product Reviews', () => {
         .delete(`${BASE}/${uuid}/reviews/REV0001`)
         .set(bearerHeader(token));
       expect([403, 404]).toContain(res.status);
+    });
+  });
+
+  describe('POST /products/:id/reviews/:reviewId/report', () => {
+    const reportUrl = `${BASE}/${uuid}/reviews/REV0009/report`;
+
+    it('returns 401 without auth', async () => {
+      const res = await request(app).post(reportUrl).send({ reason: 'spam' });
+      expect(res.status).toBe(401);
+    });
+
+    it('returns 404 when the review does not exist', async () => {
+      getDbMock().mockResolvedValueOnce({ rows: [] }); // SELECT review → none
+      const res = await request(app).post(reportUrl).set(bearerHeader(token)).send({ reason: 'spam' });
+      expect(res.status).toBe(404);
+    });
+
+    it('returns 400 when reporting your own review', async () => {
+      getDbMock().mockResolvedValueOnce({ rows: [{ id: 'REV0009', product_id: uuid, user_id: 'USR0001' }] });
+      const res = await request(app).post(reportUrl).set(bearerHeader(token)).send({ reason: 'spam' });
+      expect(res.status).toBe(400);
+    });
+
+    it('records a report and does not hide below the threshold', async () => {
+      getDbMock()
+        .mockResolvedValueOnce({ rows: [{ id: 'REV0009', product_id: uuid, user_id: 'USR0002' }] }) // SELECT review
+        .mockResolvedValueOnce({ rows: [] })                 // INSERT report (ON CONFLICT)
+        .mockResolvedValueOnce({ rows: [{ count: 1 }] });    // COUNT distinct reports
+
+      const res = await request(app).post(reportUrl).set(bearerHeader(token)).send({ reason: 'abuse' });
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.hidden).toBe(false);
+    });
+
+    it('auto-hides the review once the report threshold is reached', async () => {
+      getDbMock()
+        .mockResolvedValueOnce({ rows: [{ id: 'REV0009', product_id: uuid, user_id: 'USR0002' }] }) // SELECT review
+        .mockResolvedValueOnce({ rows: [] })                 // INSERT report
+        .mockResolvedValueOnce({ rows: [{ count: 3 }] })     // COUNT == threshold
+        .mockResolvedValueOnce({ rows: [] });                // UPDATE is_hidden
+
+      const res = await request(app).post(reportUrl).set(bearerHeader(token)).send({ reason: 'abuse' });
+      expect(res.status).toBe(200);
+      expect(res.body.hidden).toBe(true);
     });
   });
 });

@@ -37,6 +37,12 @@ jest.mock('../utils/encryption', () => ({
   isEncrypted: jest.fn(() => false),
 }));
 
+// No-op the moderation schema bootstrap so it doesn't consume mocked DB calls.
+jest.mock('../utils/moderationSchema', () => ({
+  ensureModerationSchema: jest.fn().mockResolvedValue(undefined),
+  AUTO_HIDE_THRESHOLD: 3,
+}));
+
 const getDbMock = () => require('../db').__mockQuery as jest.Mock;
 const getClientMock = () => require('../db').__mockClientQuery as jest.Mock;
 
@@ -291,5 +297,53 @@ describe('DELETE /users/me', () => {
     // financial records are RETAINED, not deleted
     expect(sqls.some(s => /DELETE FROM "?orders"?/i.test(s))).toBe(false);
     expect(sqls.some(s => /DELETE FROM order_items/i.test(s))).toBe(false);
+  });
+});
+
+describe('POST /users/block', () => {
+  it('returns 401 without auth', async () => {
+    const res = await request(app).post(`${BASE}/block`).send({ userId: 'USR0002' });
+    expect(res.status).toBe(401);
+  });
+
+  it('returns 400 when userId is missing', async () => {
+    const res = await request(app).post(`${BASE}/block`).set(bearerHeader(token)).send({});
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 400 when blocking yourself', async () => {
+    const res = await request(app).post(`${BASE}/block`).set(bearerHeader(token)).send({ userId: 'USR0001' });
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 404 when the target user does not exist', async () => {
+    getDbMock().mockResolvedValueOnce({ rows: [] }); // SELECT target → none
+    const res = await request(app).post(`${BASE}/block`).set(bearerHeader(token)).send({ userId: 'USR9999' });
+    expect(res.status).toBe(404);
+  });
+
+  it('blocks an existing user', async () => {
+    getDbMock()
+      .mockResolvedValueOnce({ rows: [{ id: 'USR0002' }] }) // SELECT target exists
+      .mockResolvedValueOnce({ rows: [] });                  // INSERT block (ON CONFLICT)
+    const res = await request(app).post(`${BASE}/block`).set(bearerHeader(token)).send({ userId: 'USR0002' });
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    const sqls = getDbMock().mock.calls.map((c: any[]) => String(c[0]));
+    expect(sqls.some(s => /INSERT INTO user_blocks/i.test(s))).toBe(true);
+  });
+});
+
+describe('DELETE /users/block/:userId', () => {
+  it('returns 401 without auth', async () => {
+    const res = await request(app).delete(`${BASE}/block/USR0002`);
+    expect(res.status).toBe(401);
+  });
+
+  it('unblocks a user', async () => {
+    getDbMock().mockResolvedValueOnce({ rows: [] }); // DELETE block
+    const res = await request(app).delete(`${BASE}/block/USR0002`).set(bearerHeader(token));
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
   });
 });
