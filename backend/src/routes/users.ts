@@ -189,6 +189,76 @@ router.put('/profileDetails', authenticate, async (req: AuthRequest, res: Respon
   }
 });
 
+// ── DELETE /api/v1/users/me ───────────────────────────────────────────────────
+// In-app account deletion (App Store guideline 5.1.1(v)).
+// Anonymizes the user row in place and removes all personal data + UGC, while
+// RETAINING order/invoice records (now tied to an anonymized user) as required
+// for tax/accounting compliance. Runs in a single transaction.
+
+router.delete('/me', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+  const userId = req.userId!;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Lock the row and confirm the account still exists.
+    const existing = await client.query(
+      `SELECT id FROM ${USERS} WHERE id = $1 FOR UPDATE`,
+      [userId]
+    );
+    if (existing.rows.length === 0) {
+      await client.query('ROLLBACK');
+      res.status(404).json({ success: false, message: 'User not found' });
+      return;
+    }
+
+    // Remove personal data + user-generated content. Orders, order_items,
+    // return_requests and order_cancellations are intentionally retained as
+    // financial records, kept valid by the anonymized user row below.
+    await client.query(`DELETE FROM refresh_tokens     WHERE user_id = $1`, [userId]);
+    await client.query(`DELETE FROM auth_tokens        WHERE user_id = $1`, [userId]);
+    await client.query(`DELETE FROM ${ADDRESSES}       WHERE user_id = $1`, [userId]);
+    await client.query(`DELETE FROM cart_items         WHERE user_id = $1`, [userId]);
+    await client.query(`DELETE FROM wishlists          WHERE user_id = $1`, [userId]);
+    await client.query(`DELETE FROM product_reviews    WHERE user_id = $1`, [userId]);
+    await client.query(`DELETE FROM notifications      WHERE user_id = $1`, [userId]);
+    await client.query(`DELETE FROM wallet_transactions WHERE user_id = $1`, [userId]);
+    await client.query(`DELETE FROM wallets            WHERE user_id = $1`, [userId]);
+
+    // Anonymize the user row in place: scrub every personal identifier, give the
+    // UNIQUE columns id-derived placeholders to avoid collisions, and set
+    // is_active=false so the account can never be logged into again.
+    await client.query(
+      `UPDATE ${USERS} SET
+         name = 'Deleted User',
+         user_name = $2,
+         email = $3,
+         mobile = NULL,
+         password_hash = NULL,
+         dob = NULL,
+         gender = NULL,
+         profile_image = NULL,
+         is_active = false,
+         is_verified = false,
+         receive_push_notifications = false,
+         receive_email_updates = false,
+         receive_order_updates = false,
+         updated_at = NOW()
+       WHERE id = $1`,
+      [userId, `deleted_${userId}`, `deleted_${userId}@deleted.zpin.invalid`]
+    );
+
+    await client.query('COMMIT');
+    res.json({ success: true, message: 'Account deleted' });
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('deleteAccount error:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  } finally {
+    client.release();
+  }
+});
+
 // ── GET /api/v1/users/:id ─────────────────────────────────────────────────────
 // Users can only read their own profile
 

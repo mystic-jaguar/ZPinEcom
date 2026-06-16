@@ -11,9 +11,15 @@ const token = makeAccessToken('USR0001');
 
 jest.mock('../db', () => {
   const mockQuery = jest.fn();
+  const mockClientQuery = jest.fn();
+  const mockClient = { query: mockClientQuery, release: jest.fn() };
   return {
-    pool: { query: mockQuery },
+    pool: {
+      query: mockQuery,
+      connect: jest.fn().mockResolvedValue(mockClient),
+    },
     __mockQuery: mockQuery,
+    __mockClientQuery: mockClientQuery,
   };
 });
 
@@ -32,6 +38,7 @@ jest.mock('../utils/encryption', () => ({
 }));
 
 const getDbMock = () => require('../db').__mockQuery as jest.Mock;
+const getClientMock = () => require('../db').__mockClientQuery as jest.Mock;
 
 const mockUserRow = {
   id: 'USR0001', user_name: 'tester', name: 'Test User',
@@ -42,7 +49,10 @@ const mockUserRow = {
   receive_order_updates: true, created_at: new Date(),
 };
 
-beforeEach(() => getDbMock().mockReset());
+beforeEach(() => {
+  getDbMock().mockReset();
+  getClientMock().mockReset();
+});
 
 // ─── GET /users/:id ───────────────────────────────────────────────────────────
 
@@ -235,5 +245,51 @@ describe('POST /users/shipping-address', () => {
     const calls = getDbMock().mock.calls;
     const hasUpdate = calls.some((c: any[]) => String(c[0]).includes('UPDATE'));
     expect(hasUpdate).toBe(true);
+  });
+});
+
+// ─── DELETE /users/me (account deletion) ─────────────────────────────────────
+
+describe('DELETE /users/me', () => {
+  const sqlsRun = () => getClientMock().mock.calls.map((c: any[]) => String(c[0]));
+
+  it('returns 401 without auth', async () => {
+    const res = await request(app).delete(`${BASE}/me`);
+    expect(res.status).toBe(401);
+  });
+
+  it('returns 404 and rolls back when the account no longer exists', async () => {
+    // SELECT ... FOR UPDATE returns no rows
+    getClientMock().mockResolvedValue({ rows: [] });
+
+    const res = await request(app).delete(`${BASE}/me`).set(bearerHeader(token));
+    expect(res.status).toBe(404);
+    expect(sqlsRun().some(s => /ROLLBACK/i.test(s))).toBe(true);
+    expect(sqlsRun().some(s => /COMMIT/i.test(s))).toBe(false);
+  });
+
+  it('anonymizes the user, deletes PII/UGC, retains orders, and commits', async () => {
+    getClientMock().mockImplementation((sql: string) => {
+      if (/^\s*SELECT/i.test(sql)) return Promise.resolve({ rows: [{ id: 'USR0001' }] });
+      return Promise.resolve({ rows: [] });
+    });
+
+    const res = await request(app).delete(`${BASE}/me`).set(bearerHeader(token));
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+
+    const sqls = sqlsRun();
+    // transaction committed
+    expect(sqls.some(s => /COMMIT/i.test(s))).toBe(true);
+    // personal data + UGC removed
+    expect(sqls.some(s => /DELETE FROM "?addresses"?/i.test(s))).toBe(true);
+    expect(sqls.some(s => /DELETE FROM refresh_tokens/i.test(s))).toBe(true);
+    expect(sqls.some(s => /DELETE FROM product_reviews/i.test(s))).toBe(true);
+    expect(sqls.some(s => /DELETE FROM wallets/i.test(s))).toBe(true);
+    // user row anonymized + deactivated
+    expect(sqls.some(s => /UPDATE "?users"? SET/i.test(s) && /is_active = false/i.test(s))).toBe(true);
+    // financial records are RETAINED, not deleted
+    expect(sqls.some(s => /DELETE FROM "?orders"?/i.test(s))).toBe(false);
+    expect(sqls.some(s => /DELETE FROM order_items/i.test(s))).toBe(false);
   });
 });

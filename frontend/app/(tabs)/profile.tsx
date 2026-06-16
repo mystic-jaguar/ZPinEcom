@@ -6,7 +6,7 @@ import { authService } from '@/services/auth';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Dimensions, Image, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Dimensions, Image, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AvatarInitials from '../../components/common/AvatarInitials';
 import ProfileOption from '../../components/profile/ProfileOption';
@@ -33,6 +33,8 @@ export default function ProfileScreen() {
     const { recentSearches } = useSearch();
     const router = useRouter();
     const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+    const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+    const [deleting, setDeleting] = useState(false);
     const [recommended, setRecommended] = useState<ProductObject[]>([]);
     const [refreshing, setRefreshing] = useState(false);
     const [legalModalVisible, setLegalModalVisible] = useState(false);
@@ -76,6 +78,33 @@ export default function ProfileScreen() {
         } catch (error) {
             console.error('Logout error:', error);
             setLogoutModalVisible(false);
+        }
+    };
+
+    const handleDeleteAccount = async () => {
+        if (deleting) return;
+        setDeleting(true);
+        try {
+            // Server anonymizes the account + clears local session on success
+            await authService.deleteAccount();
+
+            // Reset in-memory context state
+            resetUser();
+            clearCart();
+            clearWishlist();
+
+            setDeleteModalVisible(false);
+            router.replace('/auth/login');
+        } catch (error: any) {
+            // Nothing was deleted locally — tell the user it failed
+            console.error('Delete account error:', error);
+            setDeleteModalVisible(false);
+            Alert.alert(
+                'Could not delete account',
+                error?.message || 'Something went wrong. Please try again later.'
+            );
+        } finally {
+            setDeleting(false);
         }
     };
 
@@ -240,6 +269,12 @@ export default function ProfileScreen() {
                             icon="log-out"
                             onPress={() => setLogoutModalVisible(true)}
                             isDestructive={true}
+                        />
+                        <ProfileOption
+                            label="Delete Account"
+                            icon="trash-2"
+                            onPress={() => setDeleteModalVisible(true)}
+                            isDestructive={true}
                             showBorder={false}
                         />
                     </View>
@@ -277,6 +312,19 @@ export default function ProfileScreen() {
                 secondaryButtonText="CANCEL"
                 onSecondaryPress={() => setLogoutModalVisible(false)}
                 onClose={() => setLogoutModalVisible(false)}
+            />
+
+            {/* Delete Account Confirmation Modal */}
+            <ActionModal
+                visible={deleteModalVisible}
+                title="Delete Account"
+                message="This permanently deletes your account and personal data — profile, addresses, cart, wishlist, reviews and wallet. Order/invoice records are kept in anonymized form as required by law. This cannot be undone."
+                icon="trash-2"
+                primaryButtonText={deleting ? 'DELETING…' : 'DELETE ACCOUNT'}
+                onPrimaryPress={handleDeleteAccount}
+                secondaryButtonText="CANCEL"
+                onSecondaryPress={() => { if (!deleting) setDeleteModalVisible(false); }}
+                onClose={() => { if (!deleting) setDeleteModalVisible(false); }}
             />
 
             {/* Legal Document Modal */}

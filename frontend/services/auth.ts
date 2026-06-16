@@ -172,6 +172,45 @@ export const authService = {
     },
 
     /**
+     * Permanently delete the current user's account (App Store 5.1.1(v)).
+     * Server anonymizes the account and removes personal data; on success we
+     * clear all local session + cached data so the app returns to a logged-out
+     * state. Throws (without clearing anything) if the server call fails.
+     */
+    async deleteAccount() {
+        try {
+            await apiClient.delete('users/me');
+        } catch (error) {
+            throw new Error(handleApiError(error));
+        }
+
+        // Account is gone server-side — tear down the local session. Mirror the
+        // local-clear steps from logout() (but skip the auth/logout call, which
+        // would now fail).
+        try {
+            await googleAuthService.signOut();
+        } catch {
+            // Ignore — Google module may not be available or no active session
+        }
+        await tokenManager.clearTokens();
+        await userDataManager.clearUserData();
+
+        try {
+            const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+            await AsyncStorage.multiRemove([
+                '@ZPinEcom:cart',
+                '@ZPinEcom:wishlist',
+                '@ZPinEcom:paymentCards',
+                '@ZPinEcom:paymentUPIs',
+                '@ZPinEcom:recentSearches',
+                '@ZPinEcom:userPreferences'
+            ]);
+        } catch (storageError) {
+            console.error('Error clearing AsyncStorage:', storageError);
+        }
+    },
+
+    /**
      * Send OTP for password reset
      */
     async sendPasswordResetOTP(mobile: string, email: string) {
