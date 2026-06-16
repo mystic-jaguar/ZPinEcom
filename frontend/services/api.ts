@@ -1,5 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios, { AxiosError, AxiosInstance } from 'axios';
+import {
+    SECURE_KEYS,
+    ensureTokensMigrated,
+    secureGet,
+    secureRemove,
+    secureSet,
+} from './secureStorage';
 
 // Hardcoded production fallback — used when EXPO_PUBLIC_API_URL is not baked into the build.
 const PRODUCTION_API_URL = 'http://195.35.20.40:5002/api/v1/';
@@ -27,10 +34,9 @@ if (__DEV__) {
     console.log(`[API] Base URL: ${BASE_URL}`);
 }
 
-// Storage keys
+// AsyncStorage keys for NON-sensitive cache only.
+// Auth tokens live in SecureStore (Keychain/Keystore) — see ./secureStorage.
 export const STORAGE_KEYS = {
-    ACCESS_TOKEN: '@zpin_access_token',
-    REFRESH_TOKEN: '@zpin_refresh_token',
     USER_DATA: '@zpin_user_data',
 };
 
@@ -69,7 +75,8 @@ apiClient.interceptors.request.use(
             config.headers.delete('Authorization');
             config.headers.delete('x-auth-token');
         } else {
-            const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+            await ensureTokensMigrated();
+            const token = await secureGet(SECURE_KEYS.ACCESS_TOKEN);
             if (token && token !== 'null' && token !== 'undefined') {
                 // Use Authorization Bearer — the standard and most secure approach
                 config.headers.set('Authorization', `Bearer ${token}`);
@@ -88,14 +95,17 @@ apiClient.interceptors.request.use(
 let refreshPromise: Promise<string> | null = null;
 
 async function refreshAccessToken(): Promise<string> {
-    const refreshToken = await AsyncStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
+    await ensureTokensMigrated();
+    const refreshToken = await secureGet(SECURE_KEYS.REFRESH_TOKEN);
     if (!refreshToken) {
         throw new Error('SESSION_EXPIRED');
     }
     const response = await axios.post(`${BASE_URL}auth/refresh-token`, { refreshToken });
     const { accessToken, refreshToken: newRefreshToken } = response.data;
-    await AsyncStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, accessToken);
-    await AsyncStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, newRefreshToken);
+    await secureSet(SECURE_KEYS.ACCESS_TOKEN, accessToken);
+    if (newRefreshToken) {
+        await secureSet(SECURE_KEYS.REFRESH_TOKEN, newRefreshToken);
+    }
     return accessToken;
 }
 
@@ -126,10 +136,10 @@ apiClient.interceptors.response.use(
                 return apiClient(originalRequest);
             } catch (refreshError) {
                 // Refresh failed — clear all auth state and force re-login
-                await AsyncStorage.multiRemove([
-                    STORAGE_KEYS.ACCESS_TOKEN,
-                    STORAGE_KEYS.REFRESH_TOKEN,
-                    STORAGE_KEYS.USER_DATA,
+                await Promise.all([
+                    secureRemove(SECURE_KEYS.ACCESS_TOKEN),
+                    secureRemove(SECURE_KEYS.REFRESH_TOKEN),
+                    AsyncStorage.removeItem(STORAGE_KEYS.USER_DATA),
                 ]);
                 // Signal to the app that auth is gone — UserContext will redirect to login
                 return Promise.reject(new Error('SESSION_EXPIRED'));
@@ -170,32 +180,35 @@ export const handleApiError = (error: any): string => {
     }
 };
 
-// Token management
+// Token management — backed by SecureStore (Keychain/Keystore).
 export const tokenManager = {
     async setTokens(accessToken: string, refreshToken?: string) {
-        await AsyncStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, accessToken);
+        await secureSet(SECURE_KEYS.ACCESS_TOKEN, accessToken);
         if (refreshToken) {
-            await AsyncStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, refreshToken);
+            await secureSet(SECURE_KEYS.REFRESH_TOKEN, refreshToken);
         }
     },
 
     async getAccessToken() {
-        return await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+        await ensureTokensMigrated();
+        return await secureGet(SECURE_KEYS.ACCESS_TOKEN);
     },
 
     async getRefreshToken() {
-        return await AsyncStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
+        await ensureTokensMigrated();
+        return await secureGet(SECURE_KEYS.REFRESH_TOKEN);
     },
 
     async clearTokens() {
-        await AsyncStorage.multiRemove([
-            STORAGE_KEYS.ACCESS_TOKEN,
-            STORAGE_KEYS.REFRESH_TOKEN,
+        await Promise.all([
+            secureRemove(SECURE_KEYS.ACCESS_TOKEN),
+            secureRemove(SECURE_KEYS.REFRESH_TOKEN),
         ]);
     },
 
     async isAuthenticated() {
-        const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+        await ensureTokensMigrated();
+        const token = await secureGet(SECURE_KEYS.ACCESS_TOKEN);
         return !!token;
     },
 };
