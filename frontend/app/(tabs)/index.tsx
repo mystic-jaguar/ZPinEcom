@@ -3,7 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as ExpoLocation from 'expo-location';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, AppState, AppStateStatus, Dimensions, Image, Linking, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { AppState, AppStateStatus, Dimensions, Image, Linking, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
 import LegalDocModal, { LegalDocType } from '../../components/common/LegalDocModal';
@@ -63,6 +63,7 @@ export default function HomeScreen() {
     const [legalModalVisible, setLegalModalVisible] = useState(false);
     const [legalDocType, setLegalDocType] = useState<LegalDocType>('privacy');
     const [contactModalVisible, setContactModalVisible] = useState(false);
+    const [comingSoonModal, setComingSoonModal] = useState<{ visible: boolean; name: string }>({ visible: false, name: '' });
     const appState = useRef(AppState.currentState);
     const awaitingSettingsReturn = useRef(false);
     // Track last successful fetch + coords so returning to this tab doesn't
@@ -262,7 +263,7 @@ export default function HomeScreen() {
 
     const handleNearbyNav = (item: any) => {
         if (item.count != null && item.count <= 0) {
-            Alert.alert('Coming Soon', `${item.name} products will be available in your area soon!`);
+            setComingSoonModal({ visible: true, name: item.name });
             return;
         }
         handleProductNav(item.category, item.subCategory);
@@ -302,6 +303,17 @@ export default function HomeScreen() {
                     setLocationGranted(false);
                     fetchProducts();
                 }}
+            />
+
+            {/* Coming Soon Modal — shown for categories with no nearby stock yet */}
+            <ActionModal
+                visible={comingSoonModal.visible}
+                icon="clock"
+                title="Coming Soon"
+                message={`${comingSoonModal.name} products will be available in your area soon!`}
+                primaryButtonText="Got it"
+                onPrimaryPress={() => setComingSoonModal({ visible: false, name: '' })}
+                onClose={() => setComingSoonModal({ visible: false, name: '' })}
             />
 
             {/* Contact Modal */}
