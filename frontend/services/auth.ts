@@ -1,7 +1,10 @@
 import * as AppleAuthentication from 'expo-apple-authentication';
-import * as Crypto from 'expo-crypto';
 import { Platform } from 'react-native';
 import apiClient, { handleApiError, tokenManager, userDataManager } from './api';
+
+// expo-crypto is loaded lazily (only during an Apple sign-in). A top-level import
+// would call requireNativeModule('ExpoCrypto') at module load, crashing any build
+// whose native binary predates the dependency — and on Android, which never uses it.
 
 const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID?.trim() || '';
 const GOOGLE_ANDROID_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID?.trim();
@@ -388,6 +391,7 @@ export const googleAuthService = {
  * Sign in with Apple (iOS only) — App Store guideline 4.8.
  */
 async function generateAppleNonce(length = 32): Promise<string> {
+  const Crypto = await import('expo-crypto');
   const bytes = await Crypto.getRandomBytesAsync(length);
   return Array.from(bytes)
     .map((b) => b.toString(16).padStart(2, '0'))
@@ -412,6 +416,7 @@ export const appleAuthService = {
   }> {
     // Send Apple the SHA256 hash of a random nonce; keep the raw value to prove
     // possession to our backend (replay protection).
+    const Crypto = await import('expo-crypto');
     const rawNonce = await generateAppleNonce();
     const hashedNonce = await Crypto.digestStringAsync(
       Crypto.CryptoDigestAlgorithm.SHA256,
