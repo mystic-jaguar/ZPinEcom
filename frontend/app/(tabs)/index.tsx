@@ -65,6 +65,11 @@ export default function HomeScreen() {
     const [contactModalVisible, setContactModalVisible] = useState(false);
     const appState = useRef(AppState.currentState);
     const awaitingSettingsReturn = useRef(false);
+    // Track last successful fetch + coords so returning to this tab doesn't
+    // re-fetch (and re-acquire GPS) on every focus — only when data is stale.
+    const lastFetchRef = useRef(0);
+    const lastCoordsRef = useRef<{ lat?: number; lng?: number }>({});
+    const STALE_MS = 5 * 60 * 1000;
 
     const openLegalDoc = (type: LegalDocType) => {
         setLegalDocType(type);
@@ -171,6 +176,7 @@ export default function HomeScreen() {
         if (isLoadingProducts) return;
         setIsLoadingProducts(true);
         setError(null);
+        lastCoordsRef.current = { lat, lng };
 
         try {
             // Fire all 3 requests in parallel — eliminates sequential blocking
@@ -223,6 +229,7 @@ export default function HomeScreen() {
         } catch (error) {
             console.error('Error fetching home products:', error);
         } finally {
+            lastFetchRef.current = Date.now();
             setIsLoadingProducts(false);
         }
     };
@@ -230,11 +237,19 @@ export default function HomeScreen() {
     const hasMountedRef = useRef(false);
     useFocusEffect(
         useCallback(() => {
+            // Skip the very first focus — the mount effect already fetches.
             if (!hasMountedRef.current) {
                 hasMountedRef.current = true;
                 return;
             }
-            onRefresh();
+            // On subsequent focuses (returning from another tab), only refresh
+            // when the data is actually stale. Do it silently — reuse the last
+            // known location instead of a fresh GPS fix, and don't spin the
+            // pull-to-refresh control. Manual pull-to-refresh is unaffected.
+            if (Date.now() - lastFetchRef.current > STALE_MS) {
+                const { lat, lng } = lastCoordsRef.current;
+                fetchProducts(lat, lng);
+            }
         }, [])
     );
 
