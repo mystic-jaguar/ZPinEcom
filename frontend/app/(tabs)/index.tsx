@@ -95,16 +95,15 @@ export default function HomeScreen() {
     };
 
     useEffect(() => {
-        // Check current permission status first — only show pre-prompt if undetermined
+        // Do NOT prompt for location at launch (App Store 5.1.1 — location must be
+        // requested in-context, at the point of use). If it was already granted in a
+        // previous session we use it; otherwise we just load products and let the user
+        // enable location from the "Nearby Availabilities" card, which shows the
+        // explainer modal before the native dialog.
         ExpoLocation.getForegroundPermissionsAsync().then(({ status }) => {
             if (status === 'granted') {
-                // Already granted — fetch directly
                 requestLocationAndFetch();
-            } else if (status === 'undetermined') {
-                // Show our explanation modal before the native dialog
-                setShowLocationModal(true);
             } else {
-                // Denied — skip location, just fetch products
                 setLocationGranted(false);
                 fetchProducts();
             }
