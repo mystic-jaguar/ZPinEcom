@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
+import { WALLET_ENABLED } from '../../constants/features';
 import { useOrder } from '../../context/OrderContext';
 import { orderService } from '../../services/order';
 
@@ -189,6 +190,8 @@ export default function CancelOrderScreen() {
                                 <Text style={styles.refundDesc}>Refund will be credited to your original payment source within 5-7 business days.</Text>
                             </TouchableOpacity>
 
+                            {/* ZPIN Wallet refund — hidden while the wallet is on hold (RBI PPI compliance) */}
+                            {WALLET_ENABLED && (
                             <TouchableOpacity
                                 style={[
                                     styles.refundOption,
@@ -207,6 +210,7 @@ export default function CancelOrderScreen() {
                                 </View>
                                 <Text style={styles.refundDesc}>Instant refund to your ZPIN Wallet. Can be used for future purchases.</Text>
                             </TouchableOpacity>
+                            )}
                         </View>
                     </View>
                 )}

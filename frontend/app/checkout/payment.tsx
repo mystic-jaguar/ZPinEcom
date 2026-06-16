@@ -1,6 +1,7 @@
 import { CheckoutProgress } from '@/components/checkout/CheckoutProgress';
 import ActionModal from '@/components/common/ActionModal';
 import { Colors } from '@/constants/Colors';
+import { WALLET_ENABLED } from '@/constants/features';
 import { useAddress } from '@/context/AddressContext';
 import { useCart } from '@/context/CartContext';
 import { useCheckout } from '@/context/CheckoutContext';
@@ -34,6 +35,8 @@ export default function CheckoutPaymentScreen() {
     const [confirmedFinalAmount, setConfirmedFinalAmount] = useState<number | null>(null);
 
     useEffect(() => {
+        // Wallet is on hold (RBI PPI compliance) — skip the balance fetch while disabled.
+        if (!WALLET_ENABLED) return;
         walletService.getWallet().then(data => setWalletBalance(data.balance)).catch(() => setWalletBalance(0));
     }, []);
 
@@ -284,6 +287,9 @@ export default function CheckoutPaymentScreen() {
                     {renderOption('cod', 'COD (Cash on Delivery)', 'cash-outline')}
                 </View>
 
+                {/* ZPIN Wallet payment — hidden while the wallet is on hold (RBI PPI compliance) */}
+                {WALLET_ENABLED && (
+                <>
                 <Text style={styles.sectionTitle}>ZPIN WALLET</Text>
                 <View style={styles.sectionContainer}>
                     <TouchableOpacity
@@ -314,6 +320,8 @@ export default function CheckoutPaymentScreen() {
                         </View>
                     </TouchableOpacity>
                 </View>
+                </>
+                )}
 
             </ScrollView>
 
