@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import {
+    Linking,
     Modal,
     ScrollView,
     StyleSheet,
@@ -9,6 +10,7 @@ import {
     View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { PRIVACY_POLICY_URL, TERMS_URL } from '../../constants/legal';
 
 const PRIVACY_POLICY = `PRIVACY POLICY - ZPIN
 Last Updated: April 2025
@@ -318,6 +320,7 @@ export default function LegalDocModal({ visible, docType, onClose }: LegalDocMod
     const isPrivacy = docType === 'privacy';
     const title = isPrivacy ? 'Privacy Policy' : 'Terms & Conditions';
     const content = isPrivacy ? PRIVACY_POLICY : TERMS_AND_CONDITIONS;
+    const onlineUrl = isPrivacy ? PRIVACY_POLICY_URL : TERMS_URL;
 
     return (
         <Modal
@@ -348,6 +351,14 @@ export default function LegalDocModal({ visible, docType, onClose }: LegalDocMod
 
                 {/* Footer */}
                 <View style={styles.footer}>
+                    <TouchableOpacity
+                        style={styles.onlineLink}
+                        onPress={() => Linking.openURL(onlineUrl)}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                        <Ionicons name="open-outline" size={15} color="#6B7280" />
+                        <Text style={styles.onlineLinkText}>View latest version online</Text>
+                    </TouchableOpacity>
                     <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
                         <Text style={styles.closeBtnText}>Close</Text>
                     </TouchableOpacity>
@@ -405,6 +416,19 @@ const styles = StyleSheet.create({
         paddingVertical: 16,
         borderTopWidth: 1,
         borderTopColor: '#E5E7EB',
+    },
+    onlineLink: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        paddingVertical: 8,
+        marginBottom: 8,
+    },
+    onlineLinkText: {
+        fontSize: 13,
+        color: '#6B7280',
+        fontWeight: '600',
     },
     closeBtn: {
         backgroundColor: '#FBBF24',
