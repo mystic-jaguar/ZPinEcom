@@ -65,3 +65,6 @@ ZPIN_Use_Case_Specifications.pdf
 backend/src/scripts/seedRealProducts.ts
 backend/src/scripts
 *.xlsx
+
+# Generated/hostable legal documents (Word) — not part of the app source
+*.docx
