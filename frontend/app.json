@@ -30,7 +30,6 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "usesCleartextTraffic": true,
       "package": "com.zpin.ecom",
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
@@ -70,7 +69,15 @@
       ],
       "expo-web-browser",
       "expo-secure-store",
-      "expo-apple-authentication"
+      "expo-apple-authentication",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
