@@ -20,7 +20,8 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.zpin.ecom",
-      "usesAppleSignIn": true
+      "usesAppleSignIn": true,
+      "googleServicesFile": "./GoogleService-Info.plist"
     },
     "android": {
       "googleServicesFile": "./google-services.json",
@@ -47,7 +48,7 @@
       [
         "@react-native-google-signin/google-signin",
         {
-          "iosUrlScheme": "com.googleusercontent.apps.736340596721-9jtt15209tbto660bim55n3gs23svisp"
+          "iosUrlScheme": "com.googleusercontent.apps.19891056241-ggdjrjllnt4qn6an7ldukcmabt2htegm"
         }
       ],
       [
