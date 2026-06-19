@@ -6,16 +6,19 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
 import Input from '../../components/common/Input';
 import { useAddress } from '../../context/AddressContext';
+import { useUser } from '../../context/UserContext';
 
 export default function AddAddressScreen() {
     const router = useRouter();
     const params = useLocalSearchParams();
     const { addAddress, updateAddress, addresses } = useAddress();
+    const { user } = useUser();
+    const signupPhone = (user?.mobile || (user as any)?.phoneNumber || '').toString();
     const headerTitle = params.id ? 'Edit Address' : 'Add New Address';
 
     const [form, setForm] = useState({
         name: '',
-        phone: '',
+        phone: signupPhone,
         addressLine1: '',
         addressLine2: '',
         city: '',
@@ -35,7 +38,7 @@ export default function AddAddressScreen() {
             if (existingAddress) {
                 setForm({
                     name: existingAddress.name,
-                    phone: existingAddress.phone,
+                    phone: existingAddress.phone || signupPhone,
                     addressLine1: existingAddress.addressLine1 || existingAddress.address || '',
                     addressLine2: existingAddress.addressLine2 || '',
                     city: existingAddress.city,
@@ -56,7 +59,7 @@ export default function AddAddressScreen() {
         let newErrors: Record<string, string> = {};
 
         if (!form.name) { newErrors.name = 'Name is required'; valid = false; }
-        if (!form.phone) { newErrors.phone = 'Phone number is required'; valid = false; }
+        if (!form.phone) { newErrors.phone = 'Please enter a phone number for this address'; valid = false; }
         else if (form.phone.length < 10) { newErrors.phone = 'Invalid phone number'; valid = false; }
 
         if (!form.pincode) { newErrors.pincode = 'Pincode is required'; valid = false; }
@@ -113,12 +116,12 @@ export default function AddAddressScreen() {
                     error={errors.name}
                 />
                 <Input
-                    label="Phone Number"
+                    label="Phone Number (Optional)"
                     placeholder="Enter 10-digit number"
                     keyboardType="phone-pad"
                     maxLength={10}
                     value={form.phone}
-                    onChangeText={t => setForm({ ...form, phone: t })}
+                    onChangeText={t => setForm({ ...form, phone: t.replace(/[^0-9]/g, '') })}
                     error={errors.phone}
                 />
 
