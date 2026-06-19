@@ -104,10 +104,18 @@ export default function VariantSelector({
                                     {stock !== undefined && stock > 0 && stock <= 5 && (
                                         <Text style={styles.lowStockText}>Only {stock} left</Text>
                                     )}
+                                    {outOfStock && (
+                                        <Text style={styles.outOfStockCaption}>Out of stock</Text>
+                                    )}
                                 </TouchableOpacity>
                             );
                         })}
                     </View>
+                    {sizeQuantities && sizes.every((s) => sizeQuantities[s] === 0) && (
+                        <Text style={styles.unavailableNote}>
+                            This product is currently not available in any size.
+                        </Text>
+                    )}
                 </View>
             )}
         </View>
@@ -195,5 +203,17 @@ const styles = StyleSheet.create({
         color: '#EF4444',
         fontWeight: '600',
         marginTop: 2,
+    },
+    outOfStockCaption: {
+        fontSize: 9,
+        color: '#9CA3AF',
+        fontWeight: '600',
+        marginTop: 2,
+    },
+    unavailableNote: {
+        fontSize: 12,
+        color: '#EF4444',
+        fontWeight: '600',
+        marginTop: 8,
     },
 });

@@ -18,9 +18,11 @@ const TTL_NEARBY = 3600;        // 1h — nearby categories
 const router = Router();
 
 function normalizeProduct(row: any) {
-  // Extract sizes from size_quantities keys (e.g. {S:10, M:15} → ['S','M'])
+  // Extract sizes from size_quantities keys (e.g. {S:10, M:15} → ['S','M']).
+  // Include out-of-stock sizes too so the UI can mark them as unavailable
+  // instead of hiding them; availability is driven by sizeQuantities below.
   const sizeQuantities = row.size_quantities || {};
-  const sizes = Object.keys(sizeQuantities).filter(k => sizeQuantities[k] > 0);
+  const sizes = Object.keys(sizeQuantities);
 
   // Extract colors from extracted_attributes
   const attrs = row.extracted_attributes || {};

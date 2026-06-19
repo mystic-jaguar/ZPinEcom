@@ -27,6 +27,7 @@ export default function ProductDetails() {
     const { orders, isLoading: isOrdersLoading } = useOrder();
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [showVariantWarningModal, setShowVariantWarningModal] = useState(false);
+    const [unavailableMessage, setUnavailableMessage] = useState<string | null>(null);
     const [showDeleteReviewModal, setShowDeleteReviewModal] = useState(false);
     const [reviewFeedback, setReviewFeedback] = useState<string | null>(null);
     const [reviewRating, setReviewRating] = useState(5);
@@ -113,7 +114,12 @@ export default function ProductDetails() {
             const activeCoupons = (couponsRes.data?.data || []).filter((c: any) => c.status === 'active');
             if (activeCoupons.length > 0) setActiveCoupon(activeCoupons[0]);
             if (data.colors && data.colors.length > 0) setSelectedColor(data.colors[0]);
-            if (data.sizes && data.sizes.length > 0) setSelectedSize(data.sizes[0]);
+            if (data.sizes && data.sizes.length > 0) {
+                // Default to the first in-stock size; leave unselected if all are out of stock.
+                const sq = (data as any).sizeQuantities || {};
+                const firstAvailable = data.sizes.find((s: string) => (sq[s] ?? 1) > 0);
+                setSelectedSize(firstAvailable || '');
+            }
         } catch (err: any) {
             setError(err.message || 'Failed to load product details');
         } finally {
@@ -220,6 +226,19 @@ export default function ProductDetails() {
 
         if ((requiresColor && !selectedColor) || (requiresSize && !selectedSize)) {
             setShowVariantWarningModal(true);
+            return;
+        }
+
+        // Block adding a combination that is not in stock.
+        const sizeQuantities = (product as any).sizeQuantities as Record<string, number> | undefined;
+        if (requiresSize && sizeQuantities && sizeQuantities[selectedSize] === 0) {
+            setUnavailableMessage(
+                `This product is currently not available in size "${selectedSize}"${selectedColor ? ` (${selectedColor})` : ''}. Please choose another size.`
+            );
+            return;
+        }
+        if (!product.inStock) {
+            setUnavailableMessage('This product is currently out of stock.');
             return;
         }
 
@@ -607,6 +626,17 @@ export default function ProductDetails() {
                 primaryButtonText="OK"
                 onPrimaryPress={() => setShowVariantWarningModal(false)}
                 onClose={() => setShowVariantWarningModal(false)}
+            />
+
+            {/* Variant Unavailable Modal */}
+            <ActionModal
+                visible={!!unavailableMessage}
+                title="Not Available"
+                message={unavailableMessage || ''}
+                icon="slash"
+                primaryButtonText="OK"
+                onPrimaryPress={() => setUnavailableMessage(null)}
+                onClose={() => setUnavailableMessage(null)}
             />
 
             <ActionModal
