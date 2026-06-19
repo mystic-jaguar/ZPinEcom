@@ -6,7 +6,6 @@ import rateLimit from 'express-rate-limit';
 import { OAuth2Client } from 'google-auth-library';
 import jwt from 'jsonwebtoken';
 import { pool } from '../db';
-import { verifyFirebaseToken } from '../utils/firebaseAdmin';
 import { generateId } from '../utils/id';
 import { logger } from '../utils/logger';
 import { sendOTPEmail } from '../utils/mailer';
@@ -509,25 +508,28 @@ router.post('/forgetPassword/resetPassword', otpVerifyLimiter, async (req: Reque
 // ─── POST /api/v1/auth/verification/sendOTP ──────────────────────────────────
 
 router.post('/verification/sendOTP', otpLimiter, async (req: Request, res: Response): Promise<void> => {
-  const { mobile, email } = req.body;
+  const { email } = req.body;
+  if (!email) {
+    res.status(400).json({ success: false, message: 'Email is required' });
+    return;
+  }
+
   const otp = generateOTP(); // cryptographically secure
   const otpHash = await bcrypt.hash(otp, 10); // hash before storing
 
   try {
     await pool.query(
       `DELETE FROM ${AUTH_TOKENS}
-       WHERE token_type = 'signup_verification' AND (mobile = $1 OR email = $2)`,
-      [mobile || '', email || '']
+       WHERE token_type = 'signup_verification' AND email = $1`,
+      [email.toLowerCase()]
     );
     await pool.query(
-      `INSERT INTO ${AUTH_TOKENS} (id, mobile, email, token, token_type, is_used, expires_at, created_at)
-       VALUES ($1,$2,$3,$4,'signup_verification',false,NOW() + INTERVAL '10 minutes',NOW())`,
-      [generateId(), mobile || '', email || '', otpHash]
+      `INSERT INTO ${AUTH_TOKENS} (id, email, token, token_type, is_used, expires_at, created_at)
+       VALUES ($1,$2,$3,'signup_verification',false,NOW() + INTERVAL '10 minutes',NOW())`,
+      [generateId(), email.toLowerCase(), otpHash]
     );
 
-    if (email) {
-      await sendOTPEmail(email.toLowerCase(), otp, 'verification');
-    }
+    await sendOTPEmail(email.toLowerCase(), otp, 'verification');
 
     // Never return OTP in response
     res.json({ success: true, message: 'OTP sent' });
@@ -540,17 +542,21 @@ router.post('/verification/sendOTP', otpLimiter, async (req: Request, res: Respo
 // ─── POST /api/v1/auth/verification/verifyOTP ────────────────────────────────
 
 router.post('/verification/verifyOTP', otpVerifyLimiter, async (req: Request, res: Response): Promise<void> => {
-  const { mobile, email, otp } = req.body;
+  const { email, otp } = req.body;
+  if (!email || !otp) {
+    res.status(400).json({ success: false, message: 'Email and OTP are required' });
+    return;
+  }
 
   try {
     // Fetch unexpired, unused candidates — then bcrypt.compare (OTP is stored hashed)
     const result = await pool.query(
       `SELECT * FROM ${AUTH_TOKENS}
        WHERE token_type = 'signup_verification'
-         AND (mobile = $1 OR email = $2)
+         AND email = $1
          AND expires_at > NOW()
          AND is_used = false`,
-      [mobile || '', email || '']
+      [email.toLowerCase()]
     );
 
     if (result.rows.length === 0) {
@@ -574,12 +580,10 @@ router.post('/verification/verifyOTP', otpVerifyLimiter, async (req: Request, re
       [matchedRow.id]
     );
 
-    if (email) {
-      await pool.query(
-        `UPDATE ${USERS} SET is_verified = true, updated_at = NOW() WHERE email = $1`,
-        [email.toLowerCase()]
-      );
-    }
+    await pool.query(
+      `UPDATE ${USERS} SET is_verified = true, updated_at = NOW() WHERE email = $1`,
+      [email.toLowerCase()]
+    );
 
     res.json({ success: true, message: 'OTP verified successfully' });
   } catch (err) {
@@ -867,41 +871,6 @@ router.post('/apple', loginLimiter, async (req: Request, res: Response): Promise
   } catch (err: any) {
     logger.error('auth.apple_error', { message: err.message, ip: req.ip || '' });
     res.status(401).json({ success: false, message: 'Apple authentication failed' });
-  }
-});
-
-// ─── POST /api/v1/auth/verification/verifyFirebaseOTP ────────────────────────
-// Called after Firebase Phone Auth confirms the OTP on the frontend.
-// The frontend sends the Firebase ID token; we verify it and mark the user verified.
-
-router.post('/verification/verifyFirebaseOTP', otpVerifyLimiter, async (req: Request, res: Response): Promise<void> => {
-  const { firebaseIdToken, mobile } = req.body;
-  if (!firebaseIdToken || !mobile) {
-    res.status(400).json({ success: false, message: 'firebaseIdToken and mobile are required' });
-    return;
-  }
-
-  try {
-    const decoded = await verifyFirebaseToken(firebaseIdToken);
-
-    // Ensure the phone number in the token matches the claimed mobile
-    const normalizedMobile = mobile.replace(/\D/g, '').slice(-10); // last 10 digits
-    const tokenPhone = (decoded.phone_number || '').replace(/\D/g, '').slice(-10);
-
-    if (tokenPhone !== normalizedMobile) {
-      res.status(400).json({ success: false, message: 'Phone number mismatch' });
-      return;
-    }
-
-    await pool.query(
-      `UPDATE ${USERS} SET is_verified = true, updated_at = NOW() WHERE mobile = $1`,
-      [normalizedMobile]
-    );
-
-    res.json({ success: true, message: 'Mobile verified successfully' });
-  } catch (err: any) {
-    console.error('verifyFirebaseOTP error:', err.message);
-    res.status(400).json({ success: false, message: 'Invalid or expired Firebase token' });
   }
 });
 

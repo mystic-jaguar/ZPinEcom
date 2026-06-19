@@ -178,7 +178,7 @@ export default function SignupScreen() {
 
             // Backend already emails a verification OTP during signup.
             // Navigate to OTP verification — verified against the user's email.
-            router.push({ pathname: '/auth/verify-otp', params: { email, mobile } });
+            router.push({ pathname: '/auth/verify-otp', params: { email } });
         } catch (error: any) {
             setErrorMessage(error.message || 'An error occurred. Please try again.');
             setShowErrorModal(true);

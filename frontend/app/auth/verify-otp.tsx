@@ -17,7 +17,6 @@ export default function VerifyOTPScreen() {
     const router = useRouter();
     const params = useLocalSearchParams();
     const email = params.email as string || '';
-    const mobile = params.mobile as string || '';
 
     const [otp, setOtp] = useState(['', '', '', '', '', '']);
     const [loading, setLoading] = useState(false);

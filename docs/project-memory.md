@@ -60,7 +60,6 @@ utils/
   id.ts                   — UUID & 7-char short ID generation
   logger.ts               — Structured event logging
   mailer.ts               — Nodemailer setup
-  firebaseAdmin.ts        — Firebase token verification
   sql.ts                  — SQL identifier escaping
 scripts/
   runMigration.ts         — DB initialization
@@ -238,7 +237,6 @@ Base path: `/api/v1/`
 | jsonwebtoken       | 9.0.2   | JWT auth                   |
 | bcryptjs           | 2.4.3   | Password hashing           |
 | razorpay           | 2.9.6   | Payment gateway            |
-| firebase-admin     | 13.10.0 | Firebase integration       |
 | nodemailer         | 8.0.8   | Email service              |
 | helmet             | 8.1.0   | Security headers           |
 | express-rate-limit | 7.5.0   | Rate limiting              |
@@ -253,7 +251,6 @@ Base path: `/api/v1/`
 | react-native               | 0.81.5  | Mobile UI             |
 | expo-router                | 6.0.23  | File-based navigation |
 | axios                      | 1.13.4  | HTTP client           |
-| @react-native-firebase/auth| 22.1.2  | Firebase auth         |
 | react-native-razorpay      | 3.0.0   | Payment UI            |
 | expo-location              | 19.0.8  | Geolocation           |
 | @react-native-async-storage| 2.1.2   | Local persistence     |
