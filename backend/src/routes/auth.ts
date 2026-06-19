@@ -16,6 +16,7 @@ const router = Router();
 const USERS = safeIdentifier('users');
 const REFRESH_TOKENS = safeIdentifier('refresh_tokens');
 const AUTH_TOKENS = safeIdentifier('auth_tokens');
+const PENDING_SIGNUPS = safeIdentifier('pending_signups');
 
 // ─── Rate Limiters ────────────────────────────────────────────────────────────
 
@@ -151,74 +152,86 @@ router.post('/signup', signupLimiter, async (req: Request, res: Response): Promi
 
   try {
     const existing = await pool.query(
-      `SELECT id FROM ${USERS} WHERE email = $1`, [email.toLowerCase()]
+      `SELECT id, is_verified FROM ${USERS} WHERE email = $1`, [email.toLowerCase()]
     );
     if (existing.rows.length > 0) {
-      res.status(409).json({ success: false, message: 'Email already registered' });
-      return;
+      if (existing.rows[0].is_verified) {
+        res.status(409).json({ success: false, message: 'Email already registered' });
+        return;
+      }
+      // Legacy unverified account (created before the verify-first flow). Remove it
+      // so the email is freed and the user can complete a clean pending signup.
+      await pool.query(`DELETE FROM ${USERS} WHERE id = $1`, [existing.rows[0].id]);
+    }
+
+    // Reject a mobile already owned by a fully registered (verified) account.
+    if (mobile) {
+      const mobileOwner = await pool.query(
+        `SELECT id FROM ${USERS} WHERE mobile = $1 AND is_verified = true`, [mobile]
+      );
+      if (mobileOwner.rows.length > 0) {
+        res.status(409).json({ success: false, message: 'Mobile number already registered' });
+        return;
+      }
     }
 
     const passwordHash = await bcrypt.hash(password, 12);
     const generatedUserName = userName || `${email.split('@')[0]}_${Date.now()}`;
-
-    const result = await pool.query(
-      `INSERT INTO ${USERS} (id, user_name, name, email, mobile, password_hash, user_role, is_verified, is_active, created_at, updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,'customer',false,true,NOW(),NOW()) RETURNING *`,
-      [generateId(), generatedUserName, name, email.toLowerCase(), mobile || null, passwordHash]
-    );
-
-    const user = normalizeUser(result.rows[0]);
-    const { accessToken, refreshToken } = generateTokens(user.id, user.userRole);
-
-    await pool.query(
-      `INSERT INTO ${REFRESH_TOKENS} (id, user_id, token, expires_at, created_at)
-       VALUES ($1,$2,$3,NOW() + INTERVAL '30 days',NOW())`,
-      [generateId(), user.id, refreshToken]
-    );
-
-    // Send verification OTP immediately after signup
     const otp = generateOTP();
     const otpHash = await bcrypt.hash(otp, 10);
+
+    // Hold the signup as pending — the users row is created only once the OTP is
+    // verified, so unverified emails/phones never occupy the users table. A repeat
+    // signup for the same email refreshes the pending record and OTP.
     await pool.query(
-      `INSERT INTO ${AUTH_TOKENS} (id, user_id, email, token, token_type, is_used, expires_at, created_at)
-       VALUES ($1,$2,$3,$4,'signup_verification',false,NOW() + INTERVAL '10 minutes',NOW())`,
-      [generateId(), user.id, email.toLowerCase(), otpHash]
+      `INSERT INTO ${PENDING_SIGNUPS}
+         (id, email, name, mobile, user_name, password_hash, otp_hash, expires_at, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7, NOW() + INTERVAL '10 minutes', NOW())
+       ON CONFLICT (email) DO UPDATE SET
+         name = EXCLUDED.name,
+         mobile = EXCLUDED.mobile,
+         user_name = EXCLUDED.user_name,
+         password_hash = EXCLUDED.password_hash,
+         otp_hash = EXCLUDED.otp_hash,
+         expires_at = EXCLUDED.expires_at,
+         created_at = NOW()`,
+      [generateId(), email.toLowerCase(), name, mobile || null, generatedUserName, passwordHash, otpHash]
     );
+
     let otpEmailSent = true;
     try {
       await sendOTPEmail(email.toLowerCase(), otp, 'verification');
     } catch (mailErr: any) {
-      // Account is created; the email just failed to go out. Tell the client the
-      // truth so it can prompt the user to retry instead of waiting for an OTP
-      // that was never sent. The user can still request a new code via /verification/sendOTP.
+      // Pending signup is stored; the email just failed to send. Tell the client the
+      // truth so it can prompt a resend instead of waiting for an OTP that never arrived.
       otpEmailSent = false;
       logger.warn('auth.signup_otp_email_failed', {
-        userId: user.id,
+        email: email.toLowerCase(),
         error: mailErr?.message,
       });
     }
 
-    // Return tokens so the user can proceed — email verification is enforced at
-    // sensitive endpoints (orders, checkout) via the isVerified flag on the user object.
+    // No tokens yet — the account is not created until the OTP is verified.
     res.status(201).json({
       success: true,
       otpEmailSent,
+      requiresVerification: true,
+      email: email.toLowerCase(),
       message: otpEmailSent
-        ? 'Account created. Please verify your email with the OTP we just sent.'
-        : "Account created, but we couldn't send the verification code right now. Please tap Resend to try again.",
-      accessToken,
-      refreshToken,
-      user,
+        ? 'Verification code sent. Enter the OTP to finish creating your account.'
+        : "We couldn't send the verification code right now. Please tap Resend to try again.",
     });
-    logger.authSuccess(user.id, req.ip || '', 'signup');
+    logger.authSuccess('pending', req.ip || '', 'signup_pending');
   } catch (err: any) {
     console.error('Signup error:', err.code);
     if (err.code === '23505') {
       const detail: string = err.detail || '';
       if (detail.includes('mobile')) {
         res.status(409).json({ success: false, message: 'Mobile number already registered' });
-      } else {
+      } else if (detail.includes('user_name')) {
         res.status(409).json({ success: false, message: 'Username already taken' });
+      } else {
+        res.status(409).json({ success: false, message: 'Email already registered' });
       }
       return;
     }
@@ -525,34 +538,42 @@ router.post('/verification/sendOTP', otpLimiter, async (req: Request, res: Respo
     return;
   }
 
+  const normalizedEmail = email.toLowerCase();
   const otp = generateOTP(); // cryptographically secure
   const otpHash = await bcrypt.hash(otp, 10); // hash before storing
 
+  let hasPending = false;
   try {
-    await pool.query(
-      `DELETE FROM ${AUTH_TOKENS}
-       WHERE token_type = 'signup_verification' AND email = $1`,
-      [email.toLowerCase()]
+    // Refresh the OTP on the pending signup for this email, if one exists.
+    const updated = await pool.query(
+      `UPDATE ${PENDING_SIGNUPS}
+         SET otp_hash = $1, expires_at = NOW() + INTERVAL '10 minutes'
+       WHERE email = $2
+       RETURNING id`,
+      [otpHash, normalizedEmail]
     );
-    await pool.query(
-      `INSERT INTO ${AUTH_TOKENS} (id, email, token, token_type, is_used, expires_at, created_at)
-       VALUES ($1,$2,$3,'signup_verification',false,NOW() + INTERVAL '10 minutes',NOW())`,
-      [generateId(), email.toLowerCase(), otpHash]
-    );
+    hasPending = updated.rows.length > 0;
   } catch (err) {
     console.error('sendOTP db error');
     res.status(500).json({ success: false, message: 'Server error' });
     return;
   }
 
+  // No pending signup for this email — respond success without revealing that,
+  // to avoid leaking which emails are mid-signup.
+  if (!hasPending) {
+    res.json({ success: true, message: 'OTP sent' });
+    return;
+  }
+
   // Send the email in its own block so a mail failure is reported distinctly
   // from a DB failure — this is what surfaces SMTP misconfiguration to the client.
   try {
-    await sendOTPEmail(email.toLowerCase(), otp, 'verification');
+    await sendOTPEmail(normalizedEmail, otp, 'verification');
     // Never return OTP in response
     res.json({ success: true, message: 'OTP sent' });
   } catch (mailErr: any) {
-    logger.warn('auth.verification_otp_email_failed', { email: email.toLowerCase(), error: mailErr?.message });
+    logger.warn('auth.verification_otp_email_failed', { email: normalizedEmail, error: mailErr?.message });
     res.status(502).json({
       success: false,
       message: "We couldn't send the verification email right now. Please try again in a moment.",
@@ -570,43 +591,68 @@ router.post('/verification/verifyOTP', otpVerifyLimiter, async (req: Request, re
   }
 
   try {
-    // Fetch unexpired, unused candidates — then bcrypt.compare (OTP is stored hashed)
-    const result = await pool.query(
-      `SELECT * FROM ${AUTH_TOKENS}
-       WHERE token_type = 'signup_verification'
-         AND email = $1
-         AND expires_at > NOW()
-         AND is_used = false`,
+    // Find the pending signup for this email (OTP is stored hashed).
+    const pendingResult = await pool.query(
+      `SELECT * FROM ${PENDING_SIGNUPS} WHERE email = $1 AND expires_at > NOW()`,
       [email.toLowerCase()]
     );
 
-    if (result.rows.length === 0) {
+    if (pendingResult.rows.length === 0) {
       res.status(400).json({ success: false, message: 'Invalid or expired OTP' });
       return;
     }
 
-    let matchedRow: any = null;
-    for (const row of result.rows) {
-      const isMatch = await bcrypt.compare(otp, row.token);
-      if (isMatch) { matchedRow = row; break; }
-    }
-
-    if (!matchedRow) {
+    const pending = pendingResult.rows[0];
+    const isMatch = await bcrypt.compare(otp, pending.otp_hash);
+    if (!isMatch) {
       res.status(400).json({ success: false, message: 'Invalid or expired OTP' });
       return;
     }
 
+    // OTP is valid — create the verified user now, from the pending data.
+    let user;
+    try {
+      const insert = await pool.query(
+        `INSERT INTO ${USERS} (id, user_name, name, email, mobile, password_hash, user_role, is_verified, is_active, created_at, updated_at)
+         VALUES ($1,$2,$3,$4,$5,$6,'customer',true,true,NOW(),NOW()) RETURNING *`,
+        [generateId(), pending.user_name, pending.name, pending.email, pending.mobile, pending.password_hash]
+      );
+      user = normalizeUser(insert.rows[0]);
+    } catch (insErr: any) {
+      // Another account claimed the email/mobile/username between signup and verify.
+      if (insErr.code === '23505') {
+        await pool.query(`DELETE FROM ${PENDING_SIGNUPS} WHERE id = $1`, [pending.id]);
+        const detail: string = insErr.detail || '';
+        if (detail.includes('mobile')) {
+          res.status(409).json({ success: false, message: 'Mobile number already registered' });
+        } else if (detail.includes('email')) {
+          res.status(409).json({ success: false, message: 'Email already registered' });
+        } else {
+          res.status(409).json({ success: false, message: 'Username already taken' });
+        }
+        return;
+      }
+      throw insErr;
+    }
+
+    // Consume the pending signup and issue tokens — the user is signed in immediately.
+    await pool.query(`DELETE FROM ${PENDING_SIGNUPS} WHERE id = $1`, [pending.id]);
+
+    const { accessToken, refreshToken } = generateTokens(user.id, user.userRole);
     await pool.query(
-      `UPDATE ${AUTH_TOKENS} SET is_used = true WHERE id = $1`,
-      [matchedRow.id]
+      `INSERT INTO ${REFRESH_TOKENS} (id, user_id, token, expires_at, created_at)
+       VALUES ($1,$2,$3,NOW() + INTERVAL '30 days',NOW())`,
+      [generateId(), user.id, refreshToken]
     );
 
-    await pool.query(
-      `UPDATE ${USERS} SET is_verified = true, updated_at = NOW() WHERE email = $1`,
-      [email.toLowerCase()]
-    );
-
-    res.json({ success: true, message: 'OTP verified successfully' });
+    res.json({
+      success: true,
+      message: 'Email verified. You are now signed in.',
+      accessToken,
+      refreshToken,
+      user,
+    });
+    logger.authSuccess(user.id, req.ip || '', 'signup_verified');
   } catch (err) {
     console.error('verifyOTP error');
     res.status(500).json({ success: false, message: 'Server error' });

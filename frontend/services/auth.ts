@@ -126,11 +126,20 @@ export const authService = {
     async verifyOTP(email: string, otp: string) {
         try {
             // POST :- /api/v1/auth/verification/verifyOTP
+            // On success the backend creates the account and returns a session —
+            // persist tokens/user so the user is signed in immediately.
             const response = await apiClient.post('auth/verification/verifyOTP', {
                 email,
                 otp,
             });
-            return response.data;
+            const data = response.data;
+            if (data.accessToken) {
+                await tokenManager.setTokens(data.accessToken, data.refreshToken);
+            }
+            if (data.user) {
+                await userDataManager.setUserData(data.user);
+            }
+            return data;
         } catch (error) {
             throw new Error(handleApiError(error));
         }

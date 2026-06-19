@@ -169,16 +169,9 @@ export default function SignupScreen() {
                 password
             });
 
-            // Backend returns tokens on signup — store them and go to OTP verification
-            if (response.accessToken) {
-                const { tokenManager, userDataManager } = await import('../../services/api');
-                await tokenManager.setTokens(response.accessToken, response.refreshToken);
-                if (response.user) await userDataManager.setUserData(response.user);
-            }
-
-            // Backend already emails a verification OTP during signup.
-            // Navigate to OTP verification — verified against the user's email.
-            // If the email failed to send, signal the verify screen to prompt a resend.
+            // The account is created only after the email OTP is verified, so there are
+            // no tokens yet. Go to OTP verification; if the email failed to send, signal
+            // the verify screen to prompt an immediate resend.
             router.push({
                 pathname: '/auth/verify-otp',
                 params: { email, otpEmailSent: response.otpEmailSent === false ? '0' : '1' },

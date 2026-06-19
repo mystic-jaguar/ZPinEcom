@@ -113,41 +113,32 @@ describe('POST /auth/signup', () => {
     expect(res.status).toBe(400);
   });
 
-  it('returns 409 when email is already registered', async () => {
-    getDbMock().mockResolvedValueOnce({ rows: [{ id: 'USR0001' }] });
+  it('returns 409 when a verified email is already registered', async () => {
+    getDbMock().mockResolvedValueOnce({ rows: [{ id: 'USR0001', is_verified: true }] });
     const res = await request(app).post(`${BASE}/signup`).send(validBody);
     expect(res.status).toBe(409);
     expect(res.body.message).toMatch(/email/i);
   });
 
-  it('returns 201, tokens, and sends a verification OTP on successful registration', async () => {
+  it('returns 201 and sends a verification OTP without creating the account yet', async () => {
     const { sendOTPEmail } = require('../utils/mailer');
     sendOTPEmail.mockClear();
 
-    // SELECT: no existing user
+    // SELECT: no existing user by email
     getDbMock().mockResolvedValueOnce({ rows: [] });
-    // INSERT user RETURNING *
-    getDbMock().mockResolvedValueOnce({
-      rows: [{
-        id: 'USR0002', user_name: 'test_user', name: 'Test User',
-        email: 'test@example.com', mobile: '9876543210',
-        user_role: 'customer', is_verified: false, is_active: true,
-        dob: null, gender: null, profile_image: null,
-        receive_push_notifications: true, receive_email_updates: false,
-        receive_order_updates: true, created_at: new Date(),
-      }],
-    });
-    // INSERT refresh token
+    // SELECT: mobile not owned by a verified account
     getDbMock().mockResolvedValueOnce({ rows: [] });
-    // INSERT verification OTP
+    // UPSERT pending_signups
     getDbMock().mockResolvedValueOnce({ rows: [] });
 
     const res = await request(app).post(`${BASE}/signup`).send(validBody);
     expect(res.status).toBe(201);
     expect(res.body.success).toBe(true);
-    expect(res.body.accessToken).toBeDefined();
-    expect(res.body.refreshToken).toBeDefined();
-    expect(res.body.user).toBeDefined();
+    expect(res.body.requiresVerification).toBe(true);
+    expect(res.body.otpEmailSent).toBe(true);
+    // No account / session is created until the OTP is verified
+    expect(res.body.accessToken).toBeUndefined();
+    expect(res.body.user).toBeUndefined();
     // Verification email must be dispatched immediately
     expect(sendOTPEmail).toHaveBeenCalledWith(
       'test@example.com',
@@ -155,7 +146,6 @@ describe('POST /auth/signup', () => {
       'verification'
     );
     // OTP must NOT appear in the response body as a standalone 6-digit field
-    // (JWT tokens contain 10-digit epoch timestamps so we can't use a simple \d{6} match)
     const responseStr = JSON.stringify(res.body);
     expect(responseStr).not.toMatch(/"otp"\s*:/i);
     expect(responseStr).not.toMatch(/"token"\s*:\s*"\d{6}"/i);
@@ -502,7 +492,7 @@ describe('POST /auth/forgetPassword/resetPassword', () => {
 
 describe('POST /auth/verification/verifyOTP (email verification)', () => {
   it('returns 400 for invalid or expired OTP', async () => {
-    getDbMock().mockResolvedValueOnce({ rows: [] });
+    getDbMock().mockResolvedValueOnce({ rows: [] }); // SELECT pending_signups
     const res = await request(app)
       .post(`${BASE}/verification/verifyOTP`)
       .send({ email: 'user@example.com', otp: '000000' });
@@ -514,7 +504,7 @@ describe('POST /auth/verification/verifyOTP (email verification)', () => {
     const bcrypt = require('bcryptjs');
     const wrongOtpHash = await bcrypt.hash('654321', 10);
     getDbMock().mockResolvedValueOnce({
-      rows: [{ id: 'TKN0002', token: wrongOtpHash, mobile: '', email: 'user@example.com' }],
+      rows: [{ id: 'PND0002', otp_hash: wrongOtpHash, email: 'user@example.com' }],
     });
     const res = await request(app)
       .post(`${BASE}/verification/verifyOTP`)
@@ -522,24 +512,45 @@ describe('POST /auth/verification/verifyOTP (email verification)', () => {
     expect(res.status).toBe(400);
   });
 
-  it('marks user as verified and marks token used on correct OTP', async () => {
+  it('creates the verified user and signs them in on correct OTP', async () => {
     const bcrypt = require('bcryptjs');
     const correctOtp = '123456';
     const otpHash = await bcrypt.hash(correctOtp, 10);
+    // SELECT pending_signups
     getDbMock().mockResolvedValueOnce({
-      rows: [{ id: 'TKN0002', token: otpHash, mobile: '', email: 'user@example.com' }],
+      rows: [{
+        id: 'PND0002', otp_hash: otpHash, email: 'user@example.com',
+        name: 'Test User', mobile: '9876543210', user_name: 'test_user',
+        password_hash: 'hashed',
+      }],
     });
-    getDbMock().mockResolvedValueOnce({ rows: [] }); // UPDATE token is_used
-    getDbMock().mockResolvedValueOnce({ rows: [] }); // UPDATE users is_verified
+    // INSERT users RETURNING *
+    getDbMock().mockResolvedValueOnce({
+      rows: [{
+        id: 'USR0002', user_name: 'test_user', name: 'Test User',
+        email: 'user@example.com', mobile: '9876543210',
+        user_role: 'customer', is_verified: true, is_active: true,
+        dob: null, gender: null, profile_image: null,
+        receive_push_notifications: true, receive_email_updates: false,
+        receive_order_updates: true, created_at: new Date(),
+      }],
+    });
+    getDbMock().mockResolvedValueOnce({ rows: [] }); // DELETE pending_signups
+    getDbMock().mockResolvedValueOnce({ rows: [] }); // INSERT refresh token
 
     const res = await request(app)
       .post(`${BASE}/verification/verifyOTP`)
       .send({ email: 'user@example.com', otp: correctOtp });
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
-    // Confirm is_verified was updated in DB
+    // User is signed in immediately after verifying
+    expect(res.body.accessToken).toBeDefined();
+    expect(res.body.refreshToken).toBeDefined();
+    expect(res.body.user).toBeDefined();
+    expect(res.body.user.isVerified).toBe(true);
+    // Confirm the verified user row was created
     const dbCalls = getDbMock().mock.calls.map((c: any[]) => c[0] as string);
-    expect(dbCalls.some(q => /is_verified.*true/i.test(q))).toBe(true);
+    expect(dbCalls.some(q => /INSERT INTO .*users/i.test(q))).toBe(true);
   });
 });
 

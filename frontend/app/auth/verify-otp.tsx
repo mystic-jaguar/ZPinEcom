@@ -11,10 +11,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
+import { useUser } from '../../context/UserContext';
 import { authService } from '../../services/auth';
 
 export default function VerifyOTPScreen() {
     const router = useRouter();
+    const { setUser } = useUser();
     const params = useLocalSearchParams();
     const email = params.email as string || '';
     const otpEmailSent = (params.otpEmailSent as string) !== '0';
@@ -92,11 +94,16 @@ export default function VerifyOTPScreen() {
 
         setLoading(true);
         try {
-            // Verify the email OTP with our backend — marks the user as verified
-            await authService.verifyOTP(email, code);
+            // Verifying the OTP creates the account and returns a session.
+            const data = await authService.verifyOTP(email, code);
 
-            setModalMessage('Account verified successfully!');
-            setShowSuccessModal(true);
+            // Sign the user in immediately — RootLayout auto-redirects to the app
+            // once a user is set and authenticated.
+            if (data.user) {
+                setUser(data.user);
+            } else {
+                router.replace('/auth/login');
+            }
         } catch (error: any) {
             setModalMessage(error.message || 'Invalid OTP. Please try again.');
             setShowErrorModal(true);
@@ -216,18 +223,8 @@ export default function VerifyOTPScreen() {
                 message={modalMessage}
                 icon="check-circle"
                 primaryButtonText="OK"
-                onPrimaryPress={() => {
-                    setShowSuccessModal(false);
-                    if (modalMessage.includes('verified')) {
-                        router.replace('/auth/login');
-                    }
-                }}
-                onClose={() => {
-                    setShowSuccessModal(false);
-                    if (modalMessage.includes('verified')) {
-                        router.replace('/auth/login');
-                    }
-                }}
+                onPrimaryPress={() => setShowSuccessModal(false)}
+                onClose={() => setShowSuccessModal(false)}
             />
         </SafeAreaView>
     );

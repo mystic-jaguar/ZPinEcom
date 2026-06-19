@@ -52,6 +52,22 @@ CREATE TABLE IF NOT EXISTS auth_tokens (
 CREATE INDEX IF NOT EXISTS idx_auth_tokens_user_id ON auth_tokens(user_id);
 CREATE INDEX IF NOT EXISTS idx_auth_tokens_token   ON auth_tokens(token);
 
+-- ── 3b. pending_signups ───────────────────────────────────────────────────────
+-- Holds signup data until the email OTP is verified. The users row is only
+-- created after verification, so unverified emails/phones never occupy users.
+CREATE TABLE IF NOT EXISTS pending_signups (
+  id            VARCHAR(7)   PRIMARY KEY,
+  email         VARCHAR(255) UNIQUE NOT NULL,
+  name          VARCHAR(255) NOT NULL,
+  mobile        VARCHAR(20),
+  user_name     VARCHAR(255) NOT NULL,
+  password_hash VARCHAR(255) NOT NULL,
+  otp_hash      TEXT         NOT NULL,
+  expires_at    TIMESTAMP    NOT NULL,
+  created_at    TIMESTAMP    NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_pending_signups_email ON pending_signups(email);
+
 -- ── 4. addresses ──────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS addresses (
   id            VARCHAR(7)   PRIMARY KEY,
