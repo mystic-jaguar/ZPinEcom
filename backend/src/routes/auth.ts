@@ -184,17 +184,28 @@ router.post('/signup', signupLimiter, async (req: Request, res: Response): Promi
        VALUES ($1,$2,$3,$4,'signup_verification',false,NOW() + INTERVAL '10 minutes',NOW())`,
       [generateId(), user.id, email.toLowerCase(), otpHash]
     );
+    let otpEmailSent = true;
     try {
       await sendOTPEmail(email.toLowerCase(), otp, 'verification');
-    } catch (mailErr) {
-      logger.warn('auth.signup_otp_email_failed', { userId: user.id });
+    } catch (mailErr: any) {
+      // Account is created; the email just failed to go out. Tell the client the
+      // truth so it can prompt the user to retry instead of waiting for an OTP
+      // that was never sent. The user can still request a new code via /verification/sendOTP.
+      otpEmailSent = false;
+      logger.warn('auth.signup_otp_email_failed', {
+        userId: user.id,
+        error: mailErr?.message,
+      });
     }
 
     // Return tokens so the user can proceed — email verification is enforced at
     // sensitive endpoints (orders, checkout) via the isVerified flag on the user object.
     res.status(201).json({
       success: true,
-      message: 'Account created. Please verify your email with the OTP we just sent.',
+      otpEmailSent,
+      message: otpEmailSent
+        ? 'Account created. Please verify your email with the OTP we just sent.'
+        : "Account created, but we couldn't send the verification code right now. Please tap Resend to try again.",
       accessToken,
       refreshToken,
       user,
@@ -528,14 +539,24 @@ router.post('/verification/sendOTP', otpLimiter, async (req: Request, res: Respo
        VALUES ($1,$2,$3,'signup_verification',false,NOW() + INTERVAL '10 minutes',NOW())`,
       [generateId(), email.toLowerCase(), otpHash]
     );
+  } catch (err) {
+    console.error('sendOTP db error');
+    res.status(500).json({ success: false, message: 'Server error' });
+    return;
+  }
 
+  // Send the email in its own block so a mail failure is reported distinctly
+  // from a DB failure — this is what surfaces SMTP misconfiguration to the client.
+  try {
     await sendOTPEmail(email.toLowerCase(), otp, 'verification');
-
     // Never return OTP in response
     res.json({ success: true, message: 'OTP sent' });
-  } catch (err) {
-    console.error('sendOTP error');
-    res.status(500).json({ success: false, message: 'Server error' });
+  } catch (mailErr: any) {
+    logger.warn('auth.verification_otp_email_failed', { email: email.toLowerCase(), error: mailErr?.message });
+    res.status(502).json({
+      success: false,
+      message: "We couldn't send the verification email right now. Please try again in a moment.",
+    });
   }
 });
 

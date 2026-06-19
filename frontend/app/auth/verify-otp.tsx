@@ -17,6 +17,7 @@ export default function VerifyOTPScreen() {
     const router = useRouter();
     const params = useLocalSearchParams();
     const email = params.email as string || '';
+    const otpEmailSent = (params.otpEmailSent as string) !== '0';
 
     const [otp, setOtp] = useState(['', '', '', '', '', '']);
     const [loading, setLoading] = useState(false);
@@ -42,6 +43,18 @@ export default function VerifyOTPScreen() {
 
         return () => clearInterval(timer);
     }, []);
+
+    useEffect(() => {
+        // Signup couldn't send the verification email — let the user retry right away.
+        if (!otpEmailSent) {
+            setResendTimer(0);
+            setCanResend(true);
+            setModalMessage(
+                "We couldn't send your verification code. Tap Resend to try again."
+            );
+            setShowErrorModal(true);
+        }
+    }, [otpEmailSent]);
 
     const handleOtpChange = (value: string, index: number) => {
         const newOtp = [...otp];
