@@ -6,7 +6,7 @@ import { authService } from '@/services/auth';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Alert, Dimensions, Image, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, Image, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AvatarInitials from '../../components/common/AvatarInitials';
 import ProfileOption from '../../components/profile/ProfileOption';
@@ -35,6 +35,8 @@ export default function ProfileScreen() {
     const [logoutModalVisible, setLogoutModalVisible] = useState(false);
     const [deleteModalVisible, setDeleteModalVisible] = useState(false);
     const [deleting, setDeleting] = useState(false);
+    const [deleteErrorVisible, setDeleteErrorVisible] = useState(false);
+    const [deleteErrorMessage, setDeleteErrorMessage] = useState('');
     const [recommended, setRecommended] = useState<ProductObject[]>([]);
     const [refreshing, setRefreshing] = useState(false);
     const [legalModalVisible, setLegalModalVisible] = useState(false);
@@ -96,13 +98,12 @@ export default function ProfileScreen() {
             setDeleteModalVisible(false);
             router.replace('/auth/login');
         } catch (error: any) {
-            // Nothing was deleted locally — tell the user it failed
+            // Nothing was deleted locally — tell the user it failed, using the
+            // app's themed ActionModal (not the bare OS Alert).
             console.error('Delete account error:', error);
             setDeleteModalVisible(false);
-            Alert.alert(
-                'Could not delete account',
-                error?.message || 'Something went wrong. Please try again later.'
-            );
+            setDeleteErrorMessage(error?.message || 'Something went wrong. Please try again later.');
+            setDeleteErrorVisible(true);
         } finally {
             setDeleting(false);
         }
@@ -325,6 +326,17 @@ export default function ProfileScreen() {
                 secondaryButtonText="CANCEL"
                 onSecondaryPress={() => { if (!deleting) setDeleteModalVisible(false); }}
                 onClose={() => { if (!deleting) setDeleteModalVisible(false); }}
+            />
+
+            {/* Delete Account Error Modal */}
+            <ActionModal
+                visible={deleteErrorVisible}
+                title="Could not delete account"
+                message={deleteErrorMessage}
+                icon="alert-circle"
+                primaryButtonText="OK"
+                onPrimaryPress={() => setDeleteErrorVisible(false)}
+                onClose={() => setDeleteErrorVisible(false)}
             />
 
             {/* Legal Document Modal */}

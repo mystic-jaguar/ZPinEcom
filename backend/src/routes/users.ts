@@ -218,10 +218,13 @@ router.delete('/me', authenticate, async (req: AuthRequest, res: Response): Prom
     // financial records, kept valid by the anonymized user row below.
     //
     // The prod DB is a legacy schema that diverges from migrate.sql — some of
-    // these tables may not exist there. A DELETE against a missing table aborts
-    // the whole transaction (→ 500), so each delete is guarded by to_regclass
-    // and skipped when the table is absent. Order matters for FK children:
-    // wallet_transactions before wallets.
+    // these tables may not exist there, and some legacy tables type user_id as
+    // uuid rather than VARCHAR(7). A DELETE against a missing table, a missing
+    // user_id column, or a uuid column (which tries to parse our short id as a
+    // uuid → 22P02) aborts the whole transaction (→ 500). So we only delete
+    // from tables that actually have a user_id column, and compare against
+    // user_id::text so a uuid-typed column simply yields no match instead of
+    // throwing. Order matters for FK children: wallet_transactions before wallets.
     const cleanupTables = [
       'refresh_tokens',
       'auth_tokens',
@@ -233,10 +236,16 @@ router.delete('/me', authenticate, async (req: AuthRequest, res: Response): Prom
       'wallet_transactions',
       'wallets',
     ];
+    const cleanupColsResult = await client.query(
+      `SELECT table_name FROM information_schema.columns
+        WHERE table_schema = 'public' AND column_name = 'user_id'
+          AND table_name = ANY($1)`,
+      [cleanupTables]
+    );
+    const deletableTables = new Set<string>(cleanupColsResult.rows.map((r: any) => r.table_name));
     for (const table of cleanupTables) {
-      const exists = await client.query('SELECT to_regclass($1) AS reg', [`public.${table}`]);
-      if (!exists.rows[0].reg) continue;
-      await client.query(`DELETE FROM ${safeIdentifier(table)} WHERE user_id = $1`, [userId]);
+      if (!deletableTables.has(table)) continue;
+      await client.query(`DELETE FROM ${safeIdentifier(table)} WHERE user_id::text = $1`, [userId]);
     }
 
     // Anonymize the user row in place: scrub every personal identifier, give the
