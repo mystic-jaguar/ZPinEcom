@@ -216,37 +216,70 @@ router.delete('/me', authenticate, async (req: AuthRequest, res: Response): Prom
     // Remove personal data + user-generated content. Orders, order_items,
     // return_requests and order_cancellations are intentionally retained as
     // financial records, kept valid by the anonymized user row below.
-    await client.query(`DELETE FROM refresh_tokens     WHERE user_id = $1`, [userId]);
-    await client.query(`DELETE FROM auth_tokens        WHERE user_id = $1`, [userId]);
-    await client.query(`DELETE FROM ${ADDRESSES}       WHERE user_id = $1`, [userId]);
-    await client.query(`DELETE FROM cart_items         WHERE user_id = $1`, [userId]);
-    await client.query(`DELETE FROM wishlists          WHERE user_id = $1`, [userId]);
-    await client.query(`DELETE FROM product_reviews    WHERE user_id = $1`, [userId]);
-    await client.query(`DELETE FROM notifications      WHERE user_id = $1`, [userId]);
-    await client.query(`DELETE FROM wallet_transactions WHERE user_id = $1`, [userId]);
-    await client.query(`DELETE FROM wallets            WHERE user_id = $1`, [userId]);
+    //
+    // The prod DB is a legacy schema that diverges from migrate.sql — some of
+    // these tables may not exist there. A DELETE against a missing table aborts
+    // the whole transaction (→ 500), so each delete is guarded by to_regclass
+    // and skipped when the table is absent. Order matters for FK children:
+    // wallet_transactions before wallets.
+    const cleanupTables = [
+      'refresh_tokens',
+      'auth_tokens',
+      'addresses',
+      'cart_items',
+      'wishlists',
+      'product_reviews',
+      'notifications',
+      'wallet_transactions',
+      'wallets',
+    ];
+    for (const table of cleanupTables) {
+      const exists = await client.query('SELECT to_regclass($1) AS reg', [`public.${table}`]);
+      if (!exists.rows[0].reg) continue;
+      await client.query(`DELETE FROM ${safeIdentifier(table)} WHERE user_id = $1`, [userId]);
+    }
 
     // Anonymize the user row in place: scrub every personal identifier, give the
     // UNIQUE columns id-derived placeholders to avoid collisions, and set
     // is_active=false so the account can never be logged into again.
+    //
+    // Build the SET clause from columns that actually exist — the legacy prod
+    // users table may be missing some of the newer profile/notification columns,
+    // and referencing a non-existent column would abort the transaction.
+    const colsResult = await client.query(
+      `SELECT column_name FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'users'`
+    );
+    const userColumns = new Set<string>(colsResult.rows.map((r: any) => r.column_name));
+
+    const anonValues: Record<string, any> = {
+      name: 'Deleted User',
+      user_name: `deleted_${userId}`,
+      email: `deleted_${userId}@deleted.zpin.invalid`,
+      mobile: null,
+      password_hash: null,
+      dob: null,
+      gender: null,
+      profile_image: null,
+      is_active: false,
+      is_verified: false,
+      receive_push_notifications: false,
+      receive_email_updates: false,
+      receive_order_updates: false,
+      updated_at: new Date(),
+    };
+
+    const setClauses: string[] = [];
+    const setParams: any[] = [userId];
+    for (const [col, val] of Object.entries(anonValues)) {
+      if (!userColumns.has(col)) continue;
+      setParams.push(val);
+      setClauses.push(`${safeIdentifier(col)} = $${setParams.length}`);
+    }
+
     await client.query(
-      `UPDATE ${USERS} SET
-         name = 'Deleted User',
-         user_name = $2,
-         email = $3,
-         mobile = NULL,
-         password_hash = NULL,
-         dob = NULL,
-         gender = NULL,
-         profile_image = NULL,
-         is_active = false,
-         is_verified = false,
-         receive_push_notifications = false,
-         receive_email_updates = false,
-         receive_order_updates = false,
-         updated_at = NOW()
-       WHERE id = $1`,
-      [userId, `deleted_${userId}`, `deleted_${userId}@deleted.zpin.invalid`]
+      `UPDATE ${USERS} SET ${setClauses.join(', ')} WHERE id = $1`,
+      setParams
     );
 
     await client.query('COMMIT');
