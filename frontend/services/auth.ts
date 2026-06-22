@@ -67,8 +67,11 @@ export const authService = {
     async signup(data: SignupData) {
         try {
             // POST :- /api/v1/auth/signup
+            // Don't send userName — let the backend generate a collision-free one
+            // (`<email-prefix>_<timestamp>`). Sending the bare email prefix here made
+            // two users sharing a local part (john@gmail.com / john@yahoo.com) collide
+            // on the UNIQUE users.user_name, failing the second one at OTP verification.
             const response = await apiClient.post('auth/signup', {
-                userName: data.email.split('@')[0], // Generate username from email
                 mobile: data.mobile,
                 userRole: 'customer',
                 password: data.password,

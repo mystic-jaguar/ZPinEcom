@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { authService } from '../../services/auth';
+import { validatePassword } from '../../utils/validation';
 
 export default function ResetPasswordScreen() {
     const router = useRouter();
@@ -32,7 +33,8 @@ export default function ResetPasswordScreen() {
 
     const getPasswordStrength = (password: string) => {
         if (password.length === 0) return { text: '', color: '#E0E0E0', widthPercent: 0 };
-        if (password.length < 8 || !/[a-zA-Z]/.test(password) || !/[0-9]/.test(password)) return { text: 'Weak', color: '#FF5252', widthPercent: 33 };
+        // Anything that doesn't satisfy the full backend policy is "Weak".
+        if (!validatePassword(password).isValid) return { text: 'Weak', color: '#FF5252', widthPercent: 33 };
         if (password.length < 12) return { text: 'Medium', color: '#FFA726', widthPercent: 66 };
         return { text: 'Strong', color: '#66BB6A', widthPercent: 100 };
     };
@@ -44,8 +46,9 @@ export default function ResetPasswordScreen() {
             return false;
         }
 
-        if (newPassword.length < 8 || !/[a-zA-Z]/.test(newPassword) || !/[0-9]/.test(newPassword)) {
-            setErrorMessage('Password must be at least 8 characters and contain at least one letter and one number');
+        const passwordCheck = validatePassword(newPassword);
+        if (!passwordCheck.isValid) {
+            setErrorMessage(`Password must contain: ${passwordCheck.requirements.join(', ')}`);
             setShowErrorModal(true);
             return false;
         }
