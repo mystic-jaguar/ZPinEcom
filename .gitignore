@@ -68,3 +68,6 @@ backend/src/scripts
 
 # Generated/hostable legal documents (Word) — not part of the app source
 *.docx
+
+# Local session handoff / progress notes (not part of the app source)
+docs/IOS_COMPLIANCE_PROGRESS.md

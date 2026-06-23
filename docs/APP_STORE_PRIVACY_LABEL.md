@@ -20,7 +20,7 @@
 | Payments | `react-native-razorpay` — payment data handled by Razorpay; app does **not** store card/CVV/UPI PIN (Privacy Policy §3.3). |
 | Auth | `@react-native-google-signin/google-signin` + `expo-apple-authentication` (email/password & OTP also). |
 | Location | `expo-location` — precise location, **when-in-use only**, for "nearby availability"/delivery. No background/Always. |
-| Firebase | `google-services.json` / `GoogleService-Info.plist` present (Google Sign-In / phone-auth config). No Firebase **Analytics** SDK in `package.json`. **Owner to confirm** no analytics is enabled before claiming "no diagnostics collection". |
+| Firebase | `google-services.json` / `GoogleService-Info.plist` present (Google Sign-In / phone-auth config only). **Verified:** no Firebase **Analytics**/Crashlytics or any analytics/crash SDK in `package.json` → the "no Diagnostics collection" answer holds. |
 
 ---
 
@@ -47,7 +47,8 @@ account); *(c)* purposes.
 ### Data types NOT collected by the app (answer "Not Collected")
 - Health & Fitness, Sensitive Info, Contacts (address book), Browsing History,
   Search History (server-side product search is App Functionality, not Safari browsing),
-  Audio Data, Photos/Videos (unless a profile-avatar upload exists — **confirm**),
+  Audio Data, Photos/Videos (**verified:** no `image-picker`/`camera`/`media-library`
+  dependency and no avatar/photo upload in the customer app),
   Diagnostics/Crash Data (no crash SDK found).
 
 > ⚠️ **Identifiers → Device ID / Diagnostics:** if you later add Firebase Analytics,
@@ -76,7 +77,7 @@ Confirm each SDK's current privacy manifest and reflect any additional types abo
 - [ ] App Store Connect → App Information → **Privacy Policy URL** = the published URL.
 - [ ] Google Play Console → **Data safety** form: mirror §2 (Play uses similar categories).
 - [ ] In-app link verified — `LegalDocModal` opens from Profile and Signup, and "View latest version online" opens the hosted URL (already wired in `frontend/components/common/LegalDocModal.tsx` + `constants/legal.ts`).
-- [ ] Confirm no avatar/photo upload, and no analytics SDK, before final submission (or update label).
+- [x] Confirmed (code-verified 2026-06-23): no avatar/photo upload and no analytics/crash SDK. Re-verify only if such a dependency is later added.
 
 > Note: this label depends on blocker **B1 (HTTPS)** being done — the privacy policy URL and
 > all API traffic must be served over TLS, not the current cleartext `http://195.35.20.40`.
