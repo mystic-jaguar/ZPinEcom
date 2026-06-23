@@ -52,8 +52,7 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "ZPIN uses your location to show nearby product availability.",
-          "locationWhenInUsePermission": "ZPIN uses your location to show nearby product availability.",
+          "locationWhenInUsePermission": "ZPIN uses your location only while you're using the app to show product availability and delivery options near you.",
           "isIosBackgroundLocationEnabled": false
         }
       ],
