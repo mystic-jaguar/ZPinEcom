@@ -19,6 +19,7 @@ import ActionModal from '../../components/common/ActionModal';
 import LegalDocModal, { LegalDocType } from '../../components/common/LegalDocModal';
 import { useUser } from '../../context/UserContext';
 import { appleAuthService, authService, googleAuthService } from '../../services/auth';
+import { validatePassword } from '../../utils/validation';
 
 // Google Sign-In requires a native build — not available in Expo Go
 let isGoogleSignInAvailable = false;
@@ -113,8 +114,12 @@ export default function SignupScreen() {
             setShowErrorModal(true);
             return false;
         }
-        if (password.length < 8 || !/[a-zA-Z]/.test(password) || !/[0-9]/.test(password)) {
-            setErrorMessage('Password must be at least 8 characters and contain at least one letter and one number');
+        // Match the backend's strength policy exactly (validation.ts is kept in
+        // sync with isStrongPassword), otherwise the form accepts passwords the
+        // server then rejects with a 400.
+        const passwordCheck = validatePassword(password);
+        if (!passwordCheck.isValid) {
+            setErrorMessage(`Password must contain: ${passwordCheck.requirements.join(', ')}`);
             setShowErrorModal(true);
             return false;
         }

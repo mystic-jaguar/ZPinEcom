@@ -12,3 +12,11 @@ expo-env.d.ts
 # Native directories - managed by Expo Prebuild (CNG)
 /android
 /ios
+
+# Dependencies & build artifacts — never commit these
+node_modules
+.expo
+dist
+*.tar
+*.tar.gz
+**/*.map
