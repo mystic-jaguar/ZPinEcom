@@ -23,21 +23,17 @@ export default function ForgotPasswordScreen() {
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
     const [loading, setLoading] = useState(false);
-    const [isEmail, setIsEmail] = useState(false);
 
     const validateInput = () => {
         if (!emailOrPhone.trim()) {
-            setErrorMessage('Please enter your email or phone number');
+            setErrorMessage('Please enter your email address');
             setShowErrorModal(true);
             return false;
         }
 
-        // Check if it's a valid email or phone number
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        const phoneRegex = /^[0-9]{10}$/;
-
-        if (!emailRegex.test(emailOrPhone) && !phoneRegex.test(emailOrPhone)) {
-            setErrorMessage('Please enter a valid email address or 10-digit phone number');
+        if (!emailRegex.test(emailOrPhone.trim())) {
+            setErrorMessage('Please enter a valid email address');
             setShowErrorModal(true);
             return false;
         }
@@ -50,14 +46,8 @@ export default function ForgotPasswordScreen() {
 
         setLoading(true);
         try {
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            const isEmailInput = emailRegex.test(emailOrPhone);
-            setIsEmail(isEmailInput);
-
-            await authService.sendPasswordResetOTP(
-                isEmailInput ? '' : emailOrPhone,
-                isEmailInput ? emailOrPhone : ''
-            );
+            // Password reset is email-only (OTP is delivered by email).
+            await authService.sendPasswordResetOTP('', emailOrPhone.trim());
 
             setShowSuccessModal(true);
         } catch (error: any) {
@@ -103,7 +93,7 @@ export default function ForgotPasswordScreen() {
                     <View style={styles.header}>
                         <Text style={styles.title}>Forgot Password?</Text>
                         <Text style={styles.description}>
-                            Enter your email or phone number to reset your password and get back to shopping.
+                            Enter your registered email to reset your password and get back to shopping.
                         </Text>
                     </View>
 
@@ -111,7 +101,7 @@ export default function ForgotPasswordScreen() {
                     <View style={styles.form}>
                         {/* Email/Phone Input */}
                         <View style={styles.inputContainer}>
-                            <Text style={styles.label}>Email or Phone Number</Text>
+                            <Text style={styles.label}>Email Address</Text>
                             <View style={styles.inputWrapper}>
                                 <TextInput
                                     style={styles.input}
@@ -172,8 +162,8 @@ export default function ForgotPasswordScreen() {
                     router.push({
                         pathname: '/auth/verify-reset-otp',
                         params: {
-                            emailOrPhone: emailOrPhone,
-                            isEmail: isEmail ? 'true' : 'false'
+                            emailOrPhone: emailOrPhone.trim(),
+                            isEmail: 'true'
                         }
                     });
                 }}
