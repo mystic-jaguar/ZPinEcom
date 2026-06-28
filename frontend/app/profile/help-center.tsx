@@ -18,8 +18,6 @@ export default function HelpCenterScreen() {
     const [searchQuery, setSearchQuery] = useState('');
     const [expandedFaq, setExpandedFaq] = useState<string | null>(null);
     const [showAllFaqs, setShowAllFaqs] = useState(false);
-    const [bookingModalVisible, setBookingModalVisible] = useState(false);
-    const [chatModalVisible, setChatModalVisible] = useState(false);
 
     // Generic Modal State
     const [infoModalVisible, setInfoModalVisible] = useState(false);
@@ -210,23 +208,13 @@ export default function HelpCenterScreen() {
                     <>
                         <Text style={styles.helpText}>STILL NEED HELP?</Text>
 
-                        <View style={styles.supportButtonsRow}>
-                            <TouchableOpacity
-                                style={[styles.supportButton, styles.chatButton]}
-                                onPress={() => setChatModalVisible(true)}
-                            >
-                                <Ionicons name="chatbubble" size={20} color="#000" style={{ marginRight: 8 }} />
-                                <Text style={styles.supportButtonText}>Chat with Us</Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                style={[styles.supportButton, styles.callButton]}
-                                onPress={handleCallSupport}
-                            >
-                                <Ionicons name="call-outline" size={20} color="#000" style={{ marginRight: 8 }} />
-                                <Text style={styles.supportButtonText}>Call Support</Text>
-                            </TouchableOpacity>
-                        </View>
+                        <TouchableOpacity
+                            style={[styles.supportButton, styles.callButton, { marginBottom: 15 }]}
+                            onPress={handleCallSupport}
+                        >
+                            <Ionicons name="call-outline" size={20} color="#000" style={{ marginRight: 8 }} />
+                            <Text style={styles.supportButtonText}>Call Support</Text>
+                        </TouchableOpacity>
 
                         <TouchableOpacity
                             style={styles.emailButton}
@@ -240,53 +228,6 @@ export default function HelpCenterScreen() {
 
                 <View style={{ height: 40 }} />
             </ScrollView>
-
-            {/* Chat Modal */}
-            <ActionModal
-                visible={chatModalVisible}
-                title="Chat Support"
-                message="Our chat support is available 24/7. We'll connect you with an agent shortly."
-                icon="message-circle"
-                primaryButtonText="START CHAT"
-                onPrimaryPress={() => {
-                    setChatModalVisible(false);
-                    // Slight delay to allow previous modal to close smoothly
-                    setTimeout(() => {
-                        setInfoModalConfig({
-                            title: 'Coming Soon',
-                            message: 'Chat feature will be available soon!',
-                            icon: 'info'
-                        });
-                        setInfoModalVisible(true);
-                    }, 300);
-                }}
-                secondaryButtonText="CANCEL"
-                onSecondaryPress={() => setChatModalVisible(false)}
-                onClose={() => setChatModalVisible(false)}
-            />
-
-            {/* Booking Modal */}
-            <ActionModal
-                visible={bookingModalVisible}
-                title="Book Stylist Session"
-                message="Get personalized fashion advice from our expert stylists. Sessions are completely free and last 30 minutes."
-                icon="calendar"
-                primaryButtonText="CONFIRM BOOKING"
-                onPrimaryPress={() => {
-                    setBookingModalVisible(false);
-                    setTimeout(() => {
-                        setInfoModalConfig({
-                            title: 'Success',
-                            message: 'Your session has been booked! We\'ll send you a confirmation email shortly.',
-                            icon: 'check-circle'
-                        });
-                        setInfoModalVisible(true);
-                    }, 300);
-                }}
-                secondaryButtonText="CANCEL"
-                onSecondaryPress={() => setBookingModalVisible(false)}
-                onClose={() => setBookingModalVisible(false)}
-            />
 
             {/* Generic Info/Error/Success Modal */}
             <ActionModal
