@@ -9,7 +9,7 @@ import {
 } from './secureStorage';
 
 // Hardcoded production fallback — used when EXPO_PUBLIC_API_URL is not baked into the build.
-const PRODUCTION_API_URL = 'http://195.35.20.40:5002/api/v1/';
+const PRODUCTION_API_URL = 'https://ecom-api.zpinservices.com/api/v1/';
 
 const resolveBaseUrl = (): string => {
     const envUrl = process.env.EXPO_PUBLIC_API_URL;
