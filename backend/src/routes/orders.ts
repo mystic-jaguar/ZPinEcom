@@ -449,16 +449,23 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
     });
     const primarySellerId = Object.keys(sellerTotals).sort((a, b) => sellerTotals[b] - sellerTotals[a])[0] || null;
 
+    // COD orders have no online payment step to flip them to 'confirmed' later
+    // (Razorpay confirms on payment verify, wallet confirms inline below), so they
+    // must be created already confirmed — otherwise they never surface to delivery
+    // partners, whose queue is status IN ('confirmed','processing','shipped').
+    // payment_status stays 'pending': cash is collected on delivery, not now.
+    const orderStatus = paymentMethod === 'cod' ? 'confirmed' : 'pending';
+
     await client.query(
       `INSERT INTO ${ORDERS}
         (id, order_number, user_id, status, payment_status, total_amount, shipping_amount,
          tax_amount, final_amount, shipping_address, payment_method, notes, estimated_delivery, created_at, updated_at)
-       VALUES ($1,$2,$3,'pending','pending',$4,$5,$6,$7,$8,$9,$10,
+       VALUES ($1,$2,$3,$11,'pending',$4,$5,$6,$7,$8,$9,$10,
          (NOW() AT TIME ZONE 'Asia/Kolkata') + INTERVAL '5 days',
          (NOW() AT TIME ZONE 'Asia/Kolkata'),
          (NOW() AT TIME ZONE 'Asia/Kolkata'))`,
       [orderId, orderNumber, req.userId, totalAmount, shippingAmount, taxAmount, finalAmount,
-       JSON.stringify(encryptedShippingAddress), paymentMethod, notes || '']
+       JSON.stringify(encryptedShippingAddress), paymentMethod, notes || '', orderStatus]
     );
 
     for (const item of cartResult.rows) {
@@ -598,7 +605,7 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
     res.status(201).json({
       success: true,
       message: 'Order placed successfully',
-      data: { order: { id: orderId, orderNumber, finalAmount, status: 'pending' } },
+      data: { order: { id: orderId, orderNumber, finalAmount, status: orderStatus } },
     });
   } catch (err) {
     try {
