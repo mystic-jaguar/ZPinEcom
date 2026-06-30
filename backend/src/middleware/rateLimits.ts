@@ -30,10 +30,10 @@ export const productListLimiter = rateLimit({
 });
 
 // ── Order creation — prevent order spam ──────────────────────────────────────
-// Production: 10/hour | Development: unlimited
+// Production: 20/hour | Development: unlimited
 export const orderCreateLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
-  max: isProd ? 10 : 10000,
+  max: isProd ? 20 : 10000,
   message: json429('Too many orders placed. Please try again later.'),
   standardHeaders: true,
   legacyHeaders: false,
@@ -50,10 +50,10 @@ export const cartWriteLimiter = rateLimit({
 });
 
 // ── Review submission — prevent review spam ───────────────────────────────────
-// Production: 5/hour | Development: unlimited
+// Production: 10/hour | Development: unlimited
 export const reviewLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
-  max: isProd ? 5 : 10000,
+  max: isProd ? 10 : 10000,
   message: json429('Too many reviews submitted. Please try again later.'),
   standardHeaders: true,
   legacyHeaders: false,
