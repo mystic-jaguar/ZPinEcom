@@ -90,15 +90,16 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
         }
     };
 
-    const saveCart = async (items: CartItemObject[]) => {
-        try {
-            await AsyncStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
-        } catch (error) {
-            console.error('Error saving cart:', error);
-            // Consider showing a user notification here in production
-            throw error;
-        }
-    };
+    // Persist the cart whenever it changes (after the initial load). Centralizing
+    // the write here means every committed change — optimistic updates and
+    // rollbacks alike — is saved, instead of fire-and-forget writes buried inside
+    // the state updaters (which could be lost if the component unmounted mid-write).
+    useEffect(() => {
+        if (isLoading) return; // don't clobber stored cart before loadCart() runs
+        AsyncStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cartItems)).catch(err =>
+            console.error('Error saving cart:', err)
+        );
+    }, [cartItems, isLoading]);
 
     const addToCart = async (product: ProductObject, selectedColor?: string, selectedSize?: string) => {
         // Optimistic update
@@ -129,11 +130,6 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
                 };
                 newItems = [...prevItems, newCartItem];
             }
-            // Save asynchronously but don't block state update
-            saveCart(newItems).catch(err => {
-                console.error('Failed to persist cart to storage:', err);
-                // In a production app, you might want to show a toast/notification here
-            });
             return newItems;
         });
 
@@ -145,9 +141,8 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
             }
         } catch (error) {
             console.error('Error syncing add to cart:', error);
-            // Rollback optimistic update on failure
+            // Rollback optimistic update on failure (persistence effect re-saves)
             setCartItems(previousItems);
-            await saveCart(previousItems);
             throw error;
         }
     };
@@ -159,13 +154,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
         const productId = itemToRemove?.productId;
 
         const previousItems = cartItems;
-        setCartItems(prevItems => {
-            const newItems = prevItems.filter(item => item.cartItemId !== cartItemId);
-            saveCart(newItems).catch(err => {
-                console.error('Failed to persist cart removal:', err);
-            });
-            return newItems;
-        });
+        setCartItems(prevItems => prevItems.filter(item => item.cartItemId !== cartItemId));
 
         if (productId) {
             try {
@@ -175,9 +164,8 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
                 }
             } catch (error) {
                 console.error('Error syncing remove from cart:', error);
-                // Rollback on failure
+                // Rollback on failure (persistence effect re-saves)
                 setCartItems(previousItems);
-                await saveCart(previousItems);
                 throw error;
             }
         }
@@ -192,17 +180,11 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
         const productId = itemToUpdate?.productId;
 
         const previousItems = cartItems;
-        setCartItems(prevItems => {
-            const newItems = prevItems.map(item =>
-                item.cartItemId === cartItemId
-                    ? { ...item, quantity }
-                    : item
-            );
-            saveCart(newItems).catch(err => {
-                console.error('Failed to persist quantity update:', err);
-            });
-            return newItems;
-        });
+        setCartItems(prevItems => prevItems.map(item =>
+            item.cartItemId === cartItemId
+                ? { ...item, quantity }
+                : item
+        ));
 
         if (productId) {
             try {
@@ -212,9 +194,8 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
                 }
             } catch (error) {
                 console.error('Error syncing update quantity:', error);
-                // Rollback on failure
+                // Rollback on failure (persistence effect re-saves)
                 setCartItems(previousItems);
-                await saveCart(previousItems);
                 throw error;
             }
         }

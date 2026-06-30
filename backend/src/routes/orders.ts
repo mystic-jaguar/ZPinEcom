@@ -727,8 +727,10 @@ router.patch('/:id/return-status', authenticate, async (req: AuthRequest, res: R
     return;
   }
 
+  const client = await pool.connect();
   try {
     await ensureOrderSupportTables();
+    await client.query('BEGIN');
 
     // Verify the order exists and enforce seller ownership:
     // sellers may only update return status for orders containing their products.
@@ -750,22 +752,27 @@ router.patch('/:id/return-status', authenticate, async (req: AuthRequest, res: R
       orderCheckParams = [req.params.id];
     }
 
-    const orderCheck = await pool.query(orderCheckQuery, orderCheckParams);
+    const orderCheck = await client.query(orderCheckQuery, orderCheckParams);
     if (orderCheck.rows.length === 0) {
+      await client.query('ROLLBACK');
       res.status(404).json({ success: false, message: 'Order not found' });
       return;
     }
 
-    const returnResult = await pool.query(
+    // Lock the latest return-request row so concurrent status updates serialize
+    // instead of racing on a read-modify-write of status_history.
+    const returnResult = await client.query(
       `SELECT id, order_id, status, status_history, picked_up_at, refunded_at
        FROM ${RETURN_REQUESTS}
        WHERE order_id = $1
        ORDER BY created_at DESC
-       LIMIT 1`,
+       LIMIT 1
+       FOR UPDATE`,
       [req.params.id]
     );
 
     if (returnResult.rows.length === 0) {
+      await client.query('ROLLBACK');
       res.status(404).json({ success: false, message: 'Return request not found' });
       return;
     }
@@ -777,16 +784,18 @@ router.patch('/:id/return-status', authenticate, async (req: AuthRequest, res: R
     };
 
     if (!allowedNextStatuses[currentReturn.status]?.includes(nextStatus)) {
+      await client.query('ROLLBACK');
       res.status(400).json({ success: false, message: 'Invalid return status transition' });
       return;
     }
 
     const now = new Date().toISOString();
-    const history = Array.isArray(currentReturn.status_history) ? currentReturn.status_history : [];
-    history.push({ status: nextStatus, at: now, by: req.userId, role: req.userRole });
+    // Append the new entry atomically in SQL (status_history || $3) instead of
+    // rewriting the whole array we read — under the row lock nothing is lost.
+    const entry = JSON.stringify([{ status: nextStatus, at: now, by: req.userId, role: req.userRole }]);
 
-    const updateFields: string[] = ['status = $2', 'status_history = $3', 'updated_at = NOW()'];
-    const values: any[] = [req.params.id, nextStatus, JSON.stringify(history)];
+    const updateFields: string[] = ['status = $2', 'status_history = status_history || $3::jsonb', 'updated_at = NOW()'];
+    const values: any[] = [currentReturn.id, nextStatus, entry];
 
     if (nextStatus === 'picked_up') {
       updateFields.unshift('picked_up_at = NOW()');
@@ -796,22 +805,24 @@ router.patch('/:id/return-status', authenticate, async (req: AuthRequest, res: R
       updateFields.unshift('refunded_at = NOW()');
     }
 
-    await pool.query(
+    const updated = await client.query(
       `UPDATE ${RETURN_REQUESTS}
        SET ${updateFields.join(', ')}
-       WHERE order_id = $1
-       RETURNING id`,
+       WHERE id = $1
+       RETURNING status_history`,
       values
     );
 
     if (nextStatus === 'refunded') {
-      await pool.query(
+      await client.query(
         `UPDATE ${ORDERS}
          SET status = 'returned', payment_status = 'refunded', updated_at = NOW()
          WHERE id = $1`,
         [req.params.id]
       );
     }
+
+    await client.query('COMMIT');
 
     res.json({
       success: true,
@@ -821,12 +832,15 @@ router.patch('/:id/return-status', authenticate, async (req: AuthRequest, res: R
         status: nextStatus,
         pickedUpAt: nextStatus === 'picked_up' ? now : currentReturn.picked_up_at,
         refundedAt: nextStatus === 'refunded' ? now : currentReturn.refunded_at,
-        statusHistory: history,
+        statusHistory: updated.rows[0].status_history,
       },
     });
   } catch (err) {
+    try { await client.query('ROLLBACK'); } catch { /* ignore */ }
     console.error('updateReturnStatus error:', err);
     res.status(500).json({ success: false, message: 'Server error' });
+  } finally {
+    client.release();
   }
 });
 

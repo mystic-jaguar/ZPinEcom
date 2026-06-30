@@ -89,9 +89,6 @@ export const authService = {
      */
     async login(email: string, password: string) {
         try {
-            if (__DEV__) {
-                console.log('[Auth] Login attempt:', email);
-            }
             const response = await apiClient.post('auth/login', { email, password });
             const data = response.data;
 

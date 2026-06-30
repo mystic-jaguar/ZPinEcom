@@ -83,28 +83,25 @@ export const WishlistProvider = ({ children }: { children: ReactNode }) => {
         }
     };
 
-    const saveWishlist = async (items: ProductObject[]) => {
-        try {
-            await AsyncStorage.setItem(WISHLIST_STORAGE_KEY, JSON.stringify(items));
-        } catch (error) {
-            console.error('Error saving wishlist:', error);
-            throw error;
-        }
-    };
+    // Persist the wishlist whenever it changes (after the initial load). One
+    // centralized write covers optimistic updates and rollbacks, instead of
+    // fire-and-forget writes buried in the state updaters that could be lost if
+    // the component unmounted mid-write.
+    useEffect(() => {
+        if (isLoading) return; // don't clobber stored wishlist before loadWishlist() runs
+        AsyncStorage.setItem(WISHLIST_STORAGE_KEY, JSON.stringify(wishlistItems)).catch(err =>
+            console.error('Error saving wishlist:', err)
+        );
+    }, [wishlistItems, isLoading]);
 
     const addToWishlist = async (product: ProductObject) => {
         // Optimistic update
         const previousItems = wishlistItems;
-        setWishlistItems(prev => {
-            if (prev.some(item => item.productId === product.productId)) {
-                return prev;
-            }
-            const newItems = [...prev, product];
-            saveWishlist(newItems).catch(err => {
-                console.error('Failed to persist wishlist:', err);
-            });
-            return newItems;
-        });
+        setWishlistItems(prev =>
+            prev.some(item => item.productId === product.productId)
+                ? prev
+                : [...prev, product]
+        );
 
         // Sync with backend
         try {
@@ -114,9 +111,8 @@ export const WishlistProvider = ({ children }: { children: ReactNode }) => {
             }
         } catch (error) {
             console.error('Error syncing add to wishlist:', error);
-            // Rollback on failure
+            // Rollback on failure (persistence effect re-saves)
             setWishlistItems(previousItems);
-            await saveWishlist(previousItems);
             throw error;
         }
     };
@@ -124,13 +120,7 @@ export const WishlistProvider = ({ children }: { children: ReactNode }) => {
     const removeFromWishlist = async (productId: string) => {
         // Optimistic update
         const previousItems = wishlistItems;
-        setWishlistItems(prev => {
-            const newItems = prev.filter(item => item.productId !== productId);
-            saveWishlist(newItems).catch(err => {
-                console.error('Failed to persist wishlist removal:', err);
-            });
-            return newItems;
-        });
+        setWishlistItems(prev => prev.filter(item => item.productId !== productId));
 
         // Sync with backend
         try {
@@ -140,9 +130,8 @@ export const WishlistProvider = ({ children }: { children: ReactNode }) => {
             }
         } catch (error) {
             console.error('Error syncing remove from wishlist:', error);
-            // Rollback on failure
+            // Rollback on failure (persistence effect re-saves)
             setWishlistItems(previousItems);
-            await saveWishlist(previousItems);
             throw error;
         }
     };
