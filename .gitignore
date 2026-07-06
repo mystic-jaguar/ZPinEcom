@@ -71,3 +71,7 @@ backend/src/scripts
 
 # Local session handoff / progress notes (not part of the app source)
 docs/IOS_COMPLIANCE_PROGRESS.md
+
+# Documentation — kept local, not versioned
+docs/
+CLAUDE_MEMORY.md
