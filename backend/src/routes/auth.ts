@@ -831,7 +831,7 @@ const appleAudience = (() => {
 // The apple_id column is new (not present on already-deployed databases). Ensure
 // it exists once, idempotently, before the first Apple sign-in touches it.
 let appleColumnReady = false;
-async function ensureAppleColumn() {
+export async function ensureAppleColumn() {
   if (appleColumnReady) return;
   await pool.query(`ALTER TABLE ${USERS} ADD COLUMN IF NOT EXISTS apple_id VARCHAR(255)`);
   appleColumnReady = true;

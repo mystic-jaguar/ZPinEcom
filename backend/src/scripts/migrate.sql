@@ -4,6 +4,76 @@
 -- Run this against a fresh database.
 -- ============================================================
 
+-- ============================================================
+-- 0. CATALOG TABLES — ⚠️ RECONSTRUCTED FROM THE REPO, *NOT* THE LIVE/PROD SCHEMA
+-- ------------------------------------------------------------
+-- On production, products / product_images / categories / coupons are owned by the
+-- seller/admin app and were created directly on the DB (they pre-date this file).
+-- They are defined here ONLY so a fresh TEST database can be built and seeded
+-- end-to-end. Column names and types were derived from DATABASE.md, the seed
+-- scripts, and the route queries — live column defaults, constraints, extra columns
+-- or ID strategies MAY DIFFER. Do NOT run this section against production.
+-- ============================================================
+
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";  -- required by uuid_generate_v4() in the seed scripts
+
+CREATE TABLE IF NOT EXISTS categories (
+  id          UUID       PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name        TEXT       NOT NULL,
+  parent_id   UUID       REFERENCES categories(id) ON DELETE SET NULL,
+  description TEXT,
+  image_url   TEXT,
+  is_active   BOOLEAN    NOT NULL DEFAULT true,
+  created_at  TIMESTAMP  NOT NULL DEFAULT NOW(),
+  updated_at  TIMESTAMP  NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS products (
+  id                    UUID          PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id               VARCHAR(7),                    -- seller id; not FK-enforced in the test schema
+  product_name          TEXT          NOT NULL,
+  description           TEXT,
+  category_id           UUID,                          -- loose ref to categories(id); read but not FK-enforced by the customer app
+  deepest_category_name TEXT,
+  category_path         JSONB,
+  price                 NUMERIC(10,2) NOT NULL,
+  quantity              INTEGER       NOT NULL DEFAULT 0,
+  in_stock              BOOLEAN       NOT NULL DEFAULT true,
+  is_approved           BOOLEAN       NOT NULL DEFAULT false,
+  approval_notes        TEXT,
+  search_tags           TEXT[],
+  search_vector         TSVECTOR,
+  extracted_attributes  JSONB,
+  size_quantities       JSONB,
+  created_at            TIMESTAMP     NOT NULL DEFAULT NOW(),
+  updated_at            TIMESTAMP     NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS product_images (
+  id            UUID       PRIMARY KEY DEFAULT uuid_generate_v4(),
+  product_id    UUID       NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  image_url     TEXT       NOT NULL,
+  display_order INTEGER    NOT NULL DEFAULT 0,
+  created_at    TIMESTAMP  NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS coupons (
+  id                  UUID          PRIMARY KEY DEFAULT uuid_generate_v4(),
+  code                VARCHAR(50)   NOT NULL UNIQUE,
+  description         TEXT,
+  discount_type       VARCHAR(20)   NOT NULL,           -- 'percentage' | 'fixed'
+  discount_value      NUMERIC(10,2) NOT NULL,
+  min_order_amount    NUMERIC(10,2) NOT NULL DEFAULT 0,
+  max_discount_amount NUMERIC(10,2),
+  valid_from          TIMESTAMP     NOT NULL DEFAULT NOW(),
+  valid_until         TIMESTAMP,
+  usage_limit         INTEGER,
+  usage_count         INTEGER       NOT NULL DEFAULT 0,
+  is_active           BOOLEAN       NOT NULL DEFAULT true,
+  created_at          TIMESTAMP     NOT NULL DEFAULT NOW(),
+  updated_at          TIMESTAMP     NOT NULL DEFAULT NOW()
+);
+
 -- ── 1. users ──────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS users (
   id                         VARCHAR(7)   PRIMARY KEY,
@@ -261,8 +331,8 @@ CREATE TABLE IF NOT EXISTS user_blocks (
 CREATE INDEX IF NOT EXISTS idx_user_blocks_blocker ON user_blocks(blocker_user_id);
 
 -- Performance indexes for product listing/filtering/sorting (category route).
--- The products/product_images tables are seeded externally but exist before this
--- migration runs (other tables FK to products), so IF NOT EXISTS is safe here.
+-- products/product_images are created in section 0 above for test DBs, and pre-exist
+-- on prod, so these indexes apply either way (IF NOT EXISTS keeps it idempotent).
 CREATE INDEX IF NOT EXISTS idx_products_created_at        ON products(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_products_price             ON products(price);
 CREATE INDEX IF NOT EXISTS idx_products_in_stock          ON products(in_stock);

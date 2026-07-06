@@ -17,7 +17,7 @@ const ORDER_CANCELLATIONS = safeIdentifier('order_cancellations');
 
 let supportTablesReady = false;
 
-async function ensureOrderSupportTables() {
+export async function ensureOrderSupportTables() {
   if (supportTablesReady) return;
 
   try {
@@ -474,15 +474,24 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
          VALUES ($1,$2,$3,$4,$5,$6,$7,(NOW() AT TIME ZONE 'Asia/Kolkata'))`,
         [generateId(), orderId, item.product_id, item.product_name, item.quantity, item.price, item.image || '']
       );
-      // Decrement inventory — set in_stock=false when quantity reaches 0
-      await client.query(
+      // Decrement inventory atomically. The `quantity >= $1` guard makes the
+      // check-and-decrement a single locked operation, so concurrent orders for
+      // the same low-stock item can't oversell. No row updated → not enough stock.
+      const dec = await client.query(
         `UPDATE products
-         SET quantity = GREATEST(quantity - $1, 0),
+         SET quantity = quantity - $1,
              in_stock = CASE WHEN quantity - $1 <= 0 THEN false ELSE in_stock END,
              updated_at = NOW()
-         WHERE id = $2`,
+         WHERE id = $2 AND quantity >= $1
+         RETURNING id`,
         [item.quantity, item.product_id]
       );
+      if (dec.rows.length === 0) {
+        // Roll back the whole order; the finally block releases the client.
+        await client.query('ROLLBACK');
+        res.status(409).json({ success: false, message: `Insufficient stock for ${item.product_name}` });
+        return;
+      }
     }
 
     // Increment coupon usage count if a coupon was applied

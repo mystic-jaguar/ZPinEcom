@@ -8,11 +8,11 @@ import { httpsRedirect } from './middleware/httpsRedirect';
 import { inputSanitizer } from './middleware/inputSanitizer';
 import { globalLimiter } from './middleware/rateLimits';
 import { requestLogger } from './middleware/requestLogger';
-import authRoutes from './routes/auth';
+import authRoutes, { ensureAppleColumn } from './routes/auth';
 import cartRoutes from './routes/cart';
 import couponRoutes from './routes/coupons';
 import notificationRoutes from './routes/notifications';
-import orderRoutes from './routes/orders';
+import orderRoutes, { ensureOrderSupportTables } from './routes/orders';
 import productRoutes from './routes/products';
 import razorpayRoutes from './routes/razorpay';
 import userRoutes from './routes/users';
@@ -20,6 +20,7 @@ import walletRoutes from './routes/wallet';
 import wishlistRoutes from './routes/wishlist';
 import { prepareSensitiveDataEncryption } from './utils/encryption';
 import { logger } from './utils/logger';
+import { ensureModerationSchema } from './utils/moderationSchema';
 import redis from './utils/redis';
 
 dotenv.config();
@@ -68,12 +69,15 @@ app.use(requestLogger);
 app.use(globalLimiter);
 
 // ─── CORS ────────────────────────────────────────────────────────────────────
-const allowedOrigins = process.env.ALLOWED_ORIGINS
-  ? process.env.ALLOWED_ORIGINS.split(',')
-  : ['*'];
+// Fail closed: only origins listed in ALLOWED_ORIGINS are permitted. Native
+// mobile clients send no Origin header and are always allowed. Never fall back to
+// '*' — '*' combined with credentials is invalid, and an unset env var must not
+// silently allow every origin.
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
+  .split(',').map((o) => o.trim()).filter(Boolean);
 
 app.use(cors({
-  origin: allowedOrigins.includes('*') ? '*' : (origin: string | undefined, cb: (err: Error | null, allow?: boolean) => void) => {
+  origin: (origin: string | undefined, cb: (err: Error | null, allow?: boolean) => void) => {
     if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
     logger.warn('cors.blocked', { origin });
     cb(new Error('Not allowed by CORS'));
@@ -122,6 +126,18 @@ async function startServer() {
     await prepareSensitiveDataEncryption(pool);
   } catch (err: any) {
     logger.warn('startup.encryption_migration_failed', { message: err.message });
+  }
+
+  // Ensure auxiliary schema exists at startup (idempotent) so DDL never runs on a
+  // user request path — removes first-request latency and keeps schema management
+  // out of request handlers. The per-route ensure* calls remain as a safety net
+  // but become no-ops once these have run.
+  for (const ensure of [ensureOrderSupportTables, ensureModerationSchema, ensureAppleColumn]) {
+    try {
+      await ensure();
+    } catch (err: any) {
+      logger.warn('startup.schema_ensure_failed', { fn: ensure.name, message: err.message });
+    }
   }
 
   // Connect Redis (non-fatal — app works without cache)

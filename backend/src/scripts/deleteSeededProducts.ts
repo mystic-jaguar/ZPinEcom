@@ -1,7 +1,8 @@
 /**
  * Deletes all products seeded by seedProducts.ts.
  * Identified by description starting with "[SEED]".
- * Cascades to product_images and product_reviews automatically.
+ * Deletes product_images and product_reviews explicitly first, because the legacy
+ * prod tables may lack ON DELETE CASCADE (the reconstructed test schema has it).
  *
  * Run: npx ts-node-dev --transpile-only --respawn=false src/scripts/deleteSeededProducts.ts
  */
