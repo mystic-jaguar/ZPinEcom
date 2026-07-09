@@ -1,7 +1,9 @@
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { RotateCcw, Shirt, ShoppingCart, Zap } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AccordionItem from '../../components/common/AccordionItem';
 import ActionModal from '../../components/common/ActionModal';
 import DeliveryOptionSelector from '../../components/product/DeliveryOptionSelector';
@@ -15,12 +17,14 @@ import apiClient, { tokenManager } from '../../services/api';
 import { productService } from '../../services/product';
 import { reviewService } from '../../services/review';
 import { userService } from '../../services/user';
+import { colors, fonts, palette, radius } from '../../constants/theme';
 import { ProductObject, ReviewObject } from '../../types/types';
 
 export default function ProductDetails() {
     const { id } = useLocalSearchParams();
     const productId = Array.isArray(id) ? id[0] : id;
     const router = useRouter();
+    const insets = useSafeAreaInsets();
     const { addToCart } = useCart();
     const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
     const { user, isAuthenticated } = useUser();
@@ -273,7 +277,7 @@ export default function ProductDetails() {
 
     return (
         <View style={styles.container}>
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 130 }}>
                 {/* Images Carousel */}
                 <View style={{ position: 'relative' }}>
                     <ProductImageCarousel
@@ -358,34 +362,28 @@ export default function ProductDetails() {
                         </View>
                     )}
 
-                    {/* Action Buttons */}
-                    <View style={styles.actionRow}>
-                        <TouchableOpacity
-                            style={styles.wishlistBtn}
-                            onPress={() => {
-                                if (isInWishlist(product.productId)) {
-                                    removeFromWishlist(product.productId);
-                                } else {
-                                    addToWishlist(product);
-                                }
-                            }}
-                        >
-                            <Feather
-                                name={isInWishlist(product.productId) ? "heart" : "heart"}
-                                size={20}
-                                color={isInWishlist(product.productId) ? "#F59E0B" : "#1a1a1a"}
-                                style={{ marginRight: 8 }}
-                            />
-                            <Text style={styles.wishlistText}>Wishlist</Text>
-                        </TouchableOpacity>
+                    {/* Try at door explainer */}
+                    <View style={styles.tryCard}>
+                        <Zap size={90} color="rgba(255,196,0,0.12)" fill="rgba(255,196,0,0.12)" style={styles.tryGlow} />
+                        <View style={styles.tryIcon}><Shirt size={24} color={colors.textOnYellow} /></View>
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.tryTitle}>Try it at your door</Text>
+                            <Text style={styles.tryDesc}>Courier waits <Text style={styles.tryHl}>15 min</Text>. Keep what fits, hand back the rest — no box, no label.</Text>
+                        </View>
+                    </View>
 
-                        <TouchableOpacity
-                            style={styles.addToCartBtn}
-                            onPress={handleAddToCart}
-                        >
-                            <Feather name="shopping-cart" size={20} color="#1a1a1a" />
-                            <Text style={styles.addToCartText}>Add to Cart</Text>
-                        </TouchableOpacity>
+                    {/* Delivery promises */}
+                    <View style={styles.promiseRow}>
+                        <View style={styles.promiseCard}>
+                            <Zap size={18} color={palette.yellow600} />
+                            <Text style={styles.promiseTitle}>2–12 hrs</Text>
+                            <Text style={styles.promiseSub}>To your door</Text>
+                        </View>
+                        <View style={styles.promiseCard}>
+                            <RotateCcw size={18} color={palette.yellow600} />
+                            <Text style={styles.promiseTitle}>Instant return</Text>
+                            <Text style={styles.promiseSub}>Hand it back</Text>
+                        </View>
                     </View>
 
                     {/* Variants */}
@@ -602,6 +600,20 @@ export default function ProductDetails() {
 
             </ScrollView>
 
+            {/* Sticky action bar */}
+            <View style={[styles.stickyBar, { paddingBottom: 14 + insets.bottom }]}>
+                <Pressable
+                    style={styles.tryBtn}
+                    onPress={() => { setDeliveryOption('instant'); handleAddToCart(); }}
+                >
+                    <Shirt size={18} color={colors.textStrong} />
+                    <Text style={styles.tryBtnText}>Try at door</Text>
+                </Pressable>
+                <Pressable style={styles.addBtn} onPress={handleAddToCart}>
+                    <ShoppingCart size={18} color={colors.textOnYellow} />
+                    <Text style={styles.addBtnText}>Add · ₹{product.price.toLocaleString('en-IN')}</Text>
+                </Pressable>
+            </View>
 
             <ActionModal
                 visible={showSuccessModal}
@@ -715,12 +727,13 @@ const styles = StyleSheet.create({
         marginBottom: 5
     },
     productName: {
-        fontSize: 20,
-        fontWeight: '800',
-        color: '#1a1a1a',
+        fontFamily: fonts.displayBold,
+        fontSize: 23,
+        color: colors.textStrong,
         flex: 1,
         marginRight: 10,
-        lineHeight: 26
+        lineHeight: 27,
+        letterSpacing: -0.4,
     },
     ratingBadge: {
         flexDirection: 'row',
@@ -747,22 +760,39 @@ const styles = StyleSheet.create({
         marginBottom: 20
     },
     price: {
-        fontSize: 24,
-        fontWeight: '800',
-        color: '#1a1a1a',
-        marginRight: 10
+        fontFamily: fonts.displayBold,
+        fontSize: 30,
+        color: colors.textStrong,
+        marginRight: 10,
+        letterSpacing: -0.4,
     },
     originalPrice: {
+        fontFamily: fonts.bodyRegular,
         fontSize: 16,
-        color: '#999',
+        color: colors.textFaint,
         textDecorationLine: 'line-through',
         marginRight: 10
     },
     discountText: {
-        fontSize: 16,
-        color: '#FBBF24',
-        fontWeight: '700'
+        fontFamily: fonts.displayBold,
+        fontSize: 15,
+        color: palette.red500,
     },
+    tryCard: { backgroundColor: colors.surfaceInverse, borderRadius: radius.lg, padding: 16, flexDirection: 'row', gap: 14, alignItems: 'center', marginBottom: 22, overflow: 'hidden' },
+    tryGlow: { position: 'absolute', right: -14, bottom: -20 },
+    tryIcon: { width: 46, height: 46, borderRadius: 14, backgroundColor: palette.yellow500, alignItems: 'center', justifyContent: 'center' },
+    tryTitle: { fontFamily: fonts.displaySemiBold, fontSize: 15, color: colors.textInvert, marginBottom: 3 },
+    tryDesc: { fontFamily: fonts.bodyRegular, fontSize: 12, lineHeight: 17, color: palette.neutral300 },
+    tryHl: { fontFamily: fonts.bodyBold, color: palette.yellow300 },
+    promiseRow: { flexDirection: 'row', gap: 12, marginBottom: 22 },
+    promiseCard: { flex: 1, backgroundColor: palette.neutral50, borderWidth: 1, borderColor: palette.neutral100, borderRadius: radius.md, padding: 14 },
+    promiseTitle: { fontFamily: fonts.displaySemiBold, fontSize: 13, color: colors.textStrong, marginTop: 8 },
+    promiseSub: { fontFamily: fonts.bodyRegular, fontSize: 11, color: colors.textFaint, marginTop: 1 },
+    stickyBar: { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: colors.surfaceCard, borderTopWidth: 1, borderTopColor: palette.neutral100, paddingHorizontal: 20, paddingTop: 14, flexDirection: 'row', gap: 12, alignItems: 'center' },
+    tryBtn: { flex: 1, height: 54, borderRadius: radius.md, borderWidth: 2, borderColor: colors.borderInk, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
+    tryBtnText: { fontFamily: fonts.bodyBold, fontSize: 14, color: colors.textStrong },
+    addBtn: { flex: 1.3, height: 54, borderRadius: radius.md, backgroundColor: palette.yellow500, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+    addBtnText: { fontFamily: fonts.bodyBlack, fontSize: 14, color: colors.textOnYellow },
     offerBanner: {
         backgroundColor: '#FFFBE6',
         borderRadius: 8,

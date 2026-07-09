@@ -1,17 +1,20 @@
-import { Feather } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';
+import { ArrowUpLeft, Clock, Search, TrendingUp, X } from 'lucide-react-native';
 import React, { useState } from 'react';
-import { FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import SearchBar from '../components/SearchBar';
 import SkeletonCard from '../components/product/SkeletonCard';
+import { ProductCard, ZText } from '../components/ui';
+import { colors, fonts, palette, radius } from '../constants/theme';
 import { useSearch } from '../context/SearchContext';
 import apiClient from '../services/api';
 import { ProductObject } from '../types/types';
 
+const TRENDING = ['Denim jeans', 'Anti-aging serum', 'Kurta sets', 'Sunglasses', 'Messenger bag'];
+
 export default function ProductSearchScreen() {
     const router = useRouter();
-    const { addSearch } = useSearch();
+    const { addSearch, recentSearches, clearSearches } = useSearch() as any;
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState<ProductObject[]>([]);
     const [relatedProducts, setRelatedProducts] = useState<ProductObject[]>([]);
@@ -54,226 +57,146 @@ export default function ProductSearchScreen() {
         router.push(`/product/${item.productId}`);
     };
 
+    const applyTerm = (term: string) => {
+        setSearchQuery(term);
+        runSearch(term);
+    };
+
     const allDisplayed = [
         ...searchResults,
         ...relatedProducts.filter(r => !searchResults.find(s => s.productId === r.productId)),
     ];
 
     const renderProductItem = ({ item }: { item: ProductObject }) => (
-        <TouchableOpacity
-            style={styles.productCard}
+        <ProductCard
+            style={styles.gridCard}
+            image={item.images?.[0] ?? require('../assets/images/icon_backup.png')}
+            brand={item.deepestCategoryName}
+            name={item.productName}
+            price={item.price}
+            originalPrice={item.originalPrice ?? undefined}
+            discount={(item.discount ?? 0) > 0 ? `${item.discount}% OFF` : undefined}
             onPress={() => handleProductPress(item)}
-        >
-            <View style={styles.imageContainer}>
-                {item.images?.[0] ? (
-                    <Image source={{ uri: item.images[0] as string }} style={styles.productImage} />
-                ) : (
-                    <View style={[styles.productImage, { backgroundColor: '#f0f0f0', alignItems: 'center', justifyContent: 'center' }]}>
-                        <Feather name="image" size={24} color="#ccc" />
-                    </View>
-                )}
-                {(item.discount ?? 0) > 0 && (
-                    <View style={styles.discountBadge}>
-                        <Text style={styles.discountText}>{item.discount}% OFF</Text>
-                    </View>
-                )}
-            </View>
-            <View style={styles.productInfo}>
-                <Text style={styles.productName} numberOfLines={1}>{item.productName}</Text>
-                <Text style={styles.productCategory}>{item.deepestCategoryName}</Text>
-                <View style={styles.priceRow}>
-                    <Text style={styles.price}>₹{item.price}</Text>
-                    {item.originalPrice && (
-                        <Text style={styles.originalPrice}>₹{item.originalPrice}</Text>
-                    )}
-                </View>
-            </View>
-        </TouchableOpacity>
+        />
     );
 
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={styles.container} edges={['top']}>
             <Stack.Screen options={{ headerShown: false }} />
 
             <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-                    <Feather name="arrow-left" size={24} color="#333" />
-                </TouchableOpacity>
-                <View style={styles.searchBarWrapper}>
-                    <SearchBar
-                        placeholder="Search for products..."
+                <View style={styles.searchField}>
+                    <Search size={19} color={colors.textStrong} />
+                    <TextInput
+                        style={styles.searchInput}
+                        placeholder="Search styles, sneakers, gadgets"
+                        placeholderTextColor={colors.textFaint}
                         value={searchQuery}
                         onChangeText={handleSearchChange}
                         autoFocus
+                        returnKeyType="search"
                     />
+                    {searchQuery.length > 0 && (
+                        <Pressable onPress={() => handleSearchChange('')} hitSlop={8}>
+                            <X size={18} color={colors.textFaint} />
+                        </Pressable>
+                    )}
                 </View>
+                <Pressable onPress={() => router.back()} hitSlop={8}>
+                    <Text style={styles.cancel}>Cancel</Text>
+                </Pressable>
             </View>
 
-            <View style={styles.content}>
-                {loading ? (
-                    <View style={styles.skeletonGrid}>
-                        {Array.from({ length: 6 }).map((_, i) => (
-                            <SkeletonCard key={i} />
+            {loading ? (
+                <View style={styles.skeletonGrid}>
+                    {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
+                </View>
+            ) : searchQuery.length > 0 ? (
+                allDisplayed.length > 0 ? (
+                    <FlatList
+                        data={allDisplayed}
+                        renderItem={renderProductItem}
+                        keyExtractor={item => item.productId}
+                        numColumns={2}
+                        columnWrapperStyle={styles.columnWrapper}
+                        contentContainerStyle={styles.listContent}
+                        showsVerticalScrollIndicator={false}
+                        ListHeaderComponent={
+                            relatedProducts.length > 0 && searchResults.length > 0 ? (
+                                <Text style={styles.resultLabel}>
+                                    {searchResults.length} result{searchResults.length !== 1 ? 's' : ''} · related below
+                                </Text>
+                            ) : null
+                        }
+                    />
+                ) : (
+                    <View style={styles.empty}>
+                        <Search size={44} color={colors.borderStrong} />
+                        <ZText variant="muted" style={styles.emptyText}>No products found for “{searchQuery}”</ZText>
+                    </View>
+                )
+            ) : (
+                <ScrollView contentContainerStyle={styles.discover} showsVerticalScrollIndicator={false}>
+                    {recentSearches?.length > 0 && (
+                        <>
+                            <View style={styles.rowBetween}>
+                                <ZText variant="eyebrow">Recent searches</ZText>
+                                <Text style={styles.clear} onPress={() => clearSearches?.()}>Clear all</Text>
+                            </View>
+                            <View style={styles.recentList}>
+                                {recentSearches.slice(0, 6).map((term: string, i: number) => (
+                                    <Pressable key={i} style={styles.recentRow} onPress={() => applyTerm(term)}>
+                                        <Clock size={18} color={colors.textFaint} />
+                                        <Text style={styles.recentText} numberOfLines={1}>{term}</Text>
+                                        <ArrowUpLeft size={17} color={colors.borderStrong} />
+                                    </Pressable>
+                                ))}
+                            </View>
+                        </>
+                    )}
+
+                    <View style={styles.trendingHead}>
+                        <TrendingUp size={14} color={palette.yellow500} />
+                        <ZText variant="eyebrow">Trending now</ZText>
+                    </View>
+                    <View style={styles.chips}>
+                        {TRENDING.map((t) => (
+                            <Pressable key={t} style={styles.chip} onPress={() => applyTerm(t)}>
+                                <Text style={styles.chipText}>{t}</Text>
+                            </Pressable>
                         ))}
                     </View>
-                ) : searchQuery.length > 0 ? (
-                    allDisplayed.length > 0 ? (
-                        <FlatList
-                            data={allDisplayed}
-                            renderItem={renderProductItem}
-                            keyExtractor={item => item.productId}
-                            numColumns={2}
-                            columnWrapperStyle={styles.columnWrapper}
-                            contentContainerStyle={styles.listContent}
-                            showsVerticalScrollIndicator={false}
-                            ListHeaderComponent={
-                                relatedProducts.length > 0 && searchResults.length > 0 ? (
-                                    <Text style={styles.sectionLabel}>
-                                        {searchResults.length} result{searchResults.length !== 1 ? 's' : ''} · Related products below
-                                    </Text>
-                                ) : null
-                            }
-                        />
-                    ) : (
-                        <View style={styles.emptyState}>
-                            <Feather name="search" size={48} color="#ccc" />
-                            <Text style={styles.emptyText}>No products found matching "{searchQuery}"</Text>
-                        </View>
-                    )
-                ) : (
-                    <View style={styles.emptyState}>
-                        <Feather name="search" size={48} color="#eee" />
-                        <Text style={styles.emptyTextPlaceholder}>Type to search products</Text>
-                    </View>
-                )}
-            </View>
+                </ScrollView>
+            )}
         </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#fff',
-    },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingTop: 10,
-        backgroundColor: '#fff',
-    },
-    backButton: {
-        paddingLeft: 20,
-        paddingRight: 5,
-        paddingBottom: 15, // Align with search bar bottom padding
-        justifyContent: 'center',
-    },
-    searchBarWrapper: {
-        flex: 1,
-    },
-    content: {
-        flex: 1,
-        backgroundColor: '#fff',
-    },
-    listContent: {
-        padding: 10,
-    },
-    columnWrapper: {
-        justifyContent: 'space-between',
-    },
-    productCard: {
-        width: '48%',
-        backgroundColor: '#fff',
-        borderRadius: 12,
-        marginBottom: 15,
-        borderWidth: 1,
-        borderColor: '#f0f0f0',
-        overflow: 'hidden',
-    },
-    imageContainer: {
-        height: 140,
-        backgroundColor: '#f9f9f9',
-        position: 'relative',
-    },
-    productImage: {
-        width: '100%',
-        height: '100%',
-        resizeMode: 'cover',
-    },
-    discountBadge: {
-        position: 'absolute',
-        top: 8,
-        left: 8,
-        backgroundColor: '#FBBF24',
-        paddingHorizontal: 5,
-        paddingVertical: 2,
-        borderRadius: 4,
-    },
-    discountText: {
-        fontSize: 9,
-        fontWeight: '700',
-        color: '#1a1a1a',
-    },
-    productInfo: {
-        padding: 10,
-    },
-    productName: {
-        fontSize: 13,
-        fontWeight: '600',
-        color: '#1a1a1a',
-        marginBottom: 2,
-    },
-    productCategory: {
-        fontSize: 10,
-        color: '#888',
-        marginBottom: 6,
-    },
-    priceRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    price: {
-        fontSize: 14,
-        fontWeight: '700',
-        color: '#1a1a1a',
-        marginRight: 6,
-    },
-    originalPrice: {
-        fontSize: 11,
-        color: '#999',
-        textDecorationLine: 'line-through',
-    },
-    emptyState: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginTop: 50,
-    },
-    skeletonGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        justifyContent: 'space-between',
-        paddingHorizontal: 10,
-        paddingTop: 15,
-    },
-    emptyText: {
-        marginTop: 15,
-        fontSize: 16,
-        color: '#888',
-        textAlign: 'center',
-        paddingHorizontal: 40,
-    },
-    emptyTextPlaceholder: {
-        marginTop: 15,
-        fontSize: 16,
-        color: '#ccc',
-    },
-    sectionLabel: {
-        fontSize: 13,
-        color: '#9CA3AF',
-        fontWeight: '600',
-        paddingHorizontal: 5,
-        paddingBottom: 10,
-        paddingTop: 5,
-    },
+    container: { flex: 1, backgroundColor: palette.paperWarm },
+    header: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingTop: 6, paddingBottom: 16 },
+    searchField: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 11, backgroundColor: colors.surfaceCard, borderWidth: 2, borderColor: colors.borderInk, borderRadius: radius.md, height: 50, paddingHorizontal: 15 },
+    searchInput: { flex: 1, fontFamily: fonts.bodyMedium, fontSize: 15, color: colors.textStrong, padding: 0 },
+    cancel: { fontFamily: fonts.bodyBold, fontSize: 14, color: colors.textStrong },
+
+    listContent: { padding: 20, paddingBottom: 40 },
+    columnWrapper: { justifyContent: 'space-between' },
+    gridCard: { width: '48%', marginBottom: 18 },
+    resultLabel: { fontFamily: fonts.bodySemiBold, fontSize: 13, color: colors.textMuted, marginBottom: 12 },
+
+    skeletonGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 8 },
+
+    empty: { flex: 1, alignItems: 'center', justifyContent: 'center', marginTop: -40 },
+    emptyText: { marginTop: 14, textAlign: 'center', paddingHorizontal: 40 },
+
+    discover: { paddingHorizontal: 20, paddingBottom: 40 },
+    rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+    clear: { fontFamily: fonts.bodyBold, fontSize: 11, color: palette.red500 },
+    recentList: { marginBottom: 22 },
+    recentRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
+    recentText: { flex: 1, fontFamily: fonts.bodyMedium, fontSize: 15, color: colors.textBody },
+    trendingHead: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14 },
+    chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+    chip: { backgroundColor: colors.surfaceCard, borderWidth: 2, borderColor: colors.borderSubtle, borderRadius: 100, paddingHorizontal: 15, paddingVertical: 9 },
+    chipText: { fontFamily: fonts.bodyBold, fontSize: 13, color: colors.textBody },
 });
