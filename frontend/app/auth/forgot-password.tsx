@@ -1,19 +1,11 @@
 import ActionModal from '@/components/common/ActionModal';
-import { Colors } from '@/constants/Colors';
-import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { ArrowRight, KeyRound, Mail } from 'lucide-react-native';
 import React, { useState } from 'react';
-import {
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
-} from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { AppHeader, ZButton, ZInput, ZText } from '../../components/ui';
+import { colors, fonts, palette } from '../../constants/theme';
 import { authService } from '../../services/auth';
 
 export default function ForgotPasswordScreen() {
@@ -30,25 +22,21 @@ export default function ForgotPasswordScreen() {
             setShowErrorModal(true);
             return false;
         }
-
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(emailOrPhone.trim())) {
             setErrorMessage('Please enter a valid email address');
             setShowErrorModal(true);
             return false;
         }
-
         return true;
     };
 
     const handleSendResetLink = async () => {
         if (!validateInput()) return;
-
         setLoading(true);
         try {
-            // Password reset is email-only (OTP is delivered by email).
+            // Password reset is email-only (OTP delivered by email).
             await authService.sendPasswordResetOTP('', emailOrPhone.trim());
-
             setShowSuccessModal(true);
         } catch (error: any) {
             setErrorMessage(error.message || 'Failed to send OTP. Please try again.');
@@ -60,98 +48,33 @@ export default function ForgotPasswordScreen() {
 
     return (
         <SafeAreaView style={styles.container} edges={['top']}>
-            <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                style={styles.keyboardView}
-            >
-                <ScrollView
-                    contentContainerStyle={styles.scrollContent}
-                    keyboardShouldPersistTaps="handled"
-                    showsVerticalScrollIndicator={false}
-                >
-                    {/* Back Button */}
-                    <TouchableOpacity
-                        style={styles.backButton}
-                        onPress={() => router.back()}
-                    >
-                        <Ionicons name="chevron-back" size={28} color="#000" />
-                    </TouchableOpacity>
-
-                    {/* Icon */}
-                    <View style={styles.iconContainer}>
-                        <View style={styles.iconCircle}>
-                            <View style={styles.iconInnerCircle}>
-                                <Ionicons name="lock-closed" size={48} color={Colors.light.tint} />
-                            </View>
-                            <View style={styles.arrowContainer}>
-                                <Ionicons name="arrow-undo" size={32} color={Colors.light.tint} />
-                            </View>
-                        </View>
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.flex}>
+                <AppHeader onBack={() => router.back()} />
+                <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+                    <View style={styles.iconTile}>
+                        <KeyRound size={30} color={colors.textStrong} />
                     </View>
-
-                    {/* Title and Description */}
-                    <View style={styles.header}>
-                        <Text style={styles.title}>Forgot Password?</Text>
-                        <Text style={styles.description}>
-                            Enter your registered email to reset your password and get back to shopping.
-                        </Text>
-                    </View>
-
-                    {/* Form */}
-                    <View style={styles.form}>
-                        {/* Email/Phone Input */}
-                        <View style={styles.inputContainer}>
-                            <Text style={styles.label}>Email Address</Text>
-                            <View style={styles.inputWrapper}>
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="e.g. name@email.com"
-                                    placeholderTextColor="#BDBDBD"
-                                    value={emailOrPhone}
-                                    onChangeText={setEmailOrPhone}
-                                    autoCapitalize="none"
-                                    keyboardType="email-address"
-                                    editable={!loading}
-                                />
-                                <Ionicons name="at" size={24} color="#9E9E9E" style={styles.inputIcon} />
-                            </View>
-                        </View>
-
-                        {/* Send Reset Link Button */}
-                        <TouchableOpacity
-                            style={[styles.resetButton, loading && styles.resetButtonDisabled]}
-                            onPress={handleSendResetLink}
-                            disabled={loading}
-                        >
-                            <Text style={styles.resetButtonText}>
-                                {loading ? 'Sending...' : 'Send Reset Link'}
-                            </Text>
-                            <Ionicons name="arrow-forward" size={20} color="#000" />
-                        </TouchableOpacity>
-
-                        {/* Login Link */}
-                        <View style={styles.loginContainer}>
-                            <Text style={styles.loginText}>Remember your password? </Text>
-                            <TouchableOpacity onPress={() => router.back()}>
-                                <Text style={styles.loginLink}>Login</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
+                    <ZText variant="h2" style={styles.title}>Forgot password?</ZText>
+                    <ZText variant="muted" style={styles.subtitle}>
+                        Enter your email and we&apos;ll send a code to reset it. Quick as a courier.
+                    </ZText>
+                    <ZInput
+                        label="Email"
+                        icon={Mail}
+                        placeholder="you@email.com"
+                        value={emailOrPhone}
+                        onChangeText={setEmailOrPhone}
+                        autoCapitalize="none"
+                        keyboardType="email-address"
+                        editable={!loading}
+                    />
+                    <View style={{ height: 8 }} />
+                    <ZButton label={loading ? 'Sending…' : 'Send reset code'} icon={ArrowRight} onPress={handleSendResetLink} loading={loading} />
+                    <Text style={styles.back} onPress={() => router.back()}>Back to log in</Text>
                 </ScrollView>
             </KeyboardAvoidingView>
 
-            {/* Error Modal */}
-            <ActionModal
-                visible={showErrorModal}
-                title="Error"
-                message={errorMessage}
-                primaryButtonText="Try Again"
-                onPrimaryPress={() => setShowErrorModal(false)}
-                onClose={() => setShowErrorModal(false)}
-                icon="alert-circle"
-            />
-
-            {/* Success Modal */}
+            <ActionModal visible={showErrorModal} title="Error" message={errorMessage} primaryButtonText="Try Again" onPrimaryPress={() => setShowErrorModal(false)} onClose={() => setShowErrorModal(false)} icon="alert-circle" />
             <ActionModal
                 visible={showSuccessModal}
                 title="OTP Sent!"
@@ -159,13 +82,7 @@ export default function ForgotPasswordScreen() {
                 primaryButtonText="Continue"
                 onPrimaryPress={() => {
                     setShowSuccessModal(false);
-                    router.push({
-                        pathname: '/auth/verify-reset-otp',
-                        params: {
-                            emailOrPhone: emailOrPhone.trim(),
-                            isEmail: 'true'
-                        }
-                    });
+                    router.push({ pathname: '/auth/verify-reset-otp', params: { emailOrPhone: emailOrPhone.trim(), isEmail: 'true' } });
                 }}
                 onClose={() => setShowSuccessModal(false)}
                 icon="mail"
@@ -175,136 +92,11 @@ export default function ForgotPasswordScreen() {
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#FAFAFA',
-    },
-    keyboardView: {
-        flex: 1,
-    },
-    scrollContent: {
-        flexGrow: 1,
-        paddingHorizontal: 24,
-        paddingBottom: 24,
-    },
-    backButton: {
-        marginTop: 16,
-        marginBottom: 24,
-        width: 40,
-        height: 40,
-        justifyContent: 'center',
-    },
-    iconContainer: {
-        alignItems: 'center',
-        marginBottom: 32,
-    },
-    iconCircle: {
-        width: 200,
-        height: 200,
-        borderRadius: 100,
-        backgroundColor: '#FFF9E6',
-        borderWidth: 2,
-        borderStyle: 'dashed',
-        borderColor: '#FFE794',
-        justifyContent: 'center',
-        alignItems: 'center',
-        position: 'relative',
-    },
-    iconInnerCircle: {
-        width: 100,
-        height: 100,
-        borderRadius: 16,
-        backgroundColor: '#fff',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    arrowContainer: {
-        position: 'absolute',
-        top: 20,
-        left: 20,
-    },
-    header: {
-        alignItems: 'center',
-        marginBottom: 40,
-    },
-    title: {
-        fontSize: 28,
-        fontWeight: 'bold',
-        color: '#000',
-        marginBottom: 12,
-    },
-    description: {
-        fontSize: 15,
-        color: '#757575',
-        textAlign: 'center',
-        lineHeight: 22,
-        paddingHorizontal: 16,
-    },
-    form: {
-        flex: 1,
-    },
-    inputContainer: {
-        marginBottom: 24,
-    },
-    label: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#424242',
-        marginBottom: 8,
-    },
-    inputWrapper: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#fff',
-        borderRadius: 12,
-        paddingHorizontal: 16,
-        height: 56,
-        borderWidth: 1,
-        borderColor: '#E0E0E0',
-    },
-    input: {
-        flex: 1,
-        fontSize: 16,
-        color: '#000',
-    },
-    inputIcon: {
-        marginLeft: 8,
-    },
-    resetButton: {
-        backgroundColor: Colors.light.tint,
-        height: 56,
-        borderRadius: 12,
-        flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'center',
-        shadowColor: Colors.light.tint,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 5,
-        gap: 8,
-    },
-    resetButtonDisabled: {
-        opacity: 0.6,
-    },
-    resetButtonText: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#000',
-    },
-    loginContainer: {
-        flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginTop: 24,
-    },
-    loginText: {
-        fontSize: 14,
-        color: '#757575',
-    },
-    loginLink: {
-        fontSize: 14,
-        color: Colors.light.tint,
-        fontWeight: 'bold',
-    },
+    container: { flex: 1, backgroundColor: palette.paperWarm },
+    flex: { flex: 1 },
+    content: { paddingHorizontal: 26, paddingBottom: 30 },
+    iconTile: { width: 64, height: 64, borderRadius: 20, backgroundColor: palette.yellow500, alignItems: 'center', justifyContent: 'center', marginTop: 24 },
+    title: { marginTop: 22 },
+    subtitle: { marginTop: 10, marginBottom: 28, lineHeight: 23 },
+    back: { fontFamily: fonts.bodyBold, fontSize: 14, color: colors.textStrong, textAlign: 'center', marginTop: 20 },
 });

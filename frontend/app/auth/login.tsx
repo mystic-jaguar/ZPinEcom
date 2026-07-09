@@ -1,21 +1,21 @@
-import { Colors } from '@/constants/Colors';
-import { Ionicons } from '@expo/vector-icons';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { useRouter } from 'expo-router';
+import { ArrowRight, Lock, Mail } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import {
     Image,
     KeyboardAvoidingView,
     Platform,
+    Pressable,
     ScrollView,
     StyleSheet,
     Text,
-    TextInput,
-    TouchableOpacity,
-    View
+    View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
+import { GoogleGlyph, ZButton, ZInput, ZText } from '../../components/ui';
+import { colors, fonts, palette, radius } from '../../constants/theme';
 import { useUser } from '../../context/UserContext';
 import { userDataManager } from '../../services/api';
 import { appleAuthService, authService, googleAuthService } from '../../services/auth';
@@ -33,13 +33,12 @@ export default function LoginScreen() {
     const router = useRouter();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [showErrorModal, setShowErrorModal] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
     const [appleAvailable, setAppleAvailable] = useState(false);
 
-    const { updateUser, setUser } = useUser();
+    const { setUser } = useUser();
 
     useEffect(() => {
         appleAuthService.isAvailable().then(setAppleAvailable);
@@ -52,15 +51,12 @@ export default function LoginScreen() {
             const response = await appleAuthService.authenticateWithBackend(identityToken, rawNonce, fullName);
             if (response.user) {
                 setUser(response.user);
-                // Apple never supplies dob/gender — route to complete-profile if missing
                 if (!response.user.dob || !response.user.gender) {
                     router.replace('/auth/complete-profile');
                     return;
                 }
             }
-            // _layout.tsx auto-redirects to /(tabs) once profile is complete
         } catch (error: any) {
-            // User cancelling the native sheet is not an error
             if (error.code !== 'ERR_REQUEST_CANCELED') {
                 setErrorMessage(error.message || 'Apple sign-in failed');
                 setShowErrorModal(true);
@@ -81,12 +77,6 @@ export default function LoginScreen() {
             setShowErrorModal(true);
             return false;
         }
-        // Note: no complexity check on login — let the server authenticate
-        if (password.length < 1) {
-            setErrorMessage('Please enter your password');
-            setShowErrorModal(true);
-            return false;
-        }
         return true;
     };
 
@@ -97,15 +87,12 @@ export default function LoginScreen() {
             const response = await googleAuthService.authenticateWithBackend(idToken, accessToken);
             if (response.user) {
                 setUser(response.user);
-                // If DOB or gender is missing, redirect to complete-profile
-                // so the user can provide this information
                 const userData = response.user;
                 if (!userData.dob || !userData.gender) {
                     router.replace('/auth/complete-profile');
                     return;
                 }
             }
-            // If profile is complete, _layout.tsx auto-redirects to /(tabs)
         } catch (error: any) {
             if (error.code !== 'SIGN_IN_CANCELLED') {
                 setErrorMessage(error.message || 'Google sign-in failed');
@@ -122,12 +109,9 @@ export default function LoginScreen() {
         setLoading(true);
         try {
             const response = await authService.login(email, password);
-            // Never log auth responses — they contain tokens
-
             if (response.success) {
                 const responseData = response.data || response;
                 const userData = response.user || responseData.user || await userDataManager.getUserData();
-
                 if (userData) {
                     setUser(userData);
                 } else {
@@ -136,10 +120,7 @@ export default function LoginScreen() {
             } else {
                 throw new Error(response.message || 'Login failed');
             }
-
-            // REMOVED manual redirect to avoid race conditions with _layout.tsx
-            // The RootLayout will automatically redirect to /(tabs) when 
-            // isAuthenticated becomes true.
+            // RootLayout auto-redirects to /(tabs) when isAuthenticated becomes true.
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Invalid email or password';
             setErrorMessage(message);
@@ -153,138 +134,88 @@ export default function LoginScreen() {
         <SafeAreaView style={styles.container} edges={['top']}>
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                style={styles.keyboardView}
+                style={styles.flex}
             >
                 <ScrollView
                     contentContainerStyle={styles.scrollContent}
                     keyboardShouldPersistTaps="handled"
                     showsVerticalScrollIndicator={false}
                 >
-                    {/* Header */}
-                    <View style={styles.header}>
-                        <View style={styles.logoContainer}>
-                            <Image
-                                source={require('../../assets/images/icon_backup.png')}
-                                style={styles.logoImage}
-                                resizeMode="contain"
-                            />
-                        </View>
-                        <Text style={styles.title}>Welcome Back!</Text>
-                        <Text style={styles.subtitle}>Login to your account</Text>
+                    <Image
+                        source={require('../../assets/images/icon_backup.png')}
+                        style={styles.logo}
+                        resizeMode="contain"
+                    />
+
+                    <ZText variant="screenTitle" style={styles.title}>Welcome back.</ZText>
+                    <ZText variant="muted" style={styles.subtitle}>
+                        Log in to shop bike-fast and try at your door.
+                    </ZText>
+
+                    <ZInput
+                        label="Email or username"
+                        icon={Mail}
+                        placeholder="aarav.sharma@email.com"
+                        value={email}
+                        onChangeText={setEmail}
+                        autoCapitalize="none"
+                        keyboardType="email-address"
+                        editable={!loading}
+                    />
+
+                    <ZInput
+                        label="Password"
+                        icon={Lock}
+                        secure
+                        placeholder="Enter your password"
+                        value={password}
+                        onChangeText={setPassword}
+                        autoCapitalize="none"
+                        editable={!loading}
+                    />
+
+                    <Pressable style={styles.forgot} onPress={() => router.push('/auth/forgot-password')}>
+                        <Text style={styles.forgotText}>Forgot password?</Text>
+                    </Pressable>
+
+                    <ZButton
+                        label={loading ? 'Logging in…' : 'Log in'}
+                        icon={ArrowRight}
+                        onPress={handleLogin}
+                        loading={loading}
+                    />
+
+                    <View style={styles.divider}>
+                        <View style={styles.dividerLine} />
+                        <Text style={styles.dividerText}>OR CONTINUE WITH</Text>
+                        <View style={styles.dividerLine} />
                     </View>
 
-                    {/* Form */}
-                    <View style={styles.form}>
-                        {/* Email Input */}
-                        <View style={styles.inputContainer}>
-                            <Text style={styles.label}>Email or Username</Text>
-                            <View style={styles.inputWrapper}>
-                                <Ionicons name="mail-outline" size={20} color="#9E9E9E" style={styles.inputIcon} />
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="Enter your email or username"
-                                    placeholderTextColor="#BDBDBD"
-                                    value={email}
-                                    onChangeText={setEmail}
-                                    autoCapitalize="none"
-                                    keyboardType="email-address"
-                                    editable={!loading}
-                                />
-                            </View>
-                        </View>
-
-                        {/* Password Input */}
-                        <View style={styles.inputContainer}>
-                            <Text style={styles.label}>Password</Text>
-                            <View style={styles.inputWrapper}>
-                                <Ionicons name="lock-closed-outline" size={20} color="#9E9E9E" style={styles.inputIcon} />
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="Enter your password"
-                                    placeholderTextColor="#BDBDBD"
-                                    value={password}
-                                    onChangeText={setPassword}
-                                    secureTextEntry={!showPassword}
-                                    autoCapitalize="none"
-                                    editable={!loading}
-                                />
-                                <TouchableOpacity
-                                    onPress={() => setShowPassword(!showPassword)}
-                                    style={styles.eyeIcon}
-                                >
-                                    <Ionicons
-                                        name={showPassword ? 'eye-outline' : 'eye-off-outline'}
-                                        size={20}
-                                        color="#9E9E9E"
-                                    />
-                                </TouchableOpacity>
-                            </View>
-                        </View>
-
-                        {/* Forgot Password */}
-                        <TouchableOpacity
-                            style={styles.forgotButton}
-                            onPress={() => router.push('/auth/forgot-password')}
-                        >
-                            <Text style={styles.forgotText}>Forgot Password?</Text>
-                        </TouchableOpacity>
-
-                        {/* Login Button */}
-                        <TouchableOpacity
-                            style={[styles.loginButton, loading && styles.loginButtonDisabled]}
-                            onPress={handleLogin}
-                            disabled={loading}
-                        >
-                            <Text style={styles.loginButtonText}>
-                                {loading ? 'Logging in...' : 'Login'}
-                            </Text>
-                        </TouchableOpacity>
-
-                        {/* Divider */}
-                        <View style={styles.divider}>
-                            <View style={styles.dividerLine} />
-                            <Text style={styles.dividerText}>OR</Text>
-                            <View style={styles.dividerLine} />
-                        </View>
-
-                        {/* Sign in with Apple — iOS only, placed first per Apple HIG */}
+                    <View style={styles.socialRow}>
+                        {isGoogleSignInAvailable && (
+                            <Pressable style={styles.googleBtn} onPress={handleGoogleSignIn} disabled={loading}>
+                                <GoogleGlyph />
+                                <Text style={styles.googleText}>Google</Text>
+                            </Pressable>
+                        )}
                         {appleAvailable && (
                             <AppleAuthentication.AppleAuthenticationButton
                                 buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
                                 buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
-                                cornerRadius={12}
-                                style={styles.appleButton}
+                                cornerRadius={14}
+                                style={styles.appleBtn}
                                 onPress={handleAppleSignIn}
                             />
                         )}
-
-                        {/* Google Sign In */}
-                        {isGoogleSignInAvailable && (
-                        <TouchableOpacity
-                            style={styles.googleButton}
-                            onPress={handleGoogleSignIn}
-                            disabled={loading}
-                        >
-                            <Image
-                                source={{ uri: 'https://www.google.com/favicon.ico' }}
-                                style={styles.googleIcon}
-                            />
-                            <Text style={styles.googleButtonText}>Continue with Google</Text>
-                        </TouchableOpacity>
-                        )}
-
-                        {/* Sign Up */}
-                        <View style={styles.signupContainer}>
-                            <Text style={styles.signupText}>Don't have an account? </Text>
-                            <TouchableOpacity onPress={() => router.push('/auth/signup')}>
-                                <Text style={styles.signupLink}>Sign Up</Text>
-                            </TouchableOpacity>
-                        </View>
                     </View>
+
+                    <Pressable style={styles.footer} onPress={() => router.push('/auth/signup')}>
+                        <Text style={styles.footerText}>New to ZPIN? </Text>
+                        <Text style={styles.footerLink}>Create account</Text>
+                    </Pressable>
                 </ScrollView>
             </KeyboardAvoidingView>
 
-            {/* Error Modal */}
             <ActionModal
                 visible={showErrorModal}
                 title="Error"
@@ -299,156 +230,33 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-    container: {
+    container: { flex: 1, backgroundColor: palette.paperWarm },
+    flex: { flex: 1 },
+    scrollContent: { flexGrow: 1, paddingHorizontal: 26, paddingBottom: 30 },
+    logo: { height: 40, width: 120, marginTop: 30, marginBottom: 4 },
+    title: { marginTop: 20 },
+    subtitle: { marginTop: 8, marginBottom: 28 },
+    forgot: { alignSelf: 'flex-end', marginTop: 4, marginBottom: 20 },
+    forgotText: { fontFamily: fonts.bodyBold, fontSize: 12, color: palette.yellow600 },
+    divider: { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 20 },
+    dividerLine: { flex: 1, height: 1, backgroundColor: colors.borderSubtle },
+    dividerText: { fontFamily: fonts.monoBold, fontSize: 10, letterSpacing: 1, color: colors.textFaint },
+    socialRow: { flexDirection: 'row', gap: 12 },
+    googleBtn: {
         flex: 1,
-        backgroundColor: '#FAFAFA',
-    },
-    keyboardView: {
-        flex: 1,
-    },
-    scrollContent: {
-        flexGrow: 1,
-        paddingHorizontal: 24,
-        paddingBottom: 24,
-    },
-    header: {
-        alignItems: 'center',
-        marginTop: 40,
-        marginBottom: 40,
-    },
-    logoContainer: {
-        marginBottom: 20,
-    },
-    logoImage: {
-        width: 160,
-        height: 80,
-    },
-    title: {
-        fontSize: 28,
-        fontWeight: 'bold',
-        color: '#000',
-        marginBottom: 8,
-    },
-    subtitle: {
-        fontSize: 16,
-        color: '#757575',
-    },
-    form: {
-        flex: 1,
-    },
-    inputContainer: {
-        marginBottom: 20,
-    },
-    label: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#424242',
-        marginBottom: 8,
-    },
-    inputWrapper: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#fff',
-        borderRadius: 12,
-        paddingHorizontal: 16,
-        height: 56,
-        borderWidth: 1,
-        borderColor: '#E0E0E0',
-    },
-    inputIcon: {
-        marginRight: 12,
-    },
-    input: {
-        flex: 1,
-        fontSize: 16,
-        color: '#000',
-    },
-    eyeIcon: {
-        padding: 4,
-    },
-    forgotButton: {
-        alignSelf: 'flex-end',
-        marginBottom: 30,
-    },
-    forgotText: {
-        fontSize: 14,
-        color: Colors.light.tint,
-        fontWeight: '600',
-    },
-    loginButton: {
-        backgroundColor: Colors.light.tint,
-        height: 56,
-        borderRadius: 12,
-        justifyContent: 'center',
-        alignItems: 'center',
-        shadowColor: Colors.light.tint,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 5,
-    },
-    loginButtonDisabled: {
-        opacity: 0.6,
-    },
-    loginButtonText: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#000',
-    },
-    divider: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginVertical: 30,
-    },
-    dividerLine: {
-        flex: 1,
-        height: 1,
-        backgroundColor: '#E0E0E0',
-    },
-    dividerText: {
-        marginHorizontal: 16,
-        fontSize: 14,
-        color: '#9E9E9E',
-        fontWeight: '600',
-    },
-    signupContainer: {
-        flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    appleButton: {
-        width: '100%',
-        height: 56,
-        marginBottom: 12,
-    },
-    googleButton: {
+        height: 52,
+        borderRadius: radius.md,
+        borderWidth: 2,
+        borderColor: colors.borderSubtle,
+        backgroundColor: colors.surfaceCard,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#fff',
-        borderWidth: 1,
-        borderColor: '#E0E0E0',
-        borderRadius: 12,
-        height: 56,
-        marginBottom: 20,
-        gap: 12,
+        gap: 9,
     },
-    googleIcon: {
-        width: 20,
-        height: 20,
-    },
-    googleButtonText: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#000',
-    },
-    signupText: {
-        fontSize: 14,
-        color: '#757575',
-    },
-    signupLink: {
-        fontSize: 14,
-        color: Colors.light.tint,
-        fontWeight: 'bold',
-    },
+    googleText: { fontFamily: fonts.bodyBold, fontSize: 14, color: colors.textStrong },
+    appleBtn: { flex: 1, height: 52 },
+    footer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 24 },
+    footerText: { fontFamily: fonts.bodyRegular, fontSize: 14, color: colors.textMuted },
+    footerLink: { fontFamily: fonts.bodyBold, fontSize: 14, color: colors.textStrong },
 });

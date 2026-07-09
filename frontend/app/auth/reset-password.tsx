@@ -1,19 +1,11 @@
 import ActionModal from '@/components/common/ActionModal';
-import { Colors } from '@/constants/Colors';
-import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Lock } from 'lucide-react-native';
 import React, { useState } from 'react';
-import {
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
-} from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { AppHeader, ZButton, ZInput, ZText } from '../../components/ui';
+import { colors, fonts, palette } from '../../constants/theme';
 import { authService } from '../../services/auth';
 import { validatePassword } from '../../utils/validation';
 
@@ -24,53 +16,30 @@ export default function ResetPasswordScreen() {
 
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
-    const [showNewPassword, setShowNewPassword] = useState(false);
-    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [showErrorModal, setShowErrorModal] = useState(false);
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
 
-    const getPasswordStrength = (password: string) => {
-        if (password.length === 0) return { text: '', color: '#E0E0E0', widthPercent: 0 };
-        // Anything that doesn't satisfy the full backend policy is "Weak".
-        if (!validatePassword(password).isValid) return { text: 'Weak', color: '#FF5252', widthPercent: 33 };
-        if (password.length < 12) return { text: 'Medium', color: '#FFA726', widthPercent: 66 };
-        return { text: 'Strong', color: '#66BB6A', widthPercent: 100 };
+    // 0 none, 1 weak, 2 medium, 3 strong
+    const getStrength = (pw: string) => {
+        if (pw.length === 0) return { level: 0, label: '', color: colors.borderSubtle };
+        if (!validatePassword(pw).isValid) return { level: 1, label: 'WEAK', color: palette.danger500 };
+        if (pw.length < 12) return { level: 2, label: 'MEDIUM', color: palette.warning500 };
+        return { level: 3, label: 'STRONG', color: palette.green500 };
     };
 
     const validatePasswords = () => {
-        if (!newPassword.trim()) {
-            setErrorMessage('Please enter a new password');
-            setShowErrorModal(true);
-            return false;
-        }
-
+        if (!newPassword.trim()) { setErrorMessage('Please enter a new password'); setShowErrorModal(true); return false; }
         const passwordCheck = validatePassword(newPassword);
-        if (!passwordCheck.isValid) {
-            setErrorMessage(`Password must contain: ${passwordCheck.requirements.join(', ')}`);
-            setShowErrorModal(true);
-            return false;
-        }
-
-        if (!confirmPassword.trim()) {
-            setErrorMessage('Please confirm your password');
-            setShowErrorModal(true);
-            return false;
-        }
-
-        if (newPassword !== confirmPassword) {
-            setErrorMessage('Passwords do not match');
-            setShowErrorModal(true);
-            return false;
-        }
-
+        if (!passwordCheck.isValid) { setErrorMessage(`Password must contain: ${passwordCheck.requirements.join(', ')}`); setShowErrorModal(true); return false; }
+        if (!confirmPassword.trim()) { setErrorMessage('Please confirm your password'); setShowErrorModal(true); return false; }
+        if (newPassword !== confirmPassword) { setErrorMessage('Passwords do not match'); setShowErrorModal(true); return false; }
         return true;
     };
 
     const handleResetPassword = async () => {
         if (!validatePasswords()) return;
-
         setLoading(true);
         try {
             await authService.resetPassword(resetToken, newPassword);
@@ -83,167 +52,43 @@ export default function ResetPasswordScreen() {
         }
     };
 
-    const passwordStrength = getPasswordStrength(newPassword);
+    const strength = getStrength(newPassword);
 
     return (
         <SafeAreaView style={styles.container} edges={['top']}>
-            <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                style={styles.keyboardView}
-            >
-                <ScrollView
-                    contentContainerStyle={styles.scrollContent}
-                    keyboardShouldPersistTaps="handled"
-                    showsVerticalScrollIndicator={false}
-                >
-                    {/* Back Button */}
-                    <TouchableOpacity
-                        style={styles.backButton}
-                        onPress={() => router.back()}
-                    >
-                        <Ionicons name="chevron-back" size={28} color="#000" />
-                    </TouchableOpacity>
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.flex}>
+                <AppHeader onBack={() => router.back()} />
+                <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+                    <ZText variant="h2" style={styles.title}>Set a new password</ZText>
+                    <ZText variant="muted" style={styles.subtitle}>
+                        Make it strong. At least 8 characters with a number and a symbol.
+                    </ZText>
 
-                    {/* Header */}
-                    <View style={styles.header}>
-                        <View style={styles.iconContainer}>
-                            <Ionicons name="lock-closed" size={48} color={Colors.light.tint} />
-                        </View>
-                        <Text style={styles.title}>Reset Password</Text>
-                        <Text style={styles.description}>
-                            Create a new strong password for your account
-                        </Text>
-                    </View>
-
-                    {/* Form */}
-                    <View style={styles.form}>
-                        {/* New Password Input */}
-                        <View style={styles.inputContainer}>
-                            <Text style={styles.label}>New Password</Text>
-                            <View style={styles.inputWrapper}>
-                                <Ionicons name="lock-closed-outline" size={20} color="#9E9E9E" style={styles.inputIcon} />
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="Enter new password"
-                                    placeholderTextColor="#BDBDBD"
-                                    value={newPassword}
-                                    onChangeText={setNewPassword}
-                                    secureTextEntry={!showNewPassword}
-                                    autoCapitalize="none"
-                                    editable={!loading}
-                                />
-                                <TouchableOpacity
-                                    onPress={() => setShowNewPassword(!showNewPassword)}
-                                    style={styles.eyeIcon}
-                                >
-                                    <Ionicons
-                                        name={showNewPassword ? 'eye-outline' : 'eye-off-outline'}
-                                        size={20}
-                                        color="#9E9E9E"
-                                    />
-                                </TouchableOpacity>
+                    <ZInput label="New password" icon={Lock} secure placeholder="Enter new password" value={newPassword} onChangeText={setNewPassword} autoCapitalize="none" editable={!loading} containerStyle={{ marginBottom: 8 }} />
+                    {newPassword.length > 0 && (
+                        <>
+                            <View style={styles.meter}>
+                                {[0, 1, 2, 3].map((i) => (
+                                    <View key={i} style={[styles.meterSeg, { backgroundColor: i < strength.level ? strength.color : colors.borderSubtle }]} />
+                                ))}
                             </View>
+                            <Text style={[styles.strengthLabel, { color: strength.color }]}>{strength.label}</Text>
+                        </>
+                    )}
 
-                            {/* Password Strength Indicator */}
-                            {newPassword.length > 0 && (
-                                <View style={styles.strengthContainer}>
-                                    <View style={styles.strengthBar}>
-                                        <View
-                                            style={[
-                                                styles.strengthFill,
-                                                { width: `${passwordStrength.widthPercent}%`, backgroundColor: passwordStrength.color }
-                                            ]}
-                                        />
-                                    </View>
-                                    <Text style={[styles.strengthText, { color: passwordStrength.color }]}>
-                                        {passwordStrength.text}
-                                    </Text>
-                                </View>
-                            )}
-                        </View>
+                    <ZInput label="Confirm password" icon={Lock} secure placeholder="Re-enter new password" value={confirmPassword} onChangeText={setConfirmPassword} autoCapitalize="none" editable={!loading} containerStyle={{ marginTop: 12, marginBottom: 24 }} />
 
-                        {/* Confirm Password Input */}
-                        <View style={styles.inputContainer}>
-                            <Text style={styles.label}>Confirm Password</Text>
-                            <View style={styles.inputWrapper}>
-                                <Ionicons name="lock-closed-outline" size={20} color="#9E9E9E" style={styles.inputIcon} />
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="Re-enter new password"
-                                    placeholderTextColor="#BDBDBD"
-                                    value={confirmPassword}
-                                    onChangeText={setConfirmPassword}
-                                    secureTextEntry={!showConfirmPassword}
-                                    autoCapitalize="none"
-                                    editable={!loading}
-                                />
-                                <TouchableOpacity
-                                    onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-                                    style={styles.eyeIcon}
-                                >
-                                    <Ionicons
-                                        name={showConfirmPassword ? 'eye-outline' : 'eye-off-outline'}
-                                        size={20}
-                                        color="#9E9E9E"
-                                    />
-                                </TouchableOpacity>
-                            </View>
-
-                            {/* Password Match Indicator */}
-                            {confirmPassword.length > 0 && (
-                                <View style={styles.matchContainer}>
-                                    <Ionicons
-                                        name={newPassword === confirmPassword ? 'checkmark-circle' : 'close-circle'}
-                                        size={16}
-                                        color={newPassword === confirmPassword ? '#66BB6A' : '#FF5252'}
-                                    />
-                                    <Text
-                                        style={[
-                                            styles.matchText,
-                                            { color: newPassword === confirmPassword ? '#66BB6A' : '#FF5252' }
-                                        ]}
-                                    >
-                                        {newPassword === confirmPassword ? 'Passwords match' : 'Passwords do not match'}
-                                    </Text>
-                                </View>
-                            )}
-                        </View>
-
-                        {/* Reset Password Button */}
-                        <TouchableOpacity
-                            style={[styles.resetButton, loading && styles.resetButtonDisabled]}
-                            onPress={handleResetPassword}
-                            disabled={loading}
-                        >
-                            <Text style={styles.resetButtonText}>
-                                {loading ? 'Resetting...' : 'Reset Password'}
-                            </Text>
-                        </TouchableOpacity>
-                    </View>
+                    <ZButton label={loading ? 'Resetting…' : 'Reset password'} onPress={handleResetPassword} loading={loading} />
                 </ScrollView>
             </KeyboardAvoidingView>
 
-            {/* Error Modal */}
-            <ActionModal
-                visible={showErrorModal}
-                title="Error"
-                message={errorMessage}
-                primaryButtonText="Try Again"
-                onPrimaryPress={() => setShowErrorModal(false)}
-                onClose={() => setShowErrorModal(false)}
-                icon="alert-circle"
-            />
-
-            {/* Success Modal */}
+            <ActionModal visible={showErrorModal} title="Error" message={errorMessage} primaryButtonText="Try Again" onPrimaryPress={() => setShowErrorModal(false)} onClose={() => setShowErrorModal(false)} icon="alert-circle" />
             <ActionModal
                 visible={showSuccessModal}
                 title="Password Reset!"
                 message="Your password has been reset successfully. You can now login with your new password."
                 primaryButtonText="Go to Login"
-                onPrimaryPress={() => {
-                    setShowSuccessModal(false);
-                    router.replace('/auth/login');
-                }}
+                onPrimaryPress={() => { setShowSuccessModal(false); router.replace('/auth/login'); }}
                 onClose={() => setShowSuccessModal(false)}
                 icon="check-circle"
             />
@@ -252,134 +97,12 @@ export default function ResetPasswordScreen() {
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#FAFAFA',
-    },
-    keyboardView: {
-        flex: 1,
-    },
-    scrollContent: {
-        flexGrow: 1,
-        paddingHorizontal: 24,
-        paddingBottom: 24,
-    },
-    backButton: {
-        marginTop: 16,
-        marginBottom: 24,
-        width: 40,
-        height: 40,
-        justifyContent: 'center',
-    },
-    header: {
-        alignItems: 'center',
-        marginBottom: 40,
-    },
-    iconContainer: {
-        width: 100,
-        height: 100,
-        borderRadius: 50,
-        backgroundColor: '#FFF9E6',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 24,
-    },
-    title: {
-        fontSize: 28,
-        fontWeight: 'bold',
-        color: '#000',
-        marginBottom: 12,
-    },
-    description: {
-        fontSize: 15,
-        color: '#757575',
-        textAlign: 'center',
-        lineHeight: 22,
-    },
-    form: {
-        flex: 1,
-    },
-    inputContainer: {
-        marginBottom: 24,
-    },
-    label: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#424242',
-        marginBottom: 8,
-    },
-    inputWrapper: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#fff',
-        borderRadius: 12,
-        paddingHorizontal: 16,
-        height: 56,
-        borderWidth: 1,
-        borderColor: '#E0E0E0',
-    },
-    inputIcon: {
-        marginRight: 12,
-    },
-    input: {
-        flex: 1,
-        fontSize: 16,
-        color: '#000',
-    },
-    eyeIcon: {
-        padding: 4,
-    },
-    strengthContainer: {
-        marginTop: 8,
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-    },
-    strengthBar: {
-        flex: 1,
-        height: 4,
-        backgroundColor: '#E0E0E0',
-        borderRadius: 2,
-        overflow: 'hidden',
-    },
-    strengthFill: {
-        height: '100%',
-        borderRadius: 2,
-    },
-    strengthText: {
-        fontSize: 12,
-        fontWeight: '600',
-        width: 60,
-    },
-    matchContainer: {
-        marginTop: 8,
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-    },
-    matchText: {
-        fontSize: 12,
-        fontWeight: '600',
-    },
-    resetButton: {
-        backgroundColor: Colors.light.tint,
-        height: 56,
-        borderRadius: 12,
-        justifyContent: 'center',
-        alignItems: 'center',
-        shadowColor: Colors.light.tint,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 5,
-        marginTop: 16,
-    },
-    resetButtonDisabled: {
-        opacity: 0.6,
-    },
-    resetButtonText: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#000',
-    },
+    container: { flex: 1, backgroundColor: palette.paperWarm },
+    flex: { flex: 1 },
+    content: { paddingHorizontal: 26, paddingBottom: 30 },
+    title: { marginTop: 24 },
+    subtitle: { marginTop: 10, marginBottom: 28, lineHeight: 23 },
+    meter: { flexDirection: 'row', gap: 6, marginBottom: 8 },
+    meterSeg: { flex: 1, height: 5, borderRadius: 3 },
+    strengthLabel: { fontFamily: fonts.monoBold, fontSize: 10, letterSpacing: 0.6 },
 });

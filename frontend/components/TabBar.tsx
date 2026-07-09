@@ -1,100 +1,99 @@
-import { Feather } from '@expo/vector-icons';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
-import React from 'react';
-import { Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Home, LayoutGrid, LucideIcon, ShoppingCart, User } from 'lucide-react-native';
+import React, { useEffect } from 'react';
+import { LayoutAnimation, Platform, Pressable, StyleSheet, Text, UIManager, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { colors, fonts, palette, shadow } from '../constants/theme';
 
-const { width, height } = Dimensions.get('window');
-const TAB_HEIGHT = Math.max(60, height * 0.082);
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
-// Interactive Tab Bar implementing the design from Home Screen
-export default function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
-    const insets = useSafeAreaInsets();
+const TABS: Record<string, { icon: LucideIcon; label: string }> = {
+  index: { icon: Home, label: 'Home' },
+  categories: { icon: LayoutGrid, label: 'Shop' },
+  cart: { icon: ShoppingCart, label: 'Cart' },
+  profile: { icon: User, label: 'You' },
+};
 
-    return (
-        <View style={[styles.bottomNav, { paddingBottom: 2 + insets.bottom, height: TAB_HEIGHT + insets.bottom }]}>
-            {state.routes.map((route, index) => {
-                const { options } = descriptors[route.key];
-                const isFocused = state.index === index;
+/** Floating dark pill tab bar with an expanding active item (ZPIN v2 design). */
+export default function TabBar({ state, navigation }: BottomTabBarProps) {
+  const insets = useSafeAreaInsets();
 
-                const onPress = () => {
-                    const event = navigation.emit({
-                        type: 'tabPress',
-                        target: route.key,
-                        canPreventDefault: true,
-                    });
+  useEffect(() => {
+    LayoutAnimation.configureNext(LayoutAnimation.create(320, 'easeInEaseOut', 'opacity'));
+  }, [state.index]);
 
-                    if (!isFocused && !event.defaultPrevented) {
-                        navigation.navigate(route.name);
-                    }
-                };
+  return (
+    <View pointerEvents="box-none" style={[styles.host, { paddingBottom: 12 + insets.bottom }]}>
+      <View style={styles.pill}>
+        {state.routes.map((route, index) => {
+          const meta = TABS[route.name];
+          if (!meta) return null;
+          const focused = state.index === index;
+          const Icon = meta.icon;
 
-                let iconName: any;
-                let IconComponent: any = Feather;
-                let label = "Home"; // Default
+          const onPress = () => {
+            const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+            if (!focused && !event.defaultPrevented) navigation.navigate(route.name);
+          };
 
-                // Define icons based on route name
-                if (route.name === 'index') {
-                    label = "Home";
-                    iconName = "home";
-                } else if (route.name === 'categories') {
-                    label = "Categories";
-                    iconName = "grid";
-                } else if (route.name === 'cart') {
-                    label = "Cart";
-                    iconName = "shopping-cart";
-                } else if (route.name === 'profile') {
-                    label = "Profile";
-                    iconName = "user";
-                } else {
-                    return null;
-                }
-
-                const color = isFocused ? '#FBBF24' : '#999';
-
-                return (
-                    <TouchableOpacity
-                        key={index}
-                        accessibilityRole="button"
-                        accessibilityState={isFocused ? { selected: true } : {}}
-                        accessibilityLabel={options.tabBarAccessibilityLabel}
-                        onPress={onPress}
-                        style={styles.navItem}
-                    >
-                        <Feather name={iconName} size={24} color={color} />
-                        <Text style={[styles.navText, { color }]}>
-                            {label}
-                        </Text>
-                    </TouchableOpacity>
-                );
-            })}
-        </View>
-    );
+          return (
+            <Pressable
+              key={route.key}
+              accessibilityRole="button"
+              accessibilityState={focused ? { selected: true } : {}}
+              onPress={onPress}
+              style={({ pressed }) => [
+                styles.tab,
+                focused && styles.tabActive,
+                pressed && { transform: [{ scale: 0.9 }] },
+              ]}
+            >
+              <Icon size={20} color={focused ? colors.textOnYellow : '#8A877E'} />
+              {focused ? <Text style={styles.label}>{meta.label}</Text> : null}
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
-    bottomNav: {
-        flexDirection: 'row',
-        height: TAB_HEIGHT,
-        backgroundColor: '#fff',
-        borderTopWidth: 1,
-        borderTopColor: '#f0f0f0',
-        justifyContent: 'space-around',
-        alignItems: 'center',
-        elevation: 10,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: -2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 5,
-    },
-    navItem: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        flex: 1,
-    },
-    navText: {
-        fontSize: width * 0.025,
-        marginTop: 4,
-        fontWeight: '600',
-    },
+  host: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+  },
+  pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.surfaceInverse,
+    padding: 8,
+    borderRadius: 100,
+    ...shadow.lg,
+  },
+  tab: {
+    height: 44,
+    minWidth: 44,
+    borderRadius: 22,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 0,
+  },
+  tabActive: {
+    backgroundColor: palette.yellow500,
+    paddingHorizontal: 16,
+  },
+  label: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 12,
+    color: colors.textOnYellow,
+  },
 });
