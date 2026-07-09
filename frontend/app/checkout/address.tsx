@@ -1,13 +1,13 @@
-import { CheckoutProgress } from '@/components/checkout/CheckoutProgress';
 import ActionModal from '@/components/common/ActionModal';
-import { Colors } from '@/constants/Colors';
 import { useAddress } from '@/context/AddressContext';
 import { useCheckout } from '@/context/CheckoutContext';
-import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { ArrowRight, Check, MapPin, Pencil, Plus, Trash2 } from 'lucide-react-native';
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { AppHeader, BottomBar, CheckoutSteps, ZButton, ZText } from '../../components/ui';
+import { colors, fonts, palette, radius } from '../../constants/theme';
 
 export default function CheckoutAddressScreen() {
     const router = useRouter();
@@ -17,7 +17,6 @@ export default function CheckoutAddressScreen() {
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [addressToDelete, setAddressToDelete] = useState<string | null>(null);
 
-    // Set default selection if none selected
     React.useEffect(() => {
         if (!selectedAddressId && addresses.length > 0) {
             const defaultAddr = addresses.find(a => a.isDefault) || addresses[0];
@@ -25,117 +24,71 @@ export default function CheckoutAddressScreen() {
         }
     }, [addresses, selectedAddressId]);
 
-    const handleAddressSelect = (id: string) => {
-        setSelectedAddressId(id);
-    };
-
     const handleConfirm = () => {
-        if (selectedAddressId) {
-            router.push('/checkout/summary');
-        } else {
-            setShowModal(true);
-        }
-    };
-
-    const renderAddressItem = ({ item }: { item: any }) => {
-        const isSelected = selectedAddressId === item.id;
-        return (
-            <TouchableOpacity
-                activeOpacity={0.9}
-                style={[styles.card, isSelected && styles.selectedCard]}
-                onPress={() => handleAddressSelect(item.id)}
-            >
-                <View style={styles.cardHeader}>
-                    <View style={styles.radioButtonContainer}>
-                        <View style={[
-                            styles.radioButton,
-                            isSelected && styles.radioButtonSelected
-                        ]}>
-                            {isSelected && <View style={styles.radioButtonInner} />}
-                        </View>
-                    </View>
-                    <Text style={styles.name}>{item.name}</Text>
-                    <View style={styles.tagContainer}>
-                        <Text style={styles.tagText}>{item.label?.toUpperCase() || 'OTHER'}</Text>
-                    </View>
-                </View>
-
-                <View style={styles.addressContent}>
-                    <Text style={styles.addressText}>
-                        {item.address}, {item.city},
-                    </Text>
-                    <Text style={styles.addressText}>
-                        {item.state} {item.pincode}, {item.country}
-                    </Text>
-                    <Text style={styles.phoneText}>
-                        +91 {item.phone}
-                    </Text>
-                </View>
-
-                <View style={styles.actionRow}>
-                    <TouchableOpacity
-                        style={styles.editBtn}
-                        onPress={() => router.push({ pathname: '/profile/add-address', params: { id: item.id } })}
-                    >
-                        <Text style={styles.editText}>EDIT ADDRESS</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => { setAddressToDelete(item.id); setShowDeleteModal(true); }}>
-                        <Ionicons name="trash-outline" size={20} color="#9E9E9E" />
-                    </TouchableOpacity>
-                </View>
-            </TouchableOpacity>
-        );
+        if (selectedAddressId) router.push('/checkout/summary');
+        else setShowModal(true);
     };
 
     return (
         <SafeAreaView style={styles.container} edges={['top']}>
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-                    <Ionicons name="chevron-back" size={24} color="#000" />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Shipping Address</Text>
-            </View>
+            <AppHeader title="Checkout" onBack={() => router.back()} />
+            <CheckoutSteps step={1} />
 
-            <CheckoutProgress currentStep={1} />
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+                <View style={styles.eyebrowRow}>
+                    <MapPin size={13} color={palette.yellow500} />
+                    <ZText variant="eyebrow" color={colors.textMuted}>Deliver to</ZText>
+                </View>
 
-            <ScrollView style={styles.scrollContainer} contentContainerStyle={styles.contentContainer}>
-                {addresses.map(item => (
-                    <View key={item.id} style={{ marginBottom: 16 }}>
-                        {renderAddressItem({ item })}
+                {addresses.map((item: any) => {
+                    const selected = selectedAddressId === item.id;
+                    return (
+                        <Pressable
+                            key={item.id}
+                            style={[styles.card, selected ? styles.cardSelected : styles.cardUnselected]}
+                            onPress={() => setSelectedAddressId(item.id)}
+                        >
+                            <View style={styles.cardHead}>
+                                <View style={[styles.radio, selected && styles.radioOn]}>
+                                    {selected && <Check size={13} color={palette.yellow500} />}
+                                </View>
+                                <Text style={styles.name}>{item.name}</Text>
+                                <View style={[styles.tag, selected && styles.tagOn]}>
+                                    <Text style={[styles.tagText, selected && styles.tagTextOn]}>{item.label?.toUpperCase() || 'OTHER'}</Text>
+                                </View>
+                            </View>
+                            <Text style={styles.address}>{item.address}, {item.city}, {item.state} {item.pincode}, {item.country}</Text>
+                            <Text style={styles.phone}>+91 {item.phone}</Text>
+                            {selected && (
+                                <View style={styles.actions}>
+                                    <Pressable style={styles.actionBtn} onPress={() => router.push({ pathname: '/profile/add-address', params: { id: item.id } })}>
+                                        <Pencil size={13} color={colors.textStrong} />
+                                        <Text style={styles.actionText}>EDIT</Text>
+                                    </Pressable>
+                                    <Pressable style={styles.actionBtn} onPress={() => { setAddressToDelete(item.id); setShowDeleteModal(true); }}>
+                                        <Trash2 size={13} color={palette.red500} />
+                                        <Text style={[styles.actionText, { color: palette.red500 }]}>DELETE</Text>
+                                    </Pressable>
+                                </View>
+                            )}
+                        </Pressable>
+                    );
+                })}
+
+                <Pressable style={styles.addCard} onPress={() => router.push('/profile/add-address')}>
+                    <View style={styles.addIcon}><Plus size={22} color={palette.yellow700} /></View>
+                    <View>
+                        <Text style={styles.addTitle}>Add new address</Text>
+                        <Text style={styles.addSub}>Home, work, or anywhere</Text>
                     </View>
-                ))}
-
-                <TouchableOpacity
-                    style={styles.addNewCard}
-                    onPress={() => router.push('/profile/add-address')}
-                >
-                    <View style={styles.addIconCircle}>
-                        <Ionicons name="add" size={24} color={Colors.light.tint} />
-                    </View>
-                    <Text style={styles.addNewText}>Add New Address</Text>
-                </TouchableOpacity>
+                </Pressable>
             </ScrollView>
 
-            <View style={styles.footer}>
-                <TouchableOpacity
-                    style={styles.confirmButton}
-                    onPress={handleConfirm}
-                >
-                    <Text style={styles.confirmButtonText}>Confirm Address</Text>
-                    <Ionicons name="chevron-forward" size={20} color="#000" />
-                </TouchableOpacity>
-            </View>
+            <BottomBar>
+                <ZButton label="Continue to summary" icon={ArrowRight} onPress={handleConfirm} />
+            </BottomBar>
 
-            <ActionModal
-                visible={showModal}
-                title="No Address Selected"
-                message="Please select a delivery address to continue."
-                icon="map-pin"
-                primaryButtonText="OK"
-                onPrimaryPress={() => setShowModal(false)}
-                onClose={() => setShowModal(false)}
-            />
-
+            <ActionModal visible={showModal} title="No Address Selected" message="Please select a delivery address to continue." icon="map-pin" primaryButtonText="OK" onPrimaryPress={() => setShowModal(false)} onClose={() => setShowModal(false)} />
             <ActionModal
                 visible={showDeleteModal}
                 title="Delete Address"
@@ -159,173 +112,29 @@ export default function CheckoutAddressScreen() {
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#F8F9FA',
-    },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 16,
-        paddingTop: 15,
-        paddingBottom: 15,
-        backgroundColor: '#fff',
-    },
-    backButton: {
-        padding: 5,
-    },
-    headerTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        marginLeft: 10,
-        flex: 1,
-        textAlign: 'center',
-        marginRight: 40, // Balance the back button
-    },
-    scrollContainer: {
-        flex: 1,
-    },
-    contentContainer: {
-        padding: 16,
-    },
-    card: {
-        backgroundColor: '#fff',
-        borderRadius: 12,
-        padding: 16,
-        marginBottom: 0, // Handled by parent view for spacing
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 5,
-        elevation: 2,
-        borderWidth: 1,
-        borderColor: 'transparent',
-    },
-    selectedCard: {
-        borderColor: 'transparent', // Design doesn't show border, but maybe slight elevation change?
-    },
-    cardHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 10,
-    },
-    radioButtonContainer: {
-        marginRight: 10,
-    },
-    radioButton: {
-        height: 20,
-        width: 20,
-        borderRadius: 10,
-        borderWidth: 1,
-        borderColor: '#E0E0E0',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    radioButtonSelected: {
-        borderColor: Colors.light.tint, // Warning color or Theme color
-    },
-    radioButtonInner: {
-        height: 10,
-        width: 10,
-        borderRadius: 5,
-        backgroundColor: '#FFA726', // Orange-ish color from design
-    },
-    name: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#000',
-        marginRight: 10,
-    },
-    tagContainer: {
-        backgroundColor: '#FFF8E1',
-        paddingHorizontal: 8,
-        paddingVertical: 2,
-        borderRadius: 4,
-    },
-    tagText: {
-        fontSize: 10,
-        color: '#FFA000',
-        fontWeight: 'bold',
-    },
-    addressContent: {
-        marginLeft: 30, // Align with name (skip radio)
-    },
-    addressText: {
-        fontSize: 14,
-        color: '#5C6BC0', // Bluish gray text from design? Actually design looks like dark gray/blue
-        lineHeight: 20,
-    },
-    phoneText: {
-        fontSize: 14,
-        color: '#5C6BC0',
-        marginTop: 5,
-    },
-    actionRow: {
-        flexDirection: 'row',
-        justifyContent: 'flex-end',
-        alignItems: 'center',
-        marginTop: 15,
-        borderTopWidth: 1,
-        borderTopColor: '#f5f5f5',
-        paddingTop: 10,
-    },
-    editBtn: {
-        marginRight: 15,
-    },
-    editText: {
-        fontSize: 12,
-        fontWeight: 'bold',
-        color: '#FFB300',
-    },
-    addNewCard: {
-        borderWidth: 1,
-        borderColor: '#FFD54F',
-        borderStyle: 'dashed',
-        borderRadius: 12,
-        padding: 20,
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#fff',
-        marginTop: 10,
-        marginBottom: 30,
-    },
-    addIconCircle: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: '#FFF8E1',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 10,
-    },
-    addNewText: {
-        fontSize: 14,
-        fontWeight: 'bold',
-        color: '#000',
-    },
-    footer: {
-        backgroundColor: '#fff',
-        padding: 16,
-        borderTopWidth: 1,
-        borderTopColor: '#EEEEEE',
-    },
-    confirmButton: {
-        backgroundColor: '#FFC107', // Amber/Yellow
-        flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'center',
-        paddingVertical: 15,
-        borderRadius: 12,
-        shadowColor: '#FFC107',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 5,
-    },
-    confirmButtonText: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#000',
-        marginRight: 5,
-    },
+    container: { flex: 1, backgroundColor: palette.paperWarm },
+    content: { padding: 20, paddingTop: 4 },
+    eyebrowRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14 },
+
+    card: { backgroundColor: colors.surfaceCard, borderRadius: radius.lg, padding: 16, marginBottom: 14 },
+    cardSelected: { borderWidth: 2, borderColor: colors.borderInk },
+    cardUnselected: { borderWidth: 1, borderColor: palette.neutral200 },
+    cardHead: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
+    radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: colors.borderSubtle, alignItems: 'center', justifyContent: 'center' },
+    radioOn: { backgroundColor: colors.surfaceInverse, borderWidth: 0 },
+    name: { flex: 1, fontFamily: fonts.displaySemiBold, fontSize: 16, color: colors.textStrong },
+    tag: { backgroundColor: colors.surfaceSunken, paddingHorizontal: 9, paddingVertical: 3, borderRadius: radius.xs },
+    tagOn: { backgroundColor: palette.yellow500 },
+    tagText: { fontFamily: fonts.monoBold, fontSize: 9, letterSpacing: 0.6, color: colors.textBody },
+    tagTextOn: { color: colors.textOnYellow },
+    address: { fontFamily: fonts.bodyRegular, fontSize: 14, lineHeight: 21, color: colors.textBody, marginLeft: 32 },
+    phone: { fontFamily: fonts.monoBold, fontSize: 13, color: colors.textMuted, marginLeft: 32, marginTop: 6 },
+    actions: { flexDirection: 'row', gap: 20, marginLeft: 32, marginTop: 14 },
+    actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+    actionText: { fontFamily: fonts.monoBold, fontSize: 11, letterSpacing: 0.4, color: colors.textStrong },
+
+    addCard: { flexDirection: 'row', alignItems: 'center', gap: 14, borderWidth: 2, borderColor: '#D8D4C8', borderStyle: 'dashed', borderRadius: radius.lg, padding: 18, backgroundColor: colors.surfaceCard, marginTop: 4 },
+    addIcon: { width: 44, height: 44, borderRadius: 14, backgroundColor: palette.yellow100, alignItems: 'center', justifyContent: 'center' },
+    addTitle: { fontFamily: fonts.displaySemiBold, fontSize: 15, color: colors.textStrong },
+    addSub: { fontFamily: fonts.bodyRegular, fontSize: 12, color: colors.textFaint, marginTop: 1 },
 });

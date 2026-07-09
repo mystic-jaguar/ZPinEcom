@@ -1,5 +1,6 @@
 export { default as AppHeader } from './AppHeader';
 export { default as BottomBar } from './BottomBar';
+export { default as CheckoutSteps } from './CheckoutSteps';
 export { default as GoogleGlyph } from './GoogleGlyph';
 export { default as ProductCard } from './ProductCard';
 export { default as Screen } from './Screen';
