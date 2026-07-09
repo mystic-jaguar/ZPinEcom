@@ -1,18 +1,16 @@
-import { Feather } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
+import { Image } from 'expo-image';
 import * as ExpoLocation from 'expo-location';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { ArrowRight, ChevronDown, Heart, MapPin, Search, ShoppingBag, Zap } from 'lucide-react-native';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, AppStateStatus, Dimensions, Image, Linking, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { AppState, AppStateStatus, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
 import LegalDocModal, { LegalDocType } from '../../components/common/LegalDocModal';
-import Header from '../../components/Header';
-import SearchBar from '../../components/SearchBar';
+import { ProductCard, SectionHeader, ZText } from '../../components/ui';
+import { colors, fonts, palette, radius, shadow } from '../../constants/theme';
 import { useSearch } from '../../context/SearchContext';
 import { productService } from '../../services/product';
-
-const { width } = Dimensions.get('window');
 
 const CATEGORIES = [
     { id: 'fashion', name: 'Fashion', image: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=200&q=80' },
@@ -23,7 +21,7 @@ const CATEGORIES = [
 ];
 
 const RECOMMENDED = [
-    { id: '1', name: 'Bags', desc: 'Starting from ₹499', image: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&w=400&q=80', category: 'Accessories', subCategory: 'Bags' },
+    { id: '1', name: 'Bags', desc: 'From ₹499', image: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&w=400&q=80', category: 'Accessories', subCategory: 'Bags' },
     { id: '2', name: 'Headphones', desc: 'Up to 60% OFF', image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=400&q=80', category: 'Gadgets', subCategory: 'Audio Devices' },
     { id: '3', name: 'Watches', desc: 'Min 40% OFF', image: 'https://images.unsplash.com/photo-1524592094714-0f0654e20314?auto=format&fit=crop&w=400&q=80', category: 'Accessories', subCategory: 'Watches' },
     { id: '4', name: 'Sunglasses', desc: 'Stylish & Cool', image: 'https://images.unsplash.com/photo-1511499767150-a48a237f0083?auto=format&fit=crop&w=400&q=80', category: 'Accessories', subCategory: 'Sunglasses' },
@@ -37,10 +35,10 @@ const FRESH_ARRIVALS = [
 ];
 
 const NEARBY_FALLBACK = [
-    { id: '1', name: 'Men',    image: require('../../assets/images/men_icon.jpg'),    category: 'Fashion', subCategory: 'Men',    count: null as number | null },
-    { id: '2', name: 'Women',  image: require('../../assets/images/women_icon.jpg'),  category: 'Fashion', subCategory: 'Women',  count: null as number | null },
-    { id: '3', name: 'Kids',   image: 'https://images.unsplash.com/photo-1519457431-44ccd64a579b?auto=format&fit=crop&w=200&q=80', category: 'Fashion', subCategory: 'Kids', count: 0 as number | null },
-    { id: '4', name: 'Makeup', image: require('../../assets/images/makeup_icon.jpg'), category: 'Beauty',  subCategory: 'Makeup', count: null as number | null },
+    { id: '1', name: 'Men', image: require('../../assets/images/men_icon.jpg'), category: 'Fashion', subCategory: 'Men', count: null as number | null },
+    { id: '2', name: 'Women', image: require('../../assets/images/women_icon.jpg'), category: 'Fashion', subCategory: 'Women', count: null as number | null },
+    { id: '3', name: 'Kids', image: 'https://images.unsplash.com/photo-1519457431-44ccd64a579b?auto=format&fit=crop&w=200&q=80', category: 'Fashion', subCategory: 'Kids', count: 0 as number | null },
+    { id: '4', name: 'Makeup', image: require('../../assets/images/makeup_icon.jpg'), category: 'Beauty', subCategory: 'Makeup', count: null as number | null },
 ];
 
 const BIG_DISCOUNTS = [
@@ -66,8 +64,6 @@ export default function HomeScreen() {
     const [comingSoonModal, setComingSoonModal] = useState<{ visible: boolean; name: string }>({ visible: false, name: '' });
     const appState = useRef(AppState.currentState);
     const awaitingSettingsReturn = useRef(false);
-    // Track last successful fetch + coords so returning to this tab doesn't
-    // re-fetch (and re-acquire GPS) on every focus — only when data is stale.
     const lastFetchRef = useRef(0);
     const lastCoordsRef = useRef<{ lat?: number; lng?: number }>({});
     const STALE_MS = 5 * 60 * 1000;
@@ -95,11 +91,7 @@ export default function HomeScreen() {
     };
 
     useEffect(() => {
-        // Do NOT prompt for location at launch (App Store 5.1.1 — location must be
-        // requested in-context, at the point of use). If it was already granted in a
-        // previous session we use it; otherwise we just load products and let the user
-        // enable location from the "Nearby Availabilities" card, which shows the
-        // explainer modal before the native dialog.
+        // Do NOT prompt for location at launch (App Store 5.1.1 — request in-context).
         ExpoLocation.getForegroundPermissionsAsync().then(({ status }) => {
             if (status === 'granted') {
                 requestLocationAndFetch();
@@ -110,7 +102,6 @@ export default function HomeScreen() {
         });
     }, []);
 
-    // Re-check permission when user returns from system settings
     useEffect(() => {
         const subscription = AppState.addEventListener('change', async (nextState: AppStateStatus) => {
             if (appState.current.match(/inactive|background/) && nextState === 'active') {
@@ -135,30 +126,20 @@ export default function HomeScreen() {
     const requestLocationAndFetch = async () => {
         let lat: number | undefined;
         let lng: number | undefined;
-
         try {
-            // Check current status first — if denied, we can't re-prompt, must open settings
             const { status: currentStatus } = await ExpoLocation.getForegroundPermissionsAsync();
-
             if (currentStatus === 'denied') {
-                // Already denied — open system settings so user can manually grant
                 setLocationGranted(false);
                 awaitingSettingsReturn.current = true;
                 await Linking.openSettings();
-                // AppState listener will handle the re-check when app comes back
                 return;
             }
-
             const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
             setLocationGranted(status === 'granted');
-
             if (status === 'granted') {
-                const loc = await ExpoLocation.getCurrentPositionAsync({
-                    accuracy: ExpoLocation.Accuracy.Balanced,
-                });
+                const loc = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced });
                 lat = loc.coords.latitude;
                 lng = loc.coords.longitude;
-
                 const [place] = await ExpoLocation.reverseGeocodeAsync({ latitude: lat, longitude: lng });
                 if (place) {
                     const label = place.district || place.subregion || place.city || place.region || 'Your Area';
@@ -168,7 +149,6 @@ export default function HomeScreen() {
         } catch {
             // Location failed — proceed without it
         }
-
         await fetchProducts(lat, lng);
     };
 
@@ -177,9 +157,7 @@ export default function HomeScreen() {
         setIsLoadingProducts(true);
         setError(null);
         lastCoordsRef.current = { lat, lng };
-
         try {
-            // Fire all 3 requests in parallel — eliminates sequential blocking
             const [freshCats, recProducts, nearbyData] = await Promise.allSettled([
                 productService.getFreshCategories(),
                 productService.getRecommended(recentSearches, 8),
@@ -237,15 +215,10 @@ export default function HomeScreen() {
     const hasMountedRef = useRef(false);
     useFocusEffect(
         useCallback(() => {
-            // Skip the very first focus — the mount effect already fetches.
             if (!hasMountedRef.current) {
                 hasMountedRef.current = true;
                 return;
             }
-            // On subsequent focuses (returning from another tab), only refresh
-            // when the data is actually stale. Do it silently — reuse the last
-            // known location instead of a fresh GPS fix, and don't spin the
-            // pull-to-refresh control. Manual pull-to-refresh is unaffected.
             if (Date.now() - lastFetchRef.current > STALE_MS) {
                 const { lat, lng } = lastCoordsRef.current;
                 fetchProducts(lat, lng);
@@ -254,10 +227,7 @@ export default function HomeScreen() {
     );
 
     const handleProductNav = (category: string, subCategory?: string) => {
-        router.push({
-            pathname: '/product-listing',
-            params: { categoryName: category, subCategoryName: subCategory },
-        });
+        router.push({ pathname: '/product-listing', params: { categoryName: category, subCategoryName: subCategory } });
     };
 
     const handleNearbyNav = (item: any) => {
@@ -269,10 +239,7 @@ export default function HomeScreen() {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
-            <Header />
-
-            {/* Location pre-prompt — shown before native OS dialog */}
+        <SafeAreaView style={styles.container} edges={['top']}>
             <ActionModal
                 visible={showLocationModal}
                 icon="map-pin"
@@ -283,28 +250,16 @@ export default function HomeScreen() {
                     setShowLocationModal(false);
                     const { status } = await ExpoLocation.getForegroundPermissionsAsync();
                     if (status === 'denied') {
-                        // Already denied — go straight to settings
                         awaitingSettingsReturn.current = true;
                         await Linking.openSettings();
-                        // AppState listener will handle re-check when app returns
                     } else {
                         requestLocationAndFetch();
                     }
                 }}
                 secondaryButtonText="Skip"
-                onSecondaryPress={() => {
-                    setShowLocationModal(false);
-                    setLocationGranted(false);
-                    fetchProducts();
-                }}
-                onClose={() => {
-                    setShowLocationModal(false);
-                    setLocationGranted(false);
-                    fetchProducts();
-                }}
+                onSecondaryPress={() => { setShowLocationModal(false); setLocationGranted(false); fetchProducts(); }}
+                onClose={() => { setShowLocationModal(false); setLocationGranted(false); fetchProducts(); }}
             />
-
-            {/* Coming Soon Modal — shown for categories with no nearby stock yet */}
             <ActionModal
                 visible={comingSoonModal.visible}
                 icon="clock"
@@ -314,230 +269,171 @@ export default function HomeScreen() {
                 onPrimaryPress={() => setComingSoonModal({ visible: false, name: '' })}
                 onClose={() => setComingSoonModal({ visible: false, name: '' })}
             />
-
-            {/* Contact Modal */}
             <ActionModal
                 visible={contactModalVisible}
                 icon="phone"
                 title="Contact Us"
                 message="How would you like to reach us?"
                 primaryButtonText="Call Us"
-                onPrimaryPress={() => {
-                    setContactModalVisible(false);
-                    Linking.openURL('tel:8789582754');
-                }}
+                onPrimaryPress={() => { setContactModalVisible(false); Linking.openURL('tel:8789582754'); }}
                 secondaryButtonText="Email Us"
-                onSecondaryPress={() => {
-                    setContactModalVisible(false);
-                    Linking.openURL('mailto:zpinpvtltd@gmail.com?subject=Contact Zpin');
-                }}
+                onSecondaryPress={() => { setContactModalVisible(false); Linking.openURL('mailto:zpinpvtltd@gmail.com?subject=Contact Zpin'); }}
                 onClose={() => setContactModalVisible(false)}
             />
+            <LegalDocModal visible={legalModalVisible} docType={legalDocType} onClose={() => setLegalModalVisible(false)} />
 
-            {/* Legal Document Modal */}
-            <LegalDocModal
-                visible={legalModalVisible}
-                docType={legalDocType}
-                onClose={() => setLegalModalVisible(false)}
-            />
+            {/* Top bar */}
+            <View style={styles.topBar}>
+                <View style={styles.brandRow}>
+                    <Text style={styles.wordmark}>ZPIN</Text>
+                    <View style={styles.topIcons}>
+                        <Pressable style={styles.iconBtn} onPress={() => router.push('/profile/wishlist')}>
+                            <Heart size={20} color={colors.textStrong} />
+                        </Pressable>
+                        <Pressable style={styles.iconBtn} onPress={() => router.push('/(tabs)/cart')}>
+                            <ShoppingBag size={20} color={colors.textStrong} />
+                        </Pressable>
+                    </View>
+                </View>
+                <Pressable style={styles.addressRow} onPress={() => setShowLocationModal(true)}>
+                    <MapPin size={14} color={palette.yellow600} />
+                    <Text style={styles.addressText}>Deliver to </Text>
+                    <Text style={styles.addressPlace}>{locationGranted ? locationLabel : 'set location'}</Text>
+                    <ChevronDown size={14} color={colors.textMuted} />
+                </Pressable>
+            </View>
+
             <ScrollView
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.scrollContent}
-                refreshControl={
-                    <RefreshControl
-                        refreshing={refreshing}
-                        onRefresh={onRefresh}
-                        colors={['#FBBF24']}
-                        tintColor="#FBBF24"
-                    />
-                }
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[palette.yellow500]} tintColor={palette.yellow500} />}
             >
+                {/* Search */}
+                <Pressable style={styles.search} onPress={() => router.push('/product-search')}>
+                    <Search size={19} color={colors.textFaint} />
+                    <Text style={styles.searchPlaceholder}>Search styles, sneakers, gadgets</Text>
+                </Pressable>
 
-                <SearchBar
-                    editable={false}
-                    onPress={() => router.push('/product-search')}
-                    placeholder="Search products..."
-                />
-
-                {/* Categories Carousel */}
-                <View style={styles.categoriesWrapper}>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoriesContainer} contentContainerStyle={styles.categoriesContent}>
-                        {CATEGORIES.map((cat) => (
-                            <TouchableOpacity
-                                key={cat.id}
-                                style={styles.categoryItem}
-                                onPress={() => router.push({ pathname: '/(tabs)/categories', params: { categoryId: cat.id } })}
-                            >
-                                <View style={styles.categoryImageContainer}>
-                                    <Image source={typeof cat.image === 'string' ? { uri: cat.image } : cat.image} style={styles.categoryImage} />
-                                </View>
-                                <Text style={styles.categoryText} numberOfLines={2}>{cat.name}</Text>
-                            </TouchableOpacity>
-                        ))}
-                    </ScrollView>
-                    {/* Fade indicator hinting more content to the right */}
-                    <View style={styles.categoriesFadeRight} pointerEvents="none">
-                        <LinearGradient
-                            colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.85)', '#ffffff']}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 0 }}
-                            style={styles.categoriesFadeGradient}
-                        />
-                    </View>
+                {/* Delivery voltage strip */}
+                <View style={styles.voltage}>
+                    <Zap size={13} color={palette.yellow500} fill={palette.yellow500} />
+                    <Text style={styles.voltageText}>Bike-fast delivery</Text>
+                    <View style={styles.voltageDot} />
+                    <Text style={styles.voltageStrong}>2–12 HRS</Text>
+                    <View style={styles.voltageDot} />
+                    <Text style={styles.voltageText}>live in your area</Text>
                 </View>
 
                 {/* Hero */}
-                <View style={styles.heroSection}>
-                    <View style={styles.heroContent}>
-                        <Text style={styles.heroTitle}>Fashion at</Text>
-                        <Text style={[styles.heroTitle, styles.heroTitleItalic]}>Lightning</Text>
-                        <Text style={[styles.heroTitle, styles.heroTitleItalic]}>Speed</Text>
-                        <Text style={styles.heroSubtitle}>Get your favorite styles delivered in just 2-12 hours. Fast, trendy, and always fresh.</Text>
-                        <View style={styles.heroStats}>
-                            <View>
-                                <Text style={styles.heroStatValue}>2-12</Text>
-                                <Text style={styles.heroStatLabel}>HOURS</Text>
-                            </View>
-                            <View style={styles.heroStatDivider} />
-                            <View>
-                                <Text style={styles.heroStatValue}>50K+</Text>
-                                <Text style={styles.heroStatLabel}>PRODUCTS</Text>
-                            </View>
-                        </View>
-                        <TouchableOpacity style={styles.heroButton} onPress={() => router.push('/product-listing')}>
-                            <Text style={styles.heroButtonText}>Shop Latest Looks</Text>
-                            <Feather name="arrow-right" size={16} color="#333" />
-                        </TouchableOpacity>
+                <View style={styles.hero}>
+                    <View style={styles.tryBadge}>
+                        <Zap size={11} color={palette.yellow500} fill={palette.yellow500} />
+                        <Text style={styles.tryBadgeText}>TRY-AT-DOOR</Text>
                     </View>
-                    <View style={styles.heroImageContainer}>
-                        <Image source={{ uri: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=400&q=80' }} style={styles.heroImage} />
-                        <View style={styles.priceTag}>
-                            <Text style={styles.priceTagText}>PREMIUM</Text>
-                            <Text style={styles.priceTagPrice}>₹2,999</Text>
-                        </View>
-                    </View>
+                    <Text style={styles.heroTitle}>Wear it before{'\n'}you buy it.</Text>
+                    <Text style={styles.heroSub}>The courier waits while you try. Keep what fits.</Text>
+                    <Pressable style={styles.heroCta} onPress={() => router.push('/product-listing')}>
+                        <Text style={styles.heroCtaText}>Shop new in</Text>
+                        <ArrowRight size={17} color={colors.textOnYellow} />
+                    </Pressable>
                 </View>
 
-                {/* Promo Banner */}
-                <View style={styles.promoBannerContainer}>
-                    <LinearGradient colors={['#667db6', '#0082c8', '#0082c8', '#667db6']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.promoBanner}>
-                        <View style={styles.promoContent}>
-                            <Text style={styles.promoLabel}>LIMITED TIME</Text>
-                            <Text style={styles.promoTitle}>DRESS FEST</Text>
-                            <Text style={styles.promoSubtitle}>UP TO 50% OFF</Text>
-                            <Text style={styles.promoFooter}>BRIGHTS, PRINTS & MORE</Text>
-                            <TouchableOpacity style={styles.promoCta} onPress={() => handleProductNav('Fashion')} activeOpacity={0.85}>
-                                <Text style={styles.promoCtaText}>Shop Now</Text>
-                                <Feather name="arrow-right" size={12} color="#0082c8" />
-                            </TouchableOpacity>
-                        </View>
-                        <Image source={{ uri: 'https://images.unsplash.com/photo-1496747611176-843222e1e57c?auto=format&fit=crop&w=300&q=80' }} style={styles.promoImage} />
-                    </LinearGradient>
-                </View>
+                {/* Category chips */}
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
+                    {CATEGORIES.map((cat) => (
+                        <Pressable
+                            key={cat.id}
+                            style={styles.chip}
+                            onPress={() => router.push({ pathname: '/(tabs)/categories', params: { categoryId: cat.id } })}
+                        >
+                            <View style={styles.chipImageWrap}>
+                                <Image source={typeof cat.image === 'string' ? { uri: cat.image } : cat.image} style={styles.chipImage} contentFit="cover" />
+                            </View>
+                            <Text style={styles.chipText} numberOfLines={1}>{cat.name}</Text>
+                        </Pressable>
+                    ))}
+                </ScrollView>
 
                 {/* Recommended */}
-                <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Recommended</Text>
-                </View>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
+                <SectionHeader eyebrow="Fresh today" title="New in your size" actionLabel="See all" onAction={() => router.push('/product-listing')} style={styles.section} />
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hList}>
                     {recommended.map((item) => (
-                        <TouchableOpacity key={item.id} style={styles.recommendCard} onPress={() => handleProductNav(item.category, item.subCategory)}>
-                            <View style={styles.recommendImageContainer}>
-                                <Image source={typeof item.image === 'string' ? { uri: item.image } : item.image} style={styles.recommendImage} />
-                            </View>
-                            <Text style={styles.recommendName} numberOfLines={1}>{item.name}</Text>
-                            <Text style={styles.recommendDesc}>{item.desc}</Text>
-                        </TouchableOpacity>
+                        <ProductCard
+                            key={item.id}
+                            width={168}
+                            style={styles.hCard}
+                            image={item.image}
+                            brand="ZPIN"
+                            name={item.name}
+                            price={item.desc}
+                            tryAtDoor
+                            onPress={() => handleProductNav(item.category, item.subCategory)}
+                        />
                     ))}
                 </ScrollView>
 
                 {/* Fresh Arrivals */}
-                <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Fresh Arrivals</Text>
-                </View>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
+                <SectionHeader eyebrow="Just dropped" title="Fresh arrivals" style={styles.section} />
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hList}>
                     {freshArrivals.map((item) => (
-                        <TouchableOpacity key={item.id} style={[styles.freshCard, { backgroundColor: item.color || '#fff' }]} onPress={() => handleProductNav(item.category, item.subCategory)}>
-                            <Image source={typeof item.image === 'string' ? { uri: item.image } : item.image} style={styles.freshImage} />
-                            <View style={styles.freshInfo}>
+                        <Pressable key={item.id} style={styles.freshCard} onPress={() => handleProductNav(item.category, item.subCategory)}>
+                            <Image source={typeof item.image === 'string' ? { uri: item.image } : item.image} style={styles.freshImage} contentFit="cover" />
+                            <View style={styles.freshOverlay}>
                                 <Text style={styles.freshName} numberOfLines={1}>{item.name}</Text>
                                 <Text style={styles.freshOffer}>{item.offer}</Text>
                             </View>
-                        </TouchableOpacity>
+                        </Pressable>
                     ))}
                 </ScrollView>
 
-                {/* Nearby Availabilities */}
-                <View style={styles.sectionHeader}>
-                    <View>
-                        <Text style={styles.sectionTitle}>Nearby Availabilities</Text>
-                        {locationGranted && (
-                            <Text style={styles.locationLabel}>{locationLabel}</Text>
-                        )}
-                    </View>
-                </View>
-
+                {/* Nearby */}
+                <SectionHeader
+                    eyebrow={locationGranted ? locationLabel : 'Trending near you'}
+                    title="Nearby availabilities"
+                    style={styles.section}
+                />
                 {locationGranted ? (
                     <View style={styles.nearbyGrid}>
-                        {nearby.map((item) => (
-                            <TouchableOpacity key={item.id} style={[styles.nearbyItem, item.count != null && item.count <= 0 && styles.nearbyItemDisabled]} onPress={() => handleNearbyNav(item)}>
-                                <View style={styles.nearbyImageContainer}>
-                                    <Image source={typeof item.image === 'string' ? { uri: item.image } : item.image} style={styles.nearbyImage} />
-                                    {item.count != null && item.count > 0 && (
-                                        <View style={styles.nearbyBadge}>
-                                            <Text style={styles.nearbyBadgeText}>{item.count}+</Text>
-                                        </View>
+                        {nearby.map((item) => {
+                            const soon = item.count != null && item.count <= 0;
+                            return (
+                                <Pressable key={item.id} style={styles.nearbyItem} onPress={() => handleNearbyNav(item)}>
+                                    <View style={styles.nearbyImageWrap}>
+                                        <Image source={typeof item.image === 'string' ? { uri: item.image } : item.image} style={styles.nearbyImage} contentFit="cover" />
+                                        {item.count != null && item.count > 0 && (
+                                            <View style={styles.nearbyBadge}><Text style={styles.nearbyBadgeText}>{item.count}+</Text></View>
+                                        )}
+                                        {soon && <View style={styles.soonOverlay}><Text style={styles.soonText}>Coming soon</Text></View>}
+                                    </View>
+                                    <Text style={styles.nearbyName}>{item.name}</Text>
+                                    {item.count != null && (
+                                        <Text style={styles.nearbyCount}>{item.count > 0 ? `${item.count} items` : 'Coming soon'}</Text>
                                     )}
-                                    {item.count != null && item.count <= 0 && (
-                                        <View style={styles.comingSoonOverlay}>
-                                            <Text style={styles.comingSoonText}>Coming Soon</Text>
-                                        </View>
-                                    )}
-                                </View>
-                                <Text style={styles.nearbyName}>{item.name}</Text>
-                                {item.count != null && (
-                                    <Text style={styles.nearbyCount}>{item.count > 0 ? `${item.count} items` : 'Coming soon'}</Text>
-                                )}
-                            </TouchableOpacity>
-                        ))}
+                                </Pressable>
+                            );
+                        })}
                     </View>
                 ) : (
-                    <TouchableOpacity
-                        style={styles.locationDisclaimer}
-                        onPress={() => setShowLocationModal(true)}
-                        activeOpacity={0.85}
-                    >
-                        <View style={styles.locationDisclaimerIcon}>
-                            <Feather name="map-pin" size={28} color="#FBBF24" />
-                        </View>
-                        <Text style={styles.locationDisclaimerTitle}>Location Access Required</Text>
-                        <Text style={styles.locationDisclaimerText}>
-                            Allow location access to discover products available near you.
-                        </Text>
-                        <View style={styles.locationDisclaimerButton}>
-                            <Text style={styles.locationDisclaimerButtonText}>Enable Location</Text>
-                        </View>
-                    </TouchableOpacity>
+                    <Pressable style={styles.locCard} onPress={() => setShowLocationModal(true)}>
+                        <View style={styles.locIcon}><MapPin size={26} color={palette.yellow600} /></View>
+                        <ZText variant="lg" style={{ marginBottom: 4 }}>Location access required</ZText>
+                        <ZText variant="muted" style={styles.locText}>Allow location to discover products available near you.</ZText>
+                        <View style={styles.locBtn}><Text style={styles.locBtnText}>Enable location</Text></View>
+                    </Pressable>
                 )}
 
                 {/* Big Discounts */}
-                <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Big Discounts</Text>
-                </View>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
+                <SectionHeader eyebrow="Mega hours" title="Big discounts" style={styles.section} />
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hList}>
                     {BIG_DISCOUNTS.map((item) => (
-                        <TouchableOpacity key={item.id} style={styles.discountCard} onPress={() => handleProductNav(item.category, item.subCategory)}>
-                            <Image source={{ uri: item.image }} style={styles.discountImage} />
-                            <View style={styles.discountOverlay}>
-                                <View style={styles.discountBadge}>
-                                    <Text style={styles.discountBadgeText}>Flat 40% OFF</Text>
-                                </View>
-                            </View>
+                        <Pressable key={item.id} style={styles.discountCard} onPress={() => handleProductNav(item.category, item.subCategory)}>
+                            <Image source={{ uri: item.image }} style={styles.discountImage} contentFit="cover" />
+                            <View style={styles.discountBadge}><Text style={styles.discountBadgeText}>FLAT 40% OFF</Text></View>
                             <View style={styles.discountInfo}>
                                 <Text style={styles.discountName}>{item.name}</Text>
                                 <Text style={styles.discountDesc}>{item.desc}</Text>
                             </View>
-                        </TouchableOpacity>
+                        </Pressable>
                     ))}
                 </ScrollView>
 
@@ -559,297 +455,83 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#fff' },
-    scrollContent: { paddingBottom: 20 },
+    container: { flex: 1, backgroundColor: palette.paperWarm },
+    scrollContent: { paddingBottom: 130 },
 
-    // Categories carousel with fade indicator
-    categoriesWrapper: {
-        marginBottom: width * 0.05,
-        position: 'relative',
-    },
-    categoriesContainer: { paddingLeft: width * 0.05 },
-    categoriesContent: { paddingRight: width * 0.12 },
-    categoryItem: { alignItems: 'center', marginRight: width * 0.04, width: width * 0.18 },
-    categoryImageContainer: {
-        width: width * 0.15,
-        height: width * 0.15,
-        borderRadius: width * 0.075,
-        backgroundColor: '#f5f5f5',
-        marginBottom: 8,
-        overflow: 'hidden',
-        borderWidth: 1,
-        borderColor: '#f0f0f0',
-    },
-    categoryImage: { width: '100%', height: '100%' },
-    categoryText: { fontSize: 11, color: '#555', fontWeight: '500', textAlign: 'center', lineHeight: 14 },
-    categoriesFadeRight: {
-        position: 'absolute',
-        right: 0,
-        top: 0,
-        bottom: 0,
-        width: width * 0.14,
-        justifyContent: 'center',
-        alignItems: 'flex-end',
-    },
-    categoriesFadeGradient: {
-        position: 'absolute',
-        left: 0,
-        right: 0,
-        top: 0,
-        bottom: 0,
-    },
+    topBar: { paddingHorizontal: 20, paddingTop: 6, paddingBottom: 10 },
+    brandRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    wordmark: { fontFamily: fonts.displayBold, fontSize: 26, letterSpacing: -1, color: colors.textStrong },
+    topIcons: { flexDirection: 'row', gap: 8 },
+    iconBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surfaceCard, alignItems: 'center', justifyContent: 'center', ...shadow.xs },
+    addressRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 8 },
+    addressText: { fontFamily: fonts.bodyRegular, fontSize: 13, color: colors.textMuted },
+    addressPlace: { fontFamily: fonts.bodyBold, fontSize: 13, color: colors.textStrong },
 
-    // Hero
-    heroSection: {
-        backgroundColor: '#FFFBE6',
-        marginHorizontal: width * 0.05,
-        borderRadius: 20,
-        padding: width * 0.05,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginBottom: width * 0.06,
-        overflow: 'hidden',
+    search: {
+        marginHorizontal: 20, flexDirection: 'row', alignItems: 'center', gap: 11,
+        backgroundColor: colors.surfaceCard, borderWidth: 1.5, borderColor: colors.borderSubtle,
+        borderRadius: radius.md, height: 50, paddingHorizontal: 15,
     },
-    heroContent: { flex: 1, paddingRight: width * 0.02 },
-    heroTitle: { fontSize: width * 0.06, fontWeight: '800', color: '#1A1A1A', lineHeight: width * 0.076 },
-    heroTitleItalic: { color: '#FBBF24', fontStyle: 'italic' },
-    heroSubtitle: { fontSize: width * 0.03, color: '#666', marginTop: 8, marginBottom: 15, lineHeight: width * 0.042 },
-    heroStats: { flexDirection: 'row', marginBottom: 15, alignItems: 'center' },
-    heroStatValue: { fontWeight: '800', fontSize: width * 0.04, color: '#333' },
-    heroStatLabel: { fontSize: width * 0.025, color: '#888' },
-    heroStatDivider: { width: 1, height: 25, backgroundColor: '#ddd', marginHorizontal: 10 },
-    heroButton: {
-        backgroundColor: '#FBBF24',
-        paddingVertical: width * 0.025,
-        paddingHorizontal: width * 0.04,
-        borderRadius: 25,
-        flexDirection: 'row',
-        alignItems: 'center',
-        alignSelf: 'flex-start',
-    },
-    heroButtonText: { fontSize: width * 0.03, fontWeight: '700', color: '#1a1a1a', marginRight: 5 },
-    heroImageContainer: { width: width * 0.3, height: width * 0.4, borderRadius: 15, overflow: 'hidden' },
-    heroImage: { width: '100%', height: '100%' },
-    priceTag: {
-        position: 'absolute',
-        top: 8,
-        left: 8,
-        backgroundColor: 'rgba(255,255,255,0.95)',
-        paddingHorizontal: 8,
-        paddingVertical: 5,
-        borderRadius: 8,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.15,
-        shadowRadius: 3,
-        elevation: 2,
-    },
-    priceTagText: { color: '#9CA3AF', fontSize: width * 0.022, fontWeight: '700', letterSpacing: 0.5 },
-    priceTagPrice: { color: '#1a1a1a', fontWeight: '800', fontSize: width * 0.032 },
+    searchPlaceholder: { fontFamily: fonts.bodyRegular, fontSize: 14, color: colors.textFaint },
 
-    // Promo Banner
-    promoBannerContainer: {
-        marginHorizontal: width * 0.05,
-        borderRadius: 20,
-        overflow: 'hidden',
-        marginBottom: width * 0.06,
-        height: width * 0.44,
-    },
-    promoBanner: { flex: 1, flexDirection: 'row', alignItems: 'center', paddingHorizontal: width * 0.05 },
-    promoContent: { flex: 1 },
-    promoLabel: { color: '#fff', fontSize: width * 0.025, letterSpacing: 1, marginBottom: 5 },
-    promoTitle: { color: '#fff', fontSize: width * 0.06, fontWeight: '900', fontStyle: 'italic' },
-    promoSubtitle: { color: '#fff', fontSize: width * 0.045, fontWeight: '700', marginBottom: 5 },
-    promoFooter: { color: '#eee', fontSize: width * 0.025 },
-    promoCta: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        alignSelf: 'flex-start',
-        backgroundColor: '#fff',
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 20,
-        marginTop: 10,
-    },
-    promoCtaText: { color: '#0082c8', fontWeight: '800', fontSize: width * 0.028, marginRight: 4 },
-    promoImage: { width: width * 0.3, height: '100%', resizeMode: 'cover', borderTopRightRadius: 20, borderBottomRightRadius: 20, opacity: 0.85 },
+    voltage: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 20, marginTop: 12 },
+    voltageText: { fontFamily: fonts.monoBold, fontSize: 10, letterSpacing: 0.6, color: colors.textMuted, textTransform: 'uppercase' },
+    voltageStrong: { fontFamily: fonts.monoBold, fontSize: 10, letterSpacing: 0.6, color: colors.textStrong },
+    voltageDot: { width: 3, height: 3, borderRadius: 2, backgroundColor: colors.borderStrong },
 
-    // Section header
-    sectionHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'baseline',
-        paddingHorizontal: width * 0.05,
-        marginBottom: 15,
-    },
-    sectionTitle: { fontSize: width * 0.045, fontWeight: '800', color: '#1a1a1a' },
-    viewAllText: { color: '#FBBF24', fontSize: width * 0.03, fontWeight: '600' },
-    locationLabel: { fontSize: width * 0.028, color: '#888', marginTop: 2 },
+    hero: { marginHorizontal: 20, marginTop: 16, backgroundColor: colors.surfaceInverse, borderRadius: radius.xl, padding: 24 },
+    tryBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', marginBottom: 14 },
+    tryBadgeText: { fontFamily: fonts.monoBold, fontSize: 10, letterSpacing: 1, color: palette.yellow500 },
+    heroTitle: { fontFamily: fonts.displayBold, fontSize: 30, lineHeight: 33, letterSpacing: -0.8, color: colors.textInvert },
+    heroSub: { fontFamily: fonts.bodyRegular, fontSize: 14, color: palette.neutral400, marginTop: 10, marginBottom: 18 },
+    heroCta: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', backgroundColor: palette.yellow500, borderRadius: radius.md, paddingVertical: 12, paddingHorizontal: 18 },
+    heroCtaText: { fontFamily: fonts.bodyBlack, fontSize: 15, color: colors.textOnYellow },
 
-    // Horizontal lists
-    horizontalList: { paddingLeft: width * 0.05, paddingRight: width * 0.025, marginBottom: 20 },
+    chipsRow: { paddingHorizontal: 20, gap: 16, marginTop: 22 },
+    chip: { alignItems: 'center', width: 68 },
+    chipImageWrap: { width: 64, height: 64, borderRadius: 32, overflow: 'hidden', backgroundColor: colors.surfaceSunken, marginBottom: 7, borderWidth: 1, borderColor: colors.borderSubtle },
+    chipImage: { width: '100%', height: '100%' },
+    chipText: { fontFamily: fonts.bodyMedium, fontSize: 12, color: colors.textBody, textAlign: 'center' },
 
-    // Recommended
-    recommendCard: { width: width * 0.35, marginRight: width * 0.038 },
-    recommendImageContainer: {
-        height: width * 0.35,
-        backgroundColor: '#f9f9f9',
-        borderRadius: 15,
-        marginBottom: 10,
-        overflow: 'hidden',
-        shadowColor: '#AAA',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 5,
-        elevation: 5,
-    },
-    recommendImage: { width: '100%', height: '100%', resizeMode: 'cover' },
-    recommendName: { fontWeight: '700', color: '#333', fontSize: width * 0.035, textAlign: 'center' },
-    recommendDesc: { color: '#888', fontSize: width * 0.025, textAlign: 'center' },
+    section: { paddingHorizontal: 20, marginTop: 28 },
+    hList: { paddingHorizontal: 20, gap: 14 },
+    hCard: { width: 168 },
 
-    // Fresh Arrivals
-    freshCard: { width: width * 0.4, height: width * 0.55, borderRadius: 15, marginRight: width * 0.038, overflow: 'hidden' },
+    freshCard: { width: 160, height: 220, borderRadius: radius.lg, overflow: 'hidden', backgroundColor: colors.surfaceSunken },
     freshImage: { width: '100%', height: '100%' },
-    freshInfo: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        backgroundColor: 'rgba(255,255,255,0.9)',
-        padding: 10,
-    },
-    freshName: { fontWeight: '700', fontSize: width * 0.03, color: '#333', textAlign: 'center' },
-    freshOffer: { color: '#666', fontSize: width * 0.025, textAlign: 'center' },
+    freshOverlay: { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(252,251,246,0.92)', padding: 12 },
+    freshName: { fontFamily: fonts.bodyBold, fontSize: 14, color: colors.textStrong },
+    freshOffer: { fontFamily: fonts.bodyMedium, fontSize: 12, color: colors.textMuted, marginTop: 2 },
 
-    // Nearby grid
-    nearbyGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        paddingHorizontal: width * 0.038,
-        justifyContent: 'space-between',
-        marginBottom: 20,
-    },
-    nearbyItem: { width: '47%', marginBottom: 15, alignItems: 'center' },
-    nearbyImageContainer: {
-        width: '100%',
-        aspectRatio: 1.4,
-        borderRadius: 15,
-        backgroundColor: '#f5f5f5',
-        marginBottom: 8,
-        overflow: 'hidden',
-        position: 'relative',
-    },
+    nearbyGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 20, justifyContent: 'space-between', rowGap: 16 },
+    nearbyItem: { width: '47.5%' },
+    nearbyImageWrap: { width: '100%', aspectRatio: 1.4, borderRadius: radius.lg, overflow: 'hidden', backgroundColor: colors.surfaceSunken, marginBottom: 8 },
     nearbyImage: { width: '100%', height: '100%' },
-    nearbyBadge: {
-        position: 'absolute',
-        top: 8,
-        right: 8,
-        backgroundColor: '#FBBF24',
-        borderRadius: 10,
-        paddingHorizontal: 7,
-        paddingVertical: 2,
-    },
-    nearbyBadgeText: { fontSize: width * 0.025, fontWeight: '800', color: '#1a1a1a' },
-    nearbyName: { fontWeight: '600', fontSize: width * 0.035, color: '#333' },
-    nearbyCount: { fontSize: width * 0.028, color: '#888', marginTop: 2 },
-    nearbyItemDisabled: { opacity: 0.75 },
-    comingSoonOverlay: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0,0,0,0.35)',
-        borderRadius: 15,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    comingSoonText: {
-        color: '#fff',
-        fontSize: width * 0.035,
-        fontWeight: '800',
-        letterSpacing: 0.5,
-    },
+    nearbyBadge: { position: 'absolute', top: 8, right: 8, backgroundColor: palette.yellow500, borderRadius: 100, paddingHorizontal: 8, paddingVertical: 2 },
+    nearbyBadgeText: { fontFamily: fonts.bodyBold, fontSize: 11, color: colors.textOnYellow },
+    soonOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(14,13,11,0.4)', alignItems: 'center', justifyContent: 'center' },
+    soonText: { fontFamily: fonts.bodyBold, fontSize: 14, color: '#fff' },
+    nearbyName: { fontFamily: fonts.bodySemiBold, fontSize: 15, color: colors.textStrong },
+    nearbyCount: { fontFamily: fonts.bodyRegular, fontSize: 12, color: colors.textMuted, marginTop: 1 },
 
-    // Location disclaimer
-    locationDisclaimer: {
-        marginHorizontal: width * 0.038,
-        marginBottom: 30,
-        backgroundColor: '#FFFBE6',
-        borderRadius: 16,
-        padding: width * 0.06,
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: '#FEF3C7',
-    },
-    locationDisclaimerIcon: {
-        width: width * 0.14,
-        height: width * 0.14,
-        borderRadius: width * 0.07,
-        backgroundColor: '#FFF',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 12,
-        shadowColor: '#FBBF24',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 6,
-        elevation: 3,
-    },
-    locationDisclaimerTitle: {
-        fontSize: width * 0.04,
-        fontWeight: '800',
-        color: '#1a1a1a',
-        marginBottom: 6,
-        textAlign: 'center',
-    },
-    locationDisclaimerText: {
-        fontSize: width * 0.033,
-        color: '#6B7280',
-        textAlign: 'center',
-        lineHeight: width * 0.05,
-        marginBottom: 16,
-        paddingHorizontal: '5%',
-    },
-    locationDisclaimerButton: {
-        backgroundColor: '#FBBF24',
-        paddingVertical: width * 0.03,
-        paddingHorizontal: width * 0.07,
-        borderRadius: 25,
-    },
-    locationDisclaimerButtonText: {
-        fontSize: width * 0.035,
-        fontWeight: '800',
-        color: '#1a1a1a',
-    },
+    locCard: { marginHorizontal: 20, backgroundColor: colors.surfaceBrandTint, borderRadius: radius.lg, padding: 24, alignItems: 'center', borderWidth: 1, borderColor: palette.yellow200 },
+    locIcon: { width: 56, height: 56, borderRadius: 28, backgroundColor: colors.surfaceCard, alignItems: 'center', justifyContent: 'center', marginBottom: 12, ...shadow.sm },
+    locText: { textAlign: 'center', marginBottom: 16 },
+    locBtn: { backgroundColor: palette.yellow500, borderRadius: radius.md, paddingVertical: 12, paddingHorizontal: 24 },
+    locBtnText: { fontFamily: fonts.bodyBlack, fontSize: 14, color: colors.textOnYellow },
 
-    // Big Discounts
-    discountCard: { width: width * 0.5, marginRight: width * 0.038 },
-    discountImage: { width: '100%', height: width * 0.3, borderRadius: 15, backgroundColor: '#eee' },
-    discountOverlay: { position: 'absolute', top: 10, left: 10 },
-    discountBadge: { backgroundColor: 'rgba(255,255,255,0.9)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 5 },
-    discountBadgeText: { fontSize: width * 0.025, fontWeight: '700', color: '#0082c8' },
-    discountInfo: { marginTop: 8 },
-    discountName: { fontWeight: '700', color: '#333', fontSize: width * 0.035 },
-    discountDesc: { color: '#888', fontSize: width * 0.028 },
+    discountCard: { width: 240 },
+    discountImage: { width: '100%', height: 140, borderRadius: radius.lg, backgroundColor: colors.surfaceSunken },
+    discountBadge: { position: 'absolute', top: 10, left: 10, backgroundColor: 'rgba(252,251,246,0.95)', paddingHorizontal: 9, paddingVertical: 4, borderRadius: radius.xs },
+    discountBadgeText: { fontFamily: fonts.monoBold, fontSize: 10, letterSpacing: 0.4, color: palette.green500 },
+    discountInfo: { marginTop: 10 },
+    discountName: { fontFamily: fonts.bodyBold, fontSize: 15, color: colors.textStrong },
+    discountDesc: { fontFamily: fonts.bodyRegular, fontSize: 13, color: colors.textMuted, marginTop: 1 },
 
-    // Footer
-    footer: {
-        alignItems: 'center',
-        paddingTop: width * 0.1,
-        paddingBottom: 8,
-        backgroundColor: '#FFFCF5',
-        marginTop: 20,
-    },
-    footerLogo: { fontSize: width * 0.06, fontWeight: '900', color: '#FBBF24', marginBottom: 10 },
-    footerTagline: {
-        color: '#888',
-        fontSize: width * 0.025,
-        textAlign: 'center',
-        marginBottom: 20,
-        paddingHorizontal: '12%',
-    },
-    footerLinks: { flexDirection: 'row', marginBottom: 20 },
-    footerLink: { marginHorizontal: width * 0.038, color: '#555', fontSize: width * 0.03, fontWeight: '500' },
-    copyright: { color: '#ccc', fontSize: width * 0.025 },
+    footer: { alignItems: 'center', paddingTop: 40, paddingBottom: 8, marginTop: 28 },
+    footerLogo: { fontFamily: fonts.displayBold, fontSize: 28, letterSpacing: -1, color: colors.textStrong, marginBottom: 10 },
+    footerTagline: { fontFamily: fonts.bodyRegular, fontSize: 12, color: colors.textMuted, textAlign: 'center', marginBottom: 18, paddingHorizontal: 48 },
+    footerLinks: { flexDirection: 'row', gap: 20, marginBottom: 16 },
+    footerLink: { fontFamily: fonts.bodySemiBold, fontSize: 13, color: colors.textBody },
+    copyright: { fontFamily: fonts.bodyRegular, fontSize: 11, color: colors.textFaint },
 });

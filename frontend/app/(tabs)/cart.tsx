@@ -1,8 +1,11 @@
-import { Feather } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
+import { ArrowRight, Minus, Plus, ShoppingCart, X, Zap } from 'lucide-react-native';
 import React, { useEffect, useRef } from 'react';
-import { Animated, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ZButton, ZText } from '../../components/ui';
+import { colors, fonts, palette, radius, shadow } from '../../constants/theme';
 import { useCart } from '../../context/CartContext';
 
 interface CartItemProps {
@@ -19,109 +22,56 @@ function CartItem({ item, index, onRemove, onUpdateQuantity }: CartItemProps) {
 
     useEffect(() => {
         Animated.parallel([
-            Animated.timing(fadeAnim, {
-                toValue: 1,
-                duration: 300,
-                delay: index * 50,
-                useNativeDriver: true,
-            }),
-            Animated.timing(slideAnim, {
-                toValue: 0,
-                duration: 300,
-                delay: index * 50,
-                useNativeDriver: true,
-            }),
+            Animated.timing(fadeAnim, { toValue: 1, duration: 300, delay: index * 50, useNativeDriver: true }),
+            Animated.timing(slideAnim, { toValue: 0, duration: 300, delay: index * 50, useNativeDriver: true }),
         ]).start();
     }, []);
 
     const handleRemove = () => {
         Animated.parallel([
-            Animated.timing(fadeAnim, {
-                toValue: 0,
-                duration: 200,
-                useNativeDriver: true,
-            }),
-            Animated.timing(slideAnim, {
-                toValue: 100,
-                duration: 200,
-                useNativeDriver: true,
-            }),
-        ]).start(() => {
-            onRemove(item.cartItemId);
-        });
+            Animated.timing(fadeAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
+            Animated.timing(slideAnim, { toValue: 100, duration: 200, useNativeDriver: true }),
+        ]).start(() => onRemove(item.cartItemId));
     };
 
+    const img = item.product?.images?.[0]
+        ? (typeof item.product.images[0] === 'string' ? { uri: item.product.images[0] } : item.product.images[0])
+        : (typeof item.image === 'string' ? { uri: item.image } : (item.image || { uri: 'https://via.placeholder.com/80' }));
+    const brand = item.product?.brand || item.brand || 'ZPIN';
+
     return (
-        <Animated.View style={[
-            styles.cartItem,
-            {
-                opacity: fadeAnim,
-                transform: [{ translateX: slideAnim }],
-            },
-        ]}>
-            <TouchableOpacity
-                style={{ flexDirection: 'row', flex: 1 }}
-                onPress={() => router.push(`/product/${item.productId || item.product?.productId || item.id}`)}
-                activeOpacity={0.7}
-            >
-                <Image
-                    source={
-                        item.product?.images?.[0]
-                            ? (typeof item.product.images[0] === 'string' ? { uri: item.product.images[0] } : item.product.images[0])
-                            : (typeof item.image === 'string' ? { uri: item.image } : (item.image || { uri: 'https://via.placeholder.com/80' }))
-                    }
-                    style={styles.itemImage}
-                    resizeMode="cover"
-                />
-
-                <View style={styles.itemDetails}>
-                    <View style={styles.headerRow}>
-                        <Text style={styles.itemName} numberOfLines={2}>{item.product?.productName || item.name}</Text>
-                        <TouchableOpacity onPress={(e) => {
-                            e.stopPropagation();
-                            handleRemove();
-                        }}>
-                            <Feather name="x" size={18} color="#999" />
-                        </TouchableOpacity>
+        <Animated.View style={[styles.item, { opacity: fadeAnim, transform: [{ translateX: slideAnim }] }]}>
+            <Pressable onPress={() => router.push(`/product/${item.productId || item.product?.productId || item.id}`)}>
+                <Image source={img} style={styles.itemImage} contentFit="cover" />
+            </Pressable>
+            <View style={styles.itemBody}>
+                <View>
+                    <View style={styles.itemTop}>
+                        <Text style={styles.itemBrand} numberOfLines={1}>{brand}</Text>
+                        <Pressable onPress={handleRemove} hitSlop={8}><X size={17} color={colors.textFaint} /></Pressable>
                     </View>
-
+                    <Text style={styles.itemName} numberOfLines={1}>{item.product?.productName || item.name}</Text>
                     {(item.selectedColor || item.selectedSize) && (
-                        <View style={styles.variantContainer}>
-                            {item.selectedSize && (
-                                <Text style={styles.variantText}>{item.selectedSize}</Text>
-                            )}
-                            {item.selectedSize && item.selectedColor && (
-                                <View style={styles.separator} />
-                            )}
-                            {item.selectedColor && (
-                                <View style={[styles.colorSwatch, { backgroundColor: item.selectedColor }]} />
-                            )}
+                        <View style={styles.chips}>
+                            {item.selectedSize ? <View style={styles.chip}><Text style={styles.chipText}>{item.selectedSize}</Text></View> : null}
+                            {item.selectedColor ? (
+                                <View style={styles.chip}>
+                                    <View style={[styles.swatch, { backgroundColor: item.selectedColor }]} />
+                                    <Text style={styles.chipText}>{String(item.selectedColor).toUpperCase()}</Text>
+                                </View>
+                            ) : null}
                         </View>
                     )}
-
-                    <View style={styles.priceRow}>
-                        <Text style={styles.itemPrice}>₹{((item.product?.price || item.price) * item.quantity).toLocaleString()}</Text>
-
-                        <View style={styles.quantityControls}>
-                            <TouchableOpacity
-                                style={styles.qtyBtn}
-                                onPress={() => onUpdateQuantity(item.cartItemId, item.quantity - 1)}
-                            >
-                                <Feather name="minus" size={14} color="#1a1a1a" />
-                            </TouchableOpacity>
-
-                            <Text style={styles.qtyText}>{item.quantity}</Text>
-
-                            <TouchableOpacity
-                                style={styles.qtyBtn}
-                                onPress={() => onUpdateQuantity(item.cartItemId, item.quantity + 1)}
-                            >
-                                <Feather name="plus" size={14} color="#1a1a1a" />
-                            </TouchableOpacity>
-                        </View>
+                </View>
+                <View style={styles.itemBottom}>
+                    <Text style={styles.itemPrice}>₹{((item.product?.price || item.price) * item.quantity).toLocaleString('en-IN')}</Text>
+                    <View style={styles.stepper}>
+                        <Pressable onPress={() => onUpdateQuantity(item.cartItemId, item.quantity - 1)} hitSlop={6}><Minus size={14} color={colors.textStrong} /></Pressable>
+                        <Text style={styles.qty}>{item.quantity}</Text>
+                        <Pressable onPress={() => onUpdateQuantity(item.cartItemId, item.quantity + 1)} hitSlop={6}><Plus size={14} color={colors.textStrong} /></Pressable>
                     </View>
                 </View>
-            </TouchableOpacity>
+            </View>
         </Animated.View>
     );
 }
@@ -129,56 +79,64 @@ function CartItem({ item, index, onRemove, onUpdateQuantity }: CartItemProps) {
 export default function CartScreen() {
     const { cartItems, updateQuantity, removeFromCart, totalPrice, totalSavings } = useCart();
     const router = useRouter();
+    const insets = useSafeAreaInsets();
+
+    const count = cartItems.length;
 
     return (
         <SafeAreaView style={styles.container} edges={['top']}>
             <View style={styles.header}>
-                <Text style={styles.headerTitle}>My Cart</Text>
-                <Text style={styles.itemCount}>{cartItems.length} {cartItems.length === 1 ? 'item' : 'items'}</Text>
+                <View style={styles.eyebrowRow}>
+                    <Zap size={12} color={palette.yellow500} fill={palette.yellow500} />
+                    <ZText variant="eyebrow" color={colors.textMuted}>{count} {count === 1 ? 'item' : 'items'} · ready to ride</ZText>
+                </View>
+                <ZText variant="h2">Your cart</ZText>
             </View>
 
-            {cartItems.length === 0 ? (
-                <View style={styles.emptyState}>
-                    <Feather name="shopping-cart" size={80} color="#ddd" />
-                    <Text style={styles.emptyText}>Your cart is empty</Text>
-                    <Text style={styles.emptySubtext}>Add items to get started</Text>
+            {count === 0 ? (
+                <View style={styles.empty}>
+                    <ShoppingCart size={72} color={colors.borderStrong} />
+                    <ZText variant="lg" style={{ marginTop: 20 }}>Your cart is empty</ZText>
+                    <ZText variant="muted" style={{ marginTop: 4 }}>Add items to get started</ZText>
+                    <ZButton label="Start shopping" fullWidth={false} style={{ marginTop: 20 }} onPress={() => router.push('/product-listing')} />
                 </View>
             ) : (
                 <>
+                    {/* Free delivery strip */}
+                    <View style={styles.freeStrip}>
+                        <View style={styles.freeRow}>
+                            <Zap size={14} color={palette.yellow500} fill={palette.yellow500} />
+                            <Text style={styles.freeText}>Free bike delivery unlocked</Text>
+                        </View>
+                        <View style={styles.freeBar}><View style={styles.freeFill} /></View>
+                    </View>
+
                     <Animated.FlatList
                         data={cartItems}
                         renderItem={({ item, index }) => (
-                            <CartItem
-                                item={item}
-                                index={index}
-                                onRemove={removeFromCart}
-                                onUpdateQuantity={updateQuantity}
-                            />
+                            <CartItem item={item} index={index} onRemove={removeFromCart} onUpdateQuantity={updateQuantity} />
                         )}
                         keyExtractor={(item) => item.cartItemId}
-                        contentContainerStyle={styles.listContent}
+                        contentContainerStyle={styles.list}
                         showsVerticalScrollIndicator={false}
                     />
 
-                    <View style={styles.footer}>
-                        {totalSavings > 0 && (
-                            <Text style={styles.savingsText}>
-                                You're saving ₹{totalSavings.toLocaleString()}!
-                            </Text>
-                        )}
-
-                        <View style={styles.totalRow}>
-                            <Text style={styles.totalLabel}>Total</Text>
-                            <Text style={styles.totalAmount}>₹{totalPrice.toLocaleString()}</Text>
+                    <View style={[styles.footer, { paddingBottom: insets.bottom + 78 }]}>
+                        <View style={styles.summaryRow}>
+                            <View>
+                                {totalSavings > 0 && (
+                                    <ZText variant="eyebrow" color={colors.textMuted} style={{ marginBottom: 3 }}>
+                                        Total · saving ₹{totalSavings.toLocaleString('en-IN')}
+                                    </ZText>
+                                )}
+                                <Text style={styles.total}>₹{totalPrice.toLocaleString('en-IN')}</Text>
+                            </View>
+                            <View style={{ alignItems: 'flex-end' }}>
+                                <Text style={styles.freeDelivery}>FREE DELIVERY</Text>
+                                <Text style={styles.eta}>in 2–12 hrs</Text>
+                            </View>
                         </View>
-
-                        <TouchableOpacity
-                            style={styles.checkoutBtn}
-                            onPress={() => router.push('/checkout/address')}
-                        >
-                            <Text style={styles.checkoutText}>Proceed to Checkout</Text>
-                            <Feather name="arrow-right" size={20} color="#1a1a1a" />
-                        </TouchableOpacity>
+                        <ZButton label="Checkout" icon={ArrowRight} onPress={() => router.push('/checkout/address')} />
                     </View>
                 </>
             )}
@@ -187,203 +145,41 @@ export default function CartScreen() {
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#F8F9FA'
-    },
-    header: {
-        paddingHorizontal: 20,
-        paddingVertical: 20,
-        backgroundColor: '#fff',
-        borderBottomWidth: 1,
-        borderBottomColor: '#f1f1f1',
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'baseline'
-    },
-    headerTitle: {
-        fontSize: 28,
-        fontWeight: '800',
-        color: '#1a1a1a'
-    },
-    itemCount: {
-        fontSize: 14,
-        color: '#666',
-        fontWeight: '600'
-    },
-    listContent: {
-        padding: 20,
-        paddingBottom: 100
-    },
-    cartItem: {
-        backgroundColor: '#fff',
-        borderRadius: 16,
-        padding: 12,
-        marginBottom: 16,
-        flexDirection: 'row',
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.03,
-        shadowRadius: 8,
-        elevation: 2
-    },
-    itemImage: {
-        width: 80,
-        height: 80,
-        borderRadius: 12,
-        backgroundColor: '#f5f5f5'
-    },
-    itemDetails: {
-        flex: 1,
-        marginLeft: 12,
-        justifyContent: 'space-between'
-    },
-    headerRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start'
-    },
-    itemName: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#1a1a1a',
-        flex: 1,
-        marginRight: 8,
-        lineHeight: 20
-    },
-    variantContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginTop: 6
-    },
-    variantText: {
-        fontSize: 13,
-        color: '#666',
-        fontWeight: '500'
-    },
-    separator: {
-        width: 1,
-        height: 12,
-        backgroundColor: '#ddd',
-        marginHorizontal: 8
-    },
-    colorSwatch: {
-        width: 18,
-        height: 18,
-        borderRadius: 9,
-        borderWidth: 1.5,
-        borderColor: '#fff',
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 2,
-        elevation: 1
-    },
-    priceRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginTop: 8
-    },
-    itemPrice: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: '#1a1a1a'
-    },
-    quantityControls: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#F3F4F6',
-        borderRadius: 8,
-        padding: 4
-    },
-    qtyBtn: {
-        width: 28,
-        height: 28,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: '#fff',
-        borderRadius: 6,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 2,
-        elevation: 1
-    },
-    qtyText: {
-        marginHorizontal: 12,
-        fontSize: 14,
-        fontWeight: '700',
-        color: '#1a1a1a'
-    },
+    container: { flex: 1, backgroundColor: palette.paperWarm },
+    header: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 14 },
+    eyebrowRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
+
+    empty: { flex: 1, alignItems: 'center', justifyContent: 'center', marginTop: -60 },
+
+    freeStrip: { marginHorizontal: 20, marginBottom: 8, backgroundColor: colors.surfaceInverse, borderRadius: radius.md, padding: 14 },
+    freeRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 9 },
+    freeText: { fontFamily: fonts.bodyBold, fontSize: 11, color: colors.textInvert },
+    freeBar: { height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.16)', overflow: 'hidden' },
+    freeFill: { width: '100%', height: '100%', backgroundColor: palette.yellow500 },
+
+    list: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 200 },
+    item: { flexDirection: 'row', gap: 13, backgroundColor: colors.surfaceCard, borderWidth: 1, borderColor: palette.neutral200, borderRadius: radius.lg, padding: 12, marginBottom: 14 },
+    itemImage: { width: 84, height: 96, borderRadius: radius.md, backgroundColor: colors.surfaceSunken },
+    itemBody: { flex: 1, justifyContent: 'space-between' },
+    itemTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    itemBrand: { fontFamily: fonts.monoBold, fontSize: 10, letterSpacing: 1.2, color: colors.textFaint, textTransform: 'uppercase', flex: 1 },
+    itemName: { fontFamily: fonts.bodySemiBold, fontSize: 14, color: colors.textStrong, marginTop: 3, marginBottom: 7 },
+    chips: { flexDirection: 'row', gap: 7 },
+    chip: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.surfaceSunken, borderRadius: radius.xs, paddingHorizontal: 8, paddingVertical: 3 },
+    chipText: { fontFamily: fonts.monoBold, fontSize: 10, color: colors.textBody },
+    swatch: { width: 9, height: 9, borderRadius: 5 },
+    itemBottom: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    itemPrice: { fontFamily: fonts.displayBold, fontSize: 17, color: colors.textStrong },
+    stepper: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1.5, borderColor: colors.borderSubtle, borderRadius: 100, paddingHorizontal: 12, paddingVertical: 5 },
+    qty: { fontFamily: fonts.displayBold, fontSize: 14, color: colors.textStrong },
+
     footer: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        backgroundColor: '#fff',
-        padding: 20,
-        paddingBottom: 30, // For bottom tabs if needed, but safer
-        borderTopLeftRadius: 24,
-        borderTopRightRadius: 24,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: -4 },
-        shadowOpacity: 0.05,
-        shadowRadius: 10,
-        elevation: 10
+        position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: colors.surfaceCard,
+        borderTopWidth: 1, borderTopColor: colors.surfaceSunken, borderTopLeftRadius: 24, borderTopRightRadius: 24,
+        paddingHorizontal: 20, paddingTop: 16, ...shadow.sheet,
     },
-    totalRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 20
-    },
-    totalLabel: {
-        fontSize: 16,
-        color: '#666',
-        fontWeight: '600'
-    },
-    totalAmount: {
-        fontSize: 24,
-        fontWeight: '800',
-        color: '#1a1a1a'
-    },
-    savingsText: {
-        fontSize: 13,
-        color: '#4CAF50',
-        fontWeight: '600',
-        marginBottom: 12,
-        marginTop: -8
-    },
-    checkoutBtn: {
-        backgroundColor: '#FBBF24',
-        borderRadius: 12,
-        paddingVertical: 16,
-        flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'center'
-    },
-    checkoutText: {
-        fontSize: 16,
-        fontWeight: '800',
-        color: '#1a1a1a',
-        marginRight: 8
-    },
-    emptyState: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginTop: -50
-    },
-    emptyText: {
-        fontSize: 20,
-        fontWeight: '700',
-        color: '#1a1a1a',
-        marginTop: 20,
-        marginBottom: 8
-    },
-    emptySubtext: {
-        fontSize: 14,
-        color: '#999'
-    }
+    summaryRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 14 },
+    total: { fontFamily: fonts.displayBold, fontSize: 26, letterSpacing: -0.4, color: colors.textStrong },
+    freeDelivery: { fontFamily: fonts.monoBold, fontSize: 10, letterSpacing: 0.6, color: colors.textFaint },
+    eta: { fontFamily: fonts.displayBold, fontSize: 13, color: colors.textStrong },
 });

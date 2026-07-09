@@ -1,7 +1,9 @@
 export { default as AppHeader } from './AppHeader';
 export { default as BottomBar } from './BottomBar';
 export { default as GoogleGlyph } from './GoogleGlyph';
+export { default as ProductCard } from './ProductCard';
 export { default as Screen } from './Screen';
+export { default as SectionHeader } from './SectionHeader';
 export { default as ZButton } from './ZButton';
 export { default as ZInput } from './ZInput';
 export { default as ZText } from './ZText';
