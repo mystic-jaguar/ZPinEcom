@@ -1,365 +1,218 @@
-import { Feather, FontAwesome5 } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Bike, Check, Headphones, HelpCircle, Home, MessageCircle, Phone, Shirt, Store, Timer, Zap } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import DeliveryPartnerCard from '../../components/profile/DeliveryPartnerCard';
-import InstantTrialCard from '../../components/profile/InstantTrialCard';
-import OrderTimeline from '../../components/profile/OrderTimeline';
-import StandardDeliveryCard from '../../components/profile/StandardDeliveryCard';
+import { Linking, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AppHeader, ZButton, ZText } from '../../components/ui';
+import { colors, fonts, palette, radius } from '../../constants/theme';
 import { useOrder } from '../../context/OrderContext';
 import { orderService } from '../../services/order';
 
+const TIMELINE = [
+    { key: 'confirmed', title: 'Order confirmed', note: 'Accepted by the vendor' },
+    { key: 'shipped', title: 'Out for delivery', note: 'On the way to you' },
+    { key: 'delivered', title: 'Delivered', note: 'Have your size ready' },
+];
+
+function stepIndex(status?: string) {
+    if (status === 'delivered') return 2;
+    if (status === 'shipped' || status === 'processing') return 1;
+    return 0; // pending / confirmed
+}
+
 export default function TrackOrderScreen() {
     const router = useRouter();
-    const params = useLocalSearchParams();
-    const { orderId } = params;
+    const insets = useSafeAreaInsets();
+    const { orderId } = useLocalSearchParams();
     const { getOrderById, refreshOrders } = useOrder();
     const [refreshing, setRefreshing] = useState(false);
-    const [trackingData, setTrackingData] = useState<{
-        trackingNumber: string | null;
-        currentStatus: string;
-        estimatedDelivery?: string;
-        trackingHistory: Array<{ status: string; title: string; timestamp: string | null; note?: string }>;
-    } | null>(null);
+    const [trackingData, setTrackingData] = useState<any>(null);
+
+    const loadTracking = async (id: string) => {
+        try {
+            const response = await orderService.trackOrder(id);
+            setTrackingData((response as any)?.data ?? null);
+        } catch { setTrackingData(null); }
+    };
 
     const onRefresh = async () => {
         setRefreshing(true);
         await refreshOrders();
-        if (orderId) {
-            await loadTracking(orderId as string);
-        }
+        if (orderId) await loadTracking(orderId as string);
         setRefreshing(false);
     };
 
-    const loadTracking = async (targetOrderId: string) => {
-        try {
-            const response = await orderService.trackOrder(targetOrderId);
-            setTrackingData((response as any)?.data ?? null);
-        } catch (error) {
-            setTrackingData(null);
-        } finally {
-        }
-    };
+    useEffect(() => { if (orderId) loadTracking(orderId as string); }, [orderId]);
 
-    useEffect(() => {
-        if (orderId) {
-            loadTracking(orderId as string);
-        }
-    }, [orderId]);
-
-    // Retrieve Order
     const order = getOrderById(orderId as string);
     const isInstant = order?.notes === 'instant_delivery';
-    const liveStatus = trackingData?.currentStatus || order?.status;
-    const liveEstimatedDelivery = trackingData?.estimatedDelivery || order?.estimatedDelivery;
+    const liveStatus = trackingData?.currentStatus || order?.status || 'confirmed';
+    const liveEta = trackingData?.estimatedDelivery || order?.estimatedDelivery;
+    const canCancel = order && ['pending', 'confirmed'].includes(liveStatus);
+    const active = stepIndex(liveStatus);
 
-    const canCancel = order && ['pending', 'confirmed'].includes(liveStatus as any);
-    const canReturn = order && liveStatus === 'delivered';
+    const etaLabel = liveEta
+        ? new Date(liveEta).toLocaleString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true })
+        : (isInstant ? '2–12 hrs' : '2–4 days');
 
     return (
-        <View style={styles.mainContainer}>
-            {/* Custom Yellow Header */}
-            <View style={styles.headerContainer}>
-                {/* Navigation Row */}
-                <View style={styles.navRow}>
-                    <TouchableOpacity onPress={() => router.back()} style={styles.iconButton}>
-                        <Feather name="chevron-left" size={28} color="#1a1a1a" />
-                    </TouchableOpacity>
-
-                    <Text style={styles.headerTitle}>Track Order</Text>
-
-                    <TouchableOpacity style={styles.iconButton}>
-                        <Feather name="help-circle" size={24} color="#1a1a1a" />
-                    </TouchableOpacity>
-                </View>
-
-                {/* Order Info */}
-                <View style={styles.orderInfoContainer}>
-                    <View style={styles.orderTextColumn}>
-                        <Text style={styles.orderIdLabel}>ORDER ID: #{order?.orderNumber ?? "ZPIN-88219"}</Text>
-                        <Text style={styles.estimatedTime}>
-                            {liveEstimatedDelivery ? new Date(liveEstimatedDelivery).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : (isInstant ? "Today, 4:15 PM" : "Friday, 26 Jan")}
-                        </Text>
-                        <Text style={styles.estimatedLabel}>Estimated Delivery</Text>
-                        {trackingData?.trackingNumber && (
-                            <Text style={styles.trackingNumber}>Tracking No. {trackingData.trackingNumber}</Text>
-                        )}
-                    </View>
-
-                    <View style={styles.badgeContainer}>
-                        {isInstant ? (
-                            <View style={styles.fastBadge}>
-                                <Feather name="zap" size={16} color="#1a1a1a" style={{ marginRight: 4 }} />
-                                <Text style={styles.badgeText}>FAST</Text>
+        <SafeAreaView style={styles.container} edges={['top']}>
+            <AppHeader
+                title="Track order"
+                onBack={() => router.back()}
+                right={<Pressable style={styles.helpBtn} onPress={() => router.push('/profile/help-center')}><HelpCircle size={20} color={colors.textStrong} /></Pressable>}
+            />
+            <ScrollView
+                contentContainerStyle={{ paddingBottom: 120 }}
+                showsVerticalScrollIndicator={false}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[palette.yellow500]} tintColor={palette.yellow500} />}
+            >
+                {/* Live ETA hero */}
+                <View style={styles.hero}>
+                    <Zap size={140} color="rgba(255,196,0,0.12)" fill="rgba(255,196,0,0.12)" style={styles.heroGlow} />
+                    <View style={styles.heroTop}>
+                        <View>
+                            <View style={styles.arrivingRow}>
+                                <View style={styles.pulse} />
+                                <Text style={styles.arriving}>ARRIVING · {liveStatus === 'delivered' ? 'DELIVERED' : 'ON THE WAY'}</Text>
                             </View>
-                        ) : (
-                            <View style={styles.stdBadge}>
-                                <FontAwesome5 name="truck" size={12} color="#1a1a1a" style={{ marginRight: 6 }} />
-                                <Text style={styles.badgeText}>STD</Text>
+                            <View style={styles.etaRow}>
+                                <Text style={styles.etaValue}>{etaLabel}</Text>
                             </View>
-                        )}
+                            <Text style={styles.orderNo}>ORDER #{order?.orderNumber ?? '—'}</Text>
+                        </View>
+                        <View style={styles.fastBadge}>
+                            <Zap size={13} color={colors.textOnYellow} fill={colors.textOnYellow} />
+                            <Text style={styles.fastText}>{isInstant ? 'FAST' : 'STD'}</Text>
+                        </View>
+                    </View>
+                    <View style={styles.route}>
+                        <View style={styles.routeNodeSmall}><Store size={14} color={colors.textOnYellow} /></View>
+                        <View style={[styles.dashed, { borderColor: palette.yellow500 }]} />
+                        <View style={styles.routeNodeBig}><Bike size={18} color={colors.textStrong} /></View>
+                        <View style={[styles.dashed, { borderColor: 'rgba(255,255,255,0.25)' }]} />
+                        <View style={styles.routeNodeDim}><Home size={14} color="#fff" /></View>
                     </View>
                 </View>
-            </View>
 
-            <View style={styles.contentContainer}>
-                {/* Scrollable Content Sheet */}
-                <ScrollView
-                    style={styles.scrollView}
-                    contentContainerStyle={styles.scrollContent}
-                    showsVerticalScrollIndicator={false}
-                    refreshControl={
-                        <RefreshControl
-                            refreshing={refreshing}
-                            onRefresh={onRefresh}
-                            colors={['#FBBF24']}
-                            tintColor="#FBBF24"
-                        />
-                    }
-                >
-                    <View style={styles.overlapContainer}>
-                        {/* Conditional Info Card (Overlapping) */}
-                        {isInstant ? (
-                            <InstantTrialCard
-                                isDelivered={liveStatus === 'delivered'}
-                                deliveredAt={order?.updatedAt}
-                            />
-                        ) : (
-                            <StandardDeliveryCard />
-                        )}
-                    </View>
-
-                    <View style={styles.sheetContent}>
-                        {/* Timeline Card */}
-                        <View style={styles.sectionContainer}>
-                            <OrderTimeline status={liveStatus as any} />
+                <View style={{ paddingHorizontal: 20 }}>
+                    {isInstant && (
+                        <View style={styles.trialCard}>
+                            <View style={styles.trialHead}>
+                                <View style={styles.trialLeft}>
+                                    <View style={styles.trialIcon}><Shirt size={20} color={palette.yellow700} /></View>
+                                    <View>
+                                        <Text style={styles.trialTitle}>Instant trial ready</Text>
+                                        <ZText variant="eyebrow">Try before you buy</ZText>
+                                    </View>
+                                </View>
+                                <View style={styles.timerPill}>
+                                    <Timer size={14} color={colors.textOnYellow} />
+                                    <Text style={styles.timerText}>15:00</Text>
+                                </View>
+                            </View>
+                            <Text style={styles.trialDesc}>Your courier waits <Text style={{ fontFamily: fonts.bodyBold, color: colors.textStrong }}>15 minutes</Text>. Try everything on, keep what fits, hand back the rest.</Text>
                         </View>
-
-                        {/* Delivery Partner */}
-                        <View style={styles.sectionContainer}>
-                            <DeliveryPartnerCard />
-                        </View>
-
-                        {/* Bottom Spacer */}
-                        <View style={{ height: 100 }} />
-                    </View>
-                </ScrollView>
-
-                {/* Bottom Actions - Fixed */}
-                <View style={styles.bottomActions}>
-                    <TouchableOpacity
-                        style={styles.viewOrderBtn}
-                        onPress={() => router.back()}
-                    >
-                        <Text style={styles.viewOrderText}>View Order</Text>
-                    </TouchableOpacity>
-
-                    {canCancel && (
-                        <TouchableOpacity
-                            style={styles.cancelBtn}
-                            onPress={() => router.push({
-                                pathname: '/profile/cancel-order',
-                                params: { orderId: orderId as string }
-                            })}
-                        >
-                            <Text style={styles.cancelBtnText}>Cancel Order</Text>
-                        </TouchableOpacity>
                     )}
 
-                    {canReturn && (
-                        <TouchableOpacity
-                            style={styles.contactSupportBtn}
-                            onPress={() => router.push('/profile/returns')}
-                        >
-                            <Text style={styles.contactSupportText}>Return Order</Text>
-                        </TouchableOpacity>
-                    )}
+                    {/* Timeline */}
+                    <View style={styles.card}>
+                        <ZText variant="eyebrow" style={{ marginBottom: 18 }}>Order status</ZText>
+                        {TIMELINE.map((step, i) => {
+                            const done = i < active;
+                            const current = i === active;
+                            const last = i === TIMELINE.length - 1;
+                            return (
+                                <View key={step.key} style={styles.tlRow}>
+                                    <View style={styles.tlLeft}>
+                                        <View style={[styles.tlDot, (done || current) ? styles.tlDotOn : styles.tlDotOff]}>
+                                            {done ? <Check size={14} color={colors.textOnYellow} /> : <View style={[styles.tlInner, current ? { backgroundColor: colors.textStrong } : { backgroundColor: colors.borderStrong }]} />}
+                                        </View>
+                                        {!last && <View style={[styles.tlLine, done ? { backgroundColor: palette.yellow500 } : { backgroundColor: colors.borderSubtle }]} />}
+                                    </View>
+                                    <View style={{ flex: 1, paddingBottom: last ? 0 : 18 }}>
+                                        <Text style={[styles.tlTitle, !done && !current && { color: colors.textFaint }]}>{step.title}</Text>
+                                        <Text style={styles.tlNote}>{step.note}</Text>
+                                    </View>
+                                </View>
+                            );
+                        })}
+                    </View>
 
-                    {!canCancel && !canReturn && (
-                        <TouchableOpacity
-                            style={styles.contactSupportBtn}
-                            onPress={() => router.push('/profile/help-center')}
-                        >
-                            <Text style={styles.contactSupportText}>Contact Support</Text>
-                        </TouchableOpacity>
+                    {/* Courier */}
+                    {liveStatus === 'shipped' && (
+                        <View style={styles.courier}>
+                            <View style={styles.courierAvatar}><Text style={styles.courierInitial}>C</Text></View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.courierName}>Your courier</Text>
+                                <ZText variant="eyebrow">On the way</ZText>
+                            </View>
+                            <Pressable style={styles.courierOutline} onPress={() => router.push('/profile/help-center')}><MessageCircle size={20} color={colors.textStrong} /></Pressable>
+                            <Pressable style={styles.courierYellow} onPress={() => Linking.openURL('tel:+919876543210')}><Phone size={20} color={colors.textOnYellow} /></Pressable>
+                        </View>
                     )}
                 </View>
+            </ScrollView>
+
+            <View style={[styles.bottomBar, { paddingBottom: 16 + insets.bottom }]}>
+                <ZButton label="View order" variant="outline" style={{ flex: 1 }} onPress={() => router.back()} />
+                {canCancel ? (
+                    <ZButton label="Cancel order" variant="red" style={{ flex: 1.2 }} onPress={() => router.push({ pathname: '/profile/cancel-order', params: { orderId: orderId as string } })} />
+                ) : (
+                    <ZButton label="Support" iconLeft={Headphones} style={{ flex: 1.2 }} onPress={() => router.push('/profile/help-center')} />
+                )}
             </View>
-        </View>
+        </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
-    mainContainer: {
-        flex: 1,
-        backgroundColor: '#F8F9FA',
-    },
-    headerContainer: {
-        backgroundColor: '#FFD700', // Yellow
-        paddingTop: 60, // Status bar
-        paddingBottom: 60, // Extra padding for overlap
-        paddingHorizontal: 20,
-        borderBottomLeftRadius: 30,
-        borderBottomRightRadius: 30,
-        zIndex: 1,
-    },
-    navRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 24,
-    },
-    iconButton: {
-        width: 40,
-        height: 40,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    headerTitle: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: '#1a1a1a',
-    },
-    orderInfoContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-    },
-    orderTextColumn: {
-        flex: 1,
-    },
-    orderIdLabel: {
-        fontSize: 12,
-        fontWeight: '600',
-        color: '#4B5563',
-        marginBottom: 6,
-        letterSpacing: 0.5,
-        textTransform: 'uppercase',
-    },
-    estimatedTime: {
-        fontSize: 26,
-        fontWeight: '800',
-        color: '#1a1a1a',
-        marginBottom: 4,
-    },
-    estimatedLabel: {
-        fontSize: 14,
-        color: '#4B5563',
-        fontWeight: '500',
-    },
-    trackingNumber: {
-        fontSize: 13,
-        fontWeight: '600',
-        color: '#4B5563',
-        marginTop: 6,
-    },
-    badgeContainer: {
-        marginLeft: 16,
-    },
-    fastBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#FFE585',
-        paddingHorizontal: 16,
-        paddingVertical: 10,
-        borderRadius: 20,
-        transform: [{ skewX: '-10deg' }]
-    },
-    stdBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#FFE585',
-        paddingHorizontal: 16,
-        paddingVertical: 10,
-        borderRadius: 20,
-        transform: [{ skewX: '-10deg' }]
-    },
-    badgeText: {
-        fontSize: 14,
-        fontWeight: '800',
-        color: '#1a1a1a',
-        fontStyle: 'italic',
-    },
-    contentContainer: {
-        flex: 1,
-        marginTop: -40, // Pull up to overlap header padding
-        zIndex: 10, // Ensure content sits on top of header
-    },
-    scrollView: {
-        flex: 1,
-    },
-    scrollContent: {
-        paddingHorizontal: 20,
-        paddingBottom: 20,
-    },
-    overlapContainer: {
-        marginBottom: 24,
-    },
-    sheetContent: {
-        //
-    },
-    sectionContainer: {
-        marginBottom: 24,
-    },
-    bottomActions: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        backgroundColor: '#fff',
-        flexDirection: 'row',
-        padding: 20,
-        paddingBottom: 40,
-        borderTopWidth: 1,
-        borderTopColor: '#F3F4F6',
-        gap: 16,
-    },
-    viewOrderBtn: {
-        flex: 1,
-        height: 54,
-        borderRadius: 16,
-        borderWidth: 2,
-        borderColor: '#FBBF24',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#fff',
-    },
-    viewOrderText: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: '#1a1a1a',
-    },
-    contactSupportBtn: {
-        flex: 1.5,
-        height: 54,
-        borderRadius: 16,
-        backgroundColor: '#FBBF24',
-        alignItems: 'center',
-        justifyContent: 'center',
-        shadowColor: '#FBBF24',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 8,
-        elevation: 4,
-    },
-    contactSupportText: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: '#1a1a1a',
-    },
-    cancelBtn: {
-        flex: 1.5,
-        height: 54,
-        borderRadius: 16,
-        backgroundColor: '#FEE2E2',
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderWidth: 1,
-        borderColor: '#EF4444',
-    },
-    cancelBtnText: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: '#EF4444',
-    },
+    container: { flex: 1, backgroundColor: palette.paperWarm },
+    helpBtn: { width: 40, height: 40, borderRadius: 20, borderWidth: 2, borderColor: colors.borderInk, alignItems: 'center', justifyContent: 'center' },
+
+    hero: { marginHorizontal: 20, marginBottom: 18, backgroundColor: colors.surfaceInverse, borderRadius: 26, padding: 20, overflow: 'hidden' },
+    heroGlow: { position: 'absolute', right: -26, top: -30 },
+    heroTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 },
+    arrivingRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 8 },
+    pulse: { width: 7, height: 7, borderRadius: 4, backgroundColor: palette.yellow500 },
+    arriving: { fontFamily: fonts.monoBold, fontSize: 10, letterSpacing: 1, color: palette.yellow300 },
+    etaRow: { flexDirection: 'row', alignItems: 'baseline', gap: 8 },
+    etaValue: { fontFamily: fonts.displayBold, fontSize: 34, letterSpacing: -1, color: '#fff' },
+    orderNo: { fontFamily: fonts.monoBold, fontSize: 10, letterSpacing: 0.6, color: '#8A877E', marginTop: 8 },
+    fastBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: palette.yellow500, paddingHorizontal: 13, paddingVertical: 8, borderRadius: 100 },
+    fastText: { fontFamily: fonts.displayBold, fontSize: 13, fontStyle: 'italic', color: colors.textOnYellow },
+    route: { flexDirection: 'row', alignItems: 'center' },
+    routeNodeSmall: { width: 26, height: 26, borderRadius: 13, backgroundColor: palette.yellow500, alignItems: 'center', justifyContent: 'center' },
+    routeNodeBig: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#fff', borderWidth: 2, borderColor: palette.yellow500, alignItems: 'center', justifyContent: 'center' },
+    routeNodeDim: { width: 26, height: 26, borderRadius: 13, backgroundColor: 'rgba(255,255,255,0.14)', alignItems: 'center', justifyContent: 'center' },
+    dashed: { flex: 1, height: 0, borderTopWidth: 3, borderStyle: 'dashed' },
+
+    trialCard: { backgroundColor: colors.surfaceCard, borderWidth: 1, borderColor: palette.neutral200, borderRadius: radius.lg, padding: 16, marginBottom: 16 },
+    trialHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+    trialLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    trialIcon: { width: 42, height: 42, borderRadius: 13, backgroundColor: palette.yellow100, alignItems: 'center', justifyContent: 'center' },
+    trialTitle: { fontFamily: fonts.displaySemiBold, fontSize: 15, color: colors.textStrong },
+    timerPill: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: palette.yellow500, paddingHorizontal: 11, paddingVertical: 7, borderRadius: 100 },
+    timerText: { fontFamily: fonts.displaySemiBold, fontSize: 13, color: colors.textOnYellow },
+    trialDesc: { fontFamily: fonts.bodyRegular, fontSize: 13, lineHeight: 19, color: colors.textMuted },
+
+    card: { backgroundColor: colors.surfaceCard, borderWidth: 1, borderColor: palette.neutral200, borderRadius: radius.lg, padding: 18, marginBottom: 16 },
+    tlRow: { flexDirection: 'row' },
+    tlLeft: { width: 26, marginRight: 15, alignItems: 'center' },
+    tlDot: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+    tlDotOn: { backgroundColor: palette.yellow500 },
+    tlDotOff: { backgroundColor: '#F3F2EE', borderWidth: 2, borderColor: colors.borderSubtle },
+    tlInner: { width: 9, height: 9, borderRadius: 5 },
+    tlLine: { flex: 1, width: 2, marginVertical: 4, minHeight: 26 },
+    tlTitle: { fontFamily: fonts.displaySemiBold, fontSize: 15, color: colors.textStrong },
+    tlNote: { fontFamily: fonts.bodyRegular, fontSize: 12, color: colors.textFaint, marginTop: 1 },
+
+    courier: { flexDirection: 'row', alignItems: 'center', gap: 13, backgroundColor: colors.surfaceCard, borderWidth: 1, borderColor: palette.neutral200, borderRadius: radius.lg, padding: 14, marginBottom: 8 },
+    courierAvatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: colors.surfaceSunken, alignItems: 'center', justifyContent: 'center' },
+    courierInitial: { fontFamily: fonts.displayBold, fontSize: 20, color: colors.textMuted },
+    courierName: { fontFamily: fonts.displaySemiBold, fontSize: 16, color: colors.textStrong, marginBottom: 2 },
+    courierOutline: { width: 46, height: 46, borderRadius: 15, borderWidth: 2, borderColor: colors.borderInk, alignItems: 'center', justifyContent: 'center' },
+    courierYellow: { width: 46, height: 46, borderRadius: 15, backgroundColor: palette.yellow500, alignItems: 'center', justifyContent: 'center' },
+
+    bottomBar: { position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', gap: 12, backgroundColor: colors.surfaceCard, borderTopWidth: 1, borderTopColor: colors.surfaceSunken, paddingHorizontal: 20, paddingTop: 16 },
 });

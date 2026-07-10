@@ -1,513 +1,152 @@
 import ActionModal from '@/components/common/ActionModal';
-import { Colors } from '@/constants/Colors';
-import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { Bike, ChevronDown, ChevronRight, ChevronUp, CreditCard, Mail, MessageCircle, Phone, RotateCcw, Search, Shirt } from 'lucide-react-native';
 import React, { useState } from 'react';
-import { Linking, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { AppHeader, ZText } from '../../components/ui';
+import { colors, fonts, palette, radius } from '../../constants/theme';
 
-type FAQ = {
-    id: string;
-    category: string;
-    question: string;
-    answer: string;
-};
+type FAQ = { id: string; category: string; question: string; answer: string };
+
+const TOPICS = [
+    { id: 'track', icon: Bike, label: "Where's my order?", route: '/profile/orders' },
+    { id: 'trial', icon: Shirt, label: 'How does Try-at-Door work?', route: '/profile/orders' },
+    { id: 'returns', icon: RotateCcw, label: 'Returns & refunds', route: '/profile/returns' },
+    { id: 'payments', icon: CreditCard, label: 'Payments & coupons', route: '/profile/coupons' },
+];
+
+const ALL_FAQS: FAQ[] = [
+    { id: '1', category: 'Orders', question: 'How do I track my order?', answer: 'Go to "My Orders" and open the order to see real-time tracking and estimated delivery time.' },
+    { id: '3', category: 'Orders', question: 'How long does delivery take?', answer: 'Standard delivery takes 2–4 days. Instant Try-at-Door delivery arrives in 2–12 hours in select cities.' },
+    { id: '5', category: 'Returns', question: 'What is Try-at-Door?', answer: 'Try products at your door for 15 minutes. Keep what fits, hand the rest back to the courier — no box, no label.' },
+    { id: '6', category: 'Returns', question: 'How do I return a product?', answer: 'Open the order and tap "Return items". Choose a reason and refund method. Returns are accepted within 7 days of delivery.' },
+    { id: '7', category: 'Returns', question: 'When will I get my refund?', answer: 'Refunds are processed within 5–7 business days after we receive the returned product.' },
+    { id: '10', category: 'Payment', question: 'What payment methods do you accept?', answer: 'UPI, Credit/Debit cards, Net Banking and Cash on Delivery via Razorpay.' },
+    { id: '14', category: 'Account', question: 'How do I change my delivery address?', answer: 'Go to Profile → Saved addresses to add, edit or set a default address.' },
+];
 
 export default function HelpCenterScreen() {
     const router = useRouter();
     const [searchQuery, setSearchQuery] = useState('');
     const [expandedFaq, setExpandedFaq] = useState<string | null>(null);
-    const [showAllFaqs, setShowAllFaqs] = useState(false);
-
-    // Generic Modal State
     const [infoModalVisible, setInfoModalVisible] = useState(false);
-    const [infoModalConfig, setInfoModalConfig] = useState({
-        title: '',
-        message: '',
-        icon: 'info' as any
-    });
+    const [infoModalConfig, setInfoModalConfig] = useState({ title: '', message: '', icon: 'info' as any });
 
-    const toggleFaq = (id: string) => {
-        setExpandedFaq(expandedFaq === id ? null : id);
-    };
-
-    const TOPICS = [
-        { id: 'track', label: 'Track Order', icon: 'bus-outline', color: '#FFD54F', route: '/profile/track-order' },
-        { id: 'returns', label: 'Returns & Refunds', icon: 'return-down-back-outline', color: '#FFF59D', route: '/profile/returns' },
-        { id: 'payment', label: 'Payment Issues', icon: 'wallet-outline', color: '#FFF176', route: '/profile/orders' },
-        { id: 'account', label: 'Account Settings', icon: 'person-outline', color: '#FFF9C4', route: '/profile/edit-profile' },
-    ];
-
-    const ALL_FAQS: FAQ[] = [
-        // Orders & Tracking
-        { id: '1', category: 'Orders', question: 'How do I track my order?', answer: 'You can track your order by going to "My Orders" in your profile and clicking on the specific order. You\'ll see real-time tracking information and estimated delivery time.' },
-        { id: '2', category: 'Orders', question: 'Can I modify my order after placing it?', answer: 'You can modify your order within 30 minutes of placing it. Go to "My Orders" and select "Modify Order". After 30 minutes, the order is processed and cannot be changed.' },
-        { id: '3', category: 'Orders', question: 'How long does delivery take?', answer: 'Standard delivery takes 3-5 business days. Instant Trial delivery is available within 2 hours in select cities. You can see estimated delivery dates during checkout.' },
-        { id: '4', category: 'Orders', question: 'Do you deliver to my area?', answer: 'We deliver across Pune. Enter your pincode during checkout to check if delivery is available in your area and see the estimated delivery time.' },
-
-        // Returns & Refunds
-        { id: '5', category: 'Returns', question: 'What is Instant Trial?', answer: 'Instant Trial allows you to try products at the time of delivery. If you don\'t like the product, you can return it immediately to the delivery person without any charges.' },
-        { id: '6', category: 'Returns', question: 'How do I return a product?', answer: 'Go to "My Orders", select the order, and click "Initiate Return". Choose your reason and preferred refund method. Standard returns are accepted within 15 days of delivery.' },
-        { id: '7', category: 'Returns', question: 'When will I get my refund?', answer: 'Refunds are processed within 5-7 business days after we receive the returned product. The amount will be credited to your original payment method.' },
-        { id: '8', category: 'Returns', question: 'What items cannot be returned?', answer: 'Personal care items, innerwear, and sale items marked as "non-returnable" cannot be returned for hygiene and policy reasons.' },
-        { id: '9', category: 'Returns', question: 'Is there a return shipping fee?', answer: 'Returns are free if the product is defective or wrong. For change of mind returns, a ₹99 pickup fee applies unless you have a premium membership.' },
-
-        // Payments
-        { id: '10', category: 'Payment', question: 'What payment methods do you accept?', answer: 'We accept Credit/Debit Cards, UPI (Google Pay, PhonePe, Paytm), Net Banking, and Cash on Delivery. You can save your payment methods for faster checkout.' },
-        { id: '11', category: 'Payment', question: 'Is it safe to save my card details?', answer: 'Yes, all payment information is encrypted and stored securely using industry-standard PCI DSS compliance. We never store your CVV.' },
-        { id: '12', category: 'Payment', question: 'Why was my payment declined?', answer: 'Payment can be declined due to insufficient funds, incorrect card details, or bank security measures. Please check with your bank or try a different payment method.' },
-        { id: '13', category: 'Payment', question: 'Can I pay in installments?', answer: 'Yes, we offer EMI options on credit cards for orders above ₹3,000. Select the EMI option during checkout to see available plans from your bank.' },
-
-        // Account
-        { id: '14', category: 'Account', question: 'How do I change my delivery address?', answer: 'Go to "Account Settings" > "Saved Addresses". You can add, edit, or delete addresses. Make sure to select the correct address during checkout.' },
-        { id: '15', category: 'Account', question: 'How do I update my profile information?', answer: 'Go to your Profile and click "Edit Profile". You can update your name, email, phone number, and date of birth.' },
-        { id: '16', category: 'Account', question: 'I forgot my password. What should I do?', answer: 'Click on "Forgot Password" on the login screen. Enter your registered email or phone number, and we\'ll send you a password reset link.' },
-        { id: '17', category: 'Account', question: 'How do I delete my account?', answer: 'Contact our support team via chat or email to request account deletion. Please note that this action is permanent and cannot be undone.' },
-
-        // Products
-        { id: '18', category: 'Products', question: 'How do I find the right size?', answer: 'Each product page has a detailed size guide. Click on "Size Guide" below the size selector to see measurements and find your perfect fit.' },
-        { id: '19', category: 'Products', question: 'Are the product images accurate?', answer: 'We strive to show accurate product images. However, colors may vary slightly due to screen settings. Check product descriptions for detailed information.' },
-        { id: '20', category: 'Products', question: 'How do I add items to my wishlist?', answer: 'Click the heart icon on any product to add it to your wishlist. Access your wishlist from your profile to view and purchase saved items.' },
-        { id: '21', category: 'Products', question: 'Do you restock sold-out items?', answer: 'Popular items are usually restocked within 2-3 weeks. Click "Notify Me" on the product page to get an email when the item is back in stock.' },
-    ];
-
-    // Filter FAQs based on search query
     const filteredFaqs = searchQuery.trim()
-        ? ALL_FAQS.filter(faq =>
-            faq.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            faq.answer.toLowerCase().includes(searchQuery.toLowerCase())
-        )
+        ? ALL_FAQS.filter(f => f.question.toLowerCase().includes(searchQuery.toLowerCase()) || f.answer.toLowerCase().includes(searchQuery.toLowerCase()))
         : ALL_FAQS;
 
-    // Show first 3 or all FAQs
-    const displayedFaqs = showAllFaqs ? filteredFaqs : filteredFaqs.slice(0, 3);
-
-    const handleTopicPress = (route: string) => {
-        router.push(route as any);
+    const contact = (fn: () => Promise<any>, errTitle: string, errMsg: string) => {
+        fn().catch(() => { setInfoModalConfig({ title: errTitle, message: errMsg, icon: 'x-circle' }); setInfoModalVisible(true); });
     };
+    const callSupport = () => contact(() => Linking.openURL('tel:+911234567890'), 'Error', 'Unable to make a call. Please dial +91-1234-567890 manually.');
+    const emailSupport = () => contact(() => Linking.openURL('mailto:support@zpin.com?subject=Support Request'), 'Error', 'Unable to open email. Please email support@zpin.com');
 
-    const handleCallSupport = () => {
-        Linking.openURL('tel:+911234567890').catch(() => {
-            setInfoModalConfig({
-                title: 'Error',
-                message: 'Unable to make a call. Please dial +91-1234-567890 manually.',
-                icon: 'x-circle'
-            });
-            setInfoModalVisible(true);
-        });
-    };
-
-    const handleEmailSupport = () => {
-        Linking.openURL('mailto:support@zpin.com?subject=Support Request').catch(() => {
-            setInfoModalConfig({
-                title: 'Error',
-                message: 'Unable to open email. Please email us at support@zpin.com',
-                icon: 'x-circle'
-            });
-            setInfoModalVisible(true);
-        });
-    };
+    const QUICK = [
+        { icon: MessageCircle, title: 'Live chat', sub: 'Avg 2 min', onPress: emailSupport },
+        { icon: Phone, title: 'Call us', sub: '8am–11pm', onPress: callSupport },
+        { icon: Mail, title: 'Email', sub: '24h reply', onPress: emailSupport },
+    ];
 
     return (
-        <View style={styles.container}>
-            {/* Header Background */}
-            <View style={styles.headerBackground}>
-                <SafeAreaView edges={['top']} style={styles.safeArea}>
-                    <View style={styles.headerTop}>
-                        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-                            <Ionicons name="chevron-back" size={24} color="#000" />
-                        </TouchableOpacity>
-                        <Text style={styles.headerTitle}>Help Center</Text>
-                        <View style={{ width: 40 }} />
-                    </View>
-
-                    <View style={styles.searchContainer}>
-                        <Ionicons name="search" size={20} color="#757575" style={styles.searchIcon} />
+        <SafeAreaView style={styles.container} edges={['top']}>
+            <AppHeader title="Help & support" onBack={() => router.back()} />
+            <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+                {/* Hero */}
+                <View style={styles.hero}>
+                    <ZText variant="h3" color="#fff" style={{ marginBottom: 6 }}>How can we help?</ZText>
+                    <Text style={styles.heroSub}>Real people, fast answers.</Text>
+                    <View style={styles.heroSearch}>
+                        <Search size={18} color={colors.textFaint} />
                         <TextInput
-                            style={styles.searchInput}
-                            placeholder="How can we help you today?"
-                            placeholderTextColor="#9E9E9E"
+                            style={styles.heroInput}
+                            placeholder="Search help topics"
+                            placeholderTextColor={colors.textFaint}
                             value={searchQuery}
                             onChangeText={setSearchQuery}
                         />
-                        {searchQuery.length > 0 && (
-                            <TouchableOpacity onPress={() => setSearchQuery('')}>
-                                <Ionicons name="close-circle" size={20} color="#757575" />
-                            </TouchableOpacity>
-                        )}
                     </View>
-                </SafeAreaView>
-            </View>
+                </View>
 
-            <ScrollView style={styles.contentScroll} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+                {/* Quick contact */}
+                <View style={styles.quickRow}>
+                    {QUICK.map((q) => (
+                        <Pressable key={q.title} style={styles.quickCard} onPress={q.onPress}>
+                            <View style={styles.quickIcon}><q.icon size={22} color={palette.yellow700} /></View>
+                            <Text style={styles.quickTitle}>{q.title}</Text>
+                            <Text style={styles.quickSub}>{q.sub}</Text>
+                        </Pressable>
+                    ))}
+                </View>
 
-                {/* Popular Topics */}
+                {/* Popular topics / search results */}
+                <ZText variant="eyebrow" style={{ marginBottom: 12 }}>{searchQuery ? `Results (${filteredFaqs.length})` : 'Popular topics'}</ZText>
+
                 {!searchQuery && (
-                    <>
-                        <Text style={styles.sectionTitle}>Popular Topics</Text>
-                        <View style={styles.topicsGrid}>
-                            {TOPICS.map((topic) => (
-                                <TouchableOpacity
-                                    key={topic.id}
-                                    style={styles.topicCard}
-                                    onPress={() => handleTopicPress(topic.route)}
-                                >
-                                    <View style={[styles.topicIconContainer, { backgroundColor: topic.color + '40' }]}>
-                                        <Ionicons name={topic.icon as any} size={24} color={Colors.light.tint} />
-                                    </View>
-                                    <Text style={styles.topicLabel}>{topic.label}</Text>
-                                </TouchableOpacity>
-                            ))}
-                        </View>
-                    </>
+                    <View style={styles.card}>
+                        {TOPICS.map((t, i) => (
+                            <Pressable key={t.id} style={[styles.topicRow, i < TOPICS.length - 1 && styles.rowBorder]} onPress={() => router.push(t.route as any)}>
+                                <View style={styles.topicIcon}><t.icon size={18} color={colors.textBody} /></View>
+                                <Text style={styles.topicLabel}>{t.label}</Text>
+                                <ChevronRight size={18} color={colors.borderStrong} />
+                            </Pressable>
+                        ))}
+                    </View>
                 )}
 
                 {/* FAQs */}
-                <View style={styles.faqHeaderRow}>
-                    <Text style={styles.sectionTitle}>
-                        {searchQuery ? `Search Results (${filteredFaqs.length})` : 'Frequently Asked Questions'}
-                    </Text>
-                    {!searchQuery && filteredFaqs.length > 3 && (
-                        <TouchableOpacity onPress={() => setShowAllFaqs(!showAllFaqs)}>
-                            <Text style={styles.viewAllText}>{showAllFaqs ? 'Show Less' : 'View All'}</Text>
-                        </TouchableOpacity>
-                    )}
-                </View>
-
-                {displayedFaqs.length > 0 ? (
-                    <View style={styles.faqContainer}>
-                        {displayedFaqs.map((faq) => (
-                            <View key={faq.id} style={styles.faqItem}>
-                                <TouchableOpacity style={styles.faqQuestionRow} onPress={() => toggleFaq(faq.id)}>
+                {(searchQuery ? filteredFaqs.length > 0 : true) ? (
+                    <View style={[styles.card, { marginTop: searchQuery ? 0 : 20 }]}>
+                        {filteredFaqs.map((faq, i) => (
+                            <View key={faq.id} style={[i < filteredFaqs.length - 1 && styles.rowBorder]}>
+                                <Pressable style={styles.faqRow} onPress={() => setExpandedFaq(expandedFaq === faq.id ? null : faq.id)}>
                                     <View style={{ flex: 1 }}>
-                                        <Text style={styles.faqCategory}>{faq.category}</Text>
-                                        <Text style={styles.faqQuestion}>{faq.question}</Text>
+                                        <ZText variant="eyebrow" style={{ marginBottom: 4 }}>{faq.category}</ZText>
+                                        <Text style={styles.faqQ}>{faq.question}</Text>
                                     </View>
-                                    <Ionicons
-                                        name={expandedFaq === faq.id ? "chevron-up" : "chevron-down"}
-                                        size={20}
-                                        color="#757575"
-                                    />
-                                </TouchableOpacity>
-                                {expandedFaq === faq.id && (
-                                    <Text style={styles.faqAnswer}>{faq.answer}</Text>
-                                )}
+                                    {expandedFaq === faq.id ? <ChevronUp size={18} color={colors.textMuted} /> : <ChevronDown size={18} color={colors.textMuted} />}
+                                </Pressable>
+                                {expandedFaq === faq.id && <Text style={styles.faqA}>{faq.answer}</Text>}
                             </View>
                         ))}
                     </View>
                 ) : (
-                    <View style={styles.noResultsContainer}>
-                        <Ionicons name="search-outline" size={48} color="#BDBDBD" />
-                        <Text style={styles.noResultsText}>No FAQs found for "{searchQuery}"</Text>
-                        <Text style={styles.noResultsSubtext}>Try different keywords or contact support</Text>
+                    <View style={styles.noResults}>
+                        <Search size={44} color={colors.borderStrong} />
+                        <ZText variant="muted" style={{ marginTop: 14 }}>No results for “{searchQuery}”</ZText>
                     </View>
                 )}
-
-                {/* Still Need Help */}
-                {!searchQuery && (
-                    <>
-                        <Text style={styles.helpText}>STILL NEED HELP?</Text>
-
-                        <TouchableOpacity
-                            style={[styles.supportButton, styles.callButton, { marginBottom: 15 }]}
-                            onPress={handleCallSupport}
-                        >
-                            <Ionicons name="call-outline" size={20} color="#000" style={{ marginRight: 8 }} />
-                            <Text style={styles.supportButtonText}>Call Support</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            style={styles.emailButton}
-                            onPress={handleEmailSupport}
-                        >
-                            <Ionicons name="mail-outline" size={20} color="#000" style={{ marginRight: 8 }} />
-                            <Text style={styles.supportButtonText}>Email Support</Text>
-                        </TouchableOpacity>
-                    </>
-                )}
-
-                <View style={{ height: 40 }} />
+                <View style={{ height: 30 }} />
             </ScrollView>
 
-            {/* Generic Info/Error/Success Modal */}
-            <ActionModal
-                visible={infoModalVisible}
-                title={infoModalConfig.title}
-                message={infoModalConfig.message}
-                icon={infoModalConfig.icon}
-                primaryButtonText="OK"
-                onPrimaryPress={() => setInfoModalVisible(false)}
-                onClose={() => setInfoModalVisible(false)}
-            />
-        </View>
+            <ActionModal visible={infoModalVisible} title={infoModalConfig.title} message={infoModalConfig.message} icon={infoModalConfig.icon} primaryButtonText="OK" onPrimaryPress={() => setInfoModalVisible(false)} onClose={() => setInfoModalVisible(false)} />
+        </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#F8F9FA',
-    },
-    headerBackground: {
-        backgroundColor: Colors.light.tint,
-        paddingBottom: 30,
-        borderBottomLeftRadius: 30,
-        borderBottomRightRadius: 30,
-    },
-    safeArea: {
-        paddingHorizontal: 20,
-    },
-    headerTop: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: 20,
-        marginTop: 10,
-    },
-    backButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: 'rgba(255,255,255,0.3)',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    headerTitle: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        color: '#000',
-    },
-    searchContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#fff',
-        borderRadius: 12,
-        paddingHorizontal: 15,
-        paddingVertical: 12,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
-    },
-    searchIcon: {
-        marginRight: 10,
-    },
-    searchInput: {
-        flex: 1,
-        fontSize: 14,
-        color: '#000',
-    },
-    contentScroll: {
-        flex: 1,
-        marginTop: 10,
-    },
-    scrollContent: {
-        padding: 20,
-    },
-    sectionTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#000',
-        marginBottom: 15,
-    },
-    topicsGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        justifyContent: 'space-between',
-        marginBottom: 25,
-    },
-    topicCard: {
-        width: '48%',
-        backgroundColor: '#fff',
-        borderRadius: 16,
-        padding: 16,
-        alignItems: 'center',
-        marginBottom: 15,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 3,
-        elevation: 2,
-    },
-    topicIconContainer: {
-        width: 50,
-        height: 50,
-        borderRadius: 25,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 10,
-    },
-    topicLabel: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#000',
-        textAlign: 'center',
-    },
-    faqHeaderRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 15,
-    },
-    viewAllText: {
-        fontSize: 14,
-        fontWeight: 'bold',
-        color: '#FBC02D',
-    },
-    faqContainer: {
-        backgroundColor: '#fff',
-        borderRadius: 16,
-        padding: 10,
-        marginBottom: 25,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 3,
-        elevation: 2,
-    },
-    faqItem: {
-        borderBottomWidth: 1,
-        borderBottomColor: '#F5F5F5',
-    },
-    faqQuestionRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingVertical: 15,
-        paddingHorizontal: 10,
-    },
-    faqCategory: {
-        fontSize: 10,
-        fontWeight: 'bold',
-        color: '#90A4AE',
-        letterSpacing: 0.5,
-        marginBottom: 5,
-    },
-    faqQuestion: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#000',
-        flex: 1,
-        marginRight: 10,
-    },
-    faqAnswer: {
-        fontSize: 13,
-        color: '#757575',
-        paddingHorizontal: 10,
-        paddingBottom: 15,
-        lineHeight: 20,
-    },
-    noResultsContainer: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 60,
-        backgroundColor: '#fff',
-        borderRadius: 16,
-        marginBottom: 25,
-    },
-    noResultsText: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#424242',
-        marginTop: 15,
-        textAlign: 'center',
-    },
-    noResultsSubtext: {
-        fontSize: 13,
-        color: '#9E9E9E',
-        marginTop: 5,
-        textAlign: 'center',
-    },
-    helpText: {
-        textAlign: 'center',
-        fontSize: 12,
-        fontWeight: 'bold',
-        color: '#90A4AE',
-        marginBottom: 15,
-        letterSpacing: 1,
-    },
-    supportButtonsRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginBottom: 15,
-        gap: 15,
-    },
-    supportButton: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 15,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: '#EEEEEE',
-        backgroundColor: '#fff',
-    },
-    chatButton: {
-        backgroundColor: Colors.light.tint,
-        borderColor: Colors.light.tint,
-    },
-    callButton: {
-        borderColor: Colors.light.tint,
-        borderWidth: 2,
-    },
-    emailButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 15,
-        borderRadius: 12,
-        borderWidth: 2,
-        borderColor: '#EEEEEE',
-        backgroundColor: '#fff',
-        marginBottom: 30,
-    },
-    supportButtonText: {
-        fontSize: 14,
-        fontWeight: 'bold',
-        color: '#000',
-    },
-    expertBanner: {
-        backgroundColor: '#F3F4F6',
-        borderRadius: 20,
-        padding: 20,
-        flexDirection: 'row',
-        alignItems: 'center',
-        overflow: 'hidden',
-    },
-    expertContent: {
-        flex: 1,
-    },
-    expertTitle: {
-        fontSize: 10,
-        fontWeight: 'bold',
-        color: '#757575',
-        letterSpacing: 1,
-        marginBottom: 5,
-    },
-    expertHeading: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#000',
-        marginBottom: 15,
-        lineHeight: 22,
-    },
-    bookButton: {
-        backgroundColor: '#000',
-        paddingHorizontal: 20,
-        paddingVertical: 10,
-        borderRadius: 20,
-        alignSelf: 'flex-start',
-    },
-    bookButtonText: {
-        color: '#fff',
-        fontSize: 12,
-        fontWeight: 'bold',
-    },
-    expertIllustration: {
-        width: 80,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
+    container: { flex: 1, backgroundColor: palette.paperWarm },
+    content: { padding: 20, paddingTop: 4 },
+    hero: { backgroundColor: colors.surfaceInverse, borderRadius: radius.xl, padding: 20, marginBottom: 20 },
+    heroSub: { fontFamily: fonts.bodyRegular, fontSize: 13, color: palette.neutral300, marginBottom: 16 },
+    heroSearch: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#fff', borderRadius: radius.md, paddingHorizontal: 15, height: 50 },
+    heroInput: { flex: 1, fontFamily: fonts.bodyRegular, fontSize: 14, color: colors.textStrong, padding: 0 },
+
+    quickRow: { flexDirection: 'row', gap: 12, marginBottom: 22 },
+    quickCard: { flex: 1, backgroundColor: colors.surfaceCard, borderWidth: 1, borderColor: palette.neutral200, borderRadius: 18, paddingVertical: 16, alignItems: 'center' },
+    quickIcon: { width: 44, height: 44, borderRadius: 14, backgroundColor: palette.yellow100, alignItems: 'center', justifyContent: 'center', marginBottom: 9 },
+    quickTitle: { fontFamily: fonts.displaySemiBold, fontSize: 13, color: colors.textStrong },
+    quickSub: { fontFamily: fonts.bodyRegular, fontSize: 11, color: colors.textFaint, marginTop: 1 },
+
+    card: { backgroundColor: colors.surfaceCard, borderWidth: 1, borderColor: palette.neutral200, borderRadius: radius.lg, overflow: 'hidden' },
+    rowBorder: { borderBottomWidth: 1, borderBottomColor: palette.neutral100 },
+    topicRow: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16 },
+    topicIcon: { width: 36, height: 36, borderRadius: 11, backgroundColor: colors.surfaceSunken, alignItems: 'center', justifyContent: 'center' },
+    topicLabel: { flex: 1, fontFamily: fonts.bodySemiBold, fontSize: 15, color: colors.textBody },
+
+    faqRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 16 },
+    faqQ: { fontFamily: fonts.bodySemiBold, fontSize: 14, color: colors.textStrong },
+    faqA: { fontFamily: fonts.bodyRegular, fontSize: 13, lineHeight: 20, color: colors.textMuted, paddingHorizontal: 16, paddingBottom: 16, marginTop: -4 },
+    noResults: { alignItems: 'center', paddingVertical: 40 },
 });

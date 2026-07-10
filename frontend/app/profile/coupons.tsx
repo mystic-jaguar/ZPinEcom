@@ -1,178 +1,146 @@
-import { Feather } from '@expo/vector-icons';
+import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
+import { Ticket } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import CouponCard, { CouponStatus, CouponType } from '../../components/Coupons/CouponCard';
+import { AppHeader, ZText } from '../../components/ui';
+import { colors, fonts, palette, radius } from '../../constants/theme';
 import { useCart } from '../../context/CartContext';
 
 const TABS = ['All', 'Active', 'Expired'];
 
 export default function CouponsScreen() {
     const router = useRouter();
-    const { availableCoupons } = useCart();
+    const { availableCoupons, applyCoupon } = useCart();
     const [selectedTab, setSelectedTab] = useState('All');
     const [isLoading, setIsLoading] = useState(true);
+    const [code, setCode] = useState('');
+    const [copied, setCopied] = useState<string | null>(null);
 
     useEffect(() => {
         if (availableCoupons !== undefined) setIsLoading(false);
     }, [availableCoupons]);
 
-    const filteredCoupons = availableCoupons.filter(coupon => {
+    const filtered = availableCoupons.filter((c: any) => {
         if (selectedTab === 'All') return true;
-        if (selectedTab === 'Active') return coupon.status === 'active' || !coupon.status;
-        if (selectedTab === 'Expired') return coupon.status === 'expired';
+        if (selectedTab === 'Active') return c.status === 'active' || !c.status;
+        if (selectedTab === 'Expired') return c.status === 'expired';
         return true;
     });
 
-    const renderHeader = () => (
-        <View style={styles.header}>
-            <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-                <Feather name="arrow-left" size={24} color="#1A1A1A" />
-            </TouchableOpacity>
-            <Text style={styles.headerTitle}>My Coupons</Text>
-            <View style={{ width: 24 }} />
-        </View>
-    );
+    const copyCode = async (c: string) => {
+        await Clipboard.setStringAsync(c);
+        setCopied(c);
+        setTimeout(() => setCopied((cur) => (cur === c ? null : cur)), 1500);
+    };
 
-    return (
-        <View style={styles.container}>
-            <View style={styles.headerBackground}>
-                <SafeAreaView edges={['top']}>
-                    {renderHeader()}
-                </SafeAreaView>
-            </View>
-
-            <View style={styles.contentContainer}>
-                <View style={styles.tabsContainer}>
-                    <FlatList
-                        horizontal
-                        data={TABS}
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={styles.tabsContent}
-                        keyExtractor={(item) => item}
-                        renderItem={({ item }) => (
-                            <TouchableOpacity
-                                style={[styles.tab, selectedTab === item && styles.activeTab]}
-                                onPress={() => setSelectedTab(item)}
-                            >
-                                <Text style={[styles.tabText, selectedTab === item && styles.activeTabText]}>
-                                    {item}
-                                </Text>
-                            </TouchableOpacity>
-                        )}
-                    />
-                </View>
-
-                {isLoading ? (
-                    <ActivityIndicator style={{ marginTop: 40 }} color="#FFD700" />
-                ) : filteredCoupons.length === 0 ? (
-                    <View style={styles.emptyContainer}>
-                        <Feather name="tag" size={48} color="#E0E0E0" />
-                        <Text style={styles.emptyText}>No coupons available</Text>
+    const renderItem = ({ item, index }: { item: any; index: number }) => {
+        const expired = item.status === 'expired';
+        const featured = index === 0 && !expired;
+        const discountLabel = item.discountType === 'percentage' ? `${item.discountValue}%` : `₹${item.discountValue}`;
+        return (
+            <View style={[styles.coupon, featured ? styles.couponDark : expired ? styles.couponExpired : styles.couponWhite]}>
+                <View style={styles.couponHead}>
+                    <Text style={[styles.code, featured && { color: palette.yellow500 }, expired && { color: colors.textFaint }]}>{item.code}</Text>
+                    <View style={[styles.catChip, featured && styles.catChipBrand]}>
+                        <Text style={[styles.catChipText, featured && { color: colors.textOnYellow }]}>{expired ? 'USED' : (item.type || 'OFFER').toUpperCase()}</Text>
                     </View>
-                ) : (
-                    <FlatList
-                        data={filteredCoupons}
-                        keyExtractor={(item) => item.id}
-                        contentContainerStyle={styles.listContent}
-                        renderItem={({ item }) => (
-                            <CouponCard
-                                title={item.title || item.code}
-                                discount={item.discountType === 'percentage'
-                                    ? `${item.discountValue}%`
-                                    : `₹${item.discountValue}`}
-                                description={item.description}
-                                code={item.code}
-                                expiry={item.expiryDate
-                                    ? new Date(item.expiryDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
-                                    : ''}
-                                type={(item.type || 'General') as CouponType}
-                                status={(item.status || 'active') as CouponStatus}
-                            />
-                        )}
-                        showsVerticalScrollIndicator={false}
-                    />
+                </View>
+                <Text style={[styles.couponDesc, featured && { color: palette.neutral300 }]} numberOfLines={2}>
+                    {item.description || `Save ${discountLabel} on your order.`}
+                </Text>
+                {!expired && (
+                    <View style={styles.couponFoot}>
+                        <Text style={[styles.expiry, featured && { color: palette.yellow300 }]}>
+                            {item.expiryDate ? `EXPIRES ${new Date(item.expiryDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }).toUpperCase()}` : 'LIMITED TIME'}
+                        </Text>
+                        <Pressable style={[styles.copyBtn, featured && styles.copyBtnDark]} onPress={() => copyCode(item.code)}>
+                            <Text style={[styles.copyText, featured && { color: '#fff' }]}>{copied === item.code ? 'Copied!' : 'Copy code'}</Text>
+                        </Pressable>
+                    </View>
                 )}
             </View>
-        </View>
+        );
+    };
+
+    return (
+        <SafeAreaView style={styles.container} edges={['top']}>
+            <AppHeader title="Coupons" onBack={() => router.back()} />
+
+            <View style={styles.applyWrap}>
+                <View style={styles.applyField}>
+                    <Ticket size={19} color={colors.textFaint} />
+                    <TextInput
+                        style={styles.applyInput}
+                        placeholder="Enter coupon code"
+                        placeholderTextColor={colors.textFaint}
+                        value={code}
+                        onChangeText={setCode}
+                        autoCapitalize="characters"
+                    />
+                    <Pressable disabled={!code.trim()} onPress={() => { if (code.trim()) applyCoupon(code.trim()); }}>
+                        <Text style={[styles.applyLink, !code.trim() && { opacity: 0.4 }]}>APPLY</Text>
+                    </Pressable>
+                </View>
+            </View>
+
+            <View style={styles.tabs}>
+                {TABS.map((t) => (
+                    <Pressable key={t} style={[styles.tab, selectedTab === t && styles.tabOn]} onPress={() => setSelectedTab(t)}>
+                        <Text style={[styles.tabText, selectedTab === t && styles.tabTextOn]}>{t}</Text>
+                    </Pressable>
+                ))}
+            </View>
+
+            {isLoading ? (
+                <ActivityIndicator style={{ marginTop: 40 }} color={palette.yellow500} />
+            ) : filtered.length === 0 ? (
+                <View style={styles.empty}>
+                    <Ticket size={48} color={colors.borderStrong} />
+                    <ZText variant="muted" style={{ marginTop: 16 }}>No coupons available</ZText>
+                </View>
+            ) : (
+                <FlatList
+                    data={filtered}
+                    keyExtractor={(item) => item.id}
+                    contentContainerStyle={styles.list}
+                    renderItem={renderItem}
+                    showsVerticalScrollIndicator={false}
+                />
+            )}
+        </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#F8F9FA',
-    },
-    headerBackground: {
-        backgroundColor: '#FFD700', // Yellow
-        paddingBottom: 20,
-    },
-    header: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingHorizontal: 20,
-        paddingVertical: 10,
-    },
-    backBtn: {
-        padding: 5,
-    },
-    headerTitle: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: '#1A1A1A',
-    },
-    contentContainer: {
-        flex: 1,
-        backgroundColor: '#F8F9FA',
-        marginTop: -20, // Overlap to create rounded effect if needed, but design shows straight cut or maybe rounded tabs
-        borderTopLeftRadius: 0,
-        borderTopRightRadius: 0,
-    },
-    tabsContainer: {
-        backgroundColor: '#F8F9FA', // Or white? Design looks like pills on white/grey
-        paddingVertical: 15,
-    },
-    tabsContent: {
-        paddingHorizontal: 20,
-        gap: 10,
-    },
-    tab: {
-        paddingHorizontal: 20,
-        paddingVertical: 8,
-        borderRadius: 20,
-        backgroundColor: '#fff',
-        borderWidth: 1,
-        borderColor: '#E5E7EB',
-        marginRight: 8,
-    },
-    activeTab: {
-        backgroundColor: '#1A1A1A',
-        borderColor: '#1A1A1A',
-    },
-    tabText: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#6B7280',
-    },
-    activeTabText: {
-        color: '#fff',
-    },
-    listContent: {
-        paddingBottom: 40,
-        paddingTop: 0,
-    },
-    emptyContainer: {
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingTop: 80,
-    },
-    emptyText: {
-        marginTop: 16,
-        fontSize: 16,
-        color: '#9E9E9E',
-        fontWeight: '500',
-    },
+    container: { flex: 1, backgroundColor: palette.paperWarm },
+    applyWrap: { paddingHorizontal: 20, paddingBottom: 12 },
+    applyField: { flexDirection: 'row', alignItems: 'center', gap: 11, backgroundColor: colors.surfaceCard, borderWidth: 1.5, borderColor: '#C9C5B8', borderStyle: 'dashed', borderRadius: radius.md, paddingHorizontal: 15, height: 52 },
+    applyInput: { flex: 1, fontFamily: fonts.monoBold, fontSize: 14, letterSpacing: 0.4, color: colors.textStrong },
+    applyLink: { fontFamily: fonts.bodyBold, fontSize: 12, color: palette.yellow600 },
+
+    tabs: { flexDirection: 'row', gap: 10, paddingHorizontal: 20, paddingBottom: 14 },
+    tab: { paddingHorizontal: 18, paddingVertical: 8, borderRadius: 100, backgroundColor: colors.surfaceCard, borderWidth: 1.5, borderColor: colors.borderSubtle },
+    tabOn: { backgroundColor: colors.surfaceInverse, borderColor: colors.surfaceInverse },
+    tabText: { fontFamily: fonts.bodyBold, fontSize: 13, color: colors.textMuted },
+    tabTextOn: { color: colors.textInvert },
+
+    list: { paddingHorizontal: 20, paddingBottom: 40 },
+    coupon: { borderRadius: 18, padding: 18, marginBottom: 14, overflow: 'hidden' },
+    couponDark: { backgroundColor: colors.surfaceInverse },
+    couponWhite: { backgroundColor: colors.surfaceCard, borderWidth: 1, borderColor: palette.neutral200 },
+    couponExpired: { backgroundColor: '#F5F4F0', borderWidth: 1, borderColor: palette.neutral200, opacity: 0.75 },
+    couponHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+    code: { fontFamily: fonts.displayBold, fontSize: 22, letterSpacing: 0.4, color: colors.textStrong },
+    catChip: { backgroundColor: colors.surfaceSunken, paddingHorizontal: 8, paddingVertical: 4, borderRadius: radius.xs },
+    catChipBrand: { backgroundColor: palette.yellow500 },
+    catChipText: { fontFamily: fonts.monoBold, fontSize: 9, letterSpacing: 0.4, color: colors.textBody },
+    couponDesc: { fontFamily: fonts.bodyRegular, fontSize: 13, lineHeight: 19, color: colors.textMuted, marginBottom: 14 },
+    couponFoot: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    expiry: { fontFamily: fonts.monoBold, fontSize: 10, letterSpacing: 0.6, color: colors.textMuted },
+    copyBtn: { backgroundColor: palette.yellow500, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 7 },
+    copyBtnDark: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: '#4A4842', borderStyle: 'dashed' },
+    copyText: { fontFamily: fonts.bodyBold, fontSize: 12, color: colors.textOnYellow },
+    empty: { flex: 1, alignItems: 'center', justifyContent: 'center', marginTop: -40 },
 });

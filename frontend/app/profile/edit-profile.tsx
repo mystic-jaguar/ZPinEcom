@@ -1,13 +1,18 @@
-import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { BadgeCheck, Calendar, Camera, Check, ChevronDown } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
-import AvatarInitials from '../../components/common/AvatarInitials';
-import Input from '../../components/common/Input';
+import { AppHeader, BottomBar, ZButton, ZInput, ZText } from '../../components/ui';
+import { colors, fonts, palette, radius } from '../../constants/theme';
 import { useUser } from '../../context/UserContext';
 import { userService } from '../../services/user';
+
+function initialsOf(name?: string) {
+    if (!name) return 'ZP';
+    return name.trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() || '').join('') || 'ZP';
+}
 
 export default function EditProfileScreen() {
     const router = useRouter();
@@ -24,8 +29,12 @@ export default function EditProfileScreen() {
         },
     });
     const [isFetching, setIsFetching] = useState(true);
+    const [showGenderPicker, setShowGenderPicker] = useState(false);
+    const [showSuccessModal, setShowSuccessModal] = useState(false);
+    const [showErrorModal, setShowErrorModal] = useState(false);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const [isSaving, setIsSaving] = useState(false);
 
-    // Always fetch fresh data from the server on mount
     useEffect(() => {
         if (!user.id) { setIsFetching(false); return; }
         userService.getUserById(user.id)
@@ -44,21 +53,13 @@ export default function EditProfileScreen() {
                     });
                 }
             })
-            .catch(() => { /* keep form pre-filled from context on error */ })
+            .catch(() => { })
             .finally(() => setIsFetching(false));
     }, [user.id]);
-
-    const [showGenderPicker, setShowGenderPicker] = useState(false);
-    const [showSuccessModal, setShowSuccessModal] = useState(false);
-    const [showErrorModal, setShowErrorModal] = useState(false);
-    const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-    const [isSaving, setIsSaving] = useState(false);
 
     const handleSave = async () => {
         if (isSaving) return;
         setIsSaving(true);
-
         try {
             const updates: Record<string, any> = {};
             if (form.name && form.name !== user.name) updates.name = form.name;
@@ -67,7 +68,6 @@ export default function EditProfileScreen() {
             updates.receivePushNotifications = form.preferences.receivePushNotifications;
             updates.receiveEmailUpdates = form.preferences.receiveEmailUpdates;
             updates.receiveOrderUpdates = form.preferences.receiveOrderUpdates;
-
             await updateUser(updates as any);
             setShowSuccessModal(true);
         } catch (error) {
@@ -79,359 +79,144 @@ export default function EditProfileScreen() {
         }
     };
 
-    const handleModalClose = () => {
-        setShowSuccessModal(false);
-        router.back();
+    const formatDob = (t: string) => {
+        const cleaned = t.replace(/[^0-9]/g, '');
+        let f = cleaned;
+        if (cleaned.length > 4) f = cleaned.slice(0, 4) + '-' + cleaned.slice(4);
+        if (cleaned.length > 6) f = f.slice(0, 7) + '-' + cleaned.slice(6);
+        if (f.length > 10) f = f.slice(0, 10);
+        setForm({ ...form, dob: f });
     };
 
     if (isFetching) {
         return (
-            <SafeAreaView style={styles.container}>
-                <View style={styles.header}>
-                    <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-                        <Feather name="chevron-left" size={28} color="#1a1a1a" />
-                    </TouchableOpacity>
-                    <Text style={styles.headerTitle}>Edit Profile</Text>
-                    <View style={{ width: 28 }} />
-                </View>
+            <SafeAreaView style={styles.container} edges={['top']}>
+                <AppHeader title="Edit profile" onBack={() => router.back()} />
                 <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                    <ActivityIndicator size="large" color="#FBBF24" />
+                    <ActivityIndicator size="large" color={palette.yellow500} />
                 </View>
             </SafeAreaView>
         );
     }
 
-    const togglePreference = (key: 'receivePushNotifications' | 'receiveEmailUpdates' | 'receiveOrderUpdates') => {
-        setForm(prev => ({
-            ...prev,
-            preferences: {
-                ...prev.preferences,
-                [key]: !prev.preferences[key]
-            }
-        }));
-    };
-
     return (
-        <SafeAreaView style={styles.container}>
-            {/* Header */}
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-                    <Feather name="chevron-left" size={28} color="#1a1a1a" />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Edit Profile</Text>
-                <View style={{ width: 28 }} />
-            </View>
+        <SafeAreaView style={styles.container} edges={['top']}>
+            <AppHeader title="Edit profile" onBack={() => router.back()} />
 
-            <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-
-                {/* Profile Avatar */}
-                <View style={styles.imageSection}>
-                    <AvatarInitials
-                        name={form.name || user.name || 'User'}
-                        size={100}
-                        borderWidth={3}
-                        borderColor="#F3F4F6"
-                        profileImage={user.profileImage}
-                    />
+            <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+                <View style={styles.avatarWrap}>
+                    <View style={styles.avatar}><Text style={styles.avatarText}>{initialsOf(form.name || user.name)}</Text></View>
+                    <View style={styles.cameraBadge}><Camera size={15} color={colors.textOnYellow} /></View>
                 </View>
 
-                {/* Personal Details */}
-                <Text style={styles.label}>FULL NAME</Text>
-                <Input
-                    value={form.name}
-                    onChangeText={t => setForm({ ...form, name: t })}
-                    containerStyle={{ marginTop: 0 }}
-                />
+                <ZInput label="Full name" value={form.name} onChangeText={(t) => setForm({ ...form, name: t })} />
+
+                {user.email ? (
+                    <>
+                        <ZText variant="eyebrow" color={colors.textBody} style={styles.label}>Email</ZText>
+                        <View style={styles.readonlyField}>
+                            <Text style={styles.readonlyText} numberOfLines={1}>{user.email}</Text>
+                            <BadgeCheck size={18} color={palette.green500} />
+                        </View>
+                    </>
+                ) : null}
+
+                {user.mobile ? (
+                    <>
+                        <ZText variant="eyebrow" color={colors.textBody} style={styles.label}>Mobile</ZText>
+                        <View style={styles.mobileField}>
+                            <Text style={styles.countryCode}>+91</Text>
+                            <View style={styles.divider} />
+                            <Text style={styles.mobileText}>{user.mobile}</Text>
+                        </View>
+                    </>
+                ) : null}
 
                 <View style={styles.row}>
-                    <View style={{ flex: 1, marginRight: 10 }}>
-                        <Text style={styles.label}>DATE OF BIRTH</Text>
-                        <Input
-                            value={form.dob}
-                            placeholder="YYYY-MM-DD"
-                            onChangeText={t => {
-                                // Simple auto-formatting for YYYY-MM-DD
-                                const cleaned = t.replace(/[^0-9]/g, '');
-                                let formatted = cleaned;
-                                if (cleaned.length > 4) {
-                                    formatted = cleaned.slice(0, 4) + '-' + cleaned.slice(4);
-                                }
-                                if (cleaned.length > 6) {
-                                    formatted = formatted.slice(0, 7) + '-' + cleaned.slice(6);
-                                }
-                                if (formatted.length > 10) formatted = formatted.slice(0, 10);
-                                setForm({ ...form, dob: formatted });
-                            }}
-                            containerStyle={{ marginTop: 0 }}
-                            maxLength={10}
-                            keyboardType="numeric"
-                        // In a real app, use a proper Date Picker
-                        />
+                    <View style={{ flex: 1 }}>
+                        <ZText variant="eyebrow" color={colors.textBody} style={styles.label}>Date of birth</ZText>
+                        <View style={styles.field}>
+                            <Calendar size={18} color={colors.textFaint} />
+                            <TextInput
+                                style={styles.fieldInput}
+                                value={form.dob}
+                                placeholder="YYYY-MM-DD"
+                                placeholderTextColor={colors.textFaint}
+                                onChangeText={formatDob}
+                                maxLength={10}
+                                keyboardType="numeric"
+                            />
+                        </View>
                     </View>
                     <View style={{ flex: 1 }}>
-                        <Text style={styles.label}>GENDER</Text>
-                        <TouchableOpacity
-                            style={styles.genderContainer}
-                            onPress={() => setShowGenderPicker(!showGenderPicker)}
-                        >
-                            <Text style={styles.genderText}>
-                                {form.gender || 'Select'}
-                            </Text>
-                            <Feather name={showGenderPicker ? "chevron-up" : "chevron-down"} size={20} color="#6B7280" />
-                        </TouchableOpacity>
+                        <ZText variant="eyebrow" color={colors.textBody} style={styles.label}>Gender</ZText>
+                        <Pressable style={styles.field} onPress={() => setShowGenderPicker((v) => !v)}>
+                            <Text style={[styles.fieldInput, !form.gender && { color: colors.textFaint }]} numberOfLines={1}>{form.gender || 'Select'}</Text>
+                            <ChevronDown size={18} color={colors.textMuted} />
+                        </Pressable>
                         {showGenderPicker && (
-                            <View style={styles.dropdownList}>
-                                {['Male', 'Female', 'Do not wish to specify'].map((option) => (
-                                    <TouchableOpacity
-                                        key={option}
-                                        style={styles.dropdownOption}
-                                        onPress={() => {
-                                            setForm({ ...form, gender: option });
-                                            setShowGenderPicker(false);
-                                        }}
-                                    >
-                                        <Text style={styles.dropdownOptionText}>{option}</Text>
-                                        {form.gender === option && <Feather name="check" size={16} color="#FBBF24" />}
-                                    </TouchableOpacity>
+                            <View style={styles.dropdown}>
+                                {['Male', 'Female', 'Do not wish to specify'].map((opt) => (
+                                    <Pressable key={opt} style={styles.dropdownItem} onPress={() => { setForm({ ...form, gender: opt }); setShowGenderPicker(false); }}>
+                                        <Text style={styles.dropdownText}>{opt}</Text>
+                                        {form.gender === opt && <Check size={16} color={palette.yellow600} />}
+                                    </Pressable>
                                 ))}
                             </View>
                         )}
                     </View>
                 </View>
 
-                {/* Preferences */}
-                <Text style={styles.sectionHeader}>PREFERENCES</Text>
-
-                <View style={styles.preferenceRow}>
-                    <View>
-                        <Text style={styles.preferenceTitle}>Receive Push Notifications</Text>
-                        <Text style={styles.preferenceSubtitle}>Get updates on latest trends and offers</Text>
+                <ZText variant="eyebrow" style={styles.section}>Preferences</ZText>
+                <View style={styles.prefRow}>
+                    <View style={{ flex: 1, paddingRight: 12 }}>
+                        <Text style={styles.prefTitle}>Push notifications</Text>
+                        <Text style={styles.prefSub}>Get updates on latest trends and offers</Text>
                     </View>
                     <Switch
-                        trackColor={{ false: "#E5E7EB", true: "#FBBF24" }}
-                        thumbColor={form.preferences.receivePushNotifications ? "#fff" : "#f4f3f4"}
-                        onValueChange={() => togglePreference('receivePushNotifications')}
+                        trackColor={{ false: colors.borderSubtle, true: palette.yellow500 }}
+                        thumbColor="#fff"
+                        onValueChange={() => setForm(prev => ({ ...prev, preferences: { ...prev.preferences, receivePushNotifications: !prev.preferences.receivePushNotifications } }))}
                         value={form.preferences.receivePushNotifications}
                     />
                 </View>
-
-                <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-                    <Text style={styles.saveButtonText}>Update Profile</Text>
-                </TouchableOpacity>
-
-                <View style={{ height: 40 }} />
             </ScrollView>
 
-            <ActionModal
-                visible={showSuccessModal}
-                title="Success"
-                message="Profile updated successfully!"
-                primaryButtonText="OK"
-                onPrimaryPress={handleModalClose}
-                onClose={handleModalClose}
-                icon="check-circle"
-            />
+            <BottomBar>
+                <ZButton label={isSaving ? 'Saving…' : 'Save changes'} onPress={handleSave} loading={isSaving} />
+            </BottomBar>
 
-            <ActionModal
-                visible={showErrorModal}
-                title="Error"
-                message={errorMessage || 'Something went wrong.'}
-                primaryButtonText="OK"
-                onPrimaryPress={() => setShowErrorModal(false)}
-                onClose={() => setShowErrorModal(false)}
-                icon="x-circle"
-            />
-
-            {/* Dark Mode FAB (Visual) removed as per clean UI request or can handle via preferences */}
-            {/* Keeping it if user wants consistent "visual" from previous design elsewhere, but strictly following 'above image' */}
-            {/* <View style={styles.fab}>
-                <Feather name="moon" size={24} color="#fff" />
-            </View> */}
+            <ActionModal visible={showSuccessModal} title="Success" message="Profile updated successfully!" primaryButtonText="OK" onPrimaryPress={() => { setShowSuccessModal(false); router.back(); }} onClose={() => { setShowSuccessModal(false); router.back(); }} icon="check-circle" />
+            <ActionModal visible={showErrorModal} title="Error" message={errorMessage || 'Something went wrong.'} primaryButtonText="OK" onPrimaryPress={() => setShowErrorModal(false)} onClose={() => setShowErrorModal(false)} icon="x-circle" />
         </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#fff', // White background
-    },
-    header: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingHorizontal: 20,
-        paddingVertical: 15,
-        backgroundColor: '#fff',
-    },
-    backBtn: {
-        padding: 5,
-        marginLeft: -5,
-    },
-    headerTitle: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: '#1a1a1a',
-    },
-    content: {
-        padding: 20,
-    },
-    imageSection: {
-        alignItems: 'center',
-        marginBottom: 30,
-    },
-    imageContainer: {
-        position: 'relative',
-        marginBottom: 10,
-    },
-    image: {
-        width: 100,
-        height: 100,
-        borderRadius: 50,
-        backgroundColor: '#F3F4F6', // Placeholder color
-    },
-    cameraIcon: {
-        position: 'absolute',
-        bottom: 0,
-        right: 0,
-        backgroundColor: '#FBBF24',
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderWidth: 2,
-        borderColor: '#fff',
-    },
-    changePhotoText: {
-        fontSize: 12,
-        fontWeight: '700',
-        color: '#4B5563',
-        letterSpacing: 0.5,
-    },
-    row: {
-        flexDirection: 'row',
-        marginBottom: 16,
-    },
-    label: {
-        fontSize: 12,
-        fontWeight: '700',
-        color: '#6B7280', // Lighter label color
-        marginBottom: 8,
-        textTransform: 'uppercase',
-        letterSpacing: 0.5
-    },
-    genderContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: '#E5E7EB',
-        borderRadius: 12,
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        backgroundColor: '#fff',
-        height: 50,
-    },
-    genderText: {
-        fontSize: 16,
-        color: '#1a1a1a',
-    },
-    phoneInputContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: '#E5E7EB',
-        borderRadius: 12,
-        paddingHorizontal: 16,
-        backgroundColor: '#fff',
-        height: 50,
-    },
-    sectionHeader: {
-        fontSize: 12,
-        fontWeight: '700',
-        color: '#9CA3AF',
-        marginTop: 10,
-        marginBottom: 15,
-        letterSpacing: 1,
-        textTransform: 'uppercase'
-    },
-    preferenceRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 20
-    },
-    preferenceTitle: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#1a1a1a',
-        marginBottom: 4
-    },
-    preferenceSubtitle: {
-        fontSize: 12,
-        color: '#9CA3AF'
-    },
-    saveButton: {
-        backgroundColor: '#FBBF24',
-        borderRadius: 12,
-        height: 50,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginTop: 20,
-        shadowColor: '#FBBF24',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 4,
-    },
-    saveButtonText: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: '#1a1a1a',
-    },
-    fab: {
-        position: 'absolute',
-        bottom: 120,
-        right: 20,
-        width: 50,
-        height: 50,
-        borderRadius: 25,
-        backgroundColor: '#111827',
-        justifyContent: 'center',
-        alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 8,
-        elevation: 5,
-    },
-    dropdownList: {
-        position: 'absolute',
-        top: 60, // Adjust based on genderContainer position + height
-        left: 0,
-        right: 0,
-        backgroundColor: '#fff',
-        borderRadius: 12,
-        padding: 8,
-        borderWidth: 1,
-        borderColor: '#E5E7EB',
-        zIndex: 1000,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 5
-    },
-    dropdownOption: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingVertical: 10,
-        paddingHorizontal: 12,
-    },
-    dropdownOptionText: {
-        fontSize: 14,
-        color: '#1a1a1a'
-    }
+    container: { flex: 1, backgroundColor: palette.paperWarm },
+    content: { padding: 26, paddingTop: 8 },
+    avatarWrap: { alignSelf: 'center', marginBottom: 26 },
+    avatar: { width: 88, height: 88, borderRadius: 44, backgroundColor: colors.surfaceInverse, borderWidth: 3, borderColor: palette.yellow500, alignItems: 'center', justifyContent: 'center' },
+    avatarText: { fontFamily: fonts.displayBold, fontSize: 32, color: palette.yellow500 },
+    cameraBadge: { position: 'absolute', bottom: 0, right: 0, width: 30, height: 30, borderRadius: 15, backgroundColor: palette.yellow500, borderWidth: 3, borderColor: palette.paperWarm, alignItems: 'center', justifyContent: 'center' },
+
+    label: { marginBottom: 7 },
+    readonlyField: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#F5F4F0', borderWidth: 1.5, borderColor: '#EFEDE6', borderRadius: radius.md, paddingHorizontal: 15, height: 52, marginBottom: 16 },
+    readonlyText: { flex: 1, fontFamily: fonts.bodyMedium, fontSize: 15, color: colors.textMuted },
+    mobileField: { flexDirection: 'row', alignItems: 'center', gap: 11, backgroundColor: colors.surfaceCard, borderWidth: 1.5, borderColor: colors.borderSubtle, borderRadius: radius.md, paddingHorizontal: 15, height: 52, marginBottom: 16 },
+    countryCode: { fontFamily: fonts.monoBold, fontSize: 13, color: colors.textStrong },
+    divider: { width: 1, height: 22, backgroundColor: colors.borderSubtle },
+    mobileText: { flex: 1, fontFamily: fonts.bodyMedium, fontSize: 15, color: colors.textStrong },
+
+    row: { flexDirection: 'row', gap: 14 },
+    field: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.surfaceCard, borderWidth: 1.5, borderColor: colors.borderSubtle, borderRadius: radius.md, paddingHorizontal: 15, height: 52 },
+    fieldInput: { flex: 1, fontFamily: fonts.bodyMedium, fontSize: 14, color: colors.textStrong, padding: 0 },
+    dropdown: { backgroundColor: colors.surfaceCard, borderWidth: 1, borderColor: colors.borderSubtle, borderRadius: radius.md, marginTop: 8, overflow: 'hidden' },
+    dropdownItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 11, paddingHorizontal: 12 },
+    dropdownText: { fontFamily: fonts.bodyMedium, fontSize: 13, color: colors.textBody },
+
+    section: { marginTop: 24, marginBottom: 14 },
+    prefRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    prefTitle: { fontFamily: fonts.bodySemiBold, fontSize: 14, color: colors.textStrong, marginBottom: 3 },
+    prefSub: { fontFamily: fonts.bodyRegular, fontSize: 12, color: colors.textMuted },
 });

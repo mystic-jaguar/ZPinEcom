@@ -1,46 +1,30 @@
-import { Feather } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Check, Info } from 'lucide-react-native';
 import React, { useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
+import { AppHeader, ZButton, ZText } from '../../components/ui';
 import { WALLET_ENABLED } from '../../constants/features';
+import { colors, fonts, palette, radius } from '../../constants/theme';
 import { useOrder } from '../../context/OrderContext';
 import { orderService } from '../../services/order';
 
-const CANCELLATION_REASONS = [
-    "Changed my mind",
-    "Found a better price elsewhere",
-    "Ordered by mistake",
-    "Shipping time is too long",
-    "Item not needed anymore",
-    "Other"
-];
-
-const RETURN_REASONS = [
-    "Defective product",
-    "Product not working",
-    "Different from description",
-    "Wrong item received",
-    "Size issue",
-    "Quality not as expected"
-];
+const CANCELLATION_REASONS = ['Ordered by mistake', 'Found a better price', 'Delivery taking too long', 'Changed my mind', 'Item not needed anymore', 'Other'];
+const RETURN_REASONS = ['Defective product', 'Product not working', 'Different from description', 'Wrong item received', 'Size issue', 'Quality not as expected'];
 
 export default function CancelOrderScreen() {
     const router = useRouter();
+    const insets = useSafeAreaInsets();
     const params = useLocalSearchParams();
     const orderId = Array.isArray(params.orderId) ? params.orderId[0] : params.orderId;
     const mode = Array.isArray(params.mode) ? params.mode[0] : (params.mode ?? 'cancel');
     const productId = Array.isArray(params.productId) ? params.productId[0] : params.productId;
     const { getOrderById, cancelOrder } = useOrder();
 
-    // For returns, we might need to handle specific items if passed
-    // const { returnOrder } = useOrder(); // Assuming this exists or will be added
-
     const isReturn = mode === 'return';
-    const screenTitle = isReturn ? 'Return Item' : 'Cancel Order';
-
-    const [selectedReason, setSelectedReason] = useState<string>('');
+    const [selectedReason, setSelectedReason] = useState('');
     const [refundMethod, setRefundMethod] = useState<'original' | 'wallet'>('original');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -49,28 +33,24 @@ export default function CancelOrderScreen() {
     const [errorMessage, setErrorMessage] = useState('');
 
     const order = getOrderById(orderId as string);
-    const selectedOrderItemId = isReturn && productId
-        ? order?.items.find(item => item.productId === productId)?.orderItemId
-        : undefined;
+    const selectedOrderItemId = isReturn && productId ? order?.items.find(item => item.productId === productId)?.orderItemId : undefined;
 
     if (!order) {
         return (
-            <SafeAreaView style={styles.container}>
-                <View style={styles.header}>
-                    <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-                        <Feather name="chevron-left" size={28} color="#1a1a1a" />
-                    </TouchableOpacity>
-                    <Text style={styles.headerTitle}>Cancel Order</Text>
-                </View>
-                <View style={styles.centerContent}>
-                    <Text style={styles.errorText}>Order not found.</Text>
-                    <TouchableOpacity style={styles.primaryButton} onPress={() => router.back()}>
-                        <Text style={styles.primaryButtonText}>Go Back</Text>
-                    </TouchableOpacity>
+            <SafeAreaView style={styles.container} edges={['top']}>
+                <AppHeader title={isReturn ? 'Return item' : 'Cancel order'} onBack={() => router.back()} />
+                <View style={styles.center}>
+                    <ZText variant="muted" style={{ marginBottom: 16 }}>Order not found.</ZText>
+                    <ZButton label="Go back" fullWidth={false} onPress={() => router.back()} />
                 </View>
             </SafeAreaView>
         );
     }
+
+    const money = (n: number) => `₹${Number(n).toLocaleString('en-IN')}`;
+    const reasons = isReturn ? RETURN_REASONS : CANCELLATION_REASONS;
+    const firstItem = order.items[0];
+    const extra = order.items.length - 1;
 
     const handleConfirmAction = async () => {
         if (!selectedReason) {
@@ -78,39 +58,26 @@ export default function CancelOrderScreen() {
             setShowErrorModal(true);
             return;
         }
-
         setIsSubmitting(true);
         try {
-            let response;
+            let response: any;
             if (isReturn) {
                 response = await orderService.returnOrder(order.id, {
                     orderItemIds: selectedOrderItemId ? [selectedOrderItemId] : [],
                     reason: selectedReason,
-                    description: 'Return request via app'
-                }) as any;
-
-            } else {
-                response = await cancelOrder(order.id, {
-                    reason: selectedReason,
-                    refundMethod
+                    description: 'Return request via app',
                 });
+            } else {
+                response = await cancelOrder(order.id, { reason: selectedReason, refundMethod });
             }
-
             let msg = response?.message || `${isReturn ? 'Return initiated' : 'Order cancelled'} successfully.`;
             if (response?.refundAmount && response.refundAmount > 0) {
-                const refundDest = response.refundMethod === 'wallet' || refundMethod === 'wallet'
-                    ? 'ZPIN Wallet'
-                    : 'original payment method';
-                msg += `\n\nRefund of ₹${response.refundAmount.toFixed(2)} credited to your ${refundDest}.`;
+                const dest = response.refundMethod === 'wallet' || refundMethod === 'wallet' ? 'ZPIN Wallet' : 'original payment method';
+                msg += `\n\nRefund of ₹${response.refundAmount.toFixed(2)} credited to your ${dest}.`;
             }
             setSuccessMessage(msg);
             setIsSubmitting(false);
-
-            // Small delay before showing success modal
-            setTimeout(() => {
-                setShowSuccessModal(true);
-            }, 300);
-
+            setTimeout(() => setShowSuccessModal(true), 300);
         } catch (error: any) {
             setIsSubmitting(false);
             setErrorMessage(error.message || `Failed to ${isReturn ? 'initiate return' : 'cancel order'}. Please try again.`);
@@ -120,137 +87,71 @@ export default function CancelOrderScreen() {
 
     return (
         <SafeAreaView style={styles.container} edges={['top']}>
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-                    <Feather name="chevron-left" size={28} color="#1a1a1a" />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>{screenTitle}</Text>
-                <View style={{ width: 28 }} />
-            </View>
-
-            <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-                {/* Order Summary */}
-                <View style={styles.summaryCard}>
-                    <Text style={styles.summaryTitle}>Order Summary</Text>
-                    <Text style={styles.orderNumber}>Order #{order.orderNumber}</Text>
-                    <Text style={styles.itemCount}>{order.items.length} Item{order.items.length !== 1 ? 's' : ''}</Text>
-                    <View style={styles.divider} />
-                    <View style={styles.totalRow}>
-                        <Text style={styles.totalLabel}>Refund Amount</Text>
-                        <Text style={styles.totalValue}>₹{order.finalAmount.toFixed(2)}</Text>
+            <AppHeader title={isReturn ? 'Return item' : 'Cancel order'} onBack={() => router.back()} />
+            <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+                {/* Order mini */}
+                <View style={styles.orderCard}>
+                    <Image source={firstItem?.image ? { uri: firstItem.image as string } : require('../../assets/images/icon_backup.png')} style={styles.orderImg} contentFit="cover" />
+                    <View style={{ flex: 1 }}>
+                        <Text style={styles.orderNo}>{order.orderNumber}</Text>
+                        <Text style={styles.orderName} numberOfLines={1}>{firstItem?.productName || 'Order'}{extra > 0 ? ` +${extra}` : ''}</Text>
                     </View>
+                    <Text style={styles.orderTotal}>{money(order.finalAmount)}</Text>
                 </View>
 
-                {/* Reason Selection */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Reason for {isReturn ? 'Return' : 'Cancellation'}</Text>
-                    <View style={styles.reasonsContainer}>
-                        {(isReturn ? RETURN_REASONS : CANCELLATION_REASONS).map((reason) => (
-                            <TouchableOpacity
-                                key={reason}
-                                style={[
-                                    styles.reasonOption,
-                                    selectedReason === reason && styles.selectedReasonOption
-                                ]}
-                                onPress={() => setSelectedReason(reason)}
-                            >
-                                <View style={[
-                                    styles.radioOuter,
-                                    selectedReason === reason && styles.selectedRadioOuter
-                                ]}>
-                                    {selectedReason === reason && <View style={styles.radioInner} />}
-                                </View>
-                                <Text style={styles.reasonText}>{reason}</Text>
-                            </TouchableOpacity>
-                        ))}
-                    </View>
+                <ZText variant="eyebrow" style={{ marginBottom: 12 }}>Why are you {isReturn ? 'returning' : 'cancelling'}?</ZText>
+                <View style={styles.reasons}>
+                    {reasons.map((reason) => {
+                        const on = selectedReason === reason;
+                        return (
+                            <Pressable key={reason} style={[styles.reason, on ? styles.reasonOn : styles.reasonOff]} onPress={() => setSelectedReason(reason)}>
+                                <Text style={[styles.reasonText, on && { fontFamily: fonts.bodyBold, color: '#fff' }]}>{reason}</Text>
+                                <View style={[styles.radio, on && styles.radioOn]}>{on && <Check size={13} color={colors.textOnYellow} />}</View>
+                            </Pressable>
+                        );
+                    })}
                 </View>
 
-                {/* Refund Method Selection (if paid) */}
-                {order.paymentStatus === 'paid' && (
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Refund Method</Text>
-                        <View style={styles.refundMethodContainer}>
-                            <TouchableOpacity
-                                style={[
-                                    styles.refundOption,
-                                    refundMethod === 'original' && styles.selectedRefundOption
-                                ]}
-                                onPress={() => setRefundMethod('original')}
-                            >
-                                <View style={styles.refundHeader}>
-                                    <View style={[
-                                        styles.radioOuter,
-                                        refundMethod === 'original' && styles.selectedRadioOuter
-                                    ]}>
-                                        {refundMethod === 'original' && <View style={styles.radioInner} />}
-                                    </View>
-                                    <Text style={styles.refundTitle}>Original Payment Method</Text>
-                                </View>
-                                <Text style={styles.refundDesc}>Refund will be credited to your original payment source within 5-7 business days.</Text>
-                            </TouchableOpacity>
-
-                            {/* ZPIN Wallet refund — hidden while the wallet is on hold (RBI PPI compliance) */}
-                            {WALLET_ENABLED && (
-                            <TouchableOpacity
-                                style={[
-                                    styles.refundOption,
-                                    refundMethod === 'wallet' && styles.selectedRefundOption
-                                ]}
-                                onPress={() => setRefundMethod('wallet')}
-                            >
-                                <View style={styles.refundHeader}>
-                                    <View style={[
-                                        styles.radioOuter,
-                                        refundMethod === 'wallet' && styles.selectedRadioOuter
-                                    ]}>
-                                        {refundMethod === 'wallet' && <View style={styles.radioInner} />}
-                                    </View>
-                                    <Text style={styles.refundTitle}>ZPIN Wallet</Text>
-                                </View>
-                                <Text style={styles.refundDesc}>Instant refund to your ZPIN Wallet. Can be used for future purchases.</Text>
-                            </TouchableOpacity>
-                            )}
+                {order.paymentStatus === 'paid' && WALLET_ENABLED && (
+                    <>
+                        <ZText variant="eyebrow" style={{ marginTop: 22, marginBottom: 12 }}>Refund to</ZText>
+                        <View style={styles.reasons}>
+                            {(['original', 'wallet'] as const).map((m) => {
+                                const on = refundMethod === m;
+                                return (
+                                    <Pressable key={m} style={[styles.reason, on ? styles.reasonOn : styles.reasonOff]} onPress={() => setRefundMethod(m)}>
+                                        <Text style={[styles.reasonText, on && { fontFamily: fonts.bodyBold, color: '#fff' }]}>{m === 'original' ? 'Original payment method' : 'ZPIN Wallet (instant)'}</Text>
+                                        <View style={[styles.radio, on && styles.radioOn]}>{on && <Check size={13} color={colors.textOnYellow} />}</View>
+                                    </Pressable>
+                                );
+                            })}
                         </View>
-                    </View>
+                    </>
                 )}
 
-                {/* Confirm Button */}
-                <TouchableOpacity
-                    style={[styles.confirmButton, isSubmitting && styles.disabledButton]}
-                    onPress={handleConfirmAction}
-                    disabled={isSubmitting}
-                >
-                    {isSubmitting ? (
-                        <ActivityIndicator color="#fff" />
-                    ) : (
-                        <Text style={styles.confirmButtonText}>
-                            {isReturn ? "Confirm Return" : "Confirm Cancellation"}
-                        </Text>
-                    )}
-                </TouchableOpacity>
-
+                <View style={styles.infoBox}>
+                    <Info size={17} color={palette.yellow700} />
+                    <Text style={styles.infoText}>Refund of <Text style={{ fontFamily: fonts.bodyBold }}>{money(order.finalAmount)}</Text> will hit your {order.paymentMethod === 'cod' ? 'account' : 'original payment method'} within 3–4 business days.</Text>
+                </View>
             </ScrollView>
+
+            <View style={[styles.bottomBar, { paddingBottom: 16 + insets.bottom }]}>
+                <ZButton label="Keep order" variant="outline" style={{ flex: 1 }} onPress={() => router.back()} />
+                <ZButton label={isReturn ? 'Confirm return' : 'Cancel order'} variant="red" loading={isSubmitting} style={{ flex: 1 }} onPress={handleConfirmAction} />
+            </View>
 
             <ActionModal
                 visible={showSuccessModal}
-                title={isReturn ? "Return Initiated" : "Cancellation Successful"}
+                title={isReturn ? 'Return Initiated' : 'Cancellation Successful'}
                 message={successMessage}
                 icon="check-circle"
                 primaryButtonText="Go to Orders"
-                onPrimaryPress={() => {
-                    setShowSuccessModal(false);
-                    router.replace('/profile/orders');
-                }}
-                onClose={() => {
-                    setShowSuccessModal(false);
-                    router.replace('/profile/orders');
-                }}
+                onPrimaryPress={() => { setShowSuccessModal(false); router.replace('/profile/orders'); }}
+                onClose={() => { setShowSuccessModal(false); router.replace('/profile/orders'); }}
             />
-
             <ActionModal
                 visible={showErrorModal}
-                title={isReturn ? "Return Failed" : "Cancellation Failed"}
+                title={isReturn ? 'Return Failed' : 'Cancellation Failed'}
                 message={errorMessage}
                 icon="alert-circle"
                 primaryButtonText="OK"
@@ -262,196 +163,22 @@ export default function CancelOrderScreen() {
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#F8F9FA',
-    },
-    header: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingHorizontal: 20,
-        paddingVertical: 15,
-        backgroundColor: '#fff',
-        borderBottomWidth: 1,
-        borderBottomColor: '#F3F4F6',
-    },
-    backBtn: {
-        padding: 5,
-        marginLeft: -5,
-    },
-    headerTitle: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: '#1a1a1a',
-    },
-    scrollContent: {
-        padding: 20,
-    },
-    centerContent: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: 20,
-    },
-    errorText: {
-        fontSize: 16,
-        color: '#EF4444',
-        marginBottom: 20,
-    },
-    primaryButton: {
-        backgroundColor: '#FBBF24',
-        paddingVertical: 12,
-        paddingHorizontal: 24,
-        borderRadius: 8,
-    },
-    primaryButtonText: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: '#1a1a1a',
-    },
-    summaryCard: {
-        backgroundColor: '#fff',
-        borderRadius: 12,
-        padding: 16,
-        marginBottom: 20,
-        borderWidth: 1,
-        borderColor: '#E5E7EB',
-    },
-    summaryTitle: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: '#1a1a1a',
-        marginBottom: 8,
-    },
-    orderNumber: {
-        fontSize: 14,
-        color: '#6B7280',
-        marginBottom: 4,
-    },
-    itemCount: {
-        fontSize: 14,
-        color: '#6B7280',
-    },
-    divider: {
-        height: 1,
-        backgroundColor: '#E5E7EB',
-        marginVertical: 12,
-    },
-    totalRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-    },
-    totalLabel: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#374151',
-    },
-    totalValue: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: '#1a1a1a',
-    },
-    section: {
-        marginBottom: 24,
-    },
-    sectionTitle: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: '#374151',
-        marginBottom: 12,
-    },
-    reasonsContainer: {
-        backgroundColor: '#fff',
-        borderRadius: 12,
-        overflow: 'hidden',
-        borderWidth: 1,
-        borderColor: '#E5E7EB',
-    },
-    reasonOption: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: '#F3F4F6',
-    },
-    selectedReasonOption: {
-        backgroundColor: '#FFFBE6',
-    },
-    radioOuter: {
-        width: 20,
-        height: 20,
-        borderRadius: 10,
-        borderWidth: 2,
-        borderColor: '#D1D5DB',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 12,
-    },
-    selectedRadioOuter: {
-        borderColor: '#FBBF24',
-    },
-    radioInner: {
-        width: 10,
-        height: 10,
-        borderRadius: 5,
-        backgroundColor: '#FBBF24',
-    },
-    reasonText: {
-        fontSize: 14,
-        color: '#374151',
-    },
-    refundMethodContainer: {
-        gap: 12,
-    },
-    refundOption: {
-        backgroundColor: '#fff',
-        borderRadius: 12,
-        padding: 16,
-        borderWidth: 1,
-        borderColor: '#E5E7EB',
-    },
-    selectedRefundOption: {
-        borderColor: '#FBBF24',
-        backgroundColor: '#FFFBE6',
-    },
-    refundHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 8,
-    },
-    refundTitle: {
-        fontSize: 14,
-        fontWeight: '700',
-        color: '#1a1a1a',
-    },
-    refundDesc: {
-        fontSize: 12,
-        color: '#6B7280',
-        paddingLeft: 32,
-        lineHeight: 18,
-    },
-    confirmButton: {
-        backgroundColor: '#EF4444',
-        paddingVertical: 16,
-        borderRadius: 12,
-        alignItems: 'center',
-        marginBottom: 40,
-        shadowColor: '#EF4444',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 8,
-        elevation: 4,
-    },
-    disabledButton: {
-        backgroundColor: '#FCA5A5',
-        shadowOpacity: 0,
-        elevation: 0,
-    },
-    confirmButtonText: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: '#fff',
-    },
+    container: { flex: 1, backgroundColor: palette.paperWarm },
+    center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    content: { padding: 20, paddingTop: 4, paddingBottom: 24 },
+    orderCard: { flexDirection: 'row', alignItems: 'center', gap: 13, backgroundColor: colors.surfaceCard, borderWidth: 1, borderColor: palette.neutral200, borderRadius: 18, padding: 14, marginBottom: 20 },
+    orderImg: { width: 48, height: 56, borderRadius: 10, backgroundColor: colors.surfaceSunken },
+    orderNo: { fontFamily: fonts.monoBold, fontSize: 10, color: colors.textFaint },
+    orderName: { fontFamily: fonts.bodySemiBold, fontSize: 14, color: colors.textStrong, marginTop: 2 },
+    orderTotal: { fontFamily: fonts.displayBold, fontSize: 16, color: colors.textStrong },
+    reasons: { gap: 11 },
+    reason: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderRadius: radius.md, paddingVertical: 15, paddingHorizontal: 16 },
+    reasonOn: { backgroundColor: colors.surfaceInverse },
+    reasonOff: { backgroundColor: colors.surfaceCard, borderWidth: 1.5, borderColor: colors.borderSubtle },
+    reasonText: { fontFamily: fonts.bodySemiBold, fontSize: 14, color: colors.textBody },
+    radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: colors.borderSubtle, alignItems: 'center', justifyContent: 'center' },
+    radioOn: { backgroundColor: palette.yellow500, borderWidth: 0 },
+    infoBox: { flexDirection: 'row', gap: 10, alignItems: 'flex-start', backgroundColor: palette.yellow100, borderRadius: radius.md, padding: 14, marginTop: 18 },
+    infoText: { flex: 1, fontFamily: fonts.bodyRegular, fontSize: 12, lineHeight: 18, color: palette.yellow800 },
+    bottomBar: { position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', gap: 12, backgroundColor: colors.surfaceCard, borderTopWidth: 1, borderTopColor: colors.surfaceSunken, paddingHorizontal: 20, paddingTop: 16 },
 });

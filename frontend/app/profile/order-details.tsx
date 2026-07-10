@@ -1,26 +1,24 @@
-import { Feather, MaterialIcons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Bike, Check, Download, MapPin, RotateCcw, Zap } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
-import DeliveryStatusCard from '../../components/profile/DeliveryStatusCard';
-import OrderItemRow from '../../components/profile/OrderItemRow';
-import PriceBreakdown from '../../components/profile/PriceBreakdown';
+import { AppHeader, ZButton, ZText } from '../../components/ui';
+import { colors, fonts, palette, radius } from '../../constants/theme';
 import { useOrder } from '../../context/OrderContext';
 import { orderService } from '../../services/order';
 import { OrderObject } from '../../types/types';
 
 export default function OrderDetailsScreen() {
     const router = useRouter();
-    const params = useLocalSearchParams();
-    const { orderId } = params;
-    const { getOrderById, refreshOrders } = useOrder();
+    const { orderId } = useLocalSearchParams();
+    const { getOrderById } = useOrder();
     const [showInvoiceModal, setShowInvoiceModal] = useState(false);
     const [fetchedOrder, setFetchedOrder] = useState<OrderObject | null>(null);
     const [isFetching, setIsFetching] = useState(true);
 
-    // Always fetch fresh data from API for accurate order details
     useEffect(() => {
         const fetchOrder = async () => {
             try {
@@ -29,58 +27,31 @@ export default function OrderDetailsScreen() {
                 const o = (response as any)?.data?.order || (response as any)?.data;
                 if (o) {
                     setFetchedOrder({
-                        id: o.id,
-                        userId: o.userId,
-                        sellerId: o.sellerId || '',
-                        orderNumber: o.orderNumber,
-                        status: o.status,
-                        paymentStatus: o.paymentStatus,
-                        totalAmount: Number(o.totalAmount || 0),
-                        shippingAmount: Number(o.shippingAmount || 0),
-                        taxAmount: Number(o.taxAmount || 0),
-                        finalAmount: Number(o.finalAmount || 0),
-                        shippingAddress: o.shippingAddress || {},
-                        paymentMethod: o.paymentMethod || 'cod',
-                        paymentId: o.paymentId,
+                        id: o.id, userId: o.userId, sellerId: o.sellerId || '', orderNumber: o.orderNumber,
+                        status: o.status, paymentStatus: o.paymentStatus,
+                        totalAmount: Number(o.totalAmount || 0), shippingAmount: Number(o.shippingAmount || 0),
+                        taxAmount: Number(o.taxAmount || 0), finalAmount: Number(o.finalAmount || 0),
+                        shippingAddress: o.shippingAddress || {}, paymentMethod: o.paymentMethod || 'cod', paymentId: o.paymentId,
                         items: Array.isArray(o.items) ? o.items.map((item: any) => ({
-                            orderItemId: item.orderItemId || item.id,
-                            productId: item.productId,
-                            productName: item.productName,
-                            quantity: item.quantity,
-                            price: Number(item.price || 0),
-                            image: item.image || '',
-                            variant: item.variant,
+                            orderItemId: item.orderItemId || item.id, productId: item.productId, productName: item.productName,
+                            quantity: item.quantity, price: Number(item.price || 0), image: item.image || '', variant: item.variant,
                         })) : [],
-                        estimatedDelivery: o.estimatedDelivery || '',
-                        trackingNumber: o.trackingNumber,
-                        notes: o.notes,
-                        createdAt: o.createdAt,
-                        updatedAt: o.updatedAt,
+                        estimatedDelivery: o.estimatedDelivery || '', trackingNumber: o.trackingNumber, notes: o.notes,
+                        createdAt: o.createdAt, updatedAt: o.updatedAt,
                     } as OrderObject);
                 }
-            } catch {
-                // Fall back to context cache if API fails
-            } finally {
-                setIsFetching(false);
-            }
+            } catch { /* fall back to cache */ } finally { setIsFetching(false); }
         };
         if (orderId) fetchOrder();
     }, [orderId]);
 
-    // Use fresh API data, fall back to context cache
     const order = fetchedOrder ?? getOrderById(orderId as string);
     const isInstantDelivery = order?.notes === 'instant_delivery';
 
     let couponCode: string | undefined;
     let noteCouponDiscount = 0;
     if (order?.notes && typeof order.notes === 'string') {
-        try {
-            const parsedNotes = JSON.parse(order.notes);
-            couponCode = parsedNotes?.couponCode;
-            noteCouponDiscount = Number(parsedNotes?.couponDiscount || 0);
-        } catch {
-            // Notes are typically plain text; ignore parsing errors.
-        }
+        try { const p = JSON.parse(order.notes); couponCode = p?.couponCode; noteCouponDiscount = Number(p?.couponDiscount || 0); } catch { }
     }
 
     const itemsTotal = Number(order?.totalAmount || 0);
@@ -91,466 +62,161 @@ export default function OrderDetailsScreen() {
     const inferredCouponDiscount = Math.max(0, Number((preDiscountTotal - Number(order?.finalAmount || 0)).toFixed(2)));
     const couponDiscount = Math.max(noteCouponDiscount, inferredCouponDiscount);
 
-    // Can cancel only before it's out for delivery (processing = out for delivery in timeline)
     const canCancel = order && ['pending', 'confirmed'].includes(order.status);
-
-    // Can return only after delivered
     const canReturn = order && order.status === 'delivered';
-
-    const handleDownloadInvoice = () => {
-        // API: GET /api/v1/orders/:id/invoice
-        setShowInvoiceModal(true);
-        // Implement file download logic here
-    };
-
-    const handleContactDelivery = () => {
-        // Contact delivery partner via phone
-        const phoneNumber = '+919876543210'; // Mock delivery partner number
-        Linking.openURL(`tel:${phoneNumber}`);
-    };
+    const money = (n: number) => `₹${Number(n).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 
     if (isFetching && !order) {
         return (
-            <SafeAreaView style={styles.container}>
-                <View style={styles.header}>
-                    <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-                        <Feather name="chevron-left" size={28} color="#1a1a1a" />
-                    </TouchableOpacity>
-                    <Text style={styles.headerTitle}>Order Details</Text>
-                    <View style={{ width: 28 }} />
-                </View>
-                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                    <ActivityIndicator size="large" color="#FBBF24" />
-                </View>
+            <SafeAreaView style={styles.container} edges={['top']}>
+                <AppHeader title="Order details" onBack={() => router.back()} />
+                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}><ActivityIndicator size="large" color={palette.yellow500} /></View>
+            </SafeAreaView>
+        );
+    }
+    if (!order) {
+        return (
+            <SafeAreaView style={styles.container} edges={['top']}>
+                <AppHeader title="Order not found" onBack={() => router.back()} />
+                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}><ZText variant="muted">Order details not available.</ZText></View>
             </SafeAreaView>
         );
     }
 
-    if (!order) {
-        return (
-            <SafeAreaView style={styles.container}>
-                <View style={styles.header}>
-                    <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-                        <Feather name="chevron-left" size={28} color="#1a1a1a" />
-                    </TouchableOpacity>
-                    <Text style={styles.headerTitle}>Order Not Found</Text>
-                </View>
-                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                    <Text>Order details not available.</Text>
-                </View>
-            </SafeAreaView>
-        );
-    }
+    const delivered = order.status === 'delivered';
+    const cancelled = order.status === 'cancelled';
+    const statusLabel = delivered ? 'Delivered' : cancelled ? 'Cancelled' : order.status.charAt(0).toUpperCase() + order.status.slice(1);
+    const statusColor = delivered ? palette.green500 : cancelled ? palette.red500 : palette.yellow600;
+    const addr = order.shippingAddress || ({} as any);
 
     return (
         <SafeAreaView style={styles.container} edges={['top']}>
-            {/* Header */}
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-                    <Feather name="chevron-left" size={28} color="#1a1a1a" />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Order #{order.orderNumber}</Text>
-                <View style={{ width: 28 }} />
-            </View>
+            <AppHeader title="Order details" onBack={() => router.back()} />
+            <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+                <ZText variant="eyebrow" style={{ marginBottom: 12 }}>Order {order.orderNumber}</ZText>
 
-            <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-                {/* Delivery Status */}
-                <DeliveryStatusCard
-                    status={order.status === 'pending' ? 'Processing' : order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-                    subtext={`${isInstantDelivery ? '⚡ Instant Trial Delivery' : '🚚 Standard Delivery'}${order.estimatedDelivery ? ` · By ${order.estimatedDelivery}` : ''}`}
-                    icon={isInstantDelivery ? 'zap' : 'truck'}
-                />
-
-                {/* Delivery Address */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>DELIVERY ADDRESS</Text>
-                    <View style={styles.addressCard}>
-                        <View style={styles.locationIcon}>
-                            <Feather name="map-pin" size={16} color="#6B7280" />
-                        </View>
-                        <View style={styles.addressContent}>
-                            <Text style={styles.addressName}>{order.shippingAddress?.name || '—'}</Text>
-                            {(order.shippingAddress?.address || order.shippingAddress?.city) ? (
-                                <Text style={styles.addressDetails}>
-                                    {[
-                                        order.shippingAddress?.address,
-                                        order.shippingAddress?.city,
-                                        order.shippingAddress?.state,
-                                        order.shippingAddress?.pincode ? `- ${order.shippingAddress.pincode}` : null,
-                                    ].filter(Boolean).join(', ')}
-                                </Text>
-                            ) : (
-                                <Text style={styles.addressDetails}>Address details not available</Text>
-                            )}
-                            {order.shippingAddress?.phone ? (
-                                <Text style={styles.addressPhone}>+91 {order.shippingAddress.phone}</Text>
-                            ) : null}
-                        </View>
+                {/* Status banner */}
+                <View style={styles.banner}>
+                    <Zap size={90} color="rgba(255,196,0,0.12)" fill="rgba(255,196,0,0.12)" style={styles.bannerGlow} />
+                    <View style={[styles.bannerIcon, { backgroundColor: statusColor }]}>
+                        {delivered ? <Check size={24} color="#fff" /> : <Bike size={22} color="#fff" />}
                     </View>
-                </View>
-
-                {/* Payment Method */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>PAYMENT METHOD</Text>
-                    <View style={styles.paymentCard}>
-                        <View style={styles.paymentRow}>
-                            <MaterialIcons name="account-balance-wallet" size={24} color="#6B7280" />
-                            <Text style={styles.paymentMethodText}>
-                                {order.paymentMethod === 'cod' ? 'Cash on Delivery'
-                                    : order.paymentMethod === 'razorpay' ? 'Online Payment'
-                                    : order.paymentMethod === 'wallet' ? 'Wallet'
-                                    : order.paymentMethod}
-                            </Text>
-                        </View>
-                        <View style={[
-                            styles.paidBadge,
-                            order.paymentStatus === 'paid' ? styles.paidBadgePaid
-                            : order.paymentMethod === 'cod' ? styles.paidBadgeCod
-                            : styles.paidBadgePending
-                        ]}>
-                            <Text style={[
-                                styles.paidText,
-                                order.paymentStatus === 'paid' ? styles.paidTextPaid
-                                : order.paymentMethod === 'cod' ? styles.paidTextCod
-                                : styles.paidTextPending
-                            ]}>
-                                {order.paymentStatus === 'paid' ? 'PAID'
-                                    : order.paymentStatus === 'refunded' ? 'REFUNDED'
-                                    : order.paymentMethod === 'cod' ? 'COD'
-                                    : 'PENDING'}
-                            </Text>
-                        </View>
+                    <View>
+                        <Text style={styles.bannerTitle}>{statusLabel}</Text>
+                        <Text style={styles.bannerSub}>{isInstantDelivery ? 'Try-at-Door · Instant' : 'Standard delivery'}{order.estimatedDelivery ? ` · by ${order.estimatedDelivery}` : ''}</Text>
                     </View>
                 </View>
 
                 {/* Items */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>ITEMS</Text>
-                    <View style={styles.itemsCard}>
-                        {(order.items || []).map((item, index) => (
-                            <OrderItemRow
-                                key={index}
-                                image={item.image || null}
-                                name={item.productName || 'Product'}
-                                variant={item.variant || ''}
-                                quantity={item.quantity || 1}
-                                price={Number(item.price) || 0}
-                            />
-                        ))}
+                <View style={styles.card}>
+                    <ZText variant="eyebrow" style={{ marginBottom: 14 }}>{order.items.length} item{order.items.length !== 1 ? 's' : ''}</ZText>
+                    {order.items.map((it, i) => (
+                        <View key={i} style={[styles.itemRow, i > 0 && styles.itemRowBorder]}>
+                            <Image source={it.image ? { uri: it.image as string } : require('../../assets/images/icon_backup.png')} style={styles.itemImg} contentFit="cover" />
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.itemName} numberOfLines={1}>{it.productName}</Text>
+                                <Text style={styles.itemVariant}>{it.variant ? `${it.variant} · ` : ''}Qty {it.quantity}</Text>
+                            </View>
+                            <Text style={styles.itemPrice}>{money(it.price)}</Text>
+                        </View>
+                    ))}
+                </View>
+
+                {/* Address */}
+                <View style={styles.addrCard}>
+                    <View style={styles.addrIcon}><MapPin size={20} color={colors.textStrong} /></View>
+                    <View style={{ flex: 1 }}>
+                        <Text style={styles.addrName}>{addr.name || '—'}</Text>
+                        <Text style={styles.addrLine}>{[addr.address, addr.city, addr.state, addr.pincode].filter(Boolean).join(', ') || 'Address not available'}</Text>
                     </View>
                 </View>
 
-                {/* Price Details */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>PRICE DETAILS</Text>
-                    <View style={styles.priceCard}>
-                        <PriceBreakdown
-                            itemsTotal={itemsTotal || order.finalAmount}
-                            instantTrialFee={instantTrialFee}
-                            deliveryCharges={shippingFee}
-                            gstAmount={gstAmount}
-                            couponDiscount={couponDiscount}
-                            couponCode={couponCode}
-                            grandTotal={order.finalAmount}
-                        />
+                {/* Bill */}
+                <View style={styles.card}>
+                    <ZText variant="eyebrow" style={{ marginBottom: 14 }}>Bill details</ZText>
+                    <BillRow label="Subtotal" value={money(itemsTotal || order.finalAmount)} />
+                    {instantTrialFee > 0 && <BillRow label="Instant trial fee" value={money(instantTrialFee)} />}
+                    <BillRow label="Delivery" value={shippingFee === 0 ? 'FREE' : money(shippingFee)} mono={shippingFee === 0} />
+                    {gstAmount > 0 && <BillRow label="Tax (GST)" value={money(gstAmount)} />}
+                    {couponDiscount > 0 && <BillRow label={couponCode ? `Coupon ${couponCode}` : 'Coupon'} value={`−${money(couponDiscount)}`} red />}
+                    <View style={styles.billTotal}>
+                        <Text style={styles.payLabel}>Paid · {order.paymentMethod === 'cod' ? 'COD' : order.paymentMethod === 'razorpay' ? 'UPI' : order.paymentMethod}</Text>
+                        <Text style={styles.payValue}>{money(order.finalAmount)}</Text>
                     </View>
                 </View>
 
-                {/* Action Buttons */}
-                <View style={styles.actionButtonsRow}>
-                    <TouchableOpacity
-                        style={styles.outlineButton}
-                        onPress={handleDownloadInvoice}
-                    >
-                        <Feather name="file-text" size={18} color="#1a1a1a" style={styles.btnIcon} />
-                        <Text style={styles.outlineButtonText}>Invoice</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={styles.outlineButton}
-                        onPress={() => router.push('/profile/help-center')}
-                    >
-                        <Feather name="help-circle" size={18} color="#1a1a1a" style={styles.btnIcon} />
-                        <Text style={styles.outlineButtonText}>Need Help?</Text>
-                    </TouchableOpacity>
+                <View style={styles.actions}>
+                    {canReturn && (
+                        <Pressable style={styles.outlineBtn} onPress={() => router.push('/profile/returns')}>
+                            <RotateCcw size={17} color={colors.textStrong} />
+                            <Text style={styles.outlineText}>Return items</Text>
+                        </Pressable>
+                    )}
+                    <Pressable style={styles.yellowBtn} onPress={() => setShowInvoiceModal(true)}>
+                        <Download size={17} color={colors.textOnYellow} />
+                        <Text style={styles.yellowText}>Invoice</Text>
+                    </Pressable>
                 </View>
 
-                {/* Contact Delivery Partner (only if order is out for delivery or in transit) */}
-                {['processing', 'shipped'].includes(order.status) && (
-                    <TouchableOpacity
-                        style={styles.contactButton}
-                        onPress={handleContactDelivery}
-                    >
-                        <Feather name="phone" size={18} color="#4CAF50" />
-                        <Text style={styles.contactButtonText}>Contact Delivery Partner</Text>
-                    </TouchableOpacity>
+                {!cancelled && order.status !== 'returned' && (
+                    <ZButton label="Track order" style={{ marginTop: 12 }} onPress={() => router.push({ pathname: '/profile/track-order', params: { orderId: order.id } })} />
                 )}
-
-                {/* Track Button - Hidden for cancelled/returned orders */}
-                {order.status !== 'cancelled' && order.status !== 'returned' && (
-                    <TouchableOpacity
-                        style={styles.primaryButton}
-                        onPress={() => router.push({
-                            pathname: '/profile/track-order',
-                            params: { orderId: order.id }
-                        })}
-                    >
-                        <Text style={styles.primaryButtonText}>Track Order</Text>
-                    </TouchableOpacity>
-                )}
-
-                {/* Cancel Order Button (only if eligible) */}
                 {canCancel && (
-                    <TouchableOpacity
-                        style={styles.cancelButton}
-                        onPress={() => router.push({
-                            pathname: '/profile/cancel-order',
-                            params: { orderId: order.id }
-                        })}
-                    >
-                        <Text style={styles.cancelButtonText}>Cancel Order</Text>
-                    </TouchableOpacity>
+                    <ZButton label="Cancel order" variant="outline" style={{ marginTop: 12 }} onPress={() => router.push({ pathname: '/profile/cancel-order', params: { orderId: order.id } })} />
                 )}
-
-                {/* Return Order Button (only if eligible) */}
-                {canReturn && (
-                    <TouchableOpacity
-                        style={styles.returnButton}
-                        onPress={() => router.push('/profile/returns')}
-                    >
-                        <Text style={styles.returnButtonText}>Return Items</Text>
-                    </TouchableOpacity>
+                {['processing', 'shipped'].includes(order.status) && (
+                    <ZButton label="Contact delivery partner" variant="light" style={{ marginTop: 12 }} onPress={() => Linking.openURL('tel:+919876543210')} />
                 )}
-
-                <View style={{ height: 40 }} />
+                <View style={{ height: 30 }} />
             </ScrollView>
 
-
-
-            {/* Invoice Modal */}
-            <ActionModal
-                visible={showInvoiceModal}
-                title="Invoice Download"
-                message="Invoice will be downloaded to your device."
-                icon="file-text"
-                primaryButtonText="OK"
-                onPrimaryPress={() => setShowInvoiceModal(false)}
-                onClose={() => setShowInvoiceModal(false)}
-            />
+            <ActionModal visible={showInvoiceModal} title="Invoice Download" message="Invoice will be downloaded to your device." icon="file-text" primaryButtonText="OK" onPrimaryPress={() => setShowInvoiceModal(false)} onClose={() => setShowInvoiceModal(false)} />
         </SafeAreaView>
     );
 }
 
+function BillRow({ label, value, mono, red }: { label: string; value: string; mono?: boolean; red?: boolean }) {
+    return (
+        <View style={styles.billRow}>
+            <Text style={[styles.billLabel, red && { color: palette.red500 }]}>{label}</Text>
+            <Text style={[mono ? styles.billMono : styles.billValue, red && { color: palette.red500 }]}>{value}</Text>
+        </View>
+    );
+}
+
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#F8F9FA',
-    },
-    header: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingHorizontal: 20,
-        paddingVertical: 15,
-        backgroundColor: '#fff',
-        borderBottomWidth: 1,
-        borderBottomColor: '#F3F4F6',
-    },
-    backBtn: {
-        padding: 5,
-        marginLeft: -5,
-    },
-    headerTitle: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: '#1a1a1a',
-    },
-    scrollContent: {
-        padding: 20,
-    },
-    section: {
-        marginBottom: 24,
-    },
-    sectionTitle: {
-        fontSize: 12,
-        fontWeight: '700',
-        color: '#9CA3AF',
-        marginBottom: 8,
-        letterSpacing: 0.5,
-    },
-    addressCard: {
-        backgroundColor: '#fff',
-        borderRadius: 12,
-        padding: 16,
-        flexDirection: 'row',
-    },
-    locationIcon: {
-        marginTop: 2,
-        marginRight: 12,
-    },
-    addressContent: {
-        flex: 1,
-    },
-    addressName: {
-        fontSize: 14,
-        fontWeight: '700',
-        color: '#1a1a1a',
-        marginBottom: 4,
-    },
-    addressDetails: {
-        fontSize: 13,
-        color: '#6B7280',
-        lineHeight: 20,
-        marginBottom: 4,
-    },
-    addressPhone: {
-        fontSize: 13,
-        fontWeight: '500',
-        color: '#4B5563',
-    },
-    paymentCard: {
-        backgroundColor: '#fff',
-        borderRadius: 12,
-        padding: 16,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-    },
-    paymentRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    paymentMethodText: {
-        fontSize: 14,
-        fontWeight: '500',
-        color: '#1a1a1a',
-        marginLeft: 12,
-    },
-    paidBadge: {
-        backgroundColor: '#DCFCE7',
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 4,
-    },
-    paidBadgePaid: {
-        backgroundColor: '#DCFCE7',
-    },
-    paidBadgePending: {
-        backgroundColor: '#FEE2E2',
-    },
-    paidBadgeCod: {
-        backgroundColor: '#FEF3C7',
-    },
-    paidText: {
-        fontSize: 10,
-        fontWeight: '700',
-        color: '#166534',
-    },
-    paidTextPaid: {
-        color: '#166534',
-    },
-    paidTextPending: {
-        color: '#991B1B',
-    },
-    paidTextCod: {
-        color: '#92400E',
-    },
-    itemsCard: {
-        backgroundColor: '#fff',
-        borderRadius: 12,
-        padding: 16,
-    },
-    priceCard: {
-        backgroundColor: '#fff',
-        borderRadius: 12,
-        padding: 16,
-    },
-    actionButtonsRow: {
-        flexDirection: 'row',
-        gap: 12,
-        marginBottom: 20,
-    },
-    outlineButton: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: 48,
-        backgroundColor: '#fff',
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: '#E5E7EB',
-    },
-    btnIcon: {
-        marginRight: 8,
-    },
-    outlineButtonText: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#1a1a1a',
-    },
-    primaryButton: {
-        height: 50,
-        backgroundColor: '#FBBF24',
-        borderRadius: 12,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 20,
-        shadowColor: '#FBBF24',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 8,
-        elevation: 4,
-    },
-    primaryButtonText: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: '#1a1a1a',
-    },
-    contactButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: 50,
-        backgroundColor: '#ECFDF5',
-        borderRadius: 12,
-        marginBottom: 15,
-        borderWidth: 1,
-        borderColor: '#4CAF50',
-        gap: 8,
-    },
-    contactButtonText: {
-        fontSize: 15,
-        fontWeight: '600',
-        color: '#4CAF50',
-    },
-    cancelButton: {
-        height: 50,
-        backgroundColor: '#FEE2E2',
-        borderRadius: 12,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 15,
-        borderWidth: 1,
-        borderColor: '#EF4444',
-    },
-    cancelButtonText: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#EF4444',
-    },
-    returnButton: {
-        height: 50,
-        backgroundColor: '#FEF3C7',
-        borderRadius: 12,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 15,
-        borderWidth: 1,
-        borderColor: '#F59E0B',
-    },
-    returnButtonText: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#F59E0B',
-    },
+    container: { flex: 1, backgroundColor: palette.paperWarm },
+    content: { padding: 20, paddingTop: 4 },
+    banner: { backgroundColor: colors.surfaceInverse, borderRadius: radius.lg, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 13, marginBottom: 16, overflow: 'hidden' },
+    bannerGlow: { position: 'absolute', right: -14, top: -16 },
+    bannerIcon: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+    bannerTitle: { fontFamily: fonts.displaySemiBold, fontSize: 16, color: '#fff' },
+    bannerSub: { fontFamily: fonts.bodyRegular, fontSize: 12, color: palette.neutral300, marginTop: 1 },
+
+    card: { backgroundColor: colors.surfaceCard, borderWidth: 1, borderColor: palette.neutral200, borderRadius: radius.lg, padding: 16, marginBottom: 16 },
+    itemRow: { flexDirection: 'row', alignItems: 'center', gap: 13, paddingTop: 14, marginTop: -14 },
+    itemRowBorder: { borderTopWidth: 1, borderTopColor: palette.neutral100, paddingTop: 14, marginTop: 0 },
+    itemImg: { width: 56, height: 66, borderRadius: 11, backgroundColor: colors.surfaceSunken },
+    itemName: { fontFamily: fonts.bodySemiBold, fontSize: 14, color: colors.textStrong },
+    itemVariant: { fontFamily: fonts.bodyRegular, fontSize: 12, color: colors.textFaint, marginTop: 2 },
+    itemPrice: { fontFamily: fonts.displaySemiBold, fontSize: 16, color: colors.textStrong },
+
+    addrCard: { flexDirection: 'row', gap: 13, backgroundColor: colors.surfaceCard, borderWidth: 1, borderColor: palette.neutral200, borderRadius: 18, padding: 14, marginBottom: 16 },
+    addrIcon: { width: 42, height: 42, borderRadius: 12, backgroundColor: colors.surfaceSunken, alignItems: 'center', justifyContent: 'center' },
+    addrName: { fontFamily: fonts.displaySemiBold, fontSize: 14, color: colors.textStrong, marginBottom: 3 },
+    addrLine: { fontFamily: fonts.bodyRegular, fontSize: 12, lineHeight: 18, color: colors.textFaint },
+
+    billRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
+    billLabel: { fontFamily: fonts.bodyRegular, fontSize: 14, color: colors.textBody },
+    billValue: { fontFamily: fonts.displaySemiBold, fontSize: 14, color: colors.textStrong },
+    billMono: { fontFamily: fonts.monoBold, fontSize: 12, color: palette.green500 },
+    billTotal: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', borderTopWidth: 1, borderTopColor: colors.borderSubtle, borderStyle: 'dashed', paddingTop: 12, marginTop: 2 },
+    payLabel: { fontFamily: fonts.displaySemiBold, fontSize: 15, color: colors.textStrong },
+    payValue: { fontFamily: fonts.displayBold, fontSize: 20, color: colors.textStrong },
+
+    actions: { flexDirection: 'row', gap: 10 },
+    outlineBtn: { flex: 1, height: 50, borderRadius: radius.md, borderWidth: 2, borderColor: colors.borderInk, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+    outlineText: { fontFamily: fonts.bodyBold, fontSize: 13, color: colors.textStrong },
+    yellowBtn: { flex: 1, height: 50, borderRadius: radius.md, backgroundColor: palette.yellow500, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+    yellowText: { fontFamily: fonts.bodyBlack, fontSize: 13, color: colors.textOnYellow },
 });

@@ -1,242 +1,82 @@
-import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { Briefcase, Home, MapPin, Pencil, Plus, Trash2 } from 'lucide-react-native';
 import React from 'react';
-import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { AppHeader, BottomBar, ZButton } from '../../components/ui';
+import { colors, fonts, palette, radius } from '../../constants/theme';
 import { useAddress } from '../../context/AddressContext';
 
 export default function SavedAddressesScreen() {
     const { addresses, removeAddress, setDefaultAddress } = useAddress();
     const router = useRouter();
 
-    const renderItem = ({ item }: { item: any }) => (
-        <View style={[styles.addressCard, item.isDefault && styles.defaultCard]}>
-            <View style={styles.cardHeader}>
-                <View style={styles.typeTag}>
-                    <Feather
-                        name={item.label === 'Home' ? 'home' : item.label === 'Work' ? 'briefcase' : 'map-pin'}
-                        size={12}
-                        color="#1a1a1a"
-                    />
-                    <Text style={styles.typeText}>{item.label}</Text>
-                </View>
-                <View style={styles.actions}>
-                    {!item.isDefault && (
-                        <TouchableOpacity onPress={() => setDefaultAddress(item.id)} style={styles.setDefaultBtn}>
-                            <Text style={styles.setDefaultText}>Set Default</Text>
-                        </TouchableOpacity>
+    const renderItem = ({ item }: { item: any }) => {
+        const Icon = item.label === 'Home' ? Home : item.label === 'Work' ? Briefcase : MapPin;
+        return (
+            <View style={[styles.card, item.isDefault ? styles.cardDefault : styles.cardPlain]}>
+                <View style={styles.head}>
+                    <Icon size={19} color={colors.textStrong} />
+                    <Text style={styles.name}>{item.name}</Text>
+                    <View style={[styles.tag, item.isDefault && styles.tagOn]}>
+                        <Text style={[styles.tagText, item.isDefault && styles.tagTextOn]}>{(item.label || 'OTHER').toUpperCase()}</Text>
+                    </View>
+                    {item.isDefault ? (
+                        <Text style={styles.defaultTag}>DEFAULT</Text>
+                    ) : (
+                        <Text style={styles.setDefault} onPress={() => setDefaultAddress(item.id)}>SET DEFAULT</Text>
                     )}
-                    <TouchableOpacity
-                        onPress={() => router.push({ pathname: '/profile/add-address', params: { id: item.id } })}
-                        style={styles.editBtn}
-                    >
-                        <Feather name="edit-2" size={16} color="#FBBF24" />
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => removeAddress(item.id)} style={styles.deleteBtn}>
-                        <Feather name="trash-2" size={16} color="#EF4444" />
-                    </TouchableOpacity>
+                </View>
+                <Text style={styles.address}>{item.address}, {item.landmark ? `${item.landmark}, ` : ''}{item.city}, {item.state} {item.pincode}</Text>
+                <Text style={styles.phone}>+91 {item.phone}</Text>
+                <View style={styles.actions}>
+                    <Pressable style={styles.actionBtn} onPress={() => router.push({ pathname: '/profile/add-address', params: { id: item.id } })}>
+                        <Pencil size={13} color={colors.textStrong} />
+                        <Text style={styles.actionText}>EDIT</Text>
+                    </Pressable>
+                    <Pressable style={styles.actionBtn} onPress={() => removeAddress(item.id)}>
+                        <Trash2 size={13} color={palette.red500} />
+                        <Text style={[styles.actionText, { color: palette.red500 }]}>DELETE</Text>
+                    </Pressable>
                 </View>
             </View>
-
-            <View style={styles.details}>
-                <Text style={styles.name}>{item.name}</Text>
-                <Text style={styles.addressText}>{item.address}</Text>
-                <Text style={styles.addressText}>{item.landmark ? `${item.landmark}, ` : ''}{item.city}, {item.state} - {item.pincode}</Text>
-                <Text style={styles.addressText}>{item.country}</Text>
-                <Text style={styles.phone}>Mobile: {item.phone}</Text>
-            </View>
-
-            {item.isDefault && (
-                <View style={styles.defaultBadge}>
-                    <Feather name="check-circle" size={12} color="#fff" />
-                    <Text style={styles.defaultBadgeText}>Default</Text>
-                </View>
-            )}
-        </View>
-    );
+        );
+    };
 
     return (
-        <SafeAreaView style={styles.container}>
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-                    <Feather name="arrow-left" size={24} color="#1a1a1a" />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Saved Addresses</Text>
-                <View style={{ width: 34 }} />
-            </View>
-
+        <SafeAreaView style={styles.container} edges={['top']}>
+            <AppHeader title="Saved addresses" onBack={() => router.back()} />
             <FlatList
                 data={addresses}
                 renderItem={renderItem}
                 keyExtractor={item => item.id}
-                contentContainerStyle={styles.listContent}
+                contentContainerStyle={styles.list}
                 showsVerticalScrollIndicator={false}
-                ListHeaderComponent={
-                    <TouchableOpacity style={styles.addNewCard} onPress={() => router.push('/profile/add-address')}>
-                        <View style={styles.plusIconBg}>
-                            <Feather name="plus" size={20} color="#FBBF24" />
-                        </View>
-                        <Text style={styles.addNewText}>Add New Address</Text>
-                    </TouchableOpacity>
-                }
             />
+            <BottomBar>
+                <ZButton label="Add new address" variant="outline" iconLeft={Plus} onPress={() => router.push('/profile/add-address')} />
+            </BottomBar>
         </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#F8F9FA'
-    },
-    header: {
-        paddingHorizontal: 20,
-        paddingVertical: 15,
-        backgroundColor: '#fff',
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 5,
-        elevation: 2,
-        zIndex: 10
-    },
-    headerTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#1a1a1a'
-    },
-    backBtn: {
-        padding: 5
-    },
-    listContent: {
-        padding: 20
-    },
-    addNewCard: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#fff',
-        padding: 16,
-        borderRadius: 12,
-        marginBottom: 20,
-        borderWidth: 1,
-        borderColor: '#FBBF24',
-        borderStyle: 'dashed'
-    },
-    plusIconBg: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        backgroundColor: '#FFFBE6',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 12
-    },
-    addNewText: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#FBBF24'
-    },
-    addressCard: {
-        backgroundColor: '#fff',
-        borderRadius: 16,
-        padding: 16,
-        marginBottom: 16,
-        borderWidth: 1,
-        borderColor: 'transparent',
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.03,
-        shadowRadius: 8,
-        elevation: 2,
-        position: 'relative'
-    },
-    defaultCard: {
-        borderColor: '#FBBF24',
-        backgroundColor: '#FFFCF2'
-    },
-    cardHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 12
-    },
-    typeTag: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#f3f4f6',
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 6
-    },
-    typeText: {
-        fontSize: 12,
-        fontWeight: '600',
-        color: '#1a1a1a',
-        marginLeft: 4
-    },
-    actions: {
-        flexDirection: 'row',
-        alignItems: 'center'
-    },
-    setDefaultBtn: {
-        marginRight: 15
-    },
-    setDefaultText: {
-        fontSize: 12,
-        fontWeight: '600',
-        color: '#FBBF24'
-    },
-    editBtn: {
-        padding: 4,
-        marginRight: 10
-    },
-    deleteBtn: {
-        padding: 4
-    },
-    details: {
-        marginTop: 4
-    },
-    name: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: '#1a1a1a',
-        marginBottom: 4
-    },
-    addressText: {
-        fontSize: 14,
-        color: '#666',
-        marginBottom: 2,
-        lineHeight: 20
-    },
-    phone: {
-        fontSize: 14,
-        color: '#1a1a1a',
-        marginTop: 8,
-        fontWeight: '500'
-    },
-    defaultBadge: {
-        position: 'absolute',
-        top: -10,
-        right: 20,
-        backgroundColor: '#FBBF24',
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 12,
-        flexDirection: 'row',
-        alignItems: 'center',
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3
-    },
-    defaultBadgeText: {
-        fontSize: 10,
-        fontWeight: '700',
-        color: '#fff',
-        marginLeft: 4
-    }
+    container: { flex: 1, backgroundColor: palette.paperWarm },
+    list: { padding: 20, paddingTop: 6 },
+    card: { backgroundColor: colors.surfaceCard, borderRadius: radius.lg, padding: 16, marginBottom: 14 },
+    cardDefault: { borderWidth: 2, borderColor: colors.borderInk },
+    cardPlain: { borderWidth: 1, borderColor: palette.neutral200 },
+    head: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
+    name: { fontFamily: fonts.displaySemiBold, fontSize: 16, color: colors.textStrong },
+    tag: { backgroundColor: colors.surfaceSunken, paddingHorizontal: 9, paddingVertical: 3, borderRadius: radius.xs },
+    tagOn: { backgroundColor: palette.yellow500 },
+    tagText: { fontFamily: fonts.monoBold, fontSize: 9, letterSpacing: 0.6, color: colors.textBody },
+    tagTextOn: { color: colors.textOnYellow },
+    defaultTag: { marginLeft: 'auto', fontFamily: fonts.monoBold, fontSize: 9, color: palette.green500 },
+    setDefault: { marginLeft: 'auto', fontFamily: fonts.monoBold, fontSize: 9, color: colors.textMuted },
+    address: { fontFamily: fonts.bodyRegular, fontSize: 14, lineHeight: 21, color: colors.textBody, marginLeft: 29 },
+    phone: { fontFamily: fonts.monoBold, fontSize: 13, color: colors.textMuted, marginLeft: 29, marginTop: 6 },
+    actions: { flexDirection: 'row', gap: 20, marginLeft: 29, marginTop: 14 },
+    actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+    actionText: { fontFamily: fonts.monoBold, fontSize: 11, letterSpacing: 0.4, color: colors.textStrong },
 });
