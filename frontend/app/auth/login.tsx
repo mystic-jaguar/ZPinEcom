@@ -233,7 +233,7 @@ const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: palette.paperWarm },
     flex: { flex: 1 },
     scrollContent: { flexGrow: 1, paddingHorizontal: 26, paddingBottom: 30 },
-    logo: { height: 60, width: 135, marginTop: 30, marginBottom: 4 },
+    logo: { height: 28, width: 63, marginTop: 30, marginBottom: 4 },
     title: { marginTop: 20 },
     subtitle: { marginTop: 8, marginBottom: 28 },
     forgot: { alignSelf: 'flex-end', marginTop: 4, marginBottom: 20 },
