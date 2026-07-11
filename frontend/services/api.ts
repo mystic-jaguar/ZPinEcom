@@ -118,8 +118,14 @@ apiClient.interceptors.response.use(
     async (error: AxiosError) => {
         const originalRequest = error.config as any;
 
+        // Only 401s on authenticated endpoints mean an expired token. A 401 from a
+        // public endpoint (e.g. wrong login credentials) must surface the server's
+        // real error, not the refresh flow's misleading SESSION_EXPIRED.
+        const requestUrl = originalRequest?.url || '';
+        const isPublicEndpoint = PUBLIC_ENDPOINTS.some(endpoint => requestUrl.startsWith(endpoint));
+
         // Handle 401 Unauthorized - Token expired (access token is now 15min)
-        if (error.response?.status === 401 && !originalRequest._retry) {
+        if (error.response?.status === 401 && !originalRequest._retry && !isPublicEndpoint) {
             originalRequest._retry = true;
 
             try {
