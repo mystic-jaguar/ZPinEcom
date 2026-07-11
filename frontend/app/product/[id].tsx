@@ -10,6 +10,7 @@ import DeliveryOptionSelector from '../../components/product/DeliveryOptionSelec
 import ProductImageCarousel from '../../components/product/ProductImageCarousel';
 import VariantSelector from '../../components/product/VariantSelector';
 import { useCart } from '../../context/CartContext';
+import { useCheckout } from '../../context/CheckoutContext';
 import { useOrder } from '../../context/OrderContext';
 import { useUser } from '../../context/UserContext';
 import { useWishlist } from '../../context/WishlistContext';
@@ -26,6 +27,7 @@ export default function ProductDetails() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const { addToCart } = useCart();
+    const { setDeliveryType } = useCheckout();
     const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
     const { user, isAuthenticated } = useUser();
     const { orders, isLoading: isOrdersLoading } = useOrder();
@@ -221,7 +223,7 @@ export default function ProductDetails() {
         }
     };
 
-    const handleAddToCart = () => {
+    const handleAddToCart = (tryAtDoor = false) => {
         if (!product) return;
 
         // Validate variant selection if product has variants
@@ -247,6 +249,12 @@ export default function ProductDetails() {
         }
 
         addToCart(product, selectedColor, selectedSize);
+
+        if (tryAtDoor) {
+            setDeliveryType('Instant');
+            router.push('/(tabs)/cart');
+            return;
+        }
         setShowSuccessModal(true);
     };
 
@@ -604,12 +612,12 @@ export default function ProductDetails() {
             <View style={[styles.stickyBar, { paddingBottom: 14 + insets.bottom }]}>
                 <Pressable
                     style={styles.tryBtn}
-                    onPress={() => { setDeliveryOption('instant'); handleAddToCart(); }}
+                    onPress={() => { setDeliveryOption('instant'); handleAddToCart(true); }}
                 >
                     <Shirt size={18} color={colors.textStrong} />
                     <Text style={styles.tryBtnText}>Try at door</Text>
                 </Pressable>
-                <Pressable style={styles.addBtn} onPress={handleAddToCart}>
+                <Pressable style={styles.addBtn} onPress={() => handleAddToCart()}>
                     <ShoppingCart size={18} color={colors.textOnYellow} />
                     <Text style={styles.addBtnText}>Add · ₹{product.price.toLocaleString('en-IN')}</Text>
                 </Pressable>
