@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
 import LegalDocModal, { LegalDocType } from '../../components/common/LegalDocModal';
 import { ProductCard, SectionHeader, ZText } from '../../components/ui';
+import { DELIVERY_CITY, isPuneLocation } from '../../constants/delivery';
 import { colors, fonts, palette, radius, shadow } from '../../constants/theme';
 import { useSearch } from '../../context/SearchContext';
 import { productService } from '../../services/product';
@@ -54,6 +55,8 @@ export default function HomeScreen() {
     const [nearby, setNearby] = useState<any[]>(NEARBY_FALLBACK);
     const [locationLabel, setLocationLabel] = useState<string>('Your Area');
     const [locationGranted, setLocationGranted] = useState<boolean | null>(null);
+    const [inServiceArea, setInServiceArea] = useState<boolean | null>(null);
+    const [showAreaModal, setShowAreaModal] = useState(false);
     const [showLocationModal, setShowLocationModal] = useState(false);
     const [isLoadingProducts, setIsLoadingProducts] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -144,6 +147,7 @@ export default function HomeScreen() {
                 if (place) {
                     const label = place.district || place.subregion || place.city || place.region || 'Your Area';
                     setLocationLabel(label);
+                    setInServiceArea(isPuneLocation(place));
                 }
             }
         } catch {
@@ -261,6 +265,15 @@ export default function HomeScreen() {
                 onClose={() => { setShowLocationModal(false); setLocationGranted(false); fetchProducts(); }}
             />
             <ActionModal
+                visible={showAreaModal}
+                icon="map-pin"
+                title="Outside delivery area"
+                message={`ZPIN currently delivers only in ${DELIVERY_CITY}. We're expanding soon — stay tuned!`}
+                primaryButtonText="Got it"
+                onPrimaryPress={() => setShowAreaModal(false)}
+                onClose={() => setShowAreaModal(false)}
+            />
+            <ActionModal
                 visible={comingSoonModal.visible}
                 icon="clock"
                 title="Coming Soon"
@@ -295,10 +308,17 @@ export default function HomeScreen() {
                         </Pressable>
                     </View>
                 </View>
-                <Pressable style={styles.addressRow} onPress={() => setShowLocationModal(true)}>
-                    <MapPin size={14} color={palette.yellow600} />
+                <Pressable
+                    style={styles.addressRow}
+                    onPress={() => (locationGranted && inServiceArea === false ? setShowAreaModal(true) : setShowLocationModal(true))}
+                >
+                    <MapPin size={14} color={locationGranted && inServiceArea === false ? palette.red500 : palette.yellow600} />
                     <Text style={styles.addressText}>Deliver to </Text>
-                    <Text style={styles.addressPlace}>{locationGranted ? locationLabel : 'set location'}</Text>
+                    {locationGranted && inServiceArea === false ? (
+                        <Text style={[styles.addressPlace, { color: palette.red500 }]}>{DELIVERY_CITY} only</Text>
+                    ) : (
+                        <Text style={styles.addressPlace}>{locationGranted ? locationLabel : 'set location'}</Text>
+                    )}
                     <ChevronDown size={14} color={colors.textMuted} />
                 </Pressable>
             </View>
@@ -324,20 +344,6 @@ export default function HomeScreen() {
                     <Text style={styles.voltageText}>live in your area</Text>
                 </View>
 
-                {/* Hero */}
-                <View style={styles.hero}>
-                    <View style={styles.tryBadge}>
-                        <Zap size={11} color={palette.yellow500} fill={palette.yellow500} />
-                        <Text style={styles.tryBadgeText}>TRY-AT-DOOR</Text>
-                    </View>
-                    <Text style={styles.heroTitle}>Wear it before{'\n'}you buy it.</Text>
-                    <Text style={styles.heroSub}>The courier waits while you try. Keep what fits.</Text>
-                    <Pressable style={styles.heroCta} onPress={() => router.push('/product-listing')}>
-                        <Text style={styles.heroCtaText}>Shop new in</Text>
-                        <ArrowRight size={17} color={colors.textOnYellow} />
-                    </Pressable>
-                </View>
-
                 {/* Category chips */}
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
                     {CATEGORIES.map((cat) => (
@@ -353,6 +359,20 @@ export default function HomeScreen() {
                         </Pressable>
                     ))}
                 </ScrollView>
+
+                {/* Hero */}
+                <View style={styles.hero}>
+                    <View style={styles.tryBadge}>
+                        <Zap size={11} color={palette.yellow500} fill={palette.yellow500} />
+                        <Text style={styles.tryBadgeText}>TRY-AT-DOOR</Text>
+                    </View>
+                    <Text style={styles.heroTitle}>Wear it before{'\n'}you buy it.</Text>
+                    <Text style={styles.heroSub}>The courier waits while you try. Keep what fits.</Text>
+                    <Pressable style={styles.heroCta} onPress={() => router.push('/product-listing')}>
+                        <Text style={styles.heroCtaText}>Shop new in</Text>
+                        <ArrowRight size={17} color={colors.textOnYellow} />
+                    </Pressable>
+                </View>
 
                 {/* Recommended */}
                 <SectionHeader eyebrow="Fresh today" title="New in your size" actionLabel="See all" onAction={() => router.push('/product-listing')} style={styles.section} />

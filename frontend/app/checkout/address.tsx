@@ -7,6 +7,7 @@ import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader, BottomBar, CheckoutSteps, ZButton, ZText } from '../../components/ui';
+import { DELIVERY_CITY, isPuneAddress } from '../../constants/delivery';
 import { colors, fonts, palette, radius } from '../../constants/theme';
 
 export default function CheckoutAddressScreen() {
@@ -14,6 +15,7 @@ export default function CheckoutAddressScreen() {
     const { addresses, removeAddress } = useAddress();
     const { selectedAddressId, setSelectedAddressId } = useCheckout();
     const [showModal, setShowModal] = useState(false);
+    const [showAreaModal, setShowAreaModal] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [addressToDelete, setAddressToDelete] = useState<string | null>(null);
 
@@ -25,8 +27,10 @@ export default function CheckoutAddressScreen() {
     }, [addresses, selectedAddressId]);
 
     const handleConfirm = () => {
-        if (selectedAddressId) router.push('/checkout/summary');
-        else setShowModal(true);
+        if (!selectedAddressId) { setShowModal(true); return; }
+        const selected = addresses.find((a: any) => a.id === selectedAddressId);
+        if (selected && !isPuneAddress(selected.city, selected.pincode)) { setShowAreaModal(true); return; }
+        router.push('/checkout/summary');
     };
 
     return (
@@ -89,6 +93,7 @@ export default function CheckoutAddressScreen() {
             </BottomBar>
 
             <ActionModal visible={showModal} title="No Address Selected" message="Please select a delivery address to continue." icon="map-pin" primaryButtonText="OK" onPrimaryPress={() => setShowModal(false)} onClose={() => setShowModal(false)} />
+            <ActionModal visible={showAreaModal} title="Outside delivery area" message={`We currently deliver only in ${DELIVERY_CITY}. Please select or add a ${DELIVERY_CITY} address to continue.`} icon="map-pin" primaryButtonText="OK" onPrimaryPress={() => setShowAreaModal(false)} onClose={() => setShowAreaModal(false)} />
             <ActionModal
                 visible={showDeleteModal}
                 title="Delete Address"

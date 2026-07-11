@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
 import { AppHeader, BottomBar, ZButton, ZInput, ZText } from '../../components/ui';
 import { colors, fonts, palette, radius } from '../../constants/theme';
+import { DELIVERY_CITY, isPuneCity, isPunePincode } from '../../constants/delivery';
 import { useAddress } from '../../context/AddressContext';
 import { useUser } from '../../context/UserContext';
 
@@ -57,8 +58,10 @@ export default function AddAddressScreen() {
         if (!form.phone) e.phone = 'Phone is required';
         else if (form.phone.length < 10) e.phone = 'Invalid phone number';
         if (!form.pincode) e.pincode = 'Pincode is required';
+        else if (!isPunePincode(form.pincode)) e.pincode = `We currently deliver only in ${DELIVERY_CITY}`;
         if (!form.addressLine1) e.addressLine1 = 'Address is required';
         if (!form.city) e.city = 'City is required';
+        else if (!isPuneCity(form.city)) e.city = `We currently deliver only in ${DELIVERY_CITY}`;
         if (!form.state) e.state = 'State is required';
         setErrors(e);
         return Object.keys(e).length === 0;
