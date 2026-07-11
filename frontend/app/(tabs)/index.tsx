@@ -76,17 +76,39 @@ export default function HomeScreen() {
         setLegalModalVisible(true);
     };
 
+    // Robust GPS read: services must be on; try instant cached fix, then a live fix
+    // that can't hang forever (races a timeout). Returns undefined coords on failure.
+    const getCoords = async (): Promise<{ lat?: number; lng?: number }> => {
+        try {
+            const servicesOn = await ExpoLocation.hasServicesEnabledAsync();
+            if (!servicesOn) {
+                console.warn('Location services are disabled on this device');
+                return {};
+            }
+            const cached = await ExpoLocation.getLastKnownPositionAsync({ maxAge: 5 * 60 * 1000 });
+            if (cached) return { lat: cached.coords.latitude, lng: cached.coords.longitude };
+
+            const live = await Promise.race([
+                ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced }),
+                new Promise<null>((resolve) => setTimeout(() => resolve(null), 12000)),
+            ]);
+            if (live) return { lat: live.coords.latitude, lng: live.coords.longitude };
+            console.warn('getCurrentPositionAsync timed out after 12s');
+            return {};
+        } catch (e) {
+            console.warn('getCoords failed:', e);
+            return {};
+        }
+    };
+
     const onRefresh = async () => {
         setRefreshing(true);
         const { status } = await ExpoLocation.getForegroundPermissionsAsync();
         if (status === 'granted') {
             setLocationGranted(true);
-            try {
-                const loc = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced });
-                await fetchProducts(loc.coords.latitude, loc.coords.longitude);
-            } catch {
-                await fetchProducts();
-            }
+            const { lat, lng } = await getCoords();
+            await applyLocationLabel(lat, lng);
+            await fetchProducts(lat, lng);
         } else {
             await fetchProducts();
         }
@@ -126,6 +148,21 @@ export default function HomeScreen() {
         return () => subscription.remove();
     }, []);
 
+    // Reverse-geocode coords into the "Deliver to" label + Pune service-area flag.
+    const applyLocationLabel = async (lat?: number, lng?: number) => {
+        if (lat == null || lng == null) return;
+        try {
+            const [place] = await ExpoLocation.reverseGeocodeAsync({ latitude: lat, longitude: lng });
+            if (place) {
+                const label = place.district || place.subregion || place.city || place.region || 'Your Area';
+                setLocationLabel(label);
+                setInServiceArea(isPuneLocation(place));
+            }
+        } catch (e) {
+            console.warn('reverseGeocode failed:', e);
+        }
+    };
+
     const requestLocationAndFetch = async () => {
         let lat: number | undefined;
         let lng: number | undefined;
@@ -140,18 +177,11 @@ export default function HomeScreen() {
             const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
             setLocationGranted(status === 'granted');
             if (status === 'granted') {
-                const loc = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced });
-                lat = loc.coords.latitude;
-                lng = loc.coords.longitude;
-                const [place] = await ExpoLocation.reverseGeocodeAsync({ latitude: lat, longitude: lng });
-                if (place) {
-                    const label = place.district || place.subregion || place.city || place.region || 'Your Area';
-                    setLocationLabel(label);
-                    setInServiceArea(isPuneLocation(place));
-                }
+                ({ lat, lng } = await getCoords());
+                await applyLocationLabel(lat, lng);
             }
-        } catch {
-            // Location failed — proceed without it
+        } catch (e) {
+            console.warn('requestLocationAndFetch failed:', e);
         }
         await fetchProducts(lat, lng);
     };
