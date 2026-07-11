@@ -397,8 +397,10 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
     );
     const shippingAmount = totalAmount > 500 ? 0 : 49;
     const taxAmount = Math.round(totalAmount * 0.18);
-    // Delivery fee is always computed server-side — never trusted from client
-    const deliveryFee = 0;
+    // Instant "Try-at-Door" trial fee. Amount is fixed server-side (₹50) — we only
+    // trust the client's delivery-type selection (notes flag), never a client amount.
+    // Must match the frontend fee in checkout/summary.tsx + payment.tsx.
+    const deliveryFee = notes === 'instant_delivery' ? 50 : 0;
 
     // SECURITY: Never trust client-supplied coupon discount.
     // Validate the coupon code server-side if provided.
