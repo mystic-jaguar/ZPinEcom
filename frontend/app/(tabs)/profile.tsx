@@ -1,6 +1,7 @@
 import ActionModal from '@/components/common/ActionModal';
 import LegalDocModal, { LegalDocType } from '@/components/common/LegalDocModal';
 import { useCart } from '@/context/CartContext';
+import { useOrder } from '@/context/OrderContext';
 import { useWishlist } from '@/context/WishlistContext';
 import { authService } from '@/services/auth';
 import { Image } from 'expo-image';
@@ -22,7 +23,8 @@ function initialsOf(name?: string) {
 
 export default function ProfileScreen() {
     const { user, resetUser } = useUser();
-    const { clearCart } = useCart();
+    const { clearCart, availableCoupons } = useCart();
+    const { orders } = useOrder();
     const { wishlistItems, clearWishlist } = useWishlist();
     const router = useRouter();
     const [logoutModalVisible, setLogoutModalVisible] = useState(false);
@@ -120,6 +122,7 @@ export default function ProfileScreen() {
                     </View>
                     <View style={styles.statsRow}>
                         <Pressable style={[styles.stat, styles.statDivider]} onPress={() => router.push('/profile/orders')}>
+                            <Text style={styles.statValue}>{orders.length}</Text>
                             <Text style={styles.statLabel}>ORDERS</Text>
                         </Pressable>
                         <Pressable style={[styles.stat, styles.statDivider]} onPress={() => router.push('/profile/wishlist')}>
@@ -127,6 +130,7 @@ export default function ProfileScreen() {
                             <Text style={styles.statLabel}>WISHLIST</Text>
                         </Pressable>
                         <Pressable style={styles.stat} onPress={() => router.push('/profile/coupons')}>
+                            <Text style={styles.statValue}>{availableCoupons.length}</Text>
                             <Text style={styles.statLabel}>COUPONS</Text>
                         </Pressable>
                     </View>
