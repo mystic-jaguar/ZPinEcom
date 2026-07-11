@@ -2,7 +2,7 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { Check, Headphones, RotateCcw } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader, ZText } from '../../components/ui';
 import { colors, fonts, palette, radius } from '../../constants/theme';
@@ -33,9 +33,16 @@ function daysLeft(order: { updatedAt?: string; createdAt?: string }) {
 
 export default function ReturnsRefundsScreen() {
     const router = useRouter();
-    const { orders } = useOrder();
+    const { orders, refreshOrders } = useOrder();
     const [isLoading, setIsLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
     const [returnStatusByOrder, setReturnStatusByOrder] = useState<Record<string, ReturnStatusRecord>>({});
+
+    const onRefresh = async () => {
+        setRefreshing(true);
+        await refreshOrders();
+        setRefreshing(false);
+    };
 
     useEffect(() => {
         let cancelled = false;
@@ -98,7 +105,7 @@ export default function ReturnsRefundsScreen() {
                 onBack={() => router.back()}
                 right={<Pressable style={styles.helpBtn} onPress={() => router.push('/profile/help-center')}><Headphones size={18} color={colors.textStrong} /></Pressable>}
             />
-            <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+            <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[palette.yellow500]} tintColor={palette.yellow500} />}>
                 {activeReturns.length > 0 && (
                     <>
                         <ZText variant="eyebrow" style={styles.sectionLabel}>Active refund</ZText>

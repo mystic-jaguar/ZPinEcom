@@ -264,7 +264,7 @@ const styles = StyleSheet.create({
     title: { flex: 1 },
     topIcons: { flexDirection: 'row', gap: 16 },
 
-    tabs: { paddingHorizontal: 20, gap: 8, paddingTop: 6, paddingBottom: 4 },
+    tabs: { paddingHorizontal: 20, gap: 8, paddingTop: 6, paddingBottom: 12 },
     tab: { height: 38, paddingHorizontal: 16, borderRadius: 100, borderWidth: 2, borderColor: colors.borderSubtle, backgroundColor: colors.surfaceCard, justifyContent: 'center' },
     tabActive: { backgroundColor: colors.surfaceInverse, borderColor: colors.surfaceInverse },
     tabText: { fontFamily: fonts.bodyBold, fontSize: 13, color: colors.textBody },

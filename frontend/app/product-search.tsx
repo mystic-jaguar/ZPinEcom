@@ -1,7 +1,7 @@
 import { Stack, useRouter } from 'expo-router';
 import { ArrowUpLeft, Clock, Search, TrendingUp, X } from 'lucide-react-native';
 import React, { useState } from 'react';
-import { FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import SkeletonCard from '../components/product/SkeletonCard';
 import { ProductCard, ZText } from '../components/ui';
@@ -19,15 +19,16 @@ export default function ProductSearchScreen() {
     const [searchResults, setSearchResults] = useState<ProductObject[]>([]);
     const [relatedProducts, setRelatedProducts] = useState<ProductObject[]>([]);
     const [loading, setLoading] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
     const searchTimeout = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    const runSearch = async (query: string) => {
+    const runSearch = async (query: string, silent = false) => {
         if (!query.trim()) {
             setSearchResults([]);
             setRelatedProducts([]);
             return;
         }
-        setLoading(true);
+        if (!silent) setLoading(true);
         try {
             const response = await apiClient.get('products/search', { params: { q: query, limit: 50 } });
             setSearchResults(response.data.products || []);
@@ -36,8 +37,15 @@ export default function ProductSearchScreen() {
             setSearchResults([]);
             setRelatedProducts([]);
         } finally {
-            setLoading(false);
+            if (!silent) setLoading(false);
         }
+    };
+
+    const onRefresh = async () => {
+        if (!searchQuery.trim()) return;
+        setRefreshing(true);
+        await runSearch(searchQuery, true);
+        setRefreshing(false);
     };
 
     const handleSearchChange = (text: string) => {
@@ -121,6 +129,7 @@ export default function ProductSearchScreen() {
                         columnWrapperStyle={styles.columnWrapper}
                         contentContainerStyle={styles.listContent}
                         showsVerticalScrollIndicator={false}
+                        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[palette.yellow500]} tintColor={palette.yellow500} />}
                         ListHeaderComponent={
                             relatedProducts.length > 0 && searchResults.length > 0 ? (
                                 <Text style={styles.resultLabel}>

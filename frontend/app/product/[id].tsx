@@ -2,7 +2,7 @@ import { Feather, Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { RotateCcw, Shirt, ShoppingCart, Zap } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AccordionItem from '../../components/common/AccordionItem';
 import ActionModal from '../../components/common/ActionModal';
@@ -53,6 +53,7 @@ export default function ProductDetails() {
     const [reviewTotal, setReviewTotal] = useState(0);
     const [activeCoupon, setActiveCoupon] = useState<{ code: string; description: string; discountType: string; discountValue: number } | null>(null);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     // State for selectors
@@ -104,9 +105,9 @@ export default function ProductDetails() {
         }
     }, [ownReview?.id]);
 
-    const loadProduct = async (productId: string) => {
+    const loadProduct = async (productId: string, silent = false) => {
         try {
-            setLoading(true);
+            if (!silent) setLoading(true);
             setError(null);
             const [data, related, couponsRes] = await Promise.all([
                 productService.getProductById(productId),
@@ -129,8 +130,15 @@ export default function ProductDetails() {
         } catch (err: any) {
             setError(err.message || 'Failed to load product details');
         } finally {
-            setLoading(false);
+            if (!silent) setLoading(false);
         }
+    };
+
+    const onRefresh = async () => {
+        if (!productId) return;
+        setRefreshing(true);
+        await loadProduct(productId as string, true);
+        setRefreshing(false);
     };
 
     const handleReviewSubmit = async () => {
@@ -285,7 +293,7 @@ export default function ProductDetails() {
 
     return (
         <View style={styles.container}>
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 130 }}>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 130 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[palette.yellow500]} tintColor={palette.yellow500} />}>
                 {/* Images Carousel */}
                 <View style={{ position: 'relative' }}>
                     <ProductImageCarousel
@@ -525,12 +533,7 @@ export default function ProductDetails() {
                                     offenders may have their account suspended.
                                 </Text>
                             </View>
-                        ) : (
-                            <View style={styles.reviewLockedCard}>
-                                <Text style={styles.bodyText}>You can write a review after this product has been delivered.</Text>
-                                {isOrdersLoading && <Text style={styles.reviewLockedHint}>Checking your delivered orders...</Text>}
-                            </View>
-                        )}
+                        ) : null}
 
                         <View style={styles.reviewList}>
                             {reviews.length === 0 ? (

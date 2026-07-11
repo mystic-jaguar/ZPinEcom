@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { ArrowRight, Minus, Plus, ShoppingCart, X, Zap } from 'lucide-react-native';
-import React, { useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ZButton, ZText } from '../../components/ui';
@@ -10,20 +10,21 @@ import { useCart } from '../../context/CartContext';
 
 interface CartItemProps {
     item: any;
-    index: number;
     onRemove: (cartItemId: string) => void;
     onUpdateQuantity: (cartItemId: string, quantity: number) => void;
 }
 
-function CartItem({ item, index, onRemove, onUpdateQuantity }: CartItemProps) {
+function CartItem({ item, onRemove, onUpdateQuantity }: CartItemProps) {
     const router = useRouter();
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(50)).current;
 
     useEffect(() => {
+        // No stagger delay: FlatList recycles rows, so an index-based delay makes
+        // rows cascade/flicker while scrolling. A flat fade-in reads smoother.
         Animated.parallel([
-            Animated.timing(fadeAnim, { toValue: 1, duration: 300, delay: index * 50, useNativeDriver: true }),
-            Animated.timing(slideAnim, { toValue: 0, duration: 300, delay: index * 50, useNativeDriver: true }),
+            Animated.timing(fadeAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
+            Animated.timing(slideAnim, { toValue: 0, duration: 300, useNativeDriver: true }),
         ]).start();
     }, []);
 
@@ -76,12 +77,23 @@ function CartItem({ item, index, onRemove, onUpdateQuantity }: CartItemProps) {
     );
 }
 
+// Memoized so changing one row's quantity re-renders only that row, not the
+// whole list. Relies on the cart handlers being stable (useCallback in CartContext).
+const MemoCartItem = React.memo(CartItem);
+
 export default function CartScreen() {
     const { cartItems, updateQuantity, removeFromCart, totalPrice, totalSavings } = useCart();
     const router = useRouter();
     const insets = useSafeAreaInsets();
 
     const count = cartItems.length;
+
+    const renderItem = useCallback(
+        ({ item }: { item: any }) => (
+            <MemoCartItem item={item} onRemove={removeFromCart} onUpdateQuantity={updateQuantity} />
+        ),
+        [removeFromCart, updateQuantity]
+    );
 
     return (
         <SafeAreaView style={styles.container} edges={['top']}>
@@ -98,7 +110,7 @@ export default function CartScreen() {
                     <ShoppingCart size={72} color={colors.borderStrong} />
                     <ZText variant="lg" style={{ marginTop: 20 }}>Your cart is empty</ZText>
                     <ZText variant="muted" style={{ marginTop: 4 }}>Add items to get started</ZText>
-                    <ZButton label="Start shopping" fullWidth={false} style={{ marginTop: 20 }} onPress={() => router.push('/product-listing')} />
+                    <ZButton label="Start shopping" fullWidth={false} style={{ marginTop: 20, alignSelf: 'center' }} onPress={() => router.push('/product-listing')} />
                 </View>
             ) : (
                 <>
@@ -113,9 +125,7 @@ export default function CartScreen() {
 
                     <Animated.FlatList
                         data={cartItems}
-                        renderItem={({ item, index }) => (
-                            <CartItem item={item} index={index} onRemove={removeFromCart} onUpdateQuantity={updateQuantity} />
-                        )}
+                        renderItem={renderItem}
                         keyExtractor={(item) => item.cartItemId}
                         contentContainerStyle={styles.list}
                         showsVerticalScrollIndicator={false}

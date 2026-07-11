@@ -1,8 +1,8 @@
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Bike, Check, Download, MapPin, RotateCcw, Zap } from 'lucide-react-native';
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
 import { AppHeader, ZButton, ZText } from '../../components/ui';
@@ -18,32 +18,40 @@ export default function OrderDetailsScreen() {
     const [showInvoiceModal, setShowInvoiceModal] = useState(false);
     const [fetchedOrder, setFetchedOrder] = useState<OrderObject | null>(null);
     const [isFetching, setIsFetching] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+
+    const fetchOrder = useCallback(async (silent = false) => {
+        try {
+            if (!silent) setIsFetching(true);
+            const response = await orderService.getOrderById(orderId as string);
+            const o = (response as any)?.data?.order || (response as any)?.data;
+            if (o) {
+                setFetchedOrder({
+                    id: o.id, userId: o.userId, sellerId: o.sellerId || '', orderNumber: o.orderNumber,
+                    status: o.status, paymentStatus: o.paymentStatus,
+                    totalAmount: Number(o.totalAmount || 0), shippingAmount: Number(o.shippingAmount || 0),
+                    taxAmount: Number(o.taxAmount || 0), finalAmount: Number(o.finalAmount || 0),
+                    shippingAddress: o.shippingAddress || {}, paymentMethod: o.paymentMethod || 'cod', paymentId: o.paymentId,
+                    items: Array.isArray(o.items) ? o.items.map((item: any) => ({
+                        orderItemId: item.orderItemId || item.id, productId: item.productId, productName: item.productName,
+                        quantity: item.quantity, price: Number(item.price || 0), image: item.image || '', variant: item.variant,
+                    })) : [],
+                    estimatedDelivery: o.estimatedDelivery || '', trackingNumber: o.trackingNumber, notes: o.notes,
+                    createdAt: o.createdAt, updatedAt: o.updatedAt,
+                } as OrderObject);
+            }
+        } catch { /* fall back to cache */ } finally { if (!silent) setIsFetching(false); }
+    }, [orderId]);
 
     useEffect(() => {
-        const fetchOrder = async () => {
-            try {
-                setIsFetching(true);
-                const response = await orderService.getOrderById(orderId as string);
-                const o = (response as any)?.data?.order || (response as any)?.data;
-                if (o) {
-                    setFetchedOrder({
-                        id: o.id, userId: o.userId, sellerId: o.sellerId || '', orderNumber: o.orderNumber,
-                        status: o.status, paymentStatus: o.paymentStatus,
-                        totalAmount: Number(o.totalAmount || 0), shippingAmount: Number(o.shippingAmount || 0),
-                        taxAmount: Number(o.taxAmount || 0), finalAmount: Number(o.finalAmount || 0),
-                        shippingAddress: o.shippingAddress || {}, paymentMethod: o.paymentMethod || 'cod', paymentId: o.paymentId,
-                        items: Array.isArray(o.items) ? o.items.map((item: any) => ({
-                            orderItemId: item.orderItemId || item.id, productId: item.productId, productName: item.productName,
-                            quantity: item.quantity, price: Number(item.price || 0), image: item.image || '', variant: item.variant,
-                        })) : [],
-                        estimatedDelivery: o.estimatedDelivery || '', trackingNumber: o.trackingNumber, notes: o.notes,
-                        createdAt: o.createdAt, updatedAt: o.updatedAt,
-                    } as OrderObject);
-                }
-            } catch { /* fall back to cache */ } finally { setIsFetching(false); }
-        };
         if (orderId) fetchOrder();
-    }, [orderId]);
+    }, [orderId, fetchOrder]);
+
+    const onRefresh = async () => {
+        setRefreshing(true);
+        await fetchOrder(true);
+        setRefreshing(false);
+    };
 
     const order = fetchedOrder ?? getOrderById(orderId as string);
     const isInstantDelivery = order?.notes === 'instant_delivery';
@@ -92,7 +100,7 @@ export default function OrderDetailsScreen() {
     return (
         <SafeAreaView style={styles.container} edges={['top']}>
             <AppHeader title="Order details" onBack={() => router.back()} />
-            <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+            <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[palette.yellow500]} tintColor={palette.yellow500} />}>
                 <ZText variant="eyebrow" style={{ marginBottom: 12 }}>Order {order.orderNumber}</ZText>
 
                 {/* Status banner */}

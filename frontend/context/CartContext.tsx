@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
+import React, { createContext, ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { tokenManager } from '../services/api';
 import { cartService } from '../services/cart';
 import { couponService } from '../services/coupon';
@@ -34,6 +34,12 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     const [isLoading, setIsLoading] = useState(true);
 
     const { isAuthenticated, isLoading: isUserLoading } = useUser();
+
+    // Always-current cart snapshot so the memoized handlers below can read the
+    // latest items without listing cartItems as a dependency (which would give
+    // them a new identity on every change and re-render every CartItem row).
+    const cartItemsRef = useRef(cartItems);
+    cartItemsRef.current = cartItems;
 
     // Load cart from AsyncStorage on mount and sync if auth changes
     useEffect(() => {
@@ -147,13 +153,13 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
         }
     };
 
-    const removeFromCart = async (cartItemId: string) => {
+    const removeFromCart = useCallback(async (cartItemId: string) => {
         // Find product ID from cart item (assuming cartItemId contains it or we look it up)
         // Since cartItemId is composite, we need finding the item
-        const itemToRemove = cartItems.find(item => item.cartItemId === cartItemId);
+        const itemToRemove = cartItemsRef.current.find(item => item.cartItemId === cartItemId);
         const productId = itemToRemove?.productId;
 
-        const previousItems = cartItems;
+        const previousItems = cartItemsRef.current;
         setCartItems(prevItems => prevItems.filter(item => item.cartItemId !== cartItemId));
 
         if (productId) {
@@ -169,17 +175,17 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
                 throw error;
             }
         }
-    };
+    }, []);
 
-    const updateQuantity = async (cartItemId: string, quantity: number) => {
+    const updateQuantity = useCallback(async (cartItemId: string, quantity: number) => {
         if (quantity < 1) {
             await removeFromCart(cartItemId);
             return;
         }
-        const itemToUpdate = cartItems.find(item => item.cartItemId === cartItemId);
+        const itemToUpdate = cartItemsRef.current.find(item => item.cartItemId === cartItemId);
         const productId = itemToUpdate?.productId;
 
-        const previousItems = cartItems;
+        const previousItems = cartItemsRef.current;
         setCartItems(prevItems => prevItems.map(item =>
             item.cartItemId === cartItemId
                 ? { ...item, quantity }
@@ -199,7 +205,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
                 throw error;
             }
         }
-    };
+    }, [removeFromCart]);
 
     const clearCart = async () => {
         setCartItems([]);

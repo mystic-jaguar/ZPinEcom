@@ -52,11 +52,6 @@ interface StepProps {
 }
 
 function TimelineStep({ title, subtext, date, isCompleted, isActive, isLast, lineProgress }: StepProps) {
-    const lineHeight = lineProgress.interpolate({
-        inputRange: [0, 1],
-        outputRange: ['0%', '100%'],
-    });
-
     return (
         <View style={styles.stepContainer}>
             {/* Left column: circle + animated line */}
@@ -78,8 +73,9 @@ function TimelineStep({ title, subtext, date, isCompleted, isActive, isLast, lin
                     <View style={styles.lineTrack}>
                         {/* Grey background line */}
                         <View style={styles.lineBackground} />
-                        {/* Animated green fill */}
-                        <Animated.View style={[styles.lineFill, { height: lineHeight }]} />
+                        {/* Animated green fill: full-height bar scaled from the top
+                            (scaleY runs on the native driver; animating height does not). */}
+                        <Animated.View style={[styles.lineFill, { transform: [{ scaleY: lineProgress }], transformOrigin: 'top' }]} />
                     </View>
                 )}
             </View>
@@ -112,7 +108,7 @@ export default function OrderTimeline({ status, dates }: OrderTimelineProps) {
                 Animated.timing(anim, {
                     toValue: 1,
                     duration: 500,
-                    useNativeDriver: false, // height % doesn't support native driver
+                    useNativeDriver: true, // scaleY transform runs on the UI thread
                 }),
             ])
         );
@@ -221,6 +217,7 @@ const styles = StyleSheet.create({
         top: 0,
         left: 0,
         right: 0,
+        bottom: 0,
         backgroundColor: '#22C55E',
     },
     stepTitle: {
