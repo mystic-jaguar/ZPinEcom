@@ -13,7 +13,7 @@
     },
     "updates": {
       "url": "https://u.expo.dev/e71bc344-7fa9-4436-aaeb-8aaf1ac044ec",
-      "enabled": false,
+      "enabled": true,
       "checkAutomatically": "ON_LOAD",
       "fallbackToCacheTimeout": 0
     },
@@ -68,6 +68,24 @@
       "expo-web-browser",
       "expo-secure-store",
       "expo-apple-authentication",
+      [
+        "expo-font",
+        {
+          "fonts": [
+            "./assets/fonts/HankenGrotesk_400Regular.ttf",
+            "./assets/fonts/HankenGrotesk_500Medium.ttf",
+            "./assets/fonts/HankenGrotesk_600SemiBold.ttf",
+            "./assets/fonts/HankenGrotesk_700Bold.ttf",
+            "./assets/fonts/HankenGrotesk_800ExtraBold.ttf",
+            "./assets/fonts/SpaceGrotesk_400Regular.ttf",
+            "./assets/fonts/SpaceGrotesk_500Medium.ttf",
+            "./assets/fonts/SpaceGrotesk_600SemiBold.ttf",
+            "./assets/fonts/SpaceGrotesk_700Bold.ttf",
+            "./assets/fonts/SpaceMono_400Regular.ttf",
+            "./assets/fonts/SpaceMono_700Bold.ttf"
+          ]
+        }
+      ],
       [
         "expo-build-properties",
         {

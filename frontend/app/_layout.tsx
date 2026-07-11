@@ -1,20 +1,5 @@
-import {
-  HankenGrotesk_400Regular,
-  HankenGrotesk_500Medium,
-  HankenGrotesk_600SemiBold,
-  HankenGrotesk_700Bold,
-  HankenGrotesk_800ExtraBold,
-} from "@expo-google-fonts/hanken-grotesk";
-import {
-  SpaceGrotesk_400Regular,
-  SpaceGrotesk_500Medium,
-  SpaceGrotesk_600SemiBold,
-  SpaceGrotesk_700Bold,
-} from "@expo-google-fonts/space-grotesk";
-import { SpaceMono_400Regular, SpaceMono_700Bold } from "@expo-google-fonts/space-mono";
-import { useFonts } from "expo-font";
 import { Stack, useRouter, useSegments } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Image, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import ErrorBoundary from "../components/common/ErrorBoundary";
@@ -92,32 +77,9 @@ function RootLayoutNav() {
 }
 
 export default function RootLayout() {
-  const [fontsLoaded, fontError] = useFonts({
-    HankenGrotesk_400Regular,
-    HankenGrotesk_500Medium,
-    HankenGrotesk_600SemiBold,
-    HankenGrotesk_700Bold,
-    HankenGrotesk_800ExtraBold,
-    SpaceGrotesk_400Regular,
-    SpaceGrotesk_500Medium,
-    SpaceGrotesk_600SemiBold,
-    SpaceGrotesk_700Bold,
-    SpaceMono_400Regular,
-    SpaceMono_700Bold,
-  });
-
-  // Never hang on the splash: proceed once fonts load, on font error (system
-  // font fallback), or after a hard timeout if asset resolution stalls.
-  const [fontTimedOut, setFontTimedOut] = useState(false);
-  useEffect(() => {
-    const t = setTimeout(() => setFontTimedOut(true), 4000);
-    return () => clearTimeout(t);
-  }, []);
-
-  if (!fontsLoaded && !fontError && !fontTimedOut) {
-    return <AnimatedSplash />;
-  }
-
+  // Fonts are embedded natively via the expo-font config plugin (see app.json),
+  // so they are registered by family name at startup — no runtime useFonts()
+  // asset resolution, which used to hang the splash under expo-updates/OTA.
   return (
     <SafeAreaProvider>
       <ErrorBoundary>
