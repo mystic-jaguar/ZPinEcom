@@ -342,7 +342,11 @@ export default function HomeScreen() {
                 </View>
                 <Pressable
                     style={styles.addressRow}
-                    onPress={() => (locationGranted && inServiceArea === false ? setShowAreaModal(true) : setShowLocationModal(true))}
+                    onPress={() => {
+                        if (locationGranted && inServiceArea === false) setShowAreaModal(true);
+                        else if (locationGranted) requestLocationAndFetch();
+                        else setShowLocationModal(true);
+                    }}
                 >
                     <MapPin size={14} color={locationGranted && inServiceArea === false ? palette.red500 : palette.yellow600} />
                     <Text style={styles.addressText}>Deliver to </Text>
