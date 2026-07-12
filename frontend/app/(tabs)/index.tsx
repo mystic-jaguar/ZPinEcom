@@ -42,6 +42,8 @@ const NEARBY_FALLBACK = [
     { id: '4', name: 'Makeup', image: require('../../assets/images/makeup_icon.jpg'), category: 'Beauty', subCategory: 'Makeup', count: null as number | null },
 ];
 
+const HERO_IMAGE = 'https://images.unsplash.com/photo-1489987707025-afc232f7ea0f?auto=format&fit=crop&w=500&q=80';
+
 const BIG_DISCOUNTS = [
     { id: '1', name: 'Sneaker Steals', desc: "Grab a pair before it's gone!", image: 'https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?auto=format&fit=crop&w=400&q=80', category: 'Footwear', subCategory: 'Sports Shoes' },
     { id: '2', name: 'Winter Clearance', desc: 'Up to 80% off jackets', image: 'https://images.unsplash.com/photo-1487222477894-8943e31ef7b2?auto=format&fit=crop&w=400&q=80', category: 'Fashion', subCategory: 'Jackets' },
@@ -364,14 +366,22 @@ export default function HomeScreen() {
                     <Text style={styles.searchPlaceholder}>Search styles, sneakers, gadgets</Text>
                 </Pressable>
 
-                {/* Delivery voltage strip */}
-                <View style={styles.voltage}>
-                    <Zap size={13} color={palette.yellow500} fill={palette.yellow500} />
-                    <Text style={styles.voltageText}>Bike-fast delivery</Text>
-                    <View style={styles.voltageDot} />
-                    <Text style={styles.voltageStrong}>2–12 HRS</Text>
-                    <View style={styles.voltageDot} />
-                    <Text style={styles.voltageText}>live in your area</Text>
+                {/* Bike-fast delivery banner */}
+                <View style={styles.deliveryBanner}>
+                    <View style={styles.deliveryZap}>
+                        <Zap size={120} color="rgba(255,196,0,0.14)" fill="rgba(255,196,0,0.14)" />
+                    </View>
+                    <View>
+                        <Text style={styles.deliveryEyebrow}>Bike-fast delivery</Text>
+                        <View style={styles.deliveryHrsRow}>
+                            <Text style={styles.deliveryHrs}>2–12</Text>
+                            <Text style={styles.deliveryHrsUnit}>HRS</Text>
+                        </View>
+                    </View>
+                    <View style={styles.livePill}>
+                        <View style={styles.liveDot} />
+                        <Text style={styles.livePillText}>LIVE IN YOUR AREA</Text>
+                    </View>
                 </View>
 
                 {/* Category chips */}
@@ -390,18 +400,23 @@ export default function HomeScreen() {
                     ))}
                 </ScrollView>
 
-                {/* Hero */}
+                {/* Try-at-door hero */}
                 <View style={styles.hero}>
-                    <View style={styles.tryBadge}>
-                        <Zap size={11} color={palette.yellow500} fill={palette.yellow500} />
-                        <Text style={styles.tryBadgeText}>TRY-AT-DOOR</Text>
+                    <View style={styles.heroImageWrap}>
+                        <Image source={{ uri: HERO_IMAGE }} style={styles.heroImage} contentFit="cover" />
                     </View>
-                    <Text style={styles.heroTitle}>Wear it before{'\n'}you buy it.</Text>
-                    <Text style={styles.heroSub}>The courier waits while you try. Keep what fits.</Text>
-                    <Pressable style={styles.heroCta} onPress={() => router.push('/product-listing')}>
-                        <Text style={styles.heroCtaText}>Shop new in</Text>
-                        <ArrowRight size={17} color={colors.textOnYellow} />
-                    </Pressable>
+                    <View style={styles.heroContent}>
+                        <View style={styles.tryBadge}>
+                            <Zap size={11} color={palette.yellow500} fill={palette.yellow500} />
+                            <Text style={styles.tryBadgeText}>TRY-AT-DOOR</Text>
+                        </View>
+                        <Text style={styles.heroTitle}>Wear it before you buy it.</Text>
+                        <Text style={styles.heroTitleItalic}>Bike-fast.</Text>
+                        <Pressable style={styles.heroCta} onPress={() => router.push('/product-listing')}>
+                            <Text style={styles.heroCtaText}>Shop new in</Text>
+                            <ArrowRight size={16} color={palette.yellow500} />
+                        </Pressable>
+                    </View>
                 </View>
 
                 {/* Recommended */}
@@ -524,18 +539,26 @@ const styles = StyleSheet.create({
     },
     searchPlaceholder: { fontFamily: fonts.bodyRegular, fontSize: 14, color: colors.textFaint },
 
-    voltage: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 20, marginTop: 12 },
-    voltageText: { fontFamily: fonts.monoBold, fontSize: 10, letterSpacing: 0.6, color: colors.textMuted, textTransform: 'uppercase' },
-    voltageStrong: { fontFamily: fonts.monoBold, fontSize: 10, letterSpacing: 0.6, color: colors.textStrong },
-    voltageDot: { width: 3, height: 3, borderRadius: 2, backgroundColor: colors.borderStrong },
+    deliveryBanner: { marginHorizontal: 20, marginTop: 12, backgroundColor: colors.surfaceInverse, borderRadius: 20, paddingVertical: 15, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', overflow: 'hidden' },
+    deliveryZap: { position: 'absolute', right: -18, top: -18 },
+    deliveryEyebrow: { fontFamily: fonts.monoBold, fontSize: 10, letterSpacing: 1.4, color: palette.yellow400, textTransform: 'uppercase', marginBottom: 6 },
+    deliveryHrsRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 6 },
+    deliveryHrs: { fontFamily: fonts.displayBold, fontSize: 28, letterSpacing: -0.6, color: colors.textInvert },
+    deliveryHrsUnit: { fontFamily: fonts.monoBold, fontSize: 12, color: palette.neutral300, marginBottom: 3 },
+    livePill: { flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: 'rgba(255,255,255,0.1)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 100 },
+    liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: palette.yellow500 },
+    livePillText: { fontFamily: fonts.monoBold, fontSize: 10, letterSpacing: 1, color: colors.textInvert },
 
-    hero: { marginHorizontal: 20, marginTop: 16, backgroundColor: colors.surfaceInverse, borderRadius: radius.xl, padding: 24 },
-    tryBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', marginBottom: 14 },
-    tryBadgeText: { fontFamily: fonts.monoBold, fontSize: 10, letterSpacing: 1, color: palette.yellow500 },
-    heroTitle: { fontFamily: fonts.displayBold, fontSize: 30, lineHeight: 33, letterSpacing: -0.8, color: colors.textInvert },
-    heroSub: { fontFamily: fonts.bodyRegular, fontSize: 14, color: palette.neutral400, marginTop: 10, marginBottom: 18 },
-    heroCta: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', backgroundColor: palette.yellow500, borderRadius: radius.md, paddingVertical: 12, paddingHorizontal: 18 },
-    heroCtaText: { fontFamily: fonts.bodyBlack, fontSize: 15, color: colors.textOnYellow },
+    hero: { marginHorizontal: 20, marginTop: 16, backgroundColor: palette.yellow500, borderRadius: 28, padding: 22, position: 'relative', overflow: 'hidden' },
+    heroImageWrap: { position: 'absolute', right: -30, bottom: -40, width: 200, height: 230, borderRadius: 24, overflow: 'hidden', transform: [{ rotate: '6deg' }] },
+    heroImage: { width: '100%', height: '100%' },
+    heroContent: { maxWidth: '64%' },
+    tryBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', backgroundColor: colors.surfaceInverse, paddingVertical: 6, paddingHorizontal: 11, borderRadius: 100, marginBottom: 14 },
+    tryBadgeText: { fontFamily: fonts.monoBold, fontSize: 9, letterSpacing: 1.1, color: colors.textInvert },
+    heroTitle: { fontFamily: fonts.displayBold, fontSize: 26, lineHeight: 28, letterSpacing: -0.5, color: colors.textOnYellow },
+    heroTitleItalic: { fontFamily: fonts.displayBold, fontSize: 26, lineHeight: 28, letterSpacing: -0.5, color: colors.textOnYellow, fontStyle: 'italic', marginBottom: 16 },
+    heroCta: { flexDirection: 'row', alignItems: 'center', gap: 7, alignSelf: 'flex-start', backgroundColor: colors.surfaceInverse, borderRadius: 100, paddingVertical: 12, paddingHorizontal: 18 },
+    heroCtaText: { fontFamily: fonts.bodyBold, fontSize: 13, color: colors.textInvert },
 
     chipsRow: { paddingHorizontal: 20, gap: 16, marginTop: 22 },
     chip: { alignItems: 'center', width: 68 },
