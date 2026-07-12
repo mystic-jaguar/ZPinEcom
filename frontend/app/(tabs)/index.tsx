@@ -1,9 +1,9 @@
 import { Image } from 'expo-image';
 import * as ExpoLocation from 'expo-location';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { ArrowRight, ChevronDown, Heart, MapPin, Search, ShoppingBag, Zap } from 'lucide-react-native';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, AppStateStatus, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ArrowRight, ChevronDown, Heart, MapPin, Search, ShoppingBag, Star, Tag, Zap } from 'lucide-react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, AppState, AppStateStatus, Linking, NativeScrollEvent, NativeSyntheticEvent, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
 import LegalDocModal, { LegalDocType } from '../../components/common/LegalDocModal';
@@ -49,9 +49,31 @@ const BIG_DISCOUNTS = [
     { id: '2', name: 'Winter Clearance', desc: 'Up to 80% off jackets', image: 'https://images.unsplash.com/photo-1487222477894-8943e31ef7b2?auto=format&fit=crop&w=400&q=80', category: 'Fashion', subCategory: 'Jackets' },
 ];
 
+// "For you" infinite grid: paginate up to a cap, then stop and offer "See all".
+const FORYOU_PAGE_SIZE = 12;
+const FORYOU_MAX = 60;      // stop auto-loading past this; show "See all products" instead
+const BANNER_EVERY = 6;     // drop a banner card after every N products (even → keeps 2-col pairs intact)
+
+// Rotating banner cards to break the grid monotony — different look + copy each.
+type ForYouBanner = { key: string; variant: 'dark' | 'yellow' | 'light' | 'green'; icon: 'zap' | 'star' | 'tag'; eyebrow: string; title: string; sub: string };
+const FORYOU_BANNERS: ForYouBanner[] = [
+    { key: 'delivery', variant: 'dark', icon: 'zap', eyebrow: 'LIVE IN YOUR AREA', title: 'Delivering to you in 2–12 hrs', sub: 'Bike-fast, straight to your door' },
+    { key: 'try', variant: 'yellow', icon: 'zap', eyebrow: 'TRY-AT-DOOR', title: 'Try it on before you pay', sub: 'Keep what fits, send back the rest' },
+    { key: 'rated', variant: 'light', icon: 'star', eyebrow: 'LOVED NEARBY', title: 'Rated 4.8 by shoppers near you', sub: 'Thousands are styling with ZPIN' },
+    { key: 'deal', variant: 'green', icon: 'tag', eyebrow: 'MEGA HOURS', title: 'Up to 70% off, today only', sub: 'Fresh deals drop every few hours' },
+];
+
+// Per-variant colours so no two banners look alike.
+const FORYOU_BANNER_STYLES = {
+    dark: { card: { backgroundColor: palette.ink }, iconBg: 'rgba(255,255,255,0.1)', iconColor: palette.yellow500, eyebrow: palette.yellow400, title: palette.neutral0, sub: palette.neutral300 },
+    yellow: { card: { backgroundColor: palette.yellow500 }, iconBg: palette.ink, iconColor: palette.yellow500, eyebrow: palette.yellow900, title: palette.ink, sub: palette.neutral700 },
+    light: { card: { backgroundColor: palette.neutral0, borderWidth: 1, borderColor: palette.neutral200 }, iconBg: palette.yellow50, iconColor: palette.yellow600, eyebrow: palette.neutral500, title: palette.ink, sub: palette.neutral500 },
+    green: { card: { backgroundColor: palette.green500 }, iconBg: 'rgba(255,255,255,0.14)', iconColor: palette.neutral0, eyebrow: palette.green100, title: palette.neutral0, sub: palette.green100 },
+} as const;
+
 export default function HomeScreen() {
     const router = useRouter();
-    const { recentSearches } = useSearch();
+    const { recentSearches, isLoading: searchLoading } = useSearch();
     const [freshArrivals, setFreshArrivals] = useState<any[]>(FRESH_ARRIVALS);
     const [recommended, setRecommended] = useState<any[]>(RECOMMENDED);
     const [nearby, setNearby] = useState<any[]>(NEARBY_FALLBACK);
@@ -72,6 +94,18 @@ export default function HomeScreen() {
     const lastFetchRef = useRef(0);
     const lastCoordsRef = useRef<{ lat?: number; lng?: number }>({});
     const STALE_MS = 5 * 60 * 1000;
+
+    // "For you" personalized infinite grid state
+    const [forYou, setForYou] = useState<any[]>([]);
+    const [forYouLoading, setForYouLoading] = useState(true);
+    const [forYouLoadingMore, setForYouLoadingMore] = useState(false);
+    const [forYouDone, setForYouDone] = useState(false);
+    const fyFetching = useRef(false);
+    const fyPage = useRef(0);
+    const fyHasMore = useRef(true);
+    const fyCount = useRef(0);
+    const fySeen = useRef<Set<string>>(new Set());
+    const fyBootstrapped = useRef(false);
 
     const openLegalDoc = (type: LegalDocType) => {
         setLegalDocType(type);
@@ -105,6 +139,10 @@ export default function HomeScreen() {
 
     const onRefresh = async () => {
         setRefreshing(true);
+        // Reset the "for you" feed so it re-personalizes from scratch.
+        fyPage.current = 0; fyHasMore.current = true; fyCount.current = 0; fySeen.current.clear();
+        setForYouDone(false);
+        loadForYou(false);
         const { status } = await ExpoLocation.getForegroundPermissionsAsync();
         if (status === 'granted') {
             setLocationGranted(true);
@@ -274,6 +312,83 @@ export default function HomeScreen() {
         handleProductNav(item.category, item.subCategory);
     };
 
+    // Load one page of the "For you" feed. The first (append=false) load leads with
+    // products matched to recent searches, so the feed is personalized up top.
+    const loadForYou = useCallback(async (append: boolean) => {
+        if (fyFetching.current || (append && (!fyHasMore.current || fyCount.current >= FORYOU_MAX))) return;
+        fyFetching.current = true;
+        if (append) setForYouLoadingMore(true); else setForYouLoading(true);
+        try {
+            const nextPage = append ? fyPage.current + 1 : 1;
+            const lead = !append && recentSearches.length
+                ? await productService.getRecommended(recentSearches, 10).catch(() => [])
+                : [];
+            const res = await productService.getProducts({ page: nextPage, limit: FORYOU_PAGE_SIZE });
+            const incoming = [...lead, ...(res.products || [])];
+            const fresh = incoming.filter(p => p.productId && !fySeen.current.has(p.productId));
+            fresh.forEach(p => fySeen.current.add(p.productId));
+
+            const prevCount = append ? fyCount.current : 0;
+            const toAdd = fresh.slice(0, Math.max(0, FORYOU_MAX - prevCount));
+            fyCount.current = prevCount + toAdd.length;
+            fyPage.current = nextPage;
+            fyHasMore.current = !!res.pagination?.hasNextPage;
+            setForYou(prev => (append ? [...prev, ...toAdd] : toAdd));
+            setForYouDone(fyCount.current >= FORYOU_MAX || !fyHasMore.current);
+        } catch (e) {
+            console.warn('loadForYou failed:', e);
+            if (!append) fyHasMore.current = false;
+        } finally {
+            setForYouLoading(false);
+            setForYouLoadingMore(false);
+            fyFetching.current = false;
+        }
+    }, [recentSearches]);
+
+    // Bootstrap once recent searches have loaded (so personalization is applied).
+    useEffect(() => {
+        if (searchLoading || fyBootstrapped.current) return;
+        fyBootstrapped.current = true;
+        loadForYou(false);
+    }, [searchLoading, loadForYou]);
+
+    // Near-bottom detection on the page scroll (avoids nesting a FlatList in the ScrollView).
+    const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+        if (!fyBootstrapped.current) return;
+        const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
+        if (contentSize.height - contentOffset.y - layoutMeasurement.height < 700) loadForYou(true);
+    };
+
+    // Weave banner cards into the product stream every BANNER_EVERY items.
+    const forYouItems = useMemo(() => {
+        const out: { type: 'product' | 'banner'; data: any; key: string }[] = [];
+        forYou.forEach((p, i) => {
+            out.push({ type: 'product', data: p, key: `p-${p.productId}` });
+            if ((i + 1) % BANNER_EVERY === 0 && i + 1 < forYou.length) {
+                const b = FORYOU_BANNERS[Math.floor(i / BANNER_EVERY) % FORYOU_BANNERS.length];
+                out.push({ type: 'banner', data: b, key: `b-${i}-${b.key}` });
+            }
+        });
+        return out;
+    }, [forYou]);
+
+    const renderForYouBanner = (b: ForYouBanner, key: string) => {
+        const v = FORYOU_BANNER_STYLES[b.variant];
+        const Icon = b.icon === 'star' ? Star : b.icon === 'tag' ? Tag : Zap;
+        return (
+            <Pressable key={key} style={[styles.fyBanner, v.card]} onPress={() => router.push('/product-listing')}>
+                <View style={[styles.fyBannerIcon, { backgroundColor: v.iconBg }]}>
+                    <Icon size={20} color={v.iconColor} fill={b.icon === 'star' ? v.iconColor : 'transparent'} />
+                </View>
+                <View style={styles.fyBannerText}>
+                    <Text style={[styles.fyBannerEyebrow, { color: v.eyebrow }]}>{b.eyebrow}</Text>
+                    <Text style={[styles.fyBannerTitle, { color: v.title }]} numberOfLines={1}>{b.title}</Text>
+                    <Text style={[styles.fyBannerSub, { color: v.sub }]} numberOfLines={1}>{b.sub}</Text>
+                </View>
+            </Pressable>
+        );
+    };
+
     return (
         <SafeAreaView style={styles.container} edges={['top']}>
             <ActionModal
@@ -362,6 +477,8 @@ export default function HomeScreen() {
             <ScrollView
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.scrollContent}
+                onScroll={onScroll}
+                scrollEventThrottle={16}
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[palette.yellow500]} tintColor={palette.yellow500} />}
             >
                 {/* Search */}
@@ -506,6 +623,44 @@ export default function HomeScreen() {
                     ))}
                 </ScrollView>
 
+                {/* For you — personalized infinite grid */}
+                <SectionHeader
+                    eyebrow={recentSearches.length ? `Because you searched "${recentSearches[0]}"` : 'Just for you'}
+                    title="More to explore"
+                    style={styles.section}
+                />
+                {forYouLoading ? (
+                    <View style={styles.fyLoader}><ActivityIndicator color={palette.yellow600} /></View>
+                ) : (
+                    <View style={styles.fyGrid}>
+                        {forYouItems.map((node) =>
+                            node.type === 'banner'
+                                ? renderForYouBanner(node.data, node.key)
+                                : (
+                                    <ProductCard
+                                        key={node.key}
+                                        style={styles.fyCard}
+                                        image={node.data.images?.[0] ?? require('../../assets/images/icon_backup.png')}
+                                        brand={node.data.deepestCategoryName || 'ZPIN'}
+                                        name={node.data.productName}
+                                        price={node.data.price}
+                                        originalPrice={node.data.originalPrice ?? undefined}
+                                        discount={(node.data.discount ?? 0) > 0 ? `${node.data.discount}% OFF` : undefined}
+                                        tryAtDoor
+                                        onPress={() => router.push(`/product/${node.data.productId}`)}
+                                    />
+                                )
+                        )}
+                    </View>
+                )}
+                {forYouLoadingMore && <View style={styles.fyLoader}><ActivityIndicator size="small" color={palette.yellow600} /></View>}
+                {forYouDone && forYou.length > 0 && (
+                    <Pressable style={styles.fySeeAll} onPress={() => router.push('/product-listing')}>
+                        <Text style={styles.fySeeAllText}>See all products</Text>
+                        <ArrowRight size={16} color={colors.textInvert} />
+                    </Pressable>
+                )}
+
                 {/* Footer */}
                 <View style={styles.footer}>
                     <Text style={styles.footerLogo}>ZPIN</Text>
@@ -604,6 +759,18 @@ const styles = StyleSheet.create({
     discountInfo: { marginTop: 10 },
     discountName: { fontFamily: fonts.bodyBold, fontSize: 15, color: colors.textStrong },
     discountDesc: { fontFamily: fonts.bodyRegular, fontSize: 13, color: colors.textMuted, marginTop: 1 },
+
+    fyGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 20, justifyContent: 'space-between', rowGap: 20, marginTop: 4 },
+    fyCard: { width: '47.5%' },
+    fyLoader: { paddingVertical: 24, alignItems: 'center' },
+    fyBanner: { width: '100%', flexDirection: 'row', alignItems: 'center', gap: 14, borderRadius: 20, paddingVertical: 16, paddingHorizontal: 16, overflow: 'hidden' },
+    fyBannerIcon: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+    fyBannerText: { flex: 1 },
+    fyBannerEyebrow: { fontFamily: fonts.monoBold, fontSize: 9, letterSpacing: 1.2, marginBottom: 4 },
+    fyBannerTitle: { fontFamily: fonts.bodyBold, fontSize: 15, marginBottom: 2 },
+    fyBannerSub: { fontFamily: fonts.bodyRegular, fontSize: 12 },
+    fySeeAll: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, alignSelf: 'center', marginTop: 24, backgroundColor: colors.surfaceInverse, borderRadius: 100, paddingVertical: 14, paddingHorizontal: 28 },
+    fySeeAllText: { fontFamily: fonts.bodyBold, fontSize: 14, color: colors.textInvert },
 
     footer: { alignItems: 'center', paddingTop: 40, paddingBottom: 8, marginTop: 28 },
     footerLogo: { fontFamily: fonts.displayBold, fontSize: 28, letterSpacing: -1, color: colors.textStrong, marginBottom: 10 },
