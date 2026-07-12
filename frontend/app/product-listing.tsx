@@ -147,6 +147,16 @@ export default function ProductListing() {
         ? 'Latest arrivals'
         : (currentCategoryNode?.name || (subCategoryName as string) || (categoryName as string) || 'Products');
 
+    // Deterministic parent: a subcategory view belongs to the Categories tab
+    // (restoring the drilled root), everything else ("Latest arrivals") to Home.
+    const goBack = useCallback(() => {
+        if (!rootTarget) { router.replace('/(tabs)'); return; }
+        const rootId = CATEGORY_DATA.find(c => c.name === categoryName)?.id;
+        router.replace(rootId
+            ? { pathname: '/(tabs)/categories', params: { categoryId: rootId } }
+            : '/(tabs)/categories');
+    }, [rootTarget, categoryName, router]);
+
     const renderProductItem = ({ item }: { item: ProductObject }) => (
         <ProductCard
             style={styles.gridCard}
@@ -164,7 +174,7 @@ export default function ProductListing() {
 
     const Header = () => (
         <View style={styles.topBar}>
-            <Pressable style={styles.backBtn} onPress={() => router.back()}>
+            <Pressable style={styles.backBtn} onPress={goBack}>
                 <ChevronLeft size={22} color={colors.textStrong} />
             </Pressable>
             <ZText variant="h3" style={styles.title} numberOfLines={1}>{screenTitle}</ZText>
