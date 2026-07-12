@@ -161,9 +161,15 @@ export default function ProductListing() {
     // through the same deterministic parent instead of letting either pop
     // raw navigation history.
     const navigation = useNavigation();
+    const leavingRef = useRef(false);
     useEffect(() => {
         return navigation.addListener('beforeRemove', (e) => {
+            // goBack() navigates via router.replace, which removes this screen and
+            // re-fires beforeRemove — let that second pass through instead of
+            // re-intercepting it (otherwise it loops → max update depth).
+            if (leavingRef.current) return;
             e.preventDefault();
+            leavingRef.current = true;
             goBack();
         });
     }, [navigation, goBack]);
