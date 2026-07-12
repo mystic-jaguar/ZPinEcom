@@ -66,48 +66,108 @@ function Segment({ filled, hidden }: { filled: boolean; hidden?: boolean }) {
 }
 
 // Crackling lightning arcing through the whole route — the instant-trial "electricity".
+// Real lightning is fractal: the channel is built by midpoint displacement (big kinks
+// with progressively finer jitter), branches fork off it and taper, and each strike
+// flashes then flickers along the SAME channel before a dark gap and a re-strike.
 const BOLT_H = 46;
+const Y_MIN = 4;
+const Y_MAX = BOLT_H - 4;
+
+const rand = (a: number, b: number) => a + Math.random() * (b - a);
+const clampY = (y: number) => Math.min(Y_MAX, Math.max(Y_MIN, y));
+
+// Midpoint-displacement: repeatedly split each segment, kicking the midpoint sideways
+// by a shrinking offset. Gives jaggedness at every scale instead of a uniform zigzag.
+function fracture(a: [number, number], b: [number, number], offset: number, passes: number): [number, number][] {
+    let pts: [number, number][] = [a, b];
+    for (let p = 0; p < passes; p++) {
+        const next: [number, number][] = [pts[0]];
+        for (let i = 1; i < pts.length; i++) {
+            const [ax, ay] = pts[i - 1];
+            const [bx, by] = pts[i];
+            next.push([(ax + bx) / 2 + rand(-offset, offset) * 0.35, clampY((ay + by) / 2 + rand(-offset, offset))], pts[i]);
+        }
+        pts = next;
+        offset *= 0.55;
+    }
+    return pts;
+}
+
+const toPath = (pts: [number, number][]) => 'M' + pts.map(p => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' L');
+
+type BoltBranch = { d: string; depth: number };
 
 function makeBolt(w: number) {
     const cy = BOLT_H / 2;
-    const seg = Math.max(6, Math.round(w / 24));
-    const pts: [number, number][] = [];
-    for (let i = 0; i <= seg; i++) {
-        const x = (w * i) / seg;
-        const y = i === 0 || i === seg ? cy : cy + (Math.random() * 2 - 1) * 9.5;
-        pts.push([x, y]);
+    // Main channel: pinned to the nodes at both ends, fractal in between.
+    const main = fracture([0, cy], [w, cy], 10, 4);
+    const branches: BoltBranch[] = [];
+
+    // Forks: leave the channel at a shallow angle (like real leaders), taper, and can
+    // themselves fork once more.
+    const grow = (from: [number, number], len: number, dirY: number, depth: number) => {
+        const ex = from[0] + len * rand(0.75, 1.15);
+        const ey = clampY(from[1] + dirY * len * rand(0.35, 0.7));
+        const pts = fracture(from, [ex, ey], len * 0.28, 3);
+        branches.push({ d: toPath(pts), depth });
+        if (depth < 2 && Math.random() < 0.45) {
+            const mid = pts[Math.floor(pts.length * rand(0.4, 0.8))];
+            grow(mid, len * 0.5, -dirY, depth + 1);
+        }
+    };
+    const nForks = 2 + Math.floor(Math.random() * 2);
+    for (let f = 0; f < nForks; f++) {
+        const at = main[Math.floor(main.length * rand(0.15, 0.85))];
+        grow(at, rand(18, 34), Math.random() < 0.5 ? -1 : 1, 1);
     }
-    const main = 'M' + pts.map(p => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' L');
-    const branches: string[] = [];
-    const nb = 1 + Math.floor(Math.random() * 2);
-    for (let b = 0; b < nb; b++) {
-        const [bx, by] = pts[1 + Math.floor(Math.random() * (seg - 1))];
-        const ex = bx + (Math.random() * 2 - 1) * 15;
-        const ey = by + (Math.random() < 0.5 ? -1 : 1) * (7 + Math.random() * 8);
-        const mx = (bx + ex) / 2 + (Math.random() * 2 - 1) * 5;
-        const my = (by + ey) / 2 + (Math.random() * 2 - 1) * 5;
-        branches.push(`M${bx.toFixed(1)},${by.toFixed(1)} L${mx.toFixed(1)},${my.toFixed(1)} L${ex.toFixed(1)},${ey.toFixed(1)}`);
-    }
-    return { main, branches, op: 0.6 + Math.random() * 0.4 };
+    return { main: toPath(main), branches };
 }
+
+type Bolt = ReturnType<typeof makeBolt>;
 
 function Electric() {
     const [w, setW] = useState(0);
-    const [bolt, setBolt] = useState(() => makeBolt(1));
+    const [bolt, setBolt] = useState<Bolt | null>(null);
+    const [flash, setFlash] = useState(1);
     useEffect(() => {
         if (w === 0) return;
-        setBolt(makeBolt(w));
-        const id = setInterval(() => setBolt(makeBolt(w)), 85); // rapid re-strike = crackle
-        return () => clearInterval(id);
+        let alive = true;
+        let t: ReturnType<typeof setTimeout>;
+        const strike = () => {
+            if (!alive) return;
+            setBolt(makeBolt(w)); // new channel
+            const flickers = 3 + Math.floor(Math.random() * 3);
+            let i = 0;
+            const tick = () => {
+                if (!alive) return;
+                if (i < flickers) {
+                    // First frame is the full-brightness flash, then it stutters and decays.
+                    setFlash(i === 0 ? 1 : rand(0.25, 0.85) * (1 - i / (flickers + 2)) + 0.15);
+                    i++;
+                    t = setTimeout(tick, rand(35, 90));
+                } else {
+                    setBolt(null); // dark gap before the next strike
+                    t = setTimeout(strike, rand(60, 220));
+                }
+            };
+            tick();
+        };
+        strike();
+        return () => { alive = false; clearTimeout(t); };
     }, [w]);
     return (
         <View style={styles.electricClip} pointerEvents="none" onLayout={e => setW(e.nativeEvent.layout.width)}>
-            {w > 0 && (
+            {w > 0 && bolt && (
                 <Svg width={w} height={BOLT_H} style={styles.bolt}>
-                    <Path d={bolt.main} stroke="rgba(255,196,0,0.45)" strokeWidth={7} fill="none" strokeLinecap="round" strokeLinejoin="round" opacity={bolt.op} />
-                    <Path d={bolt.main} stroke="#FFF6C8" strokeWidth={2.4} fill="none" strokeLinecap="round" strokeLinejoin="round" opacity={bolt.op} />
-                    {bolt.branches.map((d, i) => (
-                        <Path key={i} d={d} stroke="rgba(255,221,77,0.9)" strokeWidth={1.6} fill="none" strokeLinecap="round" strokeLinejoin="round" opacity={bolt.op * 0.85} />
+                    {/* wide soft yellow corona → tighter glow → white-hot core */}
+                    <Path d={bolt.main} stroke="rgba(255,196,0,0.18)" strokeWidth={10} fill="none" strokeLinecap="round" strokeLinejoin="round" opacity={flash} />
+                    <Path d={bolt.main} stroke="rgba(255,208,45,0.55)" strokeWidth={4.2} fill="none" strokeLinecap="round" strokeLinejoin="round" opacity={flash} />
+                    <Path d={bolt.main} stroke="#FFFBEA" strokeWidth={1.6} fill="none" strokeLinecap="round" strokeLinejoin="round" opacity={flash} />
+                    {bolt.branches.map((b, i) => (
+                        <React.Fragment key={i}>
+                            <Path d={b.d} stroke="rgba(255,205,40,0.4)" strokeWidth={b.depth === 1 ? 2.8 : 1.8} fill="none" strokeLinecap="round" strokeLinejoin="round" opacity={flash * 0.9} />
+                            <Path d={b.d} stroke="rgba(255,244,200,0.95)" strokeWidth={b.depth === 1 ? 1.1 : 0.7} fill="none" strokeLinecap="round" strokeLinejoin="round" opacity={flash * (b.depth === 1 ? 0.9 : 0.6)} />
+                        </React.Fragment>
                     ))}
                 </Svg>
             )}
