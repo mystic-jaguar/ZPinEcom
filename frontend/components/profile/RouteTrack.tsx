@@ -129,6 +129,10 @@ function Electric() {
     const [w, setW] = useState(0);
     const [bolt, setBolt] = useState<Bolt | null>(null);
     const [flash, setFlash] = useState(1);
+    // The strike is DISCHARGED left→right in two hops: it lands on the bike (mid-route)
+    // first, holds for a beat, then jumps on to the door — the courier reaching you, then
+    // reaching home. The bike sits at the horizontal centre, so 0.5 = the bike node.
+    const reveal = useRef(new Animated.Value(0)).current;
     useEffect(() => {
         if (w === 0) return;
         let alive = true;
@@ -136,29 +140,46 @@ function Electric() {
         const strike = () => {
             if (!alive) return;
             setBolt(makeBolt(w)); // new channel
-            const flickers = 3 + Math.floor(Math.random() * 3);
-            let i = 0;
-            const tick = () => {
-                if (!alive) return;
-                if (i < flickers) {
-                    // First frame is the full-brightness flash, then it stutters and decays.
-                    setFlash(i === 0 ? 1 : rand(0.25, 0.85) * (1 - i / (flickers + 2)) + 0.15);
-                    i++;
-                    t = setTimeout(tick, rand(35, 90));
-                } else {
-                    setBolt(null); // dark gap before the next strike
-                    t = setTimeout(strike, rand(60, 220));
-                }
-            };
-            tick();
+            setFlash(1);
+            reveal.setValue(0);
+            Animated.sequence([
+                // Hop 1: store → bike, easing out so it "lands" on the courier.
+                Animated.timing(reveal, { toValue: 0.5, duration: rand(560, 700), easing: Easing.out(Easing.quad), useNativeDriver: false }),
+                Animated.delay(rand(180, 280)), // held on the bike — the hit
+                // Hop 2: bike → home.
+                Animated.timing(reveal, { toValue: 1, duration: rand(560, 700), easing: Easing.out(Easing.quad), useNativeDriver: false }),
+            ]).start(({ finished }) => {
+                if (!alive || !finished) return;
+                // Once it has arrived, the full channel flickers and decays, then a dark gap.
+                const flickers = 2 + Math.floor(Math.random() * 3);
+                let i = 0;
+                const tick = () => {
+                    if (!alive) return;
+                    if (i < flickers) {
+                        setFlash(rand(0.3, 0.85) * (1 - i / (flickers + 2)) + 0.15);
+                        i++;
+                        t = setTimeout(tick, rand(40, 95));
+                    } else {
+                        setBolt(null); // dark gap before the next strike re-fires from the left
+                        t = setTimeout(strike, rand(90, 260));
+                    }
+                };
+                tick();
+            });
         };
         strike();
-        return () => { alive = false; clearTimeout(t); };
-    }, [w]);
+        return () => { alive = false; clearTimeout(t); reveal.stopAnimation(); };
+    }, [w, reveal]);
+
+    const revealW = reveal.interpolate({ inputRange: [0, 1], outputRange: [0, Math.max(w, 1)] });
+
     return (
         <View style={styles.electricClip} pointerEvents="none" onLayout={e => setW(e.nativeEvent.layout.width)}>
             {w > 0 && bolt && (
-                <Svg width={w} height={BOLT_H} style={styles.bolt}>
+                // Clip the fixed-width bolt to the advancing reveal window so it draws itself
+                // from the store toward the door.
+                <Animated.View style={[styles.boltClip, { width: revealW }]}>
+                    <Svg width={w} height={BOLT_H}>
                     {/* wide soft yellow corona → tighter glow → white-hot core */}
                     <Path d={bolt.main} stroke="rgba(255,196,0,0.18)" strokeWidth={10} fill="none" strokeLinecap="round" strokeLinejoin="round" opacity={flash} />
                     <Path d={bolt.main} stroke="rgba(255,208,45,0.55)" strokeWidth={4.2} fill="none" strokeLinecap="round" strokeLinejoin="round" opacity={flash} />
@@ -169,7 +190,8 @@ function Electric() {
                             <Path d={b.d} stroke="rgba(255,244,200,0.95)" strokeWidth={b.depth === 1 ? 1.1 : 0.7} fill="none" strokeLinecap="round" strokeLinejoin="round" opacity={flash * (b.depth === 1 ? 0.9 : 0.6)} />
                         </React.Fragment>
                     ))}
-                </Svg>
+                    </Svg>
+                </Animated.View>
             )}
         </View>
     );
@@ -208,5 +230,5 @@ const styles = StyleSheet.create({
     dash: { width: DASH_W, height: 3, borderRadius: 2, marginRight: DASH_GAP },
 
     electricClip: { ...StyleSheet.absoluteFillObject, alignItems: 'stretch', justifyContent: 'center' },
-    bolt: { position: 'absolute', top: -6 },
+    boltClip: { position: 'absolute', top: -6, left: 0, height: BOLT_H, overflow: 'hidden' },
 });
