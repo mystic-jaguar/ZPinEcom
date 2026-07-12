@@ -1,5 +1,5 @@
 import { Image } from 'expo-image';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { ChevronLeft, Search, ShoppingBag, SlidersHorizontal } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Dimensions, FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -156,6 +156,17 @@ export default function ProductListing() {
             ? { pathname: '/(tabs)/categories', params: { categoryId: rootId } }
             : '/(tabs)/categories');
     }, [rootTarget, categoryName, router]);
+
+    // Route the hardware back button (Android) and swipe-back gesture (iOS)
+    // through the same deterministic parent instead of letting either pop
+    // raw navigation history.
+    const navigation = useNavigation();
+    useEffect(() => {
+        return navigation.addListener('beforeRemove', (e) => {
+            e.preventDefault();
+            goBack();
+        });
+    }, [navigation, goBack]);
 
     const renderProductItem = ({ item }: { item: ProductObject }) => (
         <ProductCard
