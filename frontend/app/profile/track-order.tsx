@@ -1,8 +1,9 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Bike, Check, Headphones, HelpCircle, Home, MessageCircle, Phone, Shirt, Store, Timer, Zap } from 'lucide-react-native';
+import { Check, Headphones, HelpCircle, MessageCircle, Phone, Shirt, Timer, Zap } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { Linking, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import RouteTrack, { RoutePhase } from '../../components/profile/RouteTrack';
 import { AppHeader, ZButton, ZText } from '../../components/ui';
 import { colors, fonts, palette, radius } from '../../constants/theme';
 import { useOrder } from '../../context/OrderContext';
@@ -13,6 +14,8 @@ const TIMELINE = [
     { key: 'shipped', title: 'Out for delivery', note: 'On the way to you' },
     { key: 'delivered', title: 'Delivered', note: 'Have your size ready' },
 ];
+
+const ELECTRIC_DELAY_MS = 5 * 60 * 1000; // 5 min after delivery before the surge kicks in
 
 function stepIndex(status?: string) {
     if (status === 'delivered') return 2;
@@ -50,6 +53,19 @@ export default function TrackOrderScreen() {
     const liveEta = trackingData?.estimatedDelivery || order?.estimatedDelivery;
     const canCancel = order && ['pending', 'confirmed'].includes(liveStatus);
     const active = stepIndex(liveStatus);
+    const phase: RoutePhase = active === 2 ? 'delivered' : active === 1 ? 'shipped' : 'confirmed';
+
+    // Instant-trial celebration: once delivered, wait a beat, then run the electric surge.
+    const [electric, setElectric] = useState(false);
+    useEffect(() => {
+        setElectric(false);
+        if (!isInstant || liveStatus !== 'delivered') return;
+        const deliveredAt = order?.updatedAt ? new Date(order.updatedAt).getTime() : Date.now();
+        const elapsed = Date.now() - deliveredAt;
+        if (elapsed >= ELECTRIC_DELAY_MS) { setElectric(true); return; }
+        const t = setTimeout(() => setElectric(true), ELECTRIC_DELAY_MS - elapsed);
+        return () => clearTimeout(t);
+    }, [isInstant, liveStatus, order?.updatedAt]);
 
     const etaLabel = liveEta
         ? new Date(liveEta).toLocaleString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true })
@@ -86,13 +102,7 @@ export default function TrackOrderScreen() {
                             <Text style={styles.fastText}>{isInstant ? 'FAST' : 'STD'}</Text>
                         </View>
                     </View>
-                    <View style={styles.route}>
-                        <View style={styles.routeNodeSmall}><Store size={14} color={colors.textOnYellow} /></View>
-                        <View style={[styles.dashed, { borderColor: palette.yellow500 }]} />
-                        <View style={styles.routeNodeBig}><Bike size={18} color={colors.textStrong} /></View>
-                        <View style={[styles.dashed, { borderColor: 'rgba(255,255,255,0.25)' }]} />
-                        <View style={styles.routeNodeDim}><Home size={14} color="#fff" /></View>
-                    </View>
+                    <RouteTrack phase={phase} electric={electric} />
                 </View>
 
                 <View style={{ paddingHorizontal: 20 }}>
@@ -181,12 +191,6 @@ const styles = StyleSheet.create({
     orderNo: { fontFamily: fonts.monoBold, fontSize: 10, letterSpacing: 0.6, color: '#8A877E', marginTop: 8 },
     fastBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: palette.yellow500, paddingHorizontal: 13, paddingVertical: 8, borderRadius: 100 },
     fastText: { fontFamily: fonts.displayBold, fontSize: 13, fontStyle: 'italic', color: colors.textOnYellow },
-    route: { flexDirection: 'row', alignItems: 'center' },
-    routeNodeSmall: { width: 26, height: 26, borderRadius: 13, backgroundColor: palette.yellow500, alignItems: 'center', justifyContent: 'center' },
-    routeNodeBig: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#fff', borderWidth: 2, borderColor: palette.yellow500, alignItems: 'center', justifyContent: 'center' },
-    routeNodeDim: { width: 26, height: 26, borderRadius: 13, backgroundColor: 'rgba(255,255,255,0.14)', alignItems: 'center', justifyContent: 'center' },
-    dashed: { flex: 1, height: 0, borderTopWidth: 3, borderStyle: 'dashed' },
-
     trialCard: { backgroundColor: colors.surfaceCard, borderWidth: 1, borderColor: palette.neutral200, borderRadius: radius.lg, padding: 16, marginBottom: 16 },
     trialHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
     trialLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },

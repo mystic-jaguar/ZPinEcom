@@ -54,7 +54,7 @@ export default function WishlistScreen() {
                     <Heart size={64} color={colors.borderStrong} />
                     <ZText variant="lg" style={{ marginTop: 20 }}>Your wishlist is empty</ZText>
                     <ZText variant="muted" style={{ marginTop: 4, marginBottom: 20 }}>Save items you love to view them here</ZText>
-                    <ZButton label="Start shopping" fullWidth={false} onPress={() => router.push('/(tabs)')} />
+                    <ZButton label="Start shopping" fullWidth={false} style={{ alignSelf: 'center' }} onPress={() => router.push('/(tabs)')} />
                 </View>
             )}
         </SafeAreaView>
