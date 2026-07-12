@@ -37,7 +37,7 @@ function DashLine({ color }: { color: string }) {
 
 // One segment: dim marching dashes underneath, yellow marching dashes revealed by an
 // animated fill that grows to full when the courier "reaches" the next node.
-function Segment({ filled }: { filled: boolean }) {
+function Segment({ filled, hidden }: { filled: boolean; hidden?: boolean }) {
     const [w, setW] = useState(0);
     const progress = useRef(new Animated.Value(0)).current;
     useEffect(() => {
@@ -49,6 +49,8 @@ function Segment({ filled }: { filled: boolean }) {
         }).start();
     }, [filled, progress]);
     const fillWidth = progress.interpolate({ inputRange: [0, 1], outputRange: [0, w] });
+    // When lightning is active the dashes are hidden — only the bolt runs the route.
+    if (hidden) return <View style={styles.segment} />;
     return (
         <View style={styles.segment} onLayout={e => setW(e.nativeEvent.layout.width)}>
             <DashLine color="rgba(255,255,255,0.22)" />
@@ -119,11 +121,11 @@ export default function RouteTrack({ phase, electric }: { phase: RoutePhase; ele
     return (
         <View style={styles.route}>
             <View style={styles.nodeSmall}><Store size={14} color={colors.textOnYellow} /></View>
-            <Segment filled={reachedBike} />
+            <Segment filled={reachedBike} hidden={electric} />
             <View style={[styles.nodeBig, reachedBike && styles.nodeBigOn]}>
                 <Bike size={18} color={colors.textStrong} />
             </View>
-            <Segment filled={reachedHome} />
+            <Segment filled={reachedHome} hidden={electric} />
             <View style={[styles.nodeDim, reachedHome && styles.nodeHomeOn]}>
                 <Home size={14} color={reachedHome ? colors.textOnYellow : '#fff'} />
             </View>
