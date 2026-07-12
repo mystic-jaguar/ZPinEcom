@@ -1,7 +1,7 @@
-import { LinearGradient } from 'expo-linear-gradient';
 import { Bike, Home, Store } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 import { colors, palette } from '../../constants/theme';
 
 export type RoutePhase = 'confirmed' | 'shipped' | 'delivered';
@@ -63,38 +63,52 @@ function Segment({ filled }: { filled: boolean }) {
     );
 }
 
-// Bright yellow surge sweeping across the whole route — the "electricity" celebration.
-function ElectricSweep() {
-    const tx = useRef(new Animated.Value(0)).current;
+// Crackling lightning arcing through the whole route — the instant-trial "electricity".
+const BOLT_H = 46;
+
+function makeBolt(w: number) {
+    const cy = BOLT_H / 2;
+    const seg = Math.max(6, Math.round(w / 24));
+    const pts: [number, number][] = [];
+    for (let i = 0; i <= seg; i++) {
+        const x = (w * i) / seg;
+        const y = i === 0 || i === seg ? cy : cy + (Math.random() * 2 - 1) * 9.5;
+        pts.push([x, y]);
+    }
+    const main = 'M' + pts.map(p => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' L');
+    const branches: string[] = [];
+    const nb = 1 + Math.floor(Math.random() * 2);
+    for (let b = 0; b < nb; b++) {
+        const [bx, by] = pts[1 + Math.floor(Math.random() * (seg - 1))];
+        const ex = bx + (Math.random() * 2 - 1) * 15;
+        const ey = by + (Math.random() < 0.5 ? -1 : 1) * (7 + Math.random() * 8);
+        const mx = (bx + ex) / 2 + (Math.random() * 2 - 1) * 5;
+        const my = (by + ey) / 2 + (Math.random() * 2 - 1) * 5;
+        branches.push(`M${bx.toFixed(1)},${by.toFixed(1)} L${mx.toFixed(1)},${my.toFixed(1)} L${ex.toFixed(1)},${ey.toFixed(1)}`);
+    }
+    return { main, branches, op: 0.6 + Math.random() * 0.4 };
+}
+
+function Electric() {
     const [w, setW] = useState(0);
+    const [bolt, setBolt] = useState(() => makeBolt(1));
     useEffect(() => {
         if (w === 0) return;
-        const loop = Animated.loop(
-            Animated.sequence([
-                Animated.timing(tx, {
-                    toValue: 1,
-                    duration: 1100,
-                    easing: Easing.inOut(Easing.quad),
-                    useNativeDriver: true,
-                }),
-                Animated.delay(600),
-                Animated.timing(tx, { toValue: 0, duration: 0, useNativeDriver: true }),
-            ]),
-        );
-        loop.start();
-        return () => loop.stop();
-    }, [tx, w]);
-    const translateX = tx.interpolate({ inputRange: [0, 1], outputRange: [-90, w] });
+        setBolt(makeBolt(w));
+        const id = setInterval(() => setBolt(makeBolt(w)), 85); // rapid re-strike = crackle
+        return () => clearInterval(id);
+    }, [w]);
     return (
-        <View style={styles.sweepClip} pointerEvents="none" onLayout={e => setW(e.nativeEvent.layout.width)}>
-            <Animated.View style={[styles.sweep, { transform: [{ translateX }] }]}>
-                <LinearGradient
-                    colors={['rgba(255,196,0,0)', 'rgba(255,221,77,0.95)', 'rgba(255,255,255,0.9)', 'rgba(255,221,77,0.95)', 'rgba(255,196,0,0)']}
-                    start={{ x: 0, y: 0.5 }}
-                    end={{ x: 1, y: 0.5 }}
-                    style={styles.sweepGradient}
-                />
-            </Animated.View>
+        <View style={styles.electricClip} pointerEvents="none" onLayout={e => setW(e.nativeEvent.layout.width)}>
+            {w > 0 && (
+                <Svg width={w} height={BOLT_H} style={styles.bolt}>
+                    <Path d={bolt.main} stroke="rgba(255,196,0,0.45)" strokeWidth={7} fill="none" strokeLinecap="round" strokeLinejoin="round" opacity={bolt.op} />
+                    <Path d={bolt.main} stroke="#FFF6C8" strokeWidth={2.4} fill="none" strokeLinecap="round" strokeLinejoin="round" opacity={bolt.op} />
+                    {bolt.branches.map((d, i) => (
+                        <Path key={i} d={d} stroke="rgba(255,221,77,0.9)" strokeWidth={1.6} fill="none" strokeLinecap="round" strokeLinejoin="round" opacity={bolt.op * 0.85} />
+                    ))}
+                </Svg>
+            )}
         </View>
     );
 }
@@ -113,7 +127,7 @@ export default function RouteTrack({ phase, electric }: { phase: RoutePhase; ele
             <View style={[styles.nodeDim, reachedHome && styles.nodeHomeOn]}>
                 <Home size={14} color={reachedHome ? colors.textOnYellow : '#fff'} />
             </View>
-            {electric && <ElectricSweep />}
+            {electric && <Electric />}
         </View>
     );
 }
@@ -131,7 +145,6 @@ const styles = StyleSheet.create({
     dashRow: { flexDirection: 'row', height: 3 },
     dash: { width: DASH_W, height: 3, borderRadius: 2, marginRight: DASH_GAP },
 
-    sweepClip: { ...StyleSheet.absoluteFillObject, overflow: 'hidden', borderRadius: 4 },
-    sweep: { position: 'absolute', top: -8, bottom: -8, width: 90 },
-    sweepGradient: { flex: 1, borderRadius: 8 },
+    electricClip: { ...StyleSheet.absoluteFillObject, alignItems: 'stretch', justifyContent: 'center' },
+    bolt: { position: 'absolute', top: -6 },
 });
