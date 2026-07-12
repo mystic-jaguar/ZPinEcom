@@ -327,8 +327,24 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
       [req.userId]
     );
 
-    // If DB cart is empty but client sent cart items, sync them first
-    if (cartResult.rows.length === 0 && Array.isArray(bodyCartItems) && bodyCartItems.length > 0) {
+    // Reconcile the server cart to exactly the cart the user reviewed at checkout.
+    // We used to sync only when the DB cart was empty, so a stale/partial server
+    // cart could silently override the reviewed items and produce an order total
+    // (and Razorpay charge) that differed from what the summary screen showed.
+    // We trust the client only for WHICH items/quantities are in the cart — prices
+    // are always looked up server-side below, never taken from the client.
+    if (Array.isArray(bodyCartItems) && bodyCartItems.length > 0) {
+      const wantedIds = bodyCartItems.map((i: any) => i.productId).filter(Boolean);
+
+      // Drop server-cart rows the user no longer has in their reviewed cart.
+      if (wantedIds.length > 0) {
+        const placeholders = wantedIds.map((_: string, i: number) => `$${i + 2}::uuid`).join(', ');
+        await client.query(
+          `DELETE FROM ${CART} WHERE user_id = $1 AND product_id NOT IN (${placeholders})`,
+          [req.userId, ...wantedIds]
+        );
+      }
+
       for (const item of bodyCartItems) {
         if (!item.productId) continue;
         const product = await client.query(
@@ -355,7 +371,7 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
         }
       }
 
-      // Re-fetch cart after sync
+      // Re-fetch cart after reconcile
       cartResult = await client.query(
         `SELECT ci.*, p.price, p.product_name, p.user_id as seller_id,
           (SELECT image_url FROM product_images WHERE product_id = p.id LIMIT 1) as image
