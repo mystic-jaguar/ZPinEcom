@@ -95,32 +95,47 @@ function fracture(a: [number, number], b: [number, number], offset: number, pass
 
 const toPath = (pts: [number, number][]) => 'M' + pts.map(p => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' L');
 
-type BoltBranch = { d: string; depth: number };
+type Lightning = { channel: string; branches: string[]; thick: number };
+
+// One complete, self-contained lightning: its own fractal channel pinned to both nodes,
+// its own thickness, and its own forks peeling off it.
+function makeLightning(w: number, lane: number, solo: boolean): Lightning {
+    const cy = BOLT_H / 2;
+    // Each lightning lives in its own vertical lane so simultaneous strikes read as
+    // separate bolts instead of one fuzzy channel; ends stay pinned to the icons.
+    const midX = w * rand(0.35, 0.65);
+    const midY = clampY(cy + lane + rand(-3, 3));
+    const pts = fracture([0, cy], [midX, midY], rand(8, 12), 5)
+        .concat(fracture([midX, midY], [w, cy], rand(8, 12), 5).slice(1));
+
+    // Forks: mostly one, sometimes two splitting opposite ways. They travel FORWARD along
+    // the strike and die out — never re-forking back (that recursion reads as a tree).
+    const branches: string[] = [];
+    const heads = Math.random() < 0.4 ? 2 : 1;
+    let dir = Math.random() < 0.5 ? -1 : 1;
+    for (let f = 0; f < heads; f++) {
+        // Split point wanders the whole route — right off the store, mid-way, just after
+        // the bike, or a breath before the door.
+        const from = pts[Math.floor(pts.length * rand(0.06, 0.92))];
+        const len = rand(12, 22);
+        const end: [number, number] = [
+            from[0] + len * rand(0.7, 1.1),                 // continue forward, not straight down
+            clampY(from[1] + dir * len * rand(0.5, 0.95)),  // veer to one side
+        ];
+        branches.push(toPath(fracture(from, end, len * 0.3, 3)));
+        dir = -dir; // a second head veers the other way
+    }
+    // A lone strike can run fat or wiry; companions fire thinner so each stays distinct.
+    const thick = solo ? rand(0.7, 1.12) : rand(0.45, 0.75);
+    return { channel: toPath(pts), branches, thick };
+}
 
 function makeBolt(w: number) {
-    const cy = BOLT_H / 2;
-    // Main channel: pinned to the nodes at both ends, fractal in between.
-    const main = fracture([0, cy], [w, cy], 10, 4);
-    const branches: BoltBranch[] = [];
-
-    // Forks: leave the channel at a shallow angle (like real leaders), taper, and can
-    // themselves fork once more.
-    const grow = (from: [number, number], len: number, dirY: number, depth: number) => {
-        const ex = from[0] + len * rand(0.75, 1.15);
-        const ey = clampY(from[1] + dirY * len * rand(0.35, 0.7));
-        const pts = fracture(from, [ex, ey], len * 0.28, 3);
-        branches.push({ d: toPath(pts), depth });
-        if (depth < 2 && Math.random() < 0.45) {
-            const mid = pts[Math.floor(pts.length * rand(0.4, 0.8))];
-            grow(mid, len * 0.5, -dirY, depth + 1);
-        }
-    };
-    const nForks = 2 + Math.floor(Math.random() * 2);
-    for (let f = 0; f < nForks; f++) {
-        const at = main[Math.floor(main.length * rand(0.15, 0.85))];
-        grow(at, rand(18, 34), Math.random() < 0.5 ? -1 : 1, 1);
-    }
-    return { main: toPath(main), branches };
+    // How many lightnings hit at once: usually one, sometimes 2 or 3 striking together.
+    const count = Math.random() < 0.55 ? 1 : Math.random() < 0.65 ? 2 : 3;
+    // Spread the lanes so 2–3 bolts fan apart: one high, one low, one centre.
+    const lanes = count === 1 ? [0] : count === 2 ? [-9, 9] : [-13, 0, 13];
+    return { lightnings: lanes.map(lane => makeLightning(w, lane, count === 1)) };
 }
 
 type Bolt = ReturnType<typeof makeBolt>;
@@ -144,10 +159,10 @@ function Electric() {
             reveal.setValue(0);
             Animated.sequence([
                 // Hop 1: store → bike, easing out so it "lands" on the courier.
-                Animated.timing(reveal, { toValue: 0.5, duration: rand(560, 700), easing: Easing.out(Easing.quad), useNativeDriver: false }),
-                Animated.delay(rand(180, 280)), // held on the bike — the hit
+                Animated.timing(reveal, { toValue: 0.5, duration: rand(440, 560), easing: Easing.out(Easing.quad), useNativeDriver: false }),
+                Animated.delay(rand(130, 200)), // held on the bike — the hit
                 // Hop 2: bike → home.
-                Animated.timing(reveal, { toValue: 1, duration: rand(560, 700), easing: Easing.out(Easing.quad), useNativeDriver: false }),
+                Animated.timing(reveal, { toValue: 1, duration: rand(440, 560), easing: Easing.out(Easing.quad), useNativeDriver: false }),
             ]).start(({ finished }) => {
                 if (!alive || !finished) return;
                 // Once it has arrived, the full channel flickers and decays, then a dark gap.
@@ -180,14 +195,19 @@ function Electric() {
                 // from the store toward the door.
                 <Animated.View style={[styles.boltClip, { width: revealW }]}>
                     <Svg width={w} height={BOLT_H}>
-                    {/* wide soft yellow corona → tighter glow → white-hot core */}
-                    <Path d={bolt.main} stroke="rgba(255,196,0,0.18)" strokeWidth={10} fill="none" strokeLinecap="round" strokeLinejoin="round" opacity={flash} />
-                    <Path d={bolt.main} stroke="rgba(255,208,45,0.55)" strokeWidth={4.2} fill="none" strokeLinecap="round" strokeLinejoin="round" opacity={flash} />
-                    <Path d={bolt.main} stroke="#FFFBEA" strokeWidth={1.6} fill="none" strokeLinecap="round" strokeLinejoin="round" opacity={flash} />
-                    {bolt.branches.map((b, i) => (
+                    {/* each lightning: wide soft yellow corona → tighter glow → white-hot core,
+                        plus its own forks */}
+                    {bolt.lightnings.map((L, i) => (
                         <React.Fragment key={i}>
-                            <Path d={b.d} stroke="rgba(255,205,40,0.4)" strokeWidth={b.depth === 1 ? 2.8 : 1.8} fill="none" strokeLinecap="round" strokeLinejoin="round" opacity={flash * 0.9} />
-                            <Path d={b.d} stroke="rgba(255,244,200,0.95)" strokeWidth={b.depth === 1 ? 1.1 : 0.7} fill="none" strokeLinecap="round" strokeLinejoin="round" opacity={flash * (b.depth === 1 ? 0.9 : 0.6)} />
+                            <Path d={L.channel} stroke="rgba(255,196,0,0.18)" strokeWidth={10 * L.thick} fill="none" strokeLinecap="round" strokeLinejoin="round" opacity={flash} />
+                            <Path d={L.channel} stroke="rgba(255,208,45,0.55)" strokeWidth={4.2 * L.thick} fill="none" strokeLinecap="round" strokeLinejoin="round" opacity={flash} />
+                            <Path d={L.channel} stroke="#FFFBEA" strokeWidth={1.6 * L.thick} fill="none" strokeLinecap="round" strokeLinejoin="round" opacity={flash} />
+                            {L.branches.map((d, j) => (
+                                <React.Fragment key={j}>
+                                    <Path d={d} stroke="rgba(255,205,40,0.35)" strokeWidth={1.8 * L.thick} fill="none" strokeLinecap="round" strokeLinejoin="round" opacity={flash * 0.7} />
+                                    <Path d={d} stroke="rgba(255,244,200,0.9)" strokeWidth={0.8 * L.thick} fill="none" strokeLinecap="round" strokeLinejoin="round" opacity={flash * 0.55} />
+                                </React.Fragment>
+                            ))}
                         </React.Fragment>
                     ))}
                     </Svg>
