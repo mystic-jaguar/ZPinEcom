@@ -352,6 +352,17 @@ export default function HomeScreen() {
         loadForYou(false);
     }, [searchLoading, loadForYou]);
 
+    // If the first load came back empty (e.g. the Render backend was still cold and
+    // the request failed), retry when the Home tab regains focus so the section
+    // fills in instead of staying blank.
+    useFocusEffect(
+        useCallback(() => {
+            if (fyBootstrapped.current && !fyFetching.current && forYou.length === 0) {
+                loadForYou(false);
+            }
+        }, [forYou.length, loadForYou])
+    );
+
     // Near-bottom detection on the page scroll (avoids nesting a FlatList in the ScrollView).
     const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
         if (!fyBootstrapped.current) return;

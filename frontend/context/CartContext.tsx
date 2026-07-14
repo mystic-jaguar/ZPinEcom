@@ -25,6 +25,7 @@ interface CartContextType {
     availableCoupons: CouponObject[];
     applyCoupon: (code: string) => Promise<{ success: boolean; message: string }>;
     removeCoupon: () => void;
+    refreshCoupons: () => Promise<void>;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -225,12 +226,16 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     const [appliedCoupon, setAppliedCoupon] = useState<CouponObject | null>(null);
     const [availableCoupons, setAvailableCoupons] = useState<CouponObject[]>([]);
 
-    // Fetch available coupons from backend on mount
-    useEffect(() => {
-        couponService.getCoupons()
-            .then(setAvailableCoupons)
-            .catch(() => {}); // fail silently — coupons are non-critical
+    // Fetch available coupons from backend. Exposed so screens can retry after a
+    // cold-start failure (Render backend spins down when idle → first boot fetch
+    // can time out, and a one-shot mount fetch would leave the list empty forever).
+    const refreshCoupons = useCallback(async () => {
+        try {
+            setAvailableCoupons(await couponService.getCoupons());
+        } catch { /* non-critical — leave existing list, caller may retry on focus */ }
     }, []);
+
+    useEffect(() => { refreshCoupons(); }, [refreshCoupons]);
 
     const totalPrice = cartItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
     const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0);
@@ -298,7 +303,8 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
             couponDiscount,
             availableCoupons,
             applyCoupon,
-            removeCoupon
+            removeCoupon,
+            refreshCoupons
         }}>
             {children}
         </CartContext.Provider>

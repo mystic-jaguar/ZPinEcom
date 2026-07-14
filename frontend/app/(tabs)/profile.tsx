@@ -5,11 +5,11 @@ import { useOrder } from '@/context/OrderContext';
 import { useWishlist } from '@/context/WishlistContext';
 import { authService } from '@/services/auth';
 import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import {
     ChevronRight, Heart, LifeBuoy, LogOut, MapPin, RotateCcw, Settings, Shield, ShoppingBag, Ticket, Trash2, User, Zap,
 } from 'lucide-react-native';
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ZText } from '../../components/ui';
@@ -23,10 +23,19 @@ function initialsOf(name?: string) {
 
 export default function ProfileScreen() {
     const { user, resetUser } = useUser();
-    const { clearCart, availableCoupons } = useCart();
-    const { orders } = useOrder();
+    const { clearCart, availableCoupons, refreshCoupons } = useCart();
+    const { orders, refreshOrders } = useOrder();
     const { wishlistItems, clearWishlist } = useWishlist();
     const router = useRouter();
+
+    // Re-fetch the counts each time the profile is focused so a failed cold-start
+    // load (Render backend waking up) self-heals instead of showing a stale 0.
+    useFocusEffect(
+        useCallback(() => {
+            refreshOrders();
+            refreshCoupons();
+        }, [refreshOrders, refreshCoupons])
+    );
     const [logoutModalVisible, setLogoutModalVisible] = useState(false);
     const [deleteModalVisible, setDeleteModalVisible] = useState(false);
     const [deleting, setDeleting] = useState(false);

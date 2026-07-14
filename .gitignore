@@ -79,3 +79,6 @@ CLAUDE_MEMORY.md
 # Security audit report — kept local, never committed
 SECURITY_AUDIT.md
 security-audit/
+
+# Local DB backups — never commit (contains PII/secrets)
+backups/
