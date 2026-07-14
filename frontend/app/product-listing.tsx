@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { Stack, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
-import { ChevronLeft, Search, ShoppingBag, SlidersHorizontal } from 'lucide-react-native';
+import { ChevronLeft, PackageSearch, Search, ShoppingBag, SlidersHorizontal } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Dimensions, FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -127,6 +127,17 @@ export default function ProductListing() {
         setFilterState(prev => (prev.brands.length ? { ...prev, brands: [] } : prev));
     };
 
+    const hasActiveFilters =
+        filterState.priceRanges.length > 0 ||
+        filterState.brands.length > 0 ||
+        filterState.ratings.length > 0 ||
+        filterState.discounts.length > 0;
+
+    const clearFilters = () => {
+        setActiveFilter('All');
+        setFilterState({ sortBy: 'relevance', priceRanges: [], brands: [], ratings: [], discounts: [] });
+    };
+
     const findNode = (nodes: CategoryNode[], name: string): CategoryNode | null => {
         for (const node of nodes) {
             if (node.name === name) return node;
@@ -233,7 +244,7 @@ export default function ProductListing() {
             <Header />
 
             {currentCategoryNode?.children && currentCategoryNode.children.length > 0 && (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsScroll} contentContainerStyle={styles.tabs}>
                     {['All', ...currentCategoryNode.children.map(c => c.name)].map((name) => {
                         const active = activeFilter === name;
                         return (
@@ -268,7 +279,22 @@ export default function ProductListing() {
                 initialNumToRender={PAGE_SIZE}
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[palette.yellow500]} tintColor={palette.yellow500} />}
                 ListFooterComponent={loadingMore ? <View style={styles.footerLoader}><ActivityIndicator size="small" color={palette.yellow600} /></View> : null}
-                ListEmptyComponent={<View style={styles.empty}><ZText variant="muted">No products found.</ZText></View>}
+                ListEmptyComponent={
+                    <View style={styles.empty}>
+                        <View style={styles.emptyIcon}>
+                            <PackageSearch size={34} color={colors.textMuted} strokeWidth={1.75} />
+                        </View>
+                        <ZText variant="h3" style={styles.emptyTitle}>Nothing here yet</ZText>
+                        <ZText variant="muted" style={styles.emptyText}>
+                            {hasActiveFilters
+                                ? "No products match these filters. Try loosening them a little."
+                                : "We haven't stocked this collection yet — check back soon."}
+                        </ZText>
+                        {hasActiveFilters
+                            ? <ZButton label="Clear filters" size="md" fullWidth={false} onPress={clearFilters} style={styles.emptyBtn} />
+                            : <ZButton label="Browse all products" variant="outline" size="md" fullWidth={false} onPress={() => router.replace('/product-listing')} style={styles.emptyBtn} />}
+                    </View>
+                }
             />
 
             <FilterModal
@@ -291,6 +317,7 @@ const styles = StyleSheet.create({
     title: { flex: 1 },
     topIcons: { flexDirection: 'row', gap: 16 },
 
+    tabsScroll: { flexGrow: 0, flexShrink: 0 },
     tabs: { paddingHorizontal: 20, gap: 8, paddingTop: 6, paddingBottom: 12 },
     tab: { height: 38, paddingHorizontal: 16, borderRadius: 100, borderWidth: 2, borderColor: colors.borderSubtle, backgroundColor: colors.surfaceCard, justifyContent: 'center' },
     tabActive: { backgroundColor: colors.surfaceInverse, borderColor: colors.surfaceInverse },
@@ -301,10 +328,14 @@ const styles = StyleSheet.create({
     sortBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.surfaceSunken, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 100 },
     sortText: { fontFamily: fonts.bodyBold, fontSize: 12, color: colors.textStrong },
 
-    listContent: { paddingHorizontal: 20, paddingBottom: 30 },
+    listContent: { flexGrow: 1, paddingHorizontal: 20, paddingBottom: 30 },
     columnWrapper: { justifyContent: 'space-between' },
     gridCard: { width: (width - 40 - 14) / 2, marginBottom: 20 },
     footerLoader: { paddingVertical: 20, alignItems: 'center' },
     skeletonGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 16 },
-    empty: { alignItems: 'center', marginTop: 50 },
+    empty: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40, paddingBottom: 40 },
+    emptyIcon: { width: 76, height: 76, borderRadius: 38, backgroundColor: colors.surfaceSunken, alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
+    emptyTitle: { marginBottom: 8 },
+    emptyText: { textAlign: 'center', lineHeight: 21, marginBottom: 22 },
+    emptyBtn: { paddingHorizontal: 28 },
 });

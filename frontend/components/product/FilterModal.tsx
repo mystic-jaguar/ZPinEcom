@@ -1,8 +1,9 @@
-import { Colors } from '@/constants/Colors';
 import { Ionicons } from '@expo/vector-icons';
+import { X } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import {
     Modal,
+    Pressable,
     ScrollView,
     StyleSheet,
     Text,
@@ -10,6 +11,7 @@ import {
     View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { colors, fonts, palette, radius } from '../../constants/theme';
 
 export interface FilterState {
     sortBy: 'relevance' | 'new' | 'price_low' | 'price_high' | 'rating' | 'discount';
@@ -127,7 +129,7 @@ export default function FilterModal({ visible, onClose, onApply, initialFilters,
                                 onPress={() => toggleFilter('priceRanges', range)}
                             >
                                 <View style={[styles.checkbox, tempFilters.priceRanges.includes(range) && styles.checkboxSelected]}>
-                                    {tempFilters.priceRanges.includes(range) && <Ionicons name="checkmark" size={14} color="#000" />}
+                                    {tempFilters.priceRanges.includes(range) && <Ionicons name="checkmark" size={15} color={colors.textInvert} />}
                                 </View>
                                 <Text style={[styles.optionLabel, tempFilters.priceRanges.includes(range) && styles.optionLabelSelected]}>
                                     {range}
@@ -146,7 +148,7 @@ export default function FilterModal({ visible, onClose, onApply, initialFilters,
                                 onPress={() => toggleFilter('brands', brand)}
                             >
                                 <View style={[styles.checkbox, tempFilters.brands.includes(brand) && styles.checkboxSelected]}>
-                                    {tempFilters.brands.includes(brand) && <Ionicons name="checkmark" size={14} color="#000" />}
+                                    {tempFilters.brands.includes(brand) && <Ionicons name="checkmark" size={15} color={colors.textInvert} />}
                                 </View>
                                 <Text style={[styles.optionLabel, tempFilters.brands.includes(brand) && styles.optionLabelSelected]}>
                                     {brand}
@@ -167,7 +169,7 @@ export default function FilterModal({ visible, onClose, onApply, initialFilters,
                                 onPress={() => toggleFilter('ratings', rating)}
                             >
                                 <View style={[styles.checkbox, tempFilters.ratings.includes(rating) && styles.checkboxSelected]}>
-                                    {tempFilters.ratings.includes(rating) && <Ionicons name="checkmark" size={14} color="#000" />}
+                                    {tempFilters.ratings.includes(rating) && <Ionicons name="checkmark" size={15} color={colors.textInvert} />}
                                 </View>
                                 <Text style={[styles.optionLabel, tempFilters.ratings.includes(rating) && styles.optionLabelSelected]}>
                                     {rating}
@@ -195,10 +197,13 @@ export default function FilterModal({ visible, onClose, onApply, initialFilters,
         >
             <View style={styles.modalContainer}>
                 {/* Header */}
-                <View style={[styles.header, { paddingTop: insets.top + 15 }]}>
-                    <Text style={styles.headerTitle}>Filters</Text>
+                <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+                    <Pressable onPress={onClose} style={styles.closeIcon} hitSlop={8}>
+                        <X size={22} color={colors.textStrong} />
+                    </Pressable>
+                    <Text style={styles.headerTitle}>Sort & filter</Text>
                     <TouchableOpacity onPress={handleClearAll} style={styles.clearButton}>
-                        <Text style={styles.clearButtonText}>Clear All</Text>
+                        <Text style={styles.clearButtonText}>Clear all</Text>
                     </TouchableOpacity>
                 </View>
 
@@ -250,73 +255,79 @@ export default function FilterModal({ visible, onClose, onApply, initialFilters,
 const styles = StyleSheet.create({
     modalContainer: {
         flex: 1,
-        backgroundColor: '#fff',
+        backgroundColor: palette.paperWarm,
     },
     footerContainer: {
         borderTopWidth: 1,
-        borderTopColor: '#eee',
-        backgroundColor: '#fff',
+        borderTopColor: colors.borderSubtle,
+        backgroundColor: palette.paperWarm,
     },
     filterCountContainer: {
         paddingVertical: 10,
         alignItems: 'center',
-        backgroundColor: '#f9fafb',
+        backgroundColor: colors.surfaceBrandTint,
         borderBottomWidth: 1,
-        borderBottomColor: '#f0f0f0'
+        borderBottomColor: colors.borderSubtle,
     },
     filterCountText: {
-        fontSize: 13,
-        fontWeight: '600',
-        color: Colors.light.tint
+        fontFamily: fonts.monoBold,
+        fontSize: 11,
+        letterSpacing: 0.6,
+        textTransform: 'uppercase',
+        color: colors.textBody,
     },
     footerButtons: {
         flexDirection: 'row',
-        padding: 15,
-        gap: 15,
+        padding: 16,
+        gap: 12,
     },
-    // ... rest of header/body styles ...
     header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
         paddingHorizontal: 20,
-        paddingTop: 15, // will be overridden dynamically with insets.top
-        paddingBottom: 15,
+        paddingBottom: 14,
         borderBottomWidth: 1,
-        borderBottomColor: '#eee',
-        backgroundColor: '#fff',
+        borderBottomColor: colors.borderSubtle,
+        backgroundColor: palette.paperWarm,
+    },
+    closeIcon: {
+        width: 32,
+        alignItems: 'flex-start',
     },
     headerTitle: {
-        fontSize: 20,
-        fontWeight: '700',
-        color: '#000',
+        flex: 1,
+        textAlign: 'center',
+        fontFamily: fonts.bodyBlack,
+        fontSize: 18,
+        color: colors.textStrong,
     },
     clearButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
+        width: 56,
+        alignItems: 'flex-end',
     },
     clearButtonText: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: Colors.light.tint,
+        fontFamily: fonts.bodyBold,
+        fontSize: 13,
+        color: colors.accentRed,
     },
     body: {
         flex: 1,
         flexDirection: 'row',
     },
     sidebar: {
-        width: '35%',
-        backgroundColor: '#f8f9fa',
+        width: '36%',
+        backgroundColor: colors.surfaceSunken,
         borderRightWidth: 1,
-        borderRightColor: '#eee',
+        borderRightColor: colors.borderSubtle,
     },
     sidebarItem: {
-        paddingVertical: 20,
-        paddingHorizontal: 15,
+        paddingVertical: 18,
+        paddingHorizontal: 16,
         position: 'relative',
     },
     sidebarItemActive: {
-        backgroundColor: '#fff',
+        backgroundColor: palette.paperWarm,
     },
     activeIndicator: {
         position: 'absolute',
@@ -324,20 +335,20 @@ const styles = StyleSheet.create({
         top: 0,
         bottom: 0,
         width: 4,
-        backgroundColor: Colors.light.tint,
+        backgroundColor: colors.brand,
     },
     sidebarText: {
+        fontFamily: fonts.bodyMedium,
         fontSize: 14,
-        color: '#666',
-        fontWeight: '500',
+        color: colors.textMuted,
     },
     sidebarTextActive: {
-        color: '#000',
-        fontWeight: '700',
+        fontFamily: fonts.bodyBold,
+        color: colors.textStrong,
     },
     content: {
         flex: 1,
-        backgroundColor: '#fff',
+        backgroundColor: palette.paperWarm,
     },
     optionsContainer: {
         padding: 20,
@@ -348,83 +359,86 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         paddingVertical: 12,
-        marginBottom: 5,
+        marginBottom: 4,
     },
     radioCircle: {
-        width: 20,
-        height: 20,
-        borderRadius: 10,
+        width: 22,
+        height: 22,
+        borderRadius: 11,
         borderWidth: 2,
-        borderColor: '#ddd',
+        borderColor: colors.borderStrong,
         justifyContent: 'center',
         alignItems: 'center',
     },
     radioCircleSelected: {
-        borderColor: Colors.light.tint,
+        borderColor: colors.borderInk,
     },
     radioInner: {
-        width: 10,
-        height: 10,
-        borderRadius: 5,
-        backgroundColor: Colors.light.tint,
+        width: 11,
+        height: 11,
+        borderRadius: 6,
+        backgroundColor: colors.surfaceInverse,
     },
     // Checkbox Option
     checkboxOption: {
         flexDirection: 'row',
         alignItems: 'center',
         paddingVertical: 12,
-        marginBottom: 5,
+        marginBottom: 4,
     },
     checkbox: {
-        width: 20,
-        height: 20,
-        borderRadius: 4,
+        width: 22,
+        height: 22,
+        borderRadius: 6,
         borderWidth: 2,
-        borderColor: '#ddd',
+        borderColor: colors.borderStrong,
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: 12,
     },
     checkboxSelected: {
-        borderColor: Colors.light.tint,
-        // backgroundColor: Colors.light.tint, // Design might not fill it, just checkmark. Let's keep white bg with checkmark for now.
+        borderColor: colors.borderInk,
+        backgroundColor: colors.surfaceInverse,
     },
     optionLabel: {
+        fontFamily: fonts.bodyMedium,
         fontSize: 14,
-        color: '#333',
+        color: colors.textBody,
     },
     optionLabelSelected: {
-        fontWeight: '600',
-        color: '#000',
+        fontFamily: fonts.bodyBold,
+        color: colors.textStrong,
     },
     emptyText: {
-        color: '#999',
+        fontFamily: fonts.bodyRegular,
+        color: colors.textFaint,
         fontStyle: 'italic',
         marginTop: 10,
     },
     closeButton: {
         flex: 1,
-        paddingVertical: 12,
-        borderRadius: 8,
-        borderWidth: 1,
-        borderColor: '#ddd',
+        paddingVertical: 15,
+        borderRadius: radius.md,
+        borderWidth: 2,
+        borderColor: colors.borderSubtle,
+        backgroundColor: colors.surfaceCard,
         alignItems: 'center',
     },
     closeButtonText: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#333',
+        fontFamily: fonts.bodyBold,
+        fontSize: 15,
+        color: colors.textStrong,
     },
     applyButton: {
-        flex: 1,
-        paddingVertical: 12,
-        borderRadius: 8,
-        backgroundColor: Colors.light.tint,
+        flex: 1.6,
+        paddingVertical: 15,
+        borderRadius: radius.md,
+        backgroundColor: colors.brand,
         alignItems: 'center',
     },
     applyButtonText: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: '#000',
+        fontFamily: fonts.bodyBlack,
+        fontSize: 15,
+        color: colors.textOnYellow,
     },
 });
