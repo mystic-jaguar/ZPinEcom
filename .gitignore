@@ -75,3 +75,7 @@ docs/IOS_COMPLIANCE_PROGRESS.md
 # Documentation — kept local, not versioned
 docs/
 CLAUDE_MEMORY.md
+
+# Security audit report — kept local, never committed
+SECURITY_AUDIT.md
+security-audit/
