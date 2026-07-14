@@ -14,6 +14,7 @@ const CART = safeIdentifier('cart_items');
 const ADDRESSES = safeIdentifier('addresses');
 const RETURN_REQUESTS = safeIdentifier('return_requests');
 const ORDER_CANCELLATIONS = safeIdentifier('order_cancellations');
+const COUPON_REDEMPTIONS = safeIdentifier('coupon_redemptions');
 
 let supportTablesReady = false;
 
@@ -70,6 +71,22 @@ export async function ensureOrderSupportTables() {
     );
     await pool.query(
       `CREATE INDEX IF NOT EXISTS idx_order_cancellations_order_id ON ${ORDER_CANCELLATIONS}(order_id)`
+    );
+
+    // Records each coupon redemption so a coupon can be enforced as single-use
+    // per user. user_id/order_id are TEXT (not FK) so this survives the legacy
+    // prod schema divergence where those id columns may differ in type.
+    // ponytail: single redemption per (user, code). Add a per_user_limit column
+    // on coupons if a coupon ever needs to be reusable by the same user.
+    await pool.query(
+      `CREATE TABLE IF NOT EXISTS ${COUPON_REDEMPTIONS} (
+        id          VARCHAR(7)  PRIMARY KEY,
+        user_id     TEXT        NOT NULL,
+        coupon_code TEXT        NOT NULL,
+        order_id    TEXT,
+        created_at  TIMESTAMP   NOT NULL DEFAULT NOW(),
+        UNIQUE (user_id, coupon_code)
+      )`
     );
 
     supportTablesReady = true;
@@ -314,6 +331,10 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
     return;
   }
 
+  // Ensure the coupon_redemptions table exists before the checkout transaction
+  // may write to it (idempotent; a no-op after the first call / startup).
+  await ensureOrderSupportTables();
+
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -512,12 +533,45 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
       }
     }
 
-    // Increment coupon usage count if a coupon was applied
+    // Enforce coupon limits atomically. Two protections, both inside the order
+    // transaction so any failure rolls back the whole order (fail closed — no
+    // discounted order slips through):
+    //  1. Global usage_limit — the conditional UPDATE ... WHERE usage_count <
+    //     usage_limit makes check-and-increment a single locked operation, so
+    //     concurrent checkouts can't push a coupon past its cap (closes the
+    //     previous read-then-write race).
+    //  2. Per-user single use — the UNIQUE(user_id, coupon_code) row rejects a
+    //     second redemption of the same code by the same user.
     if (couponCode && couponDiscount > 0) {
-      await client.query(
-        `UPDATE coupons SET usage_count = usage_count + 1 WHERE UPPER(code) = $1`,
+      const inc = await client.query(
+        `UPDATE coupons SET usage_count = usage_count + 1, updated_at = NOW()
+         WHERE UPPER(code) = $1
+           AND is_active = true
+           AND (valid_until IS NULL OR valid_until > NOW())
+           AND (usage_limit IS NULL OR usage_count < usage_limit)
+         RETURNING id`,
         [couponCode]
       );
+      if (inc.rows.length === 0) {
+        await client.query('ROLLBACK');
+        res.status(409).json({ success: false, message: 'This coupon is no longer available' });
+        return;
+      }
+
+      try {
+        await client.query(
+          `INSERT INTO ${COUPON_REDEMPTIONS} (id, user_id, coupon_code, order_id, created_at)
+           VALUES ($1, $2, $3, $4, NOW())`,
+          [generateId(), req.userId, couponCode, orderId]
+        );
+      } catch (redeemErr: any) {
+        if (redeemErr?.code === '23505') {
+          await client.query('ROLLBACK');
+          res.status(409).json({ success: false, message: 'You have already used this coupon' });
+          return;
+        }
+        throw redeemErr;
+      }
     }
 
     await client.query(`DELETE FROM ${CART} WHERE user_id = $1`, [req.userId]);
