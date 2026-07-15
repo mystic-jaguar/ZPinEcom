@@ -82,3 +82,6 @@ security-audit/
 
 # Local DB backups — never commit (contains PII/secrets)
 backups/
+
+# Local staging for Cloudinary category artwork — not app assets
+cloudinary-upload/
