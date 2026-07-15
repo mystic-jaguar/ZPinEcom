@@ -6,6 +6,7 @@ import { Dimensions, Image, LayoutAnimation, Platform, ScrollView, StyleSheet, T
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ZText } from '../../components/ui';
 import { CATEGORY_DATA, CategoryNode } from '../../constants/categories';
+import { categoryImageUrl } from '../../constants/cloudinary';
 import { colors, fonts, palette, radius } from '../../constants/theme';
 import { useSearch } from '../../context/SearchContext';
 
@@ -117,6 +118,23 @@ const CategoryLanding = ({ onOpen, onPopular }: { onOpen: (cat: CategoryNode) =>
     );
 };
 
+// Node artwork with a graceful degradation chain: a bundled image if the node has
+// one, else the Cloudinary photo for its id, else the name initial as it was before.
+const NodeImage = ({ node, size, style }: { node: CategoryNode; size: number; style?: any }) => {
+    const [failed, setFailed] = useState(false);
+    const remote = failed ? null : categoryImageUrl(node.id, size * 2);
+    const source = node.image ?? (remote ? { uri: remote } : null);
+
+    if (!source) {
+        return (
+            <View style={[styles.gridImage, styles.placeholder, style]}>
+                <Text style={styles.placeholderText} numberOfLines={2}>{node.name.charAt(0).toUpperCase()}</Text>
+            </View>
+        );
+    }
+    return <Image source={source} style={[styles.gridImage, style]} onError={() => setFailed(true)} />;
+};
+
 const CategoryGridSection = ({ sectionTitle, items, onItemPress }: { sectionTitle?: string; items: CategoryNode[]; onItemPress: (item: CategoryNode) => void; }) => {
     if (!items || items.length === 0) return null;
     return (
@@ -133,13 +151,7 @@ const CategoryGridSection = ({ sectionTitle, items, onItemPress }: { sectionTitl
                     return (
                         <TouchableOpacity key={item.id} style={styles.gridItemContainer} onPress={() => onItemPress(item)}>
                             <View style={[styles.gridImageContainer, useRect ? styles.rectImage : styles.circleImage, !useRect && styles.highlightedBorder]}>
-                                {item.image ? (
-                                    <Image source={item.image} style={styles.gridImage} />
-                                ) : (
-                                    <View style={[styles.gridImage, styles.placeholder]}>
-                                        <Text style={styles.placeholderText} numberOfLines={2}>{item.name.charAt(0).toUpperCase()}</Text>
-                                    </View>
-                                )}
+                                <NodeImage node={item} size={useRect ? RECT_HEIGHT : CIRCLE_SIZE} />
                             </View>
                             <Text style={styles.gridItemText} numberOfLines={2}>{item.name}</Text>
                         </TouchableOpacity>
@@ -184,9 +196,7 @@ const MainCategoryView = ({ category, onLeafPress }: { category: CategoryNode; o
                                         return (
                                             <TouchableOpacity key={grandChild.id} style={styles.leafRow} onPress={() => handleNodePress(grandChild)}>
                                                 <View style={[styles.circleImage, styles.highlightedBorder, styles.leafCircle]}>
-                                                    <View style={styles.leafPlaceholder}>
-                                                        <Text style={styles.placeholderText}>{grandChild.name.charAt(0).toUpperCase()}</Text>
-                                                    </View>
+                                                    <NodeImage node={grandChild} size={40} />
                                                 </View>
                                                 <Text style={styles.leafRowText}>{grandChild.name}</Text>
                                                 <ChevronRight size={14} color={colors.borderStrong} />
@@ -377,6 +387,5 @@ const styles = StyleSheet.create({
 
     leafRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, paddingHorizontal: 5, borderBottomWidth: 1, borderBottomColor: palette.neutral100 },
     leafCircle: { width: 40, height: 40, borderRadius: 20, overflow: 'hidden' },
-    leafPlaceholder: { backgroundColor: colors.surfaceSunken, flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 20 },
     leafRowText: { flex: 1, fontFamily: fonts.bodySemiBold, fontSize: 14, color: colors.textBody },
 });
