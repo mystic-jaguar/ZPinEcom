@@ -1,198 +1,198 @@
-﻿public_id,name,path
-sweatshirts,Sweatshirts,Fashion > Men > Casual
-t-shirts,T-Shirts,Fashion > Men > Casual
-shirts,Shirts,Fashion > Men > Casual
-jackets,Jackets,Fashion > Men > Casual
-sweaters,Sweaters,Fashion > Men > Casual
-co-ords,Co-Ords,Fashion > Men > Casual
-shorts,Shorts,Fashion > Men > Casual
-jeans,Jeans,Fashion > Men > Casual
-trousers,Trousers,Fashion > Men > Casual
-kurtas,Kurtas,Fashion > Men > Ethnic
-fusion-shirts,Fusion Shirts,Fashion > Men > Ethnic
-sherwani,Sherwani,Fashion > Men > Ethnic
-short-kurtas,Short Kurtas,Fashion > Men > Ethnic
-kurta-set,Kurta Set,Fashion > Men > Ethnic
-blazers,Blazers,Fashion > Men > Ethnic
-nehru-jackets,Nehru Jackets,Fashion > Men > Ethnic
-dhoti,Dhoti,Fashion > Men > Ethnic
-3-piece-set,3 Piece Set,Fashion > Men > Ethnic
-msp-t-shirts,T-Shirts,Fashion > Men > Sportswear
-msp-track-pants,Track Pants,Fashion > Men > Sportswear
-msp-shorts,Shorts,Fashion > Men > Sportswear
-msp-jackets,Jackets,Fashion > Men > Sportswear
-msp-sweatshirts,Sweatshirts,Fashion > Men > Sportswear
-msp-tracksuits,Tracksuits,Fashion > Men > Sportswear
-msp-trunk,Trunk,Fashion > Men > Sportswear
-msp-trousers,Trousers,Fashion > Men > Sportswear
-msp-innerwear-vests,Innerwear Vests,Fashion > Men > Sportswear
-msp-swim-bottoms,Swim Bottoms,Fashion > Men > Sportswear
-msp-shirts,Shirts,Fashion > Men > Sportswear
-msp-tights,Tights,Fashion > Men > Sportswear
-msp-briefs,Briefs,Fashion > Men > Sportswear
-msp-co-ords,Co-Ords,Fashion > Men > Sportswear
-msp-rain-jacket,Rain Jacket,Fashion > Men > Sportswear
-msp-sports-jacket,Sports Jacket,Fashion > Men > Sportswear
-msp-sweaters,Sweaters,Fashion > Men > Sportswear
-msp-thermal-tops,Thermal Tops,Fashion > Men > Sportswear
-msp-lounge-t-shirts,Lounge T-Shirts,Fashion > Men > Sportswear
-msp-boxers,Boxers,Fashion > Men > Sportswear
-mww-shirts,Shirts,Fashion > Men > Workwear
-mww-blazers,Blazers,Fashion > Men > Workwear
-mww-t-shirts,T-Shirts,Fashion > Men > Workwear
-mww-trousers,Trousers,Fashion > Men > Workwear
-mww-jeans,Jeans,Fashion > Men > Workwear
-mww-sweatshirts,Sweatshirts,Fashion > Men > Workwear
-mww-sweaters,Sweaters,Fashion > Men > Workwear
-mww-jackets,Jackets,Fashion > Men > Workwear
-mww-kurtas,Kurtas,Fashion > Men > Workwear
-mww-clothing-fabric,Clothing Fabric,Fashion > Men > Workwear
-mww-formal-shoes,Formal Shoes,Fashion > Men > Workwear
-boxers,Boxers,Fashion > Men > Essentials
-innerwear-vests,Innerwear Vests,Fashion > Men > Essentials
-loungewear,Loungewear,Fashion > Men > Essentials
-trunks,Trunks,Fashion > Men > Essentials
-briefs,Briefs,Fashion > Men > Essentials
-dresses,Dresses,Fashion > Women > Western
-tops,Tops,Fashion > Women > Western
-jumpsuits,Jumpsuits,Fashion > Women > Western
-w-shirts,Shirts,Fashion > Women > Western
-w-jeans,Jeans,Fashion > Women > Western
-tees,Tees,Fashion > Women > Western
-l-and-l,L&L,Fashion > Women > Western
-kurta-sets,Kurta Sets,Fashion > Women > Ethnic
-sarees,Sarees,Fashion > Women > Ethnic
-lehengas,Lehengas,Fashion > Women > Ethnic
-w-co-ords,Co-Ords,Fashion > Women > Ethnic
-indie-work,Indie Work,Fashion > Women > Ethnic
-designer-wear,Designer Wear,Fashion > Women > Ethnic
-indie-fusion,Indie Fusion,Fashion > Women > Ethnic
-gowns,Gowns,Fashion > Women > Ethnic
-indie-fusion-w,Indie Fusion,Fashion > Women > Fusion
-boho-fusion,Boho Fusion,Fashion > Women > Fusion
-street-fusion,Street Fusion,Fashion > Women > Fusion
-festive-fusion,Festive Fusion,Fashion > Women > Fusion
-contemporary-fusion,Contemporary Fusion,Fashion > Women > Fusion
-luxury-fusion,Luxury Fusion,Fashion > Women > Fusion
-we-shapewear,Shapewear,Fashion > Women > Essentials
-we-bras,Bras,Fashion > Women > Essentials
-we-panties,Panties,Fashion > Women > Essentials
-we-night-suits,Night Suits,Fashion > Women > Essentials
-we-stockings,Stockings,Fashion > Women > Essentials
-we-thermals,Thermals,Fashion > Women > Essentials
-we-maternity-wear,Maternity Wear,Fashion > Women > Essentials
-we-swimwear,Swimwear,Fashion > Women > Essentials
-we-babydolls,Babydolls,Fashion > Women > Essentials
-we-lingerie-accessories,Lingerie Accessories,Fashion > Women > Essentials
-we-saree-shapewear,Saree Shapewear,Fashion > Women > Essentials
-we-night-dress,Night Dress,Fashion > Women > Essentials
-activewear,Activewear,Fashion > Women > Sportswear
-training-gym,Training & Gym,Fashion > Women > Sportswear
-running-wear,Running Wear,Fashion > Women > Sportswear
-ftw-heels,Heels,Footwear > Women
-ftw-flats,Flats,Footwear > Women
-ftw-casual-shoes,Casual Shoes,Footwear > Women
-ftw-flip-flops,Flip Flops,Footwear > Women
-ftw-sports-shoes,Sports Shoes,Footwear > Women
-ftw-boots,Boots,Footwear > Women
-ftw-sandals,Sandals,Footwear > Women
-ftw-formal-shoes,Formal Shoes,Footwear > Women
-ftw-partywear,Partywear,Footwear > Women
-ftw-crocs,Crocs,Footwear > Women
-ftm-casual-shoes,Casual Shoes,Footwear > Men
-ftm-sports-shoes,Sports Shoes,Footwear > Men
-ftm-flip-flops,Flip Flops,Footwear > Men
-ftm-sandals,Sandals,Footwear > Men
-ftm-formal-shoes,Formal Shoes,Footwear > Men
-ftm-boots,Boots,Footwear > Men
-ftm-flats,Flats,Footwear > Men
-ftm-crocs,Crocs,Footwear > Men
-bag-handbags,Handbags,Accessories > Bags & Backpacks
-bag-backpacks,Backpacks,Accessories > Bags & Backpacks
-bag-laptop-bags,Laptop Bags,Accessories > Bags & Backpacks
-bag-school-bags,School Bags,Accessories > Bags & Backpacks
-bag-travel/gym-bags,Travel/Gym Bags,Accessories > Bags & Backpacks
-bag-sling-&-clutch-bags,Sling & Clutch Bags,Accessories > Bags & Backpacks
-wal-wallets,Wallets,Accessories > Wallets & Belts
-wal-belts,Belts,Accessories > Wallets & Belts
-wal-card-holders,Card Holders,Accessories > Wallets & Belts
-wal-coin-pouches,Coin Pouches,Accessories > Wallets & Belts
-wat-analog,Analog,Accessories > Watches
-wat-digital,Digital,Accessories > Watches
-wat-smart-watches,Smart Watches,Accessories > Watches
-wat-sports-watches,Sports Watches,Accessories > Watches
-sun-sunglasses,Sunglasses,Accessories > Sunglasses & Eyewear
-sun-blue-light-glasses,Blue Light Glasses,Accessories > Sunglasses & Eyewear
-sun-reading-glasses,Reading Glasses,Accessories > Sunglasses & Eyewear
-sun-frames,Frames,Accessories > Sunglasses & Eyewear
-jew-earrings,Earrings,Accessories > Jewellery
-jew-necklaces,Necklaces,Accessories > Jewellery
-jew-bangles-&-bracelets,Bangles & Bracelets,Accessories > Jewellery
-jew-rings,Rings,Accessories > Jewellery
-jew-jewellery-sets,Jewellery Sets,Accessories > Jewellery
-ha-clips-&-pins,Clips & Pins,Accessories > Hair Accessories
-ha-hair-bands-&-scrunchies,Hair Bands & Scrunchies,Accessories > Hair Accessories
-ha-headbands,Headbands,Accessories > Hair Accessories
-ha-bridal-accessories,Bridal Accessories,Accessories > Hair Accessories
-cap-caps,Caps,Accessories > Caps & Hats
-cap-hats,Hats,Accessories > Caps & Hats
-cap-winter-caps,Winter Caps,Accessories > Caps & Hats
-sca-scarves,Scarves,Accessories > Scarves & Stoles
-sca-stoles,Stoles,Accessories > Scarves & Stoles
-sca-winter-wear,Winter Wear,Accessories > Scarves & Stoles
-sk-face-wash-&-cleanser,Face Wash & Cleanser,Beauty > Skincare
-sk-moisturizers-&-creams,Moisturizers & Creams,Beauty > Skincare
-sk-sunscreen,Sunscreen,Beauty > Skincare
-sk-serums-&-masks,Serums & Masks,Beauty > Skincare
-hc-shampoo-&-conditioner,Shampoo & Conditioner,Beauty > Haircare
-hc-hair-oil-&-serum,Hair Oil & Serum,Beauty > Haircare
-hc-hair-color,Hair Color,Beauty > Haircare
-hc-styling-products,Styling Products,Beauty > Haircare
-mu-face-makeup,Face Makeup,Beauty > Makeup
-mu-eye-makeup,Eye Makeup,Beauty > Makeup
-mu-lip-makeup,Lip Makeup,Beauty > Makeup
-mu-makeup-kits,Makeup Kits,Beauty > Makeup
-pc-soaps-&-body-wash,Soaps & Body Wash,Beauty > Personal Care
-pc-deodorants,Deodorants,Beauty > Personal Care
-pc-oral-care,Oral Care,Beauty > Personal Care
-pc-feminine-hygiene,Feminine Hygiene,Beauty > Personal Care
-gr-shaving-&-trimming,Shaving & Trimming,Beauty > Grooming
-gr-hair-removal,Hair Removal,Beauty > Grooming
-gr-grooming-kits,Grooming Kits,Beauty > Grooming
-gr-beard-&-styling-products,Beard & Styling Products,Beauty > Grooming
-fr-perfumes,Perfumes,Beauty > Fragrances & Deodorants
-fr-body-sprays,Body Sprays,Beauty > Fragrances & Deodorants
-fr-roll-ons,Roll-Ons,Beauty > Fragrances & Deodorants
-fr-gift-sets,Gift Sets,Beauty > Fragrances & Deodorants
-bt-hair-dryers,Hair Dryers,Beauty > Beauty Tools & Appliances
-bt-straighteners-&-curlers,Straighteners & Curlers,Beauty > Beauty Tools & Appliances
-bt-trimmers-&-shavers,Trimmers & Shavers,Beauty > Beauty Tools & Appliances
-bt-face-&-skin-tools,Face & Skin Tools,Beauty > Beauty Tools & Appliances
-kw-cookware,Cookware,Home & Living > Kitchenware
-kw-utensils,Utensils,Home & Living > Kitchenware
-kw-storage-containers,Storage Containers,Home & Living > Kitchenware
-kw-kitchen-tools,Kitchen Tools,Home & Living > Kitchenware
-din-dinner-sets,Dinner Sets,Home & Living > Dining Essentials
-din-plates-&-bowls,Plates & Bowls,Home & Living > Dining Essentials
-din-glasses-&-mugs,Glasses & Mugs,Home & Living > Dining Essentials
-din-serving-items,Serving Items,Home & Living > Dining Essentials
-sto-storage-boxes,Storage Boxes,Home & Living > Storage & Organizers
-sto-wardrobe-organizers,Wardrobe Organizers,Home & Living > Storage & Organizers
-sto-kitchen-organizers,Kitchen Organizers,Home & Living > Storage & Organizers
-sto-multipurpose-racks,Multipurpose Racks,Home & Living > Storage & Organizers
-cln-cleaning-tools,Cleaning Tools,Home & Living > Cleaning & Utility
-cln-cleaning-supplies,Cleaning Supplies,Home & Living > Cleaning & Utility
-cln-laundry-items,Laundry Items,Home & Living > Cleaning & Utility
-cln-utility-accessories,Utility Accessories,Home & Living > Cleaning & Utility
-bed-bedsheets,Bedsheets,Home & Living > Bedding & Linen
-bed-blankets-&-quilts,Blankets & Quilts,Home & Living > Bedding & Linen
-bed-pillow-covers,Pillow Covers,Home & Living > Bedding & Linen
-bed-towels,Towels,Home & Living > Bedding & Linen
-bat-soap-dispensers-&-holders,Soap Dispensers & Holders,Home & Living > Bathroom Accessories
-bat-bathroom-racks,Bathroom Racks,Home & Living > Bathroom Accessories
-bat-mirrors,Mirrors,Home & Living > Bathroom Accessories
-bat-bath-essentials,Bath Essentials,Home & Living > Bathroom Accessories
-hi-tools-&-hardware,Tools & Hardware,Home & Living > Home Improvement
-hi-electrical-fittings,Electrical Fittings,Home & Living > Home Improvement
-hi-plumbing-essentials,Plumbing Essentials,Home & Living > Home Improvement
-hi-repair-&-maintenance,Repair & Maintenance,Home & Living > Home Improvement
+﻿"public_id","name","path"
+"sweatshirts","Sweatshirts","Fashion > Men > Casual"
+"t-shirts","T-Shirts","Fashion > Men > Casual"
+"shirts","Shirts","Fashion > Men > Casual"
+"jackets","Jackets","Fashion > Men > Casual"
+"sweaters","Sweaters","Fashion > Men > Casual"
+"co-ords","Co-Ords","Fashion > Men > Casual"
+"shorts","Shorts","Fashion > Men > Casual"
+"jeans","Jeans","Fashion > Men > Casual"
+"trousers","Trousers","Fashion > Men > Casual"
+"kurtas","Kurtas","Fashion > Men > Ethnic"
+"fusion-shirts","Fusion Shirts","Fashion > Men > Ethnic"
+"sherwani","Sherwani","Fashion > Men > Ethnic"
+"short-kurtas","Short Kurtas","Fashion > Men > Ethnic"
+"kurta-set","Kurta Set","Fashion > Men > Ethnic"
+"blazers","Blazers","Fashion > Men > Ethnic"
+"nehru-jackets","Nehru Jackets","Fashion > Men > Ethnic"
+"dhoti","Dhoti","Fashion > Men > Ethnic"
+"3-piece-set","3 Piece Set","Fashion > Men > Ethnic"
+"msp-t-shirts","T-Shirts","Fashion > Men > Sportswear"
+"msp-track-pants","Track Pants","Fashion > Men > Sportswear"
+"msp-shorts","Shorts","Fashion > Men > Sportswear"
+"msp-jackets","Jackets","Fashion > Men > Sportswear"
+"msp-sweatshirts","Sweatshirts","Fashion > Men > Sportswear"
+"msp-tracksuits","Tracksuits","Fashion > Men > Sportswear"
+"msp-trunk","Trunk","Fashion > Men > Sportswear"
+"msp-trousers","Trousers","Fashion > Men > Sportswear"
+"msp-innerwear-vests","Innerwear Vests","Fashion > Men > Sportswear"
+"msp-swim-bottoms","Swim Bottoms","Fashion > Men > Sportswear"
+"msp-shirts","Shirts","Fashion > Men > Sportswear"
+"msp-tights","Tights","Fashion > Men > Sportswear"
+"msp-briefs","Briefs","Fashion > Men > Sportswear"
+"msp-co-ords","Co-Ords","Fashion > Men > Sportswear"
+"msp-rain-jacket","Rain Jacket","Fashion > Men > Sportswear"
+"msp-sports-jacket","Sports Jacket","Fashion > Men > Sportswear"
+"msp-sweaters","Sweaters","Fashion > Men > Sportswear"
+"msp-thermal-tops","Thermal Tops","Fashion > Men > Sportswear"
+"msp-lounge-t-shirts","Lounge T-Shirts","Fashion > Men > Sportswear"
+"msp-boxers","Boxers","Fashion > Men > Sportswear"
+"mww-shirts","Shirts","Fashion > Men > Workwear"
+"mww-blazers","Blazers","Fashion > Men > Workwear"
+"mww-t-shirts","T-Shirts","Fashion > Men > Workwear"
+"mww-trousers","Trousers","Fashion > Men > Workwear"
+"mww-jeans","Jeans","Fashion > Men > Workwear"
+"mww-sweatshirts","Sweatshirts","Fashion > Men > Workwear"
+"mww-sweaters","Sweaters","Fashion > Men > Workwear"
+"mww-jackets","Jackets","Fashion > Men > Workwear"
+"mww-kurtas","Kurtas","Fashion > Men > Workwear"
+"mww-clothing-fabric","Clothing Fabric","Fashion > Men > Workwear"
+"mww-formal-shoes","Formal Shoes","Fashion > Men > Workwear"
+"boxers","Boxers","Fashion > Men > Essentials"
+"innerwear-vests","Innerwear Vests","Fashion > Men > Essentials"
+"loungewear","Loungewear","Fashion > Men > Essentials"
+"trunks","Trunks","Fashion > Men > Essentials"
+"briefs","Briefs","Fashion > Men > Essentials"
+"dresses","Dresses","Fashion > Women > Western"
+"tops","Tops","Fashion > Women > Western"
+"jumpsuits","Jumpsuits","Fashion > Women > Western"
+"w-shirts","Shirts","Fashion > Women > Western"
+"w-jeans","Jeans","Fashion > Women > Western"
+"tees","Tees","Fashion > Women > Western"
+"l-and-l","L&L","Fashion > Women > Western"
+"kurta-sets","Kurta Sets","Fashion > Women > Ethnic"
+"sarees","Sarees","Fashion > Women > Ethnic"
+"lehengas","Lehengas","Fashion > Women > Ethnic"
+"w-co-ords","Co-Ords","Fashion > Women > Ethnic"
+"indie-work","Indie Work","Fashion > Women > Ethnic"
+"designer-wear","Designer Wear","Fashion > Women > Ethnic"
+"indie-fusion","Indie Fusion","Fashion > Women > Ethnic"
+"gowns","Gowns","Fashion > Women > Ethnic"
+"indie-fusion-w","Indie Fusion","Fashion > Women > Fusion"
+"boho-fusion","Boho Fusion","Fashion > Women > Fusion"
+"street-fusion","Street Fusion","Fashion > Women > Fusion"
+"festive-fusion","Festive Fusion","Fashion > Women > Fusion"
+"contemporary-fusion","Contemporary Fusion","Fashion > Women > Fusion"
+"luxury-fusion","Luxury Fusion","Fashion > Women > Fusion"
+"we-shapewear","Shapewear","Fashion > Women > Essentials"
+"we-bras","Bras","Fashion > Women > Essentials"
+"we-panties","Panties","Fashion > Women > Essentials"
+"we-night-suits","Night Suits","Fashion > Women > Essentials"
+"we-stockings","Stockings","Fashion > Women > Essentials"
+"we-thermals","Thermals","Fashion > Women > Essentials"
+"we-maternity-wear","Maternity Wear","Fashion > Women > Essentials"
+"we-swimwear","Swimwear","Fashion > Women > Essentials"
+"we-babydolls","Babydolls","Fashion > Women > Essentials"
+"we-lingerie-accessories","Lingerie Accessories","Fashion > Women > Essentials"
+"we-saree-shapewear","Saree Shapewear","Fashion > Women > Essentials"
+"we-night-dress","Night Dress","Fashion > Women > Essentials"
+"activewear","Activewear","Fashion > Women > Sportswear"
+"training-gym","Training & Gym","Fashion > Women > Sportswear"
+"running-wear","Running Wear","Fashion > Women > Sportswear"
+"ftw-heels","Heels","Footwear > Women"
+"ftw-flats","Flats","Footwear > Women"
+"ftw-casual-shoes","Casual Shoes","Footwear > Women"
+"ftw-flip-flops","Flip Flops","Footwear > Women"
+"ftw-sports-shoes","Sports Shoes","Footwear > Women"
+"ftw-boots","Boots","Footwear > Women"
+"ftw-sandals","Sandals","Footwear > Women"
+"ftw-formal-shoes","Formal Shoes","Footwear > Women"
+"ftw-partywear","Partywear","Footwear > Women"
+"ftw-crocs","Crocs","Footwear > Women"
+"ftm-casual-shoes","Casual Shoes","Footwear > Men"
+"ftm-sports-shoes","Sports Shoes","Footwear > Men"
+"ftm-flip-flops","Flip Flops","Footwear > Men"
+"ftm-sandals","Sandals","Footwear > Men"
+"ftm-formal-shoes","Formal Shoes","Footwear > Men"
+"ftm-boots","Boots","Footwear > Men"
+"ftm-flats","Flats","Footwear > Men"
+"ftm-crocs","Crocs","Footwear > Men"
+"bag-handbags","Handbags","Accessories > Bags & Backpacks"
+"bag-backpacks","Backpacks","Accessories > Bags & Backpacks"
+"bag-laptop-bags","Laptop Bags","Accessories > Bags & Backpacks"
+"bag-school-bags","School Bags","Accessories > Bags & Backpacks"
+"bag-travel-gym-bags","Travel/Gym Bags","Accessories > Bags & Backpacks"
+"bag-sling-clutch-bags","Sling & Clutch Bags","Accessories > Bags & Backpacks"
+"wal-wallets","Wallets","Accessories > Wallets & Belts"
+"wal-belts","Belts","Accessories > Wallets & Belts"
+"wal-card-holders","Card Holders","Accessories > Wallets & Belts"
+"wal-coin-pouches","Coin Pouches","Accessories > Wallets & Belts"
+"wat-analog","Analog","Accessories > Watches"
+"wat-digital","Digital","Accessories > Watches"
+"wat-smart-watches","Smart Watches","Accessories > Watches"
+"wat-sports-watches","Sports Watches","Accessories > Watches"
+"sun-sunglasses","Sunglasses","Accessories > Sunglasses & Eyewear"
+"sun-blue-light-glasses","Blue Light Glasses","Accessories > Sunglasses & Eyewear"
+"sun-reading-glasses","Reading Glasses","Accessories > Sunglasses & Eyewear"
+"sun-frames","Frames","Accessories > Sunglasses & Eyewear"
+"jew-earrings","Earrings","Accessories > Jewellery"
+"jew-necklaces","Necklaces","Accessories > Jewellery"
+"jew-bangles-bracelets","Bangles & Bracelets","Accessories > Jewellery"
+"jew-rings","Rings","Accessories > Jewellery"
+"jew-jewellery-sets","Jewellery Sets","Accessories > Jewellery"
+"ha-clips-pins","Clips & Pins","Accessories > Hair Accessories"
+"ha-hair-bands-scrunchies","Hair Bands & Scrunchies","Accessories > Hair Accessories"
+"ha-headbands","Headbands","Accessories > Hair Accessories"
+"ha-bridal-accessories","Bridal Accessories","Accessories > Hair Accessories"
+"cap-caps","Caps","Accessories > Caps & Hats"
+"cap-hats","Hats","Accessories > Caps & Hats"
+"cap-winter-caps","Winter Caps","Accessories > Caps & Hats"
+"sca-scarves","Scarves","Accessories > Scarves & Stoles"
+"sca-stoles","Stoles","Accessories > Scarves & Stoles"
+"sca-winter-wear","Winter Wear","Accessories > Scarves & Stoles"
+"sk-face-wash-cleanser","Face Wash & Cleanser","Beauty > Skincare"
+"sk-moisturizers-creams","Moisturizers & Creams","Beauty > Skincare"
+"sk-sunscreen","Sunscreen","Beauty > Skincare"
+"sk-serums-masks","Serums & Masks","Beauty > Skincare"
+"hc-shampoo-conditioner","Shampoo & Conditioner","Beauty > Haircare"
+"hc-hair-oil-serum","Hair Oil & Serum","Beauty > Haircare"
+"hc-hair-color","Hair Color","Beauty > Haircare"
+"hc-styling-products","Styling Products","Beauty > Haircare"
+"mu-face-makeup","Face Makeup","Beauty > Makeup"
+"mu-eye-makeup","Eye Makeup","Beauty > Makeup"
+"mu-lip-makeup","Lip Makeup","Beauty > Makeup"
+"mu-makeup-kits","Makeup Kits","Beauty > Makeup"
+"pc-soaps-body-wash","Soaps & Body Wash","Beauty > Personal Care"
+"pc-deodorants","Deodorants","Beauty > Personal Care"
+"pc-oral-care","Oral Care","Beauty > Personal Care"
+"pc-feminine-hygiene","Feminine Hygiene","Beauty > Personal Care"
+"gr-shaving-trimming","Shaving & Trimming","Beauty > Grooming"
+"gr-hair-removal","Hair Removal","Beauty > Grooming"
+"gr-grooming-kits","Grooming Kits","Beauty > Grooming"
+"gr-beard-styling-products","Beard & Styling Products","Beauty > Grooming"
+"fr-perfumes","Perfumes","Beauty > Fragrances & Deodorants"
+"fr-body-sprays","Body Sprays","Beauty > Fragrances & Deodorants"
+"fr-roll-ons","Roll-Ons","Beauty > Fragrances & Deodorants"
+"fr-gift-sets","Gift Sets","Beauty > Fragrances & Deodorants"
+"bt-hair-dryers","Hair Dryers","Beauty > Beauty Tools & Appliances"
+"bt-straighteners-curlers","Straighteners & Curlers","Beauty > Beauty Tools & Appliances"
+"bt-trimmers-shavers","Trimmers & Shavers","Beauty > Beauty Tools & Appliances"
+"bt-face-skin-tools","Face & Skin Tools","Beauty > Beauty Tools & Appliances"
+"kw-cookware","Cookware","Home & Living > Kitchenware"
+"kw-utensils","Utensils","Home & Living > Kitchenware"
+"kw-storage-containers","Storage Containers","Home & Living > Kitchenware"
+"kw-kitchen-tools","Kitchen Tools","Home & Living > Kitchenware"
+"din-dinner-sets","Dinner Sets","Home & Living > Dining Essentials"
+"din-plates-bowls","Plates & Bowls","Home & Living > Dining Essentials"
+"din-glasses-mugs","Glasses & Mugs","Home & Living > Dining Essentials"
+"din-serving-items","Serving Items","Home & Living > Dining Essentials"
+"sto-storage-boxes","Storage Boxes","Home & Living > Storage & Organizers"
+"sto-wardrobe-organizers","Wardrobe Organizers","Home & Living > Storage & Organizers"
+"sto-kitchen-organizers","Kitchen Organizers","Home & Living > Storage & Organizers"
+"sto-multipurpose-racks","Multipurpose Racks","Home & Living > Storage & Organizers"
+"cln-cleaning-tools","Cleaning Tools","Home & Living > Cleaning & Utility"
+"cln-cleaning-supplies","Cleaning Supplies","Home & Living > Cleaning & Utility"
+"cln-laundry-items","Laundry Items","Home & Living > Cleaning & Utility"
+"cln-utility-accessories","Utility Accessories","Home & Living > Cleaning & Utility"
+"bed-bedsheets","Bedsheets","Home & Living > Bedding & Linen"
+"bed-blankets-quilts","Blankets & Quilts","Home & Living > Bedding & Linen"
+"bed-pillow-covers","Pillow Covers","Home & Living > Bedding & Linen"
+"bed-towels","Towels","Home & Living > Bedding & Linen"
+"bat-soap-dispensers-holders","Soap Dispensers & Holders","Home & Living > Bathroom Accessories"
+"bat-bathroom-racks","Bathroom Racks","Home & Living > Bathroom Accessories"
+"bat-mirrors","Mirrors","Home & Living > Bathroom Accessories"
+"bat-bath-essentials","Bath Essentials","Home & Living > Bathroom Accessories"
+"hi-tools-hardware","Tools & Hardware","Home & Living > Home Improvement"
+"hi-electrical-fittings","Electrical Fittings","Home & Living > Home Improvement"
+"hi-plumbing-essentials","Plumbing Essentials","Home & Living > Home Improvement"
+"hi-repair-maintenance","Repair & Maintenance","Home & Living > Home Improvement"
