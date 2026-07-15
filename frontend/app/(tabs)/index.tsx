@@ -325,8 +325,14 @@ export default function HomeScreen() {
                 : [];
             const res = await productService.getProducts({ page: nextPage, limit: FORYOU_PAGE_SIZE });
             const incoming = [...lead, ...(res.products || [])];
-            const fresh = incoming.filter(p => p.productId && !fySeen.current.has(p.productId));
-            fresh.forEach(p => fySeen.current.add(p.productId));
+            // Mark as seen inside the filter: `lead` and `res.products` overlap (a
+            // recommended product also shows up in the general page), and a filter-then-add
+            // pass lets both copies through, producing duplicate React keys.
+            const fresh = incoming.filter(p => {
+                if (!p.productId || fySeen.current.has(p.productId)) return false;
+                fySeen.current.add(p.productId);
+                return true;
+            });
 
             const prevCount = append ? fyCount.current : 0;
             const toAdd = fresh.slice(0, Math.max(0, FORYOU_MAX - prevCount));
