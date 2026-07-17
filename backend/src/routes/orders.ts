@@ -497,14 +497,14 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
 
     await client.query(
       `INSERT INTO ${ORDERS}
-        (id, order_number, user_id, status, payment_status, total_amount, shipping_amount,
+        (id, order_number, user_id, seller_id, status, payment_status, total_amount, shipping_amount,
          tax_amount, final_amount, shipping_address, payment_method, notes, estimated_delivery, created_at, updated_at)
-       VALUES ($1,$2,$3,$11,'pending',$4,$5,$6,$7,$8,$9,$10,
+       VALUES ($1,$2,$3,$12,$11,'pending',$4,$5,$6,$7,$8,$9,$10,
          (NOW() AT TIME ZONE 'Asia/Kolkata') + INTERVAL '5 days',
          (NOW() AT TIME ZONE 'Asia/Kolkata'),
          (NOW() AT TIME ZONE 'Asia/Kolkata'))`,
       [orderId, orderNumber, req.userId, totalAmount, shippingAmount, taxAmount, finalAmount,
-       JSON.stringify(encryptedShippingAddress), paymentMethod, notes || '', orderStatus]
+       JSON.stringify(encryptedShippingAddress), paymentMethod, notes || '', orderStatus, primarySellerId]
     );
 
     for (const item of cartResult.rows) {
