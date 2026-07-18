@@ -479,14 +479,38 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
     const orderId = generateId();
     const orderNumber = `ZP-${orderId}`;
 
-    // Determine primary seller (seller with most items by value)
+    // Determine the seller to stamp on the order. Each cart row's seller_id is the
+    // product owner (products.user_id, joined above). Pick the seller with the most
+    // value in the cart; fall back to any owner so a zero-value cart still resolves.
     const sellerTotals: Record<string, number> = {};
     cartResult.rows.forEach((item: any) => {
       if (item.seller_id) {
         sellerTotals[item.seller_id] = (sellerTotals[item.seller_id] || 0) + Number(item.price) * item.quantity;
       }
     });
-    const primarySellerId = Object.keys(sellerTotals).sort((a, b) => sellerTotals[b] - sellerTotals[a])[0] || null;
+    const primarySellerId =
+      Object.keys(sellerTotals).sort((a, b) => sellerTotals[b] - sellerTotals[a])[0] ||
+      cartResult.rows.find((i: any) => i.seller_id)?.seller_id ||
+      null;
+
+    // seller_id must never be null: getSellerOrders filters WHERE seller_id = $1, so
+    // a null-seller order is invisible to its seller and unattributable for payouts.
+    // If no cart product has an owner, the catalog row is broken — fail closed rather
+    // than create an orphaned order (finally releases the client).
+    if (!primarySellerId) {
+      const orphan = cartResult.rows.find((i: any) => !i.seller_id);
+      console.error('createOrder: product has no owner (products.user_id is NULL)', {
+        userId: req.userId,
+        productId: orphan?.product_id,
+        productName: orphan?.product_name,
+      });
+      await client.query('ROLLBACK');
+      res.status(409).json({
+        success: false,
+        message: `"${orphan?.product_name ?? 'An item'}" is temporarily unavailable for checkout. Please remove it and try again.`,
+      });
+      return;
+    }
 
     // COD orders have no online payment step to flip them to 'confirmed' later
     // (Razorpay confirms on payment verify, wallet confirms inline below), so they
