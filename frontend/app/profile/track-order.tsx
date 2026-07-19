@@ -67,8 +67,12 @@ export default function TrackOrderScreen() {
         return () => clearTimeout(t);
     }, [isInstant, liveStatus, order?.updatedAt]);
 
+    // Instant is same-day → show a clock time; standard is days out → show a date,
+    // otherwise a +5-day ETA renders as a meaningless time-of-day and reads like fast delivery.
     const etaLabel = liveEta
-        ? new Date(liveEta).toLocaleString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true })
+        ? (isInstant
+            ? new Date(liveEta).toLocaleString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true })
+            : new Date(liveEta).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' }))
         : (isInstant ? '2–12 hrs' : '2–4 days');
 
     return (
@@ -90,7 +94,7 @@ export default function TrackOrderScreen() {
                         <View>
                             <View style={styles.arrivingRow}>
                                 <View style={styles.pulse} />
-                                <Text style={styles.arriving}>ARRIVING · {liveStatus === 'delivered' ? 'DELIVERED' : 'ON THE WAY'}</Text>
+                                <Text style={styles.arriving}>ARRIVING · {phase === 'delivered' ? 'DELIVERED' : phase === 'shipped' ? 'ON THE WAY' : 'CONFIRMED'}</Text>
                             </View>
                             <View style={styles.etaRow}>
                                 <Text style={styles.etaValue}>{etaLabel}</Text>
