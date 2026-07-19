@@ -88,6 +88,11 @@ export default function CartScreen() {
 
     const count = cartItems.length;
 
+    const FREE_DELIVERY_MIN = 599;
+    const freeDeliveryUnlocked = totalPrice >= FREE_DELIVERY_MIN;
+    const freeDeliveryPct = Math.min(totalPrice / FREE_DELIVERY_MIN, 1) * 100;
+    const amountToFree = Math.max(FREE_DELIVERY_MIN - totalPrice, 0);
+
     const renderItem = useCallback(
         ({ item }: { item: any }) => (
             <MemoCartItem item={item} onRemove={removeFromCart} onUpdateQuantity={updateQuantity} />
@@ -118,9 +123,13 @@ export default function CartScreen() {
                     <View style={styles.freeStrip}>
                         <View style={styles.freeRow}>
                             <Zap size={14} color={palette.yellow500} fill={palette.yellow500} />
-                            <Text style={styles.freeText}>Free bike delivery unlocked</Text>
+                            <Text style={styles.freeText}>
+                                {freeDeliveryUnlocked
+                                    ? 'Free bike delivery unlocked'
+                                    : `Add ₹${amountToFree.toLocaleString('en-IN')} more for free delivery`}
+                            </Text>
                         </View>
-                        <View style={styles.freeBar}><View style={styles.freeFill} /></View>
+                        <View style={styles.freeBar}><View style={[styles.freeFill, { width: `${freeDeliveryPct}%` }]} /></View>
                     </View>
 
                     <Animated.FlatList
@@ -142,8 +151,8 @@ export default function CartScreen() {
                                 <Text style={styles.total}>₹{totalPrice.toLocaleString('en-IN')}</Text>
                             </View>
                             <View style={{ alignItems: 'flex-end' }}>
-                                <Text style={styles.freeDelivery}>FREE DELIVERY</Text>
-                                <Text style={styles.eta}>in 2–12 hrs</Text>
+                                <Text style={styles.freeDelivery}>{freeDeliveryUnlocked ? 'FREE DELIVERY' : 'DELIVERY'}</Text>
+                                <Text style={styles.eta}>{freeDeliveryUnlocked ? 'in 2–12 hrs' : `₹${amountToFree.toLocaleString('en-IN')} to free`}</Text>
                             </View>
                         </View>
                         <ZButton label="Checkout" icon={ArrowRight} onPress={() => router.push('/checkout/address')} />
@@ -165,7 +174,7 @@ const styles = StyleSheet.create({
     freeRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 9 },
     freeText: { fontFamily: fonts.bodyBold, fontSize: 11, color: colors.textInvert },
     freeBar: { height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.16)', overflow: 'hidden' },
-    freeFill: { width: '100%', height: '100%', backgroundColor: palette.yellow500 },
+    freeFill: { height: '100%', backgroundColor: palette.yellow500 },
 
     list: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 200 },
     item: { flexDirection: 'row', gap: 13, backgroundColor: colors.surfaceCard, borderWidth: 1, borderColor: palette.neutral200, borderRadius: radius.lg, padding: 12, marginBottom: 14 },
