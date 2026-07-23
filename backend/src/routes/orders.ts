@@ -512,12 +512,12 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
       return;
     }
 
-    // COD orders have no online payment step to flip them to 'confirmed' later
-    // (Razorpay confirms on payment verify, wallet confirms inline below), so they
-    // must be created already confirmed — otherwise they never surface to delivery
-    // partners, whose queue is status IN ('confirmed','processing','shipped').
-    // payment_status stays 'pending': cash is collected on delivery, not now.
-    const orderStatus = paymentMethod === 'cod' ? 'confirmed' : 'pending';
+    // All orders start 'pending' so the seller explicitly accepts them in the
+    // vendor app (pending → confirmed → processing). The delivery queue is gated
+    // on IN ('processing','shipped') — i.e. only after the vendor marks the order
+    // ready — so COD no longer needs to be born 'confirmed' to reach delivery.
+    // Prepaid still flips to 'confirmed' on payment verify / wallet debit below.
+    const orderStatus = 'pending';
 
     await client.query(
       `INSERT INTO ${ORDERS}
