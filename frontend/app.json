@@ -13,7 +13,7 @@
     },
     "updates": {
       "url": "https://u.expo.dev/e71bc344-7fa9-4436-aaeb-8aaf1ac044ec",
-      "enabled": true,
+      "enabled": false,
       "checkAutomatically": "ON_LOAD",
       "fallbackToCacheTimeout": 0,
       "requestHeaders": {
