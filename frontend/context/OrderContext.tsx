@@ -49,6 +49,7 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
                     userId: o.userId,
                     sellerId: o.sellerId || '',
                     orderNumber: o.orderNumber,
+                    groupId: o.groupId ?? null,
                     status: o.status,
                     paymentStatus: o.paymentStatus,
                     totalAmount: Number(o.totalAmount || 0),

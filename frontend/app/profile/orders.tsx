@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader, ZText } from '../../components/ui';
 import { colors, fonts, palette, radius } from '../../constants/theme';
 import { useOrder } from '../../context/OrderContext';
+import { groupOrders, groupStatus, OrderGroup } from '../../utils/orderGroups';
 
 const FILTERS = ['All', 'In Progress', 'Completed', 'Cancelled'];
 
@@ -32,30 +33,38 @@ export default function AllOrdersScreen() {
         setRefreshing(false);
     };
 
-    const filteredOrders = useMemo(() => orders.filter((order) => {
-        if (activeFilter === 'All') return true;
-        if (activeFilter === 'In Progress') return ['pending', 'processing', 'shipped', 'confirmed'].includes(order.status);
-        if (activeFilter === 'Completed') return order.status === 'delivered';
-        if (activeFilter === 'Cancelled') return order.status === 'cancelled';
-        return true;
-    }), [activeFilter, orders]);
+    const groups = useMemo(() => groupOrders(orders), [orders]);
 
-    const renderItem = ({ item }: { item: any }) => {
-        const meta = statusMeta(item.status);
-        const items = item.items || [];
+    const filteredGroups = useMemo(() => groups.filter((g) => {
+        if (activeFilter === 'All') return true;
+        const s = g.orders.map(o => o.status);
+        if (activeFilter === 'In Progress') return s.some(x => ['pending', 'processing', 'shipped', 'confirmed'].includes(x));
+        if (activeFilter === 'Completed') return s.every(x => x === 'delivered');
+        if (activeFilter === 'Cancelled') return s.every(x => x === 'cancelled');
+        return true;
+    }), [activeFilter, groups]);
+
+    const renderItem = ({ item: group }: { item: OrderGroup }) => {
+        const single = group.orders.length === 1 ? group.orders[0] : null;
+        const status = single ? single.status : groupStatus(group);
+        const meta = statusMeta(status);
+        const items = group.orders.flatMap(o => o.items || []);
         const thumbs = items.slice(0, 2);
         const extra = items.length - thumbs.length;
-        const inProgress = ['pending', 'processing', 'shipped', 'confirmed'].includes(item.status);
-        const delivered = item.status === 'delivered';
-        const cancelled = item.status === 'cancelled';
-        const dateLabel = new Date(item.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+        const inProgress = ['pending', 'processing', 'shipped', 'confirmed'].includes(status);
+        const delivered = status === 'delivered';
+        const cancelled = status === 'cancelled';
+        const dateLabel = new Date(group.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 
         return (
-            <Pressable style={styles.card} onPress={() => router.push({ pathname: '/profile/order-details', params: { orderId: item.id } })}>
+            <Pressable style={styles.card} onPress={() => router.push({ pathname: '/profile/order-details', params: { groupId: group.key } })}>
                 <View style={styles.cardHead}>
                     <View>
-                        <Text style={styles.orderNo}>{item.orderNumber}</Text>
-                        <Text style={styles.placed}>{delivered ? `Delivered ${dateLabel}` : cancelled ? `Cancelled ${dateLabel}` : `Placed ${dateLabel}`}</Text>
+                        <Text style={styles.orderNo}>{group.groupNumber}</Text>
+                        <Text style={styles.placed}>
+                            {(delivered ? `Delivered ${dateLabel}` : cancelled ? `Cancelled ${dateLabel}` : `Placed ${dateLabel}`)}
+                            {!single ? ` · ${group.orders.length} shipments` : ''}
+                        </Text>
                     </View>
                     <View style={[styles.statusPill, { backgroundColor: meta.bg }]}>
                         {meta.dot && <View style={[styles.dot, { backgroundColor: meta.dot }]} />}
@@ -70,15 +79,24 @@ export default function AllOrdersScreen() {
                     {extra > 0 && <View style={styles.thumbMore}><Text style={styles.thumbMoreText}>+{extra}</Text></View>}
                     <View style={{ flex: 1, alignItems: 'flex-end' }}>
                         <ZText variant="eyebrow" style={{ marginBottom: 2 }}>Total</ZText>
-                        <Text style={styles.total}>₹{Number(item.finalAmount).toLocaleString('en-IN')}</Text>
+                        <Text style={styles.total}>₹{Number(group.total).toLocaleString('en-IN')}</Text>
                     </View>
                 </View>
 
-                {cancelled ? null : (
+                {/* Multi-shipment groups are opened from the card for per-parcel status/tracking.
+                    Single-shipment groups keep the original inline actions. */}
+                {!single ? (
+                    <View style={styles.actions}>
+                        <Pressable style={styles.primaryBtn} onPress={() => router.push({ pathname: '/profile/order-details', params: { groupId: group.key } })}>
+                            <Bike size={16} color={colors.textOnYellow} />
+                            <Text style={styles.primaryText}>View {group.orders.length} shipments</Text>
+                        </Pressable>
+                    </View>
+                ) : cancelled ? null : (
                     <View style={styles.actions}>
                         {inProgress ? (
                             <>
-                                <Pressable style={styles.primaryBtn} onPress={() => router.push({ pathname: '/profile/track-order', params: { orderId: item.id } })}>
+                                <Pressable style={styles.primaryBtn} onPress={() => router.push({ pathname: '/profile/track-order', params: { orderId: single.id } })}>
                                     <Bike size={16} color={colors.textOnYellow} />
                                     <Text style={styles.primaryText}>Track order</Text>
                                 </Pressable>
@@ -121,10 +139,10 @@ export default function AllOrdersScreen() {
             </View>
 
             <FlatList
-                data={filteredOrders}
+                data={filteredGroups}
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[palette.yellow500]} tintColor={palette.yellow500} />}
                 renderItem={renderItem}
-                keyExtractor={(item) => item.id}
+                keyExtractor={(item) => item.key}
                 contentContainerStyle={styles.list}
                 showsVerticalScrollIndicator={false}
                 ListEmptyComponent={<View style={styles.empty}><ZText variant="muted">No orders found</ZText></View>}
