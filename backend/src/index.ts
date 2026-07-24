@@ -16,7 +16,6 @@ import orderRoutes, { ensureOrderSupportTables } from './routes/orders';
 import productRoutes from './routes/products';
 import razorpayRoutes from './routes/razorpay';
 import userRoutes from './routes/users';
-import walletRoutes from './routes/wallet';
 import wishlistRoutes from './routes/wishlist';
 import { prepareSensitiveDataEncryption } from './utils/encryption';
 import { logger } from './utils/logger';
@@ -101,7 +100,6 @@ app.use('/api/v1/wishlist', wishlistRoutes);
 app.use('/api/v1/orders', orderRoutes);
 app.use('/api/v1/coupons', couponRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
-app.use('/api/v1/wallet', walletRoutes);
 app.use('/api/v1/razorpay', razorpayRoutes);
 
 // Health check — excluded from rate limiting

@@ -32,7 +32,7 @@ router.post('/create-order', authenticate, async (req: AuthRequest, res: Respons
   try {
     // Fetch the order and verify ownership
     const result = await pool.query(
-      `SELECT id, final_amount, payment_status FROM ${ORDERS} WHERE id = $1 AND user_id = $2`,
+      `SELECT id, group_id, final_amount, payment_status FROM ${ORDERS} WHERE id = $1 AND user_id = $2`,
       [orderId, req.userId]
     );
 
@@ -43,13 +43,29 @@ router.post('/create-order', authenticate, async (req: AuthRequest, res: Respons
 
     const order = result.rows[0];
 
-    if (order.payment_status === 'paid') {
+    // Multi-seller: a checkout is split into one order row per seller sharing a
+    // group_id. Charge the whole group once (sum of the sub-order finals). Legacy
+    // orders have a NULL group_id → group of one (just this row).
+    let chargeAmount = Number(order.final_amount);
+    let anyPaid = order.payment_status === 'paid';
+    if (order.group_id) {
+      const group = await pool.query(
+        `SELECT COALESCE(SUM(final_amount), 0) AS total,
+                BOOL_OR(payment_status = 'paid') AS any_paid
+         FROM ${ORDERS} WHERE group_id = $1 AND user_id = $2`,
+        [order.group_id, req.userId]
+      );
+      chargeAmount = Number(group.rows[0].total);
+      anyPaid = group.rows[0].any_paid === true;
+    }
+
+    if (anyPaid) {
       res.status(400).json({ success: false, message: 'Order is already paid' });
       return;
     }
 
     // Razorpay amount is in paise (1 INR = 100 paise)
-    const amountInPaise = Math.round(Number(order.final_amount) * 100);
+    const amountInPaise = Math.round(chargeAmount * 100);
 
     const rzpOrder = await getRazorpay().orders.create({
       amount: amountInPaise,
@@ -104,7 +120,7 @@ router.post('/verify', authenticate, async (req: AuthRequest, res: Response): Pr
 
     // Verify order ownership and current status
     const orderResult = await client.query(
-      `SELECT id, final_amount, payment_status, order_number FROM ${ORDERS} WHERE id = $1 AND user_id = $2`,
+      `SELECT id, group_id, final_amount, payment_status, order_number FROM ${ORDERS} WHERE id = $1 AND user_id = $2`,
       [appOrderId, req.userId]
     );
 
@@ -116,7 +132,16 @@ router.post('/verify', authenticate, async (req: AuthRequest, res: Response): Pr
 
     const order = orderResult.rows[0];
 
-    if (order.payment_status === 'paid') {
+    // Multi-seller: resolve every sub-order of the checkout (group of one for
+    // legacy NULL-group orders) so a single payment confirms the whole group.
+    const groupRows = order.group_id
+      ? (await client.query(
+          `SELECT id, final_amount, payment_status FROM ${ORDERS} WHERE group_id = $1 AND user_id = $2`,
+          [order.group_id, req.userId]
+        )).rows
+      : [order];
+
+    if (groupRows.every((r: any) => r.payment_status === 'paid')) {
       await client.query('ROLLBACK');
       res.json({ success: true, message: 'Payment already recorded', data: { orderId: appOrderId } });
       return;
@@ -133,15 +158,18 @@ router.post('/verify', authenticate, async (req: AuthRequest, res: Response): Pr
       return;
     }
 
-    // Mark order as paid and confirmed, store Razorpay payment ID
+    // Mark every sub-order in the group paid + confirmed, store the payment id on
+    // each. group_id IS NOT DISTINCT FROM handles the legacy NULL-group single row.
     await client.query(
       `UPDATE ${ORDERS}
        SET payment_status = 'paid', status = 'confirmed', payment_id = $1, payment_method = 'razorpay', updated_at = NOW()
-       WHERE id = $2`,
-      [razorpayPaymentId, appOrderId]
+       WHERE user_id = $2 AND (group_id IS NOT DISTINCT FROM $3 AND ($3 IS NOT NULL OR id = $4))`,
+      [razorpayPaymentId, req.userId, order.group_id, appOrderId]
     );
 
-    // Record wallet transaction if needed (not applicable for razorpay, but log for audit)
+    const groupTotal = groupRows.reduce((s: number, r: any) => s + Number(r.final_amount), 0);
+
+    // Notify the customer that payment succeeded (audit trail via notifications).
     const txnId = generateId();
     await client.query(
       `INSERT INTO notifications (id, user_id, title, message, type, data, is_read, created_at)
@@ -150,8 +178,8 @@ router.post('/verify', authenticate, async (req: AuthRequest, res: Response): Pr
         txnId,
         req.userId,
         `Payment Successful: ${order.order_number}`,
-        `Your payment of ₹${Number(order.final_amount).toFixed(2)} for order ${order.order_number} was successful.`,
-        JSON.stringify({ orderId: appOrderId, paymentId: razorpayPaymentId, amount: Number(order.final_amount) }),
+        `Your payment of ₹${groupTotal.toFixed(2)} for order ${order.order_number} was successful.`,
+        JSON.stringify({ orderId: appOrderId, groupId: order.group_id ?? null, paymentId: razorpayPaymentId, amount: groupTotal }),
       ]
     );
 

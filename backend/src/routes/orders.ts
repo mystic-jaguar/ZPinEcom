@@ -2,7 +2,7 @@ import { Response, Router } from 'express';
 import { pool } from '../db';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { orderCreateLimiter } from '../middleware/rateLimits';
-import { decryptAddressPayload, decryptMoney, encryptAddressPayload, encryptMoney } from '../utils/encryption';
+import { decryptAddressPayload, encryptAddressPayload } from '../utils/encryption';
 import { generateId } from '../utils/id';
 import { cacheDel, cacheDelPattern } from '../utils/redis';
 import { safeIdentifier } from '../utils/sql';
@@ -47,6 +47,9 @@ export async function ensureOrderSupportTables() {
       `ALTER TABLE ${RETURN_REQUESTS} ADD COLUMN IF NOT EXISTS picked_up_at TIMESTAMP`,
       `ALTER TABLE ${RETURN_REQUESTS} ADD COLUMN IF NOT EXISTS refunded_at TIMESTAMP`,
       `ALTER TABLE ${RETURN_REQUESTS} ADD COLUMN IF NOT EXISTS status_history JSONB DEFAULT '[]'::jsonb`,
+      // Multi-seller split: one checkout = one group_id shared by every seller's
+      // sub-order row (NULL for legacy pre-split orders = a group of one).
+      `ALTER TABLE ${ORDERS} ADD COLUMN IF NOT EXISTS group_id VARCHAR(7)`,
     ];
     for (const sql of alterColumns) {
       try {
@@ -58,6 +61,9 @@ export async function ensureOrderSupportTables() {
         }
       }
     }
+    await pool.query(
+      `CREATE INDEX IF NOT EXISTS idx_orders_group_id ON ${ORDERS}(group_id)`
+    );
 
     await pool.query(
       `CREATE TABLE IF NOT EXISTS ${ORDER_CANCELLATIONS} (
@@ -157,23 +163,13 @@ function buildTrackingHistory(order: any, returnRequest?: any) {
   return steps;
 }
 
-// Helper: get or create wallet for a user
-async function getOrCreateWallet(userId: string) {
-  const existing = await pool.query('SELECT * FROM wallets WHERE user_id = $1', [userId]);
-  if (existing.rows.length > 0) return existing.rows[0];
-
-  const walletId = generateId();
-  const created = await pool.query(
-    `INSERT INTO wallets (id, user_id, balance) VALUES ($1,$2,$3) RETURNING *`,
-    [walletId, userId, encryptMoney(0)]
-  );
-  return created.rows[0];
-}
-
 function normalizeOrder(row: any) {
   return {
     id: row.id,
     orderNumber: row.order_number,
+    // group_id ties a checkout's per-seller sub-orders together. Legacy rows are
+    // NULL — the frontend treats a NULL group as a group of one (its own id).
+    groupId: row.group_id ?? null,
     userId: row.user_id,
     status: row.status,
     paymentStatus: row.payment_status,
@@ -480,86 +476,134 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
     }
     couponDiscount = Math.max(0, couponDiscount);
     const finalAmount = Math.max(0, totalAmount + shippingAmount + taxAmount + deliveryFee - couponDiscount);
-    const orderId = generateId();
-    const orderNumber = `ZP-${orderId}`;
-
-    // Determine the seller to stamp on the order. Each cart row's seller_id is the
-    // product owner (products.user_id, joined above). Pick the seller with the most
-    // value in the cart; fall back to any owner so a zero-value cart still resolves.
-    const sellerTotals: Record<string, number> = {};
-    cartResult.rows.forEach((item: any) => {
-      if (item.seller_id) {
-        sellerTotals[item.seller_id] = (sellerTotals[item.seller_id] || 0) + Number(item.price) * item.quantity;
-      }
-    });
-    const primarySellerId =
-      Object.keys(sellerTotals).sort((a, b) => sellerTotals[b] - sellerTotals[a])[0] ||
-      cartResult.rows.find((i: any) => i.seller_id)?.seller_id ||
-      null;
-
-    // seller_id must never be null: getSellerOrders filters WHERE seller_id = $1, so
-    // a null-seller order is invisible to its seller and unattributable for payouts.
-    // If no cart product has an owner, the catalog row is broken — fail closed rather
-    // than create an orphaned order (finally releases the client).
-    if (!primarySellerId) {
-      const orphan = cartResult.rows.find((i: any) => !i.seller_id);
+    // ── Multi-seller split ──────────────────────────────────────────────────
+    // A cart may contain products from several sellers. Each seller's parcel is
+    // its own fulfillment (own seller_id + delivery lifecycle), so we create one
+    // order row per seller, all sharing a single group_id (the customer-facing
+    // order). seller_id must never be null: getSellerOrders filters WHERE
+    // seller_id = $1, so a null-seller row is invisible to its seller and
+    // unattributable for payouts — fail closed if any product has no owner.
+    const orphan = cartResult.rows.find((i: any) => !i.seller_id);
+    if (orphan) {
       console.error('createOrder: product has no owner (products.user_id is NULL)', {
         userId: req.userId,
-        productId: orphan?.product_id,
-        productName: orphan?.product_name,
+        productId: orphan.product_id,
+        productName: orphan.product_name,
       });
       await client.query('ROLLBACK');
       res.status(409).json({
         success: false,
-        message: `"${orphan?.product_name ?? 'An item'}" is temporarily unavailable for checkout. Please remove it and try again.`,
+        message: `"${orphan.product_name ?? 'An item'}" is temporarily unavailable for checkout. Please remove it and try again.`,
       });
       return;
     }
+
+    // Group cart rows by seller (insertion order preserved for stable splits).
+    const itemsBySeller = new Map<string, any[]>();
+    for (const row of cartResult.rows) {
+      const sid = String(row.seller_id);
+      (itemsBySeller.get(sid) ?? itemsBySeller.set(sid, []).get(sid)!).push(row);
+    }
+    const sellerIds = [...itemsBySeller.keys()];
+    const subtotalOf = (rows: any[]) => rows.reduce((s, i) => s + Number(i.price) * i.quantity, 0);
+    const sellerSubtotals = sellerIds.map((id) => subtotalOf(itemsBySeller.get(id)!));
+
+    // Split a group-level charge proportionally by each seller's subtotal. The
+    // last seller absorbs the rounding remainder so the per-seller shares sum
+    // EXACTLY to the group total (no cents lost/created across the split).
+    const round2 = (n: number) => Math.round(n * 100) / 100;
+    const allocate = (total: number): number[] => {
+      const out: number[] = [];
+      let acc = 0;
+      for (let i = 0; i < sellerSubtotals.length; i++) {
+        if (i === sellerSubtotals.length - 1) {
+          out.push(round2(total - acc));
+        } else {
+          const share = totalAmount > 0 ? round2((total * sellerSubtotals[i]) / totalAmount) : (i === 0 ? total : 0);
+          out.push(share);
+          acc += share;
+        }
+      }
+      return out;
+    };
+    // shipping / tax / delivery fee / coupon discount are all computed on the
+    // whole cart (group) above, then split here (free-delivery threshold already
+    // judged on totalAmount = the whole group).
+    const shipSplit = allocate(shippingAmount);
+    const taxSplit = allocate(taxAmount);
+    const feeSplit = allocate(deliveryFee);
+    const discSplit = allocate(couponDiscount);
 
     // All orders start 'pending' so the seller explicitly accepts them in the
     // vendor app (pending → confirmed → processing). The delivery queue is gated
     // on IN ('processing','shipped') — i.e. only after the vendor marks the order
     // ready — so COD no longer needs to be born 'confirmed' to reach delivery.
-    // Prepaid still flips to 'confirmed' on payment verify / wallet debit below.
+    // Prepaid still flips to 'confirmed' on Razorpay payment verify.
     const orderStatus = 'pending';
+    const groupId = generateId();
+    const groupOrderNumber = `ZP-${groupId}`;
 
-    await client.query(
-      `INSERT INTO ${ORDERS}
-        (id, order_number, user_id, seller_id, status, payment_status, total_amount, shipping_amount,
-         tax_amount, final_amount, shipping_address, payment_method, notes, estimated_delivery, created_at, updated_at)
-       VALUES ($1,$2,$3,$12,$11,'pending',$4,$5,$6,$7,$8,$9,$10,
-         (NOW() AT TIME ZONE 'Asia/Kolkata') + INTERVAL '5 days',
-         (NOW() AT TIME ZONE 'Asia/Kolkata'),
-         (NOW() AT TIME ZONE 'Asia/Kolkata'))`,
-      [orderId, orderNumber, req.userId, totalAmount, shippingAmount, taxAmount, finalAmount,
-       JSON.stringify(encryptedShippingAddress), paymentMethod, notes || '', orderStatus, primarySellerId]
-    );
+    const subOrders: Array<{
+      id: string; orderNumber: string; sellerId: string; items: any[]; subtotal: number; finalAmount: number;
+    }> = [];
 
-    for (const item of cartResult.rows) {
+    for (let s = 0; s < sellerIds.length; s++) {
+      const sellerId = sellerIds[s];
+      const sellerItems = itemsBySeller.get(sellerId)!;
+      const sSubtotal = sellerSubtotals[s];
+      const sShip = shipSplit[s];
+      const sTax = taxSplit[s];
+      const sFee = feeSplit[s];
+      const sDisc = discSplit[s];
+      const sFinal = Math.max(0, round2(sSubtotal + sShip + sTax + sFee - sDisc));
+      const subId = generateId();
+      const subNumber = `ZP-${subId}`;
+
       await client.query(
-        `INSERT INTO ${ORDER_ITEMS} (id, order_id, product_id, product_name, quantity, price, image, created_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,(NOW() AT TIME ZONE 'Asia/Kolkata'))`,
-        [generateId(), orderId, item.product_id, item.product_name, item.quantity, item.price, item.image || '']
+        `INSERT INTO ${ORDERS}
+          (id, order_number, user_id, seller_id, group_id, status, payment_status, total_amount, shipping_amount,
+           tax_amount, final_amount, shipping_address, payment_method, notes, estimated_delivery, created_at, updated_at)
+         VALUES ($1,$2,$3,$4,$5,$6,'pending',$7,$8,$9,$10,$11,$12,$13,
+           (NOW() AT TIME ZONE 'Asia/Kolkata') + INTERVAL '5 days',
+           (NOW() AT TIME ZONE 'Asia/Kolkata'),
+           (NOW() AT TIME ZONE 'Asia/Kolkata'))`,
+        [subId, subNumber, req.userId, sellerId, groupId, orderStatus, sSubtotal, sShip, sTax, sFinal,
+         JSON.stringify(encryptedShippingAddress), paymentMethod, notes || '']
       );
-      // Decrement inventory atomically. The `quantity >= $1` guard makes the
-      // check-and-decrement a single locked operation, so concurrent orders for
-      // the same low-stock item can't oversell. No row updated → not enough stock.
-      const dec = await client.query(
-        `UPDATE products
-         SET quantity = quantity - $1,
-             in_stock = CASE WHEN quantity - $1 <= 0 THEN false ELSE in_stock END,
-             updated_at = NOW()
-         WHERE id = $2 AND quantity >= $1
-         RETURNING id`,
-        [item.quantity, item.product_id]
-      );
-      if (dec.rows.length === 0) {
-        // Roll back the whole order; the finally block releases the client.
-        await client.query('ROLLBACK');
-        res.status(409).json({ success: false, message: `Insufficient stock for ${item.product_name}` });
-        return;
+
+      for (const item of sellerItems) {
+        await client.query(
+          `INSERT INTO ${ORDER_ITEMS} (id, order_id, product_id, product_name, quantity, price, image, created_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,(NOW() AT TIME ZONE 'Asia/Kolkata'))`,
+          [generateId(), subId, item.product_id, item.product_name, item.quantity, item.price, item.image || '']
+        );
+        // Decrement inventory atomically. The `quantity >= $1` guard makes the
+        // check-and-decrement a single locked operation, so concurrent orders for
+        // the same low-stock item can't oversell. No row updated → not enough stock.
+        const dec = await client.query(
+          `UPDATE products
+           SET quantity = quantity - $1,
+               in_stock = CASE WHEN quantity - $1 <= 0 THEN false ELSE in_stock END,
+               updated_at = NOW()
+           WHERE id = $2 AND quantity >= $1
+           RETURNING id`,
+          [item.quantity, item.product_id]
+        );
+        if (dec.rows.length === 0) {
+          // Roll back the whole checkout; the finally block releases the client.
+          await client.query('ROLLBACK');
+          res.status(409).json({ success: false, message: `Insufficient stock for ${item.product_name}` });
+          return;
+        }
       }
+
+      subOrders.push({ id: subId, orderNumber: subNumber, sellerId, items: sellerItems, subtotal: sSubtotal, finalAmount: sFinal });
     }
+
+    // Primary sub-order = the seller with the largest subtotal. Used as the id the
+    // razorpay create-order/verify + coupon redemption reference for the group.
+    const primary = subOrders.reduce((a, b) => (b.subtotal > a.subtotal ? b : a), subOrders[0]);
+    const orderId = primary.id;
 
     // Enforce coupon limits atomically. Two protections, both inside the order
     // transaction so any failure rolls back the whole order (fail closed — no
@@ -603,44 +647,9 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
     }
 
     await client.query(`DELETE FROM ${CART} WHERE user_id = $1`, [req.userId]);
-    // ── Wallet payment: debit atomically within the same transaction ──────────
-    if (paymentMethod === 'wallet') {
-      const walletResult = await client.query(
-        'SELECT * FROM wallets WHERE user_id = $1',
-        [req.userId]
-      );
-      if (walletResult.rows.length === 0) {
-        await client.query('ROLLBACK');
-        client.release();
-        res.status(400).json({ success: false, message: 'Wallet not found' });
-        return;
-      }
-      const wallet = walletResult.rows[0];
-      const currentBalance = decryptMoney(wallet.balance);
-      if (currentBalance < finalAmount) {
-        await client.query('ROLLBACK');
-        client.release();
-        res.status(400).json({ success: false, message: 'Insufficient wallet balance' });
-        return;
-      }
-      const newBalance = currentBalance - finalAmount;
-      await client.query(
-        `UPDATE wallets SET balance = $1, updated_at = NOW() WHERE id = $2`,
-        [encryptMoney(newBalance), wallet.id]
-      );
-      await client.query(
-        `INSERT INTO wallet_transactions (id, wallet_id, user_id, type, amount, description, reference_id)
-         VALUES ($1,$2,$3,'debit',$4,$5,$6)`,
-        [generateId(), wallet.id, req.userId, finalAmount, `Payment for order ${orderNumber}`, orderId]
-      );
-      // Mark order as paid and confirmed
-      await client.query(
-        `UPDATE ${ORDERS} SET payment_status = 'paid', status = 'confirmed', updated_at = NOW() WHERE id = $1`,
-        [orderId]
-      );
-    }
 
-    // Notify customer — order confirmation (type: new_order, consistent with seller)
+    // Notify customer — ONE "Order Placed" notification summarizing the whole
+    // group (all items across every seller's sub-order), keyed on the group.
     const customerItems = cartResult.rows.map((i: any) => ({
       productId: i.product_id,
       productName: i.product_name,
@@ -655,12 +664,14 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
       [
         generateId(),
         req.userId,
-        `Order Confirmed: ${orderNumber}`,
-        `Your order ${orderNumber} for ${customerItems.length} item(s) has been placed. Total: ₹${finalAmount.toFixed(2)}`,
+        `Order Confirmed: ${groupOrderNumber}`,
+        `Your order ${groupOrderNumber} for ${customerItems.length} item(s) across ${subOrders.length} seller(s) has been placed. Total: ₹${finalAmount.toFixed(2)}`,
         JSON.stringify({
           orderId,
-          orderNumber,
+          orderNumber: groupOrderNumber,
+          groupId,
           itemCount: customerItems.length,
+          shipmentCount: subOrders.length,
           total: finalAmount,
           items: customerItems,
           shippingAddress: encryptedShippingAddress,
@@ -669,27 +680,24 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
       ]
     );
 
-    // Notify each unique seller about the new order
-    const uniqueSellers = [...new Set(cartResult.rows.map((i: any) => i.seller_id).filter(Boolean))];
-    for (const sellerId of uniqueSellers) {
-      const sellerItems = cartResult.rows.filter((i: any) => i.seller_id === sellerId);
-      const sellerTotal = sellerItems.reduce((s: number, i: any) => s + Number(i.price) * i.quantity, 0);
-      const itemNames = sellerItems.map((i: any) => i.product_name).join(', ');
-
+    // Notify each seller about their own sub-order (its own id/number/total).
+    for (const sub of subOrders) {
+      const itemNames = sub.items.map((i: any) => i.product_name).join(', ');
       await client.query(
         `INSERT INTO notifications (id, user_id, title, message, type, data, is_read, created_at)
          VALUES ($1, $2, $3, $4, 'new_order', $5, false, (NOW() AT TIME ZONE 'Asia/Kolkata'))`,
         [
           generateId(),
-          sellerId,
-          `New Order: ${orderNumber}`,
-          `You have a new order for ${sellerItems.length} item(s): ${itemNames}. Total: ₹${sellerTotal.toFixed(2)}`,
+          sub.sellerId,
+          `New Order: ${sub.orderNumber}`,
+          `You have a new order for ${sub.items.length} item(s): ${itemNames}. Total: ₹${sub.finalAmount.toFixed(2)}`,
           JSON.stringify({
-            orderId,
-            orderNumber,
-            itemCount: sellerItems.length,
-            total: sellerTotal,
-            items: sellerItems.map((i: any) => ({
+            orderId: sub.id,
+            orderNumber: sub.orderNumber,
+            groupId,
+            itemCount: sub.items.length,
+            total: sub.finalAmount,
+            items: sub.items.map((i: any) => ({
               productId: i.product_id,
               productName: i.product_name,
               quantity: i.quantity,
@@ -714,7 +722,15 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
     res.status(201).json({
       success: true,
       message: 'Order placed successfully',
-      data: { order: { id: orderId, orderNumber, finalAmount, status: orderStatus } },
+      data: {
+        // `order` is the group as the customer sees it (ZP-<group>, group total).
+        // id = primary sub-order — razorpay create-order/verify resolve the group
+        // from it and charge/confirm every sub-order together.
+        order: { id: orderId, orderNumber: groupOrderNumber, finalAmount, status: orderStatus, groupId },
+        orders: subOrders.map((o) => ({
+          id: o.id, orderNumber: o.orderNumber, sellerId: o.sellerId, finalAmount: o.finalAmount, groupId,
+        })),
+      },
     });
   } catch (err) {
     try {
@@ -1013,7 +1029,7 @@ router.get('/:id/return-status', authenticate, async (req: AuthRequest, res: Res
 
 // PATCH /api/v1/orders/:id/cancel
 router.patch('/:id/cancel', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
-  const { refundMethod, reason } = req.body; // refundMethod: 'original' | 'wallet'
+  const { reason } = req.body;
 
   if (!reason || typeof reason !== 'string') {
     res.status(400).json({ success: false, message: 'reason is required' });
@@ -1070,39 +1086,12 @@ router.patch('/:id/cancel', authenticate, async (req: AuthRequest, res: Response
       );
     }
 
-    // Credit wallet only if the order was paid and user chose wallet refund
-    if (wasPaid && refundMethod === 'wallet' && refundAmount > 0) {
-      const walletResult = await client.query(
-        'SELECT * FROM wallets WHERE user_id = $1 FOR UPDATE',
-        [req.userId]
-      );
-
-      let wallet = walletResult.rows[0];
-      if (!wallet) {
-        const walletId = generateId();
-        const created = await client.query(
-          `INSERT INTO wallets (id, user_id, balance) VALUES ($1,$2,$3) RETURNING *`,
-          [walletId, req.userId, encryptMoney(0)]
-        );
-        wallet = created.rows[0];
-      }
-
-      const updatedBalance = decryptMoney(wallet.balance) + refundAmount;
-      await client.query(
-        `UPDATE wallets SET balance = $1, updated_at = NOW() WHERE id = $2`,
-        [encryptMoney(updatedBalance), wallet.id]
-      );
-      await client.query(
-        `INSERT INTO wallet_transactions (id, wallet_id, user_id, type, amount, description, reference_id)
-         VALUES ($1,$2,$3,'credit',$4,$5,$6)`,
-        [generateId(), wallet.id, req.userId, refundAmount, `Refund for cancelled order`, req.params.id]
-      );
-    }
-
+    // Paid orders are always refunded to the original payment method. (The ZPIN
+    // wallet was removed — no in-app stored-value refund destination.)
     await client.query(
       `INSERT INTO ${ORDER_CANCELLATIONS} (id, order_id, user_id, reason, refund_method, created_at)
-       VALUES ($1, $2, $3, $4, $5, NOW())`,
-      [generateId(), req.params.id, req.userId, reason, refundMethod || 'original']
+       VALUES ($1, $2, $3, $4, 'original', NOW())`,
+      [generateId(), req.params.id, req.userId, reason]
     );
 
     await client.query('COMMIT');
@@ -1112,10 +1101,8 @@ router.patch('/:id/cancel', authenticate, async (req: AuthRequest, res: Response
       data: {
         message: 'Order cancelled',
         refundAmount: wasPaid ? refundAmount : 0,
-        refundStatus: wasPaid
-          ? (refundMethod === 'wallet' ? 'credited_to_wallet' : 'initiated')
-          : 'not_applicable',
-        refundMethod: refundMethod || 'original',
+        refundStatus: wasPaid ? 'initiated' : 'not_applicable',
+        refundMethod: 'original',
       },
     });
   } catch (err) {

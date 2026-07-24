@@ -1,14 +1,13 @@
 import ActionModal from '@/components/common/ActionModal';
 import { Colors } from '@/constants/Colors';
-import { WALLET_ENABLED } from '@/constants/features';
 import { useCart } from '@/context/CartContext';
 import { useCheckout } from '@/context/CheckoutContext';
 import { useOrder } from '@/context/OrderContext';
 import { useUser } from '@/context/UserContext';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import { Banknote, Check, Landmark, Lock, LucideIcon, Smartphone, Wallet } from 'lucide-react-native';
-import React, { useCallback, useEffect, useState } from 'react';
+import { Banknote, Check, Landmark, Lock, LucideIcon, Smartphone } from 'lucide-react-native';
+import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import RazorpayCheckout from 'react-native-razorpay';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,7 +15,6 @@ import { AppHeader, CheckoutSteps, ZText } from '../../components/ui';
 import { colors, fonts, palette, radius, shadow } from '../../constants/theme';
 import { orderService } from '../../services/order';
 import { paymentService } from '../../services/payment';
-import { walletService } from '../../services/wallet';
 
 export default function CheckoutPaymentScreen() {
     const router = useRouter();
@@ -28,13 +26,7 @@ export default function CheckoutPaymentScreen() {
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [orderError, setOrderError] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [walletBalance, setWalletBalance] = useState<number | null>(null);
     const [confirmedFinalAmount, setConfirmedFinalAmount] = useState<number | null>(null);
-
-    useEffect(() => {
-        if (!WALLET_ENABLED) return;
-        walletService.getWallet().then(data => setWalletBalance(data.balance)).catch(() => setWalletBalance(0));
-    }, []);
 
     const hasRedirectedRef = React.useRef(false);
     useFocusEffect(
@@ -59,18 +51,11 @@ export default function CheckoutPaymentScreen() {
             setOrderError('Please select a payment method to continue.');
             return;
         }
-        if (selectedPaymentMethod === 'wallet') {
-            if (walletBalance === null || walletBalance < finalTotal) {
-                setOrderError(`Insufficient wallet balance. Available: ₹${(walletBalance ?? 0).toFixed(2)}, Required: ₹${finalTotal.toFixed(2)}`);
-                return;
-            }
-        }
         setIsSubmitting(true);
 
         const isRazorpayMethod = ['net_banking', 'google_pay', 'phone_pe', 'upi', 'card'].includes(selectedPaymentMethod || '');
-        const backendMethod: 'cod' | 'razorpay' | 'wallet' =
+        const backendMethod: 'cod' | 'razorpay' =
             selectedPaymentMethod === 'cod' ? 'cod'
-            : selectedPaymentMethod === 'wallet' ? 'wallet'
             : isRazorpayMethod ? 'razorpay'
             : 'cod';
 
@@ -189,15 +174,6 @@ export default function CheckoutPaymentScreen() {
                 </View>
                 <Option id="net_banking" icon={Landmark} label="Net Banking" sub="All major banks" />
                 <Option id="cod" icon={Banknote} label="Cash on Delivery" sub="Pay the courier at your door" />
-
-                {WALLET_ENABLED && (
-                    <Option
-                        id="wallet"
-                        icon={Wallet}
-                        label="ZPIN Wallet"
-                        sub={walletBalance === null ? 'Loading…' : `Balance: ₹${walletBalance.toFixed(2)}${walletBalance < finalTotal ? ' (Insufficient)' : ''}`}
-                    />
-                )}
 
                 <View style={styles.secure}>
                     <Lock size={14} color={colors.textFaint} />

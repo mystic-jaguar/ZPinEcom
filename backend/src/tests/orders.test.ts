@@ -176,6 +176,35 @@ describe('GET /orders/:id/track', () => {
 // ─── POST /orders — order creation ────────────────────────────────────────────
 
 describe('POST /orders', () => {
+  // Robust SQL-keyed mock for the createOrder transaction. Given the cart rows,
+  // it answers each query by its SQL shape (not a brittle fixed call order), so
+  // the multi-seller split — which issues a variable number of INSERTs — is
+  // exercised faithfully. Returns a non-empty row for the inventory UPDATE so the
+  // atomic stock decrement succeeds.
+  function mockCheckout(cartRows: any[]) {
+    const db = require('../db');
+    const client = db.__mockClient;
+    db.pool.connect.mockResolvedValueOnce(client);
+    const calls: Array<{ sql: string; params: any[] }> = [];
+    client.query.mockImplementation((sql: string, params: any[] = []) => {
+      calls.push({ sql, params });
+      if (/FROM\s+"cart_items"\s+ci/i.test(sql)) return Promise.resolve({ rows: cartRows });
+      if (/FROM\s+"addresses"/i.test(sql)) return Promise.resolve({ rows: [mockAddress] });
+      if (/UPDATE\s+products/i.test(sql)) return Promise.resolve({ rows: [{ id: params[1] }] }); // stock dec ok
+      return Promise.resolve({ rows: [] }); // BEGIN/COMMIT/DDL/INSERTs/DELETE/notifications
+    });
+    return calls;
+  }
+  const orderInserts = (calls: Array<{ sql: string; params: any[] }>) =>
+    calls.filter(c => /INSERT INTO\s+"orders"/i.test(c.sql));
+  const stockDecrements = (calls: Array<{ sql: string; params: any[] }>) =>
+    calls.filter(c => /UPDATE\s+products/i.test(c.sql));
+
+  afterEach(() => {
+    const db = require('../db');
+    db.__mockClient.query.mockReset();
+  });
+
   it('returns 401 without auth', async () => {
     const res = await request(app).post(BASE).send({});
     expect(res.status).toBe(401);
@@ -190,15 +219,7 @@ describe('POST /orders', () => {
   });
 
   it('returns 400 when cart is empty', async () => {
-    const db = require('../db');
-    db.__mockClient.query
-      .mockResolvedValueOnce({ rows: [] }) // BEGIN
-      .mockResolvedValueOnce({ rows: [] }) // cart query returns empty
-      .mockResolvedValueOnce({ rows: [] }) // ROLLBACK
-    ;
-    // pool.connect returns the mock client
-    db.pool.connect.mockResolvedValueOnce(db.__mockClient);
-
+    mockCheckout([]);
     const res = await request(app)
       .post(BASE)
       .set(bearerHeader(custToken))
@@ -207,62 +228,10 @@ describe('POST /orders', () => {
     expect(res.body.message).toMatch(/cart is empty/i);
   });
 
-  it('returns 400 when wallet balance is insufficient', async () => {
-    const db = require('../db');
-    const client = db.__mockClient;
-    db.pool.connect.mockResolvedValueOnce(client);
-
-    client.query
-      .mockResolvedValueOnce({ rows: [] }) // BEGIN
-      .mockResolvedValueOnce({ // cart items
-        rows: [{
-          id: 'CRT0001', product_id: productUuid, quantity: 1, price: '1000',
-          product_name: 'Shirt', seller_id: 'SLR0001', image: null,
-        }],
-      })
-      .mockResolvedValueOnce({ rows: [mockAddress] }) // address
-      .mockResolvedValueOnce({ rows: [] }) // coupon (none)
-      .mockResolvedValueOnce({ rows: [] }) // INSERT order
-      .mockResolvedValueOnce({ rows: [] }) // INSERT order item
-      .mockResolvedValueOnce({ rows: [] }) // UPDATE inventory
-      .mockResolvedValueOnce({ rows: [] }) // DELETE cart
-      .mockResolvedValueOnce({ // wallet with low balance
-        rows: [{ id: 'WAL0001', balance: '100' }],
-      })
-      .mockResolvedValueOnce({ rows: [] }) // ROLLBACK
-    ;
-
-    const res = await request(app)
-      .post(BASE)
-      .set(bearerHeader(custToken))
-      .send({ shippingAddressId: addressId, paymentMethod: 'wallet' });
-    expect(res.status).toBe(400);
-    expect(res.body.message).toMatch(/insufficient|wallet/i);
-  });
-
-  it('creates a COD order with 18% GST applied', async () => {
-    const db = require('../db');
-    const client = db.__mockClient;
-    db.pool.connect.mockResolvedValueOnce(client);
-
-    client.query
-      .mockResolvedValueOnce({ rows: [] }) // BEGIN
-      .mockResolvedValueOnce({ // cart
-        rows: [{
-          id: 'CRT0001', product_id: productUuid, quantity: 1, price: '1000',
-          product_name: 'Shirt', seller_id: 'SLR0001', image: null,
-        }],
-      })
-      .mockResolvedValueOnce({ rows: [mockAddress] }) // address
-      .mockResolvedValueOnce({ rows: [] }) // coupon
-      .mockResolvedValueOnce({ rows: [] }) // INSERT order
-      .mockResolvedValueOnce({ rows: [] }) // INSERT order item
-      .mockResolvedValueOnce({ rows: [] }) // UPDATE inventory
-      .mockResolvedValueOnce({ rows: [] }) // DELETE cart
-      .mockResolvedValueOnce({ rows: [] }) // customer notification
-      .mockResolvedValueOnce({ rows: [] }) // seller notification
-      .mockResolvedValueOnce({ rows: [] }) // COMMIT
-    ;
+  it('creates a single-seller COD order with 18% GST as a group of one', async () => {
+    const calls = mockCheckout([
+      { id: 'CRT0001', product_id: productUuid, quantity: 1, price: '1000', product_name: 'Shirt', seller_id: 'SLR0001', image: null },
+    ]);
 
     const res = await request(app)
       .post(BASE)
@@ -270,34 +239,20 @@ describe('POST /orders', () => {
       .send({ shippingAddressId: addressId, paymentMethod: 'cod' });
 
     expect(res.status).toBe(201);
+    // Customer-facing group number + total: 1000 + 0 (free shipping ≥599) + 180 tax
     expect(res.body.data.order.orderNumber).toMatch(/^ZP-/);
-    // Tax should be 18% of 1000 = 180; final = 1000 + 0 (free shipping > 500) + 180 = 1180
     expect(res.body.data.order.finalAmount).toBe(1180);
+    expect(res.body.data.order.groupId).toBeTruthy();
+    // One seller → exactly one order row, one stock decrement
+    expect(res.body.data.orders).toHaveLength(1);
+    expect(orderInserts(calls)).toHaveLength(1);
+    expect(stockDecrements(calls)).toHaveLength(1);
   });
 
-  it('applies standard shipping fee of Rs 49 for orders <= Rs 500', async () => {
-    const db = require('../db');
-    const client = db.__mockClient;
-    db.pool.connect.mockResolvedValueOnce(client);
-
-    client.query
-      .mockResolvedValueOnce({ rows: [] }) // BEGIN
-      .mockResolvedValueOnce({ // cart — low value order
-        rows: [{
-          id: 'CRT0001', product_id: productUuid, quantity: 1, price: '300',
-          product_name: 'Cap', seller_id: 'SLR0001', image: null,
-        }],
-      })
-      .mockResolvedValueOnce({ rows: [mockAddress] }) // address
-      .mockResolvedValueOnce({ rows: [] }) // coupon
-      .mockResolvedValueOnce({ rows: [] }) // INSERT order
-      .mockResolvedValueOnce({ rows: [] }) // INSERT order item
-      .mockResolvedValueOnce({ rows: [] }) // UPDATE inventory
-      .mockResolvedValueOnce({ rows: [] }) // DELETE cart
-      .mockResolvedValueOnce({ rows: [] }) // customer notification
-      .mockResolvedValueOnce({ rows: [] }) // seller notification
-      .mockResolvedValueOnce({ rows: [] }) // COMMIT
-    ;
+  it('applies standard shipping fee of Rs 49 for orders < Rs 599', async () => {
+    mockCheckout([
+      { id: 'CRT0001', product_id: productUuid, quantity: 1, price: '300', product_name: 'Cap', seller_id: 'SLR0001', image: null },
+    ]);
 
     const res = await request(app)
       .post(BASE)
@@ -305,8 +260,43 @@ describe('POST /orders', () => {
       .send({ shippingAddressId: addressId, paymentMethod: 'cod' });
 
     expect(res.status).toBe(201);
-    // total 300, shipping 49, tax ~54, final ~403
-    expect(res.body.data.order.finalAmount).toBeGreaterThan(300);
+    // total 300 → shipping 49, tax 54 → final 403
+    expect(res.body.data.order.finalAmount).toBe(403);
+  });
+
+  it('splits a 2-seller cart into 2 order rows sharing one group_id, amounts summing to the cart total', async () => {
+    const uuidB = 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22';
+    const calls = mockCheckout([
+      { id: 'CRT0001', product_id: productUuid, quantity: 1, price: '1000', product_name: 'Shirt', seller_id: 'SLR0001', image: null },
+      { id: 'CRT0002', product_id: uuidB, quantity: 1, price: '500', product_name: 'Belt', seller_id: 'SLR0002', image: null },
+    ]);
+
+    const res = await request(app)
+      .post(BASE)
+      .set(bearerHeader(custToken))
+      .send({ shippingAddressId: addressId, paymentMethod: 'cod' });
+
+    expect(res.status).toBe(201);
+
+    // Group total: 1500 + 0 shipping (≥599) + 270 tax = 1770
+    expect(res.body.data.order.finalAmount).toBe(1770);
+    expect(res.body.data.orders).toHaveLength(2);
+
+    // Two order rows, both carrying the SAME group_id (INSERT param $5 = group_id)
+    const inserts = orderInserts(calls);
+    expect(inserts).toHaveLength(2);
+    const groupIds = inserts.map(c => c.params[4]);
+    expect(groupIds[0]).toBe(groupIds[1]);
+    expect(res.body.data.order.groupId).toBe(groupIds[0]);
+    expect(new Set(inserts.map(c => c.params[3])).size).toBe(2); // two distinct sellers ($4 = seller_id)
+
+    // Per-seller finals ($10) sum EXACTLY to the group total (no cents lost/created)
+    const finals = inserts.map(c => Number(c.params[9]));
+    expect(finals.reduce((a, b) => a + b, 0)).toBe(1770);
+    expect(res.body.data.orders.reduce((s: number, o: any) => s + o.finalAmount, 0)).toBe(1770);
+
+    // Stock decremented exactly once per item
+    expect(stockDecrements(calls)).toHaveLength(2);
   });
 });
 
@@ -325,7 +315,7 @@ describe('PATCH /orders/:id/cancel', () => {
     const res = await request(app)
       .patch(`${BASE}/NOPE/cancel`)
       .set(bearerHeader(custToken))
-      .send({ reason: 'Changed my mind', refundMethod: 'wallet' });
+      .send({ reason: 'Changed my mind', refundMethod: 'original' });
     expect([400, 404]).toContain(res.status);
   });
 });

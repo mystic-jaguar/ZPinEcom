@@ -4,7 +4,7 @@ import apiClient, { handleApiError } from './api';
 export interface CreateOrderData {
     cartItems: { productId: string; quantity: number }[];
     shippingAddressId: string;
-    paymentMethod: 'razorpay' | 'cod' | 'wallet';
+    paymentMethod: 'razorpay' | 'cod';
     paymentId?: string;
     deliveryBoyId?: string;
     notes?: string;
@@ -23,7 +23,7 @@ export interface OrderListParams {
 
 export interface CancelOrderData {
     reason: string;
-    refundMethod?: 'original' | 'wallet';
+    refundMethod?: 'original';
 }
 
 export const orderService = {

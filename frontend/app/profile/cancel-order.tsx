@@ -6,7 +6,6 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
 import { AppHeader, ZButton, ZText } from '../../components/ui';
-import { WALLET_ENABLED } from '../../constants/features';
 import { colors, fonts, palette, radius } from '../../constants/theme';
 import { useOrder } from '../../context/OrderContext';
 import { orderService } from '../../services/order';
@@ -25,7 +24,6 @@ export default function CancelOrderScreen() {
 
     const isReturn = mode === 'return';
     const [selectedReason, setSelectedReason] = useState('');
-    const [refundMethod, setRefundMethod] = useState<'original' | 'wallet'>('original');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [showErrorModal, setShowErrorModal] = useState(false);
@@ -68,12 +66,11 @@ export default function CancelOrderScreen() {
                     description: 'Return request via app',
                 });
             } else {
-                response = await cancelOrder(order.id, { reason: selectedReason, refundMethod });
+                response = await cancelOrder(order.id, { reason: selectedReason, refundMethod: 'original' });
             }
             let msg = response?.message || `${isReturn ? 'Return initiated' : 'Order cancelled'} successfully.`;
             if (response?.refundAmount && response.refundAmount > 0) {
-                const dest = response.refundMethod === 'wallet' || refundMethod === 'wallet' ? 'ZPIN Wallet' : 'original payment method';
-                msg += `\n\nRefund of ₹${response.refundAmount.toFixed(2)} credited to your ${dest}.`;
+                msg += `\n\nRefund of ₹${response.refundAmount.toFixed(2)} credited to your original payment method.`;
             }
             setSuccessMessage(msg);
             setIsSubmitting(false);
@@ -111,23 +108,6 @@ export default function CancelOrderScreen() {
                         );
                     })}
                 </View>
-
-                {order.paymentStatus === 'paid' && WALLET_ENABLED && (
-                    <>
-                        <ZText variant="eyebrow" style={{ marginTop: 22, marginBottom: 12 }}>Refund to</ZText>
-                        <View style={styles.reasons}>
-                            {(['original', 'wallet'] as const).map((m) => {
-                                const on = refundMethod === m;
-                                return (
-                                    <Pressable key={m} style={[styles.reason, on ? styles.reasonOn : styles.reasonOff]} onPress={() => setRefundMethod(m)}>
-                                        <Text style={[styles.reasonText, on && { fontFamily: fonts.bodyBold, color: '#fff' }]}>{m === 'original' ? 'Original payment method' : 'ZPIN Wallet (instant)'}</Text>
-                                        <View style={[styles.radio, on && styles.radioOn]}>{on && <Check size={13} color={colors.textOnYellow} />}</View>
-                                    </Pressable>
-                                );
-                            })}
-                        </View>
-                    </>
-                )}
 
                 <View style={styles.infoBox}>
                     <Info size={17} color={palette.yellow700} />

@@ -305,6 +305,9 @@ export interface OrderObject {
     userId: string;
     sellerId: string;
     orderNumber: string;
+    // Ties a checkout's per-seller sub-orders together (ZP-<groupId>). Null/absent
+    // for legacy pre-split orders, which are treated as a group of one.
+    groupId?: string | null;
     status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'returned' | 'return_requested';
     paymentStatus: 'pending' | 'paid' | 'failed' | 'refunded';
     totalAmount: number;
@@ -312,7 +315,7 @@ export interface OrderObject {
     taxAmount: number;
     finalAmount: number;
     shippingAddress: AddressObject;
-    paymentMethod: 'razorpay' | 'cod' | 'wallet';
+    paymentMethod: 'razorpay' | 'cod';
     paymentId?: string;
     deliveryBoyId?: string;
     deliveryStatus?: 'assigned' | 'accepted' | 'picked_up' | 'in_transit' | 'delivered';
@@ -372,7 +375,7 @@ export interface PaymentObject {
     orderId: string;
     amount: number;
     currency: string;
-    method: 'razorpay' | 'cod' | 'wallet';
+    method: 'razorpay' | 'cod';
     status: 'pending' | 'paid' | 'failed' | 'refunded';
     gatewayPaymentId?: string;
     gatewayOrderId?: string;

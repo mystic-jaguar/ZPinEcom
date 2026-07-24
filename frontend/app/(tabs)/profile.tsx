@@ -193,7 +193,7 @@ export default function ProfileScreen() {
             <ActionModal
                 visible={deleteModalVisible}
                 title="Delete Account"
-                message="This permanently deletes your account and personal data — profile, addresses, cart, wishlist, reviews and wallet. Order/invoice records are kept in anonymized form as required by law. This cannot be undone."
+                message="This permanently deletes your account and personal data — profile, addresses, cart, wishlist and reviews. Order/invoice records are kept in anonymized form as required by law. This cannot be undone."
                 icon="trash-2"
                 primaryButtonText={deleting ? 'DELETING…' : 'DELETE ACCOUNT'}
                 onPrimaryPress={handleDeleteAccount}

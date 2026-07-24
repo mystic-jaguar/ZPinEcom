@@ -5,7 +5,7 @@ export interface CreatePaymentData {
     orderId: string;
     amount: number;
     currency: string;
-    method: 'razorpay' | 'cod' | 'wallet';
+    method: 'razorpay' | 'cod';
 }
 
 export interface VerifyPaymentData {
