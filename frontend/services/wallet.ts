@@ -24,22 +24,6 @@ export const walletService = {
             throw new Error(handleApiError(error));
         }
     },
-
-    async creditWallet(amount: number, description: string, referenceId?: string): Promise<{ newBalance: number }> {
-        try {
-            const response = await apiClient.post('wallet/credit', { amount, description, referenceId });
-            return response.data.data;
-        } catch (error) {
-            throw new Error(handleApiError(error));
-        }
-    },
-
-    async debitWallet(amount: number, description: string, referenceId?: string): Promise<{ newBalance: number }> {
-        try {
-            const response = await apiClient.post('wallet/debit', { amount, description, referenceId });
-            return response.data.data;
-        } catch (error) {
-            throw new Error(handleApiError(error));
-        }
-    },
+    // Wallet balance is only ever changed server-side inside the order and
+    // cancel/return transactions — there are no client credit/debit calls.
 };

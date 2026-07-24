@@ -81,76 +81,25 @@ describe('GET /wallet', () => {
   });
 });
 
-// ─── POST /wallet/credit ──────────────────────────────────────────────────────
+// ─── Wallet credit/debit endpoints removed ────────────────────────────────────
+// POST /wallet/credit and /wallet/debit were deleted (self-credit hole).
+// Balance changes now happen only inside order create / cancel transactions.
 
-describe('POST /wallet/credit', () => {
-  it('returns 403 for customer role (customers cannot self-credit)', async () => {
+describe('removed wallet endpoints', () => {
+  it('POST /wallet/credit no longer exists (404)', async () => {
     const res = await request(app)
       .post(`${WALLET_BASE}/credit`)
-      .set(bearerHeader(custToken))
+      .set(bearerHeader(adminToken))
       .send({ amount: 500 });
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(404);
   });
 
-  it('returns 400 when amount is missing or zero', async () => {
-    const res = await request(app)
-      .post(`${WALLET_BASE}/credit`)
-      .set(bearerHeader(adminToken))
-      .send({ amount: 0 });
-    expect(res.status).toBe(400);
-  });
-
-  it('credits wallet atomically for admin', async () => {
-    const db = require('../db');
-    const client = db.__mockClient;
-    db.pool.connect.mockResolvedValueOnce(client);
-
-    client.query
-      .mockResolvedValueOnce({ rows: [] }) // BEGIN
-      .mockResolvedValueOnce({ rows: [] }) // no existing wallet
-      .mockResolvedValueOnce({ rows: [{ id: 'WAL0001', balance: '0' }] }) // INSERT wallet
-      .mockResolvedValueOnce({ rows: [] }) // UPDATE balance
-      .mockResolvedValueOnce({ rows: [] }) // INSERT transaction
-      .mockResolvedValueOnce({ rows: [] }) // COMMIT
-    ;
-
-    const res = await request(app)
-      .post(`${WALLET_BASE}/credit`)
-      .set(bearerHeader(adminToken))
-      .send({ amount: 200, description: 'Test credit' });
-    expect(res.status).toBe(200);
-    expect(res.body.success).toBe(true);
-  });
-});
-
-// ─── POST /wallet/debit ───────────────────────────────────────────────────────
-
-describe('POST /wallet/debit', () => {
-  it('returns 403 for customer role', async () => {
+  it('POST /wallet/debit no longer exists (404)', async () => {
     const res = await request(app)
       .post(`${WALLET_BASE}/debit`)
-      .set(bearerHeader(custToken))
+      .set(bearerHeader(adminToken))
       .send({ amount: 100 });
-    expect(res.status).toBe(403);
-  });
-
-  it('returns 400 for insufficient balance', async () => {
-    const db = require('../db');
-    const client = db.__mockClient;
-    db.pool.connect.mockResolvedValueOnce(client);
-
-    client.query
-      .mockResolvedValueOnce({ rows: [] }) // BEGIN
-      .mockResolvedValueOnce({ rows: [{ id: 'WAL0001', balance: '50' }] }) // wallet with Rs 50
-      .mockResolvedValueOnce({ rows: [] }) // ROLLBACK
-    ;
-
-    const res = await request(app)
-      .post(`${WALLET_BASE}/debit`)
-      .set(bearerHeader(adminToken))
-      .send({ amount: 100 }); // more than balance
-    expect(res.status).toBe(400);
-    expect(res.body.message).toMatch(/insufficient/i);
+    expect(res.status).toBe(404);
   });
 });
 

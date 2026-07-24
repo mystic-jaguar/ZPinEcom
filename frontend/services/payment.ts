@@ -48,20 +48,6 @@ export const paymentService = {
             throw new Error(handleApiError(error));
         }
     },
-
-    /**
-     * Request refund — credits the refund amount to the user's ZPIN wallet.
-     * The backend handles refunds via the wallet credit endpoint.
-     */
-    async requestRefund(amount: number, description: string, referenceId?: string) {
-        try {
-            const response = await apiClient.post<{ success: boolean; data: { newBalance: number } }>(
-                'wallet/credit',
-                { amount, description: description || 'Refund', referenceId }
-            );
-            return response.data;
-        } catch (error) {
-            throw new Error(handleApiError(error));
-        }
-    },
+    // Refunds are issued server-side by the order cancel/return flow
+    // (PATCH /orders/:id/cancel) — there is no client-initiated refund call.
 };
