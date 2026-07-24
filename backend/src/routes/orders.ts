@@ -276,10 +276,16 @@ router.get('/:id/track', authenticate, async (req: AuthRequest, res: Response): 
   try {
     await ensureOrderSupportTables();
 
+    // delivery_status / delivery_boy_id are written by the delivery backend on the
+    // shared orders table (accepted → picked_up → delivered). The cheap LEFT JOIN
+    // surfaces the assigned courier's real name/phone for the track screen.
     const orderResult = await pool.query(
-      `SELECT id, order_number, status, tracking_number, estimated_delivery, created_at, updated_at
-       FROM ${ORDERS}
-       WHERE id = $1 AND user_id = $2`,
+      `SELECT o.id, o.order_number, o.status, o.tracking_number, o.estimated_delivery,
+              o.created_at, o.updated_at, o.delivery_status, o.delivery_boy_id,
+              dp.name AS courier_name, dp.mobile AS courier_phone
+       FROM ${ORDERS} o
+       LEFT JOIN delivery_partner_profiles dp ON dp.id::text = o.delivery_boy_id::text
+       WHERE o.id = $1 AND o.user_id = $2`,
       [req.params.id, req.userId]
     );
 
@@ -308,6 +314,10 @@ router.get('/:id/track', authenticate, async (req: AuthRequest, res: Response): 
         orderNumber: order.order_number,
         trackingNumber: order.tracking_number || null,
         currentStatus: returnRequest ? 'return_in_progress' : order.status,
+        deliveryStatus: order.delivery_status || null,
+        courier: order.delivery_boy_id
+          ? { name: order.courier_name || null, phone: order.courier_phone || null }
+          : null,
         estimatedDelivery: order.estimated_delivery,
         trackingHistory,
       },

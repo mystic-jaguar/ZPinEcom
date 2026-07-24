@@ -1,4 +1,4 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Check, Headphones, HelpCircle, MessageCircle, Phone, Shirt, Timer, Zap } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { Linking, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -17,9 +17,15 @@ const TIMELINE = [
 
 const ELECTRIC_DELAY_MS = 5 * 60 * 1000; // 5 min after delivery before the surge kicks in
 
-function stepIndex(status?: string) {
-    if (status === 'delivered') return 2;
-    if (status === 'shipped' || status === 'processing') return 1;
+const POLL_MS = 15 * 1000; // refresh the track screen every 15s while it's focused
+
+// delivery_status (written by the delivery app) is finer-grained than order.status:
+// accepted = courier assigned but not yet picked up; picked_up = out for delivery.
+// Prefer it when present so the hero/timeline advance live to "Out for delivery".
+function stepIndex(status?: string, deliveryStatus?: string | null) {
+    if (deliveryStatus === 'delivered' || status === 'delivered') return 2;
+    if (deliveryStatus === 'picked_up' || status === 'shipped') return 1;
+    if (deliveryStatus === 'accepted' || status === 'processing') return 1;
     return 0; // pending / confirmed
 }
 
@@ -45,14 +51,26 @@ export default function TrackOrderScreen() {
         setRefreshing(false);
     };
 
-    useEffect(() => { if (orderId) loadTracking(orderId as string); }, [orderId]);
+    // Poll while the screen is focused so the customer sees "Out for delivery" /
+    // "Delivered" live without a manual reopen; stop on blur/unmount.
+    useFocusEffect(
+        React.useCallback(() => {
+            if (!orderId) return;
+            const id = orderId as string;
+            loadTracking(id);
+            const t = setInterval(() => loadTracking(id), POLL_MS);
+            return () => clearInterval(t);
+        }, [orderId])
+    );
 
     const order = getOrderById(orderId as string);
     const isInstant = order?.notes === 'instant_delivery';
     const liveStatus = trackingData?.currentStatus || order?.status || 'confirmed';
+    const deliveryStatus: string | null = trackingData?.deliveryStatus ?? null;
+    const courier = trackingData?.courier ?? null;
     const liveEta = trackingData?.estimatedDelivery || order?.estimatedDelivery;
     const canCancel = order && ['pending', 'confirmed'].includes(liveStatus);
-    const active = stepIndex(liveStatus);
+    const active = stepIndex(liveStatus, deliveryStatus);
     const phase: RoutePhase = active === 2 ? 'delivered' : active === 1 ? 'shipped' : 'confirmed';
 
     // Instant-trial celebration: once delivered, wait a beat, then run the electric surge.
@@ -153,16 +171,18 @@ export default function TrackOrderScreen() {
                         })}
                     </View>
 
-                    {/* Courier */}
-                    {liveStatus === 'shipped' && (
+                    {/* Courier — shown once a delivery partner is assigned (real name/phone) */}
+                    {courier && (
                         <View style={styles.courier}>
-                            <View style={styles.courierAvatar}><Text style={styles.courierInitial}>C</Text></View>
+                            <View style={styles.courierAvatar}><Text style={styles.courierInitial}>{(courier.name?.trim()?.[0] || 'C').toUpperCase()}</Text></View>
                             <View style={{ flex: 1 }}>
-                                <Text style={styles.courierName}>Your courier</Text>
-                                <ZText variant="eyebrow">On the way</ZText>
+                                <Text style={styles.courierName}>{courier.name || 'Your courier'}</Text>
+                                <ZText variant="eyebrow">{deliveryStatus === 'picked_up' ? 'On the way' : deliveryStatus === 'delivered' ? 'Delivered' : 'Assigned'}</ZText>
                             </View>
                             <Pressable style={styles.courierOutline} onPress={() => router.push('/profile/help-center')}><MessageCircle size={20} color={colors.textStrong} /></Pressable>
-                            <Pressable style={styles.courierYellow} onPress={() => Linking.openURL('tel:+919876543210')}><Phone size={20} color={colors.textOnYellow} /></Pressable>
+                            {courier.phone ? (
+                                <Pressable style={styles.courierYellow} onPress={() => Linking.openURL(`tel:${courier.phone}`)}><Phone size={20} color={colors.textOnYellow} /></Pressable>
+                            ) : null}
                         </View>
                     )}
                 </View>
