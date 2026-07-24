@@ -49,7 +49,7 @@ export default function CheckoutPaymentScreen() {
     const isInstant = deliveryType === 'Instant';
     const deliveryFee = isInstant ? 50.0 : 0;
     const taxAmount = Math.round(totalPrice * 0.18);
-    const shippingAmount = totalPrice > 500 ? 0 : 49;
+    const shippingAmount = totalPrice >= 599 ? 0 : 49; // free-delivery threshold — must match server (orders.ts) + cart bar
     const estimatedTotal = totalPrice + shippingAmount + taxAmount + deliveryFee - couponDiscount;
     const finalTotal = confirmedFinalAmount ?? estimatedTotal;
 

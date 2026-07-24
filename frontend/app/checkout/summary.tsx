@@ -24,7 +24,7 @@ export default function CheckoutSummaryScreen() {
 
     // Fee logic — must match backend (orders.ts) and payment.tsx
     const instantTrialFee = 50.0;
-    const shippingFee = totalPrice > 500 ? 0 : 49;
+    const shippingFee = totalPrice >= 599 ? 0 : 49; // free-delivery threshold — must match server (orders.ts) + cart bar
     const gst = Math.round(totalPrice * 0.18);
     const isInstant = deliveryType === 'Instant';
     const deliveryFee = isInstant ? instantTrialFee : 0;
