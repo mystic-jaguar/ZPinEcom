@@ -282,7 +282,7 @@ router.get('/:id/track', authenticate, async (req: AuthRequest, res: Response): 
     const orderResult = await pool.query(
       `SELECT o.id, o.order_number, o.status, o.tracking_number, o.estimated_delivery,
               o.created_at, o.updated_at, o.delivery_status, o.delivery_boy_id,
-              dp.name AS courier_name, dp.mobile AS courier_phone
+              o.delivery_otp, dp.name AS courier_name, dp.mobile AS courier_phone
        FROM ${ORDERS} o
        LEFT JOIN delivery_partner_profiles dp ON dp.id::text = o.delivery_boy_id::text
        WHERE o.id = $1 AND o.user_id = $2`,
@@ -318,6 +318,10 @@ router.get('/:id/track', authenticate, async (req: AuthRequest, res: Response): 
         courier: order.delivery_boy_id
           ? { name: order.courier_name || null, phone: order.courier_phone || null }
           : null,
+        // Proof of delivery: the customer reads this out to the partner at the
+        // door. Only meaningful while the order is out for delivery; the
+        // delivery backend clears it the moment the OTP is accepted.
+        deliveryOtp: order.delivery_status === 'picked_up' ? order.delivery_otp || null : null,
         estimatedDelivery: order.estimated_delivery,
         trackingHistory,
       },

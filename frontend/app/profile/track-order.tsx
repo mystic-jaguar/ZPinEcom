@@ -68,6 +68,8 @@ export default function TrackOrderScreen() {
     const liveStatus = trackingData?.currentStatus || order?.status || 'confirmed';
     const deliveryStatus: string | null = trackingData?.deliveryStatus ?? null;
     const courier = trackingData?.courier ?? null;
+    // Backend only sends this while the order is out for delivery.
+    const deliveryOtp: string | null = trackingData?.deliveryOtp ?? null;
     const liveEta = trackingData?.estimatedDelivery || order?.estimatedDelivery;
     const canCancel = order && ['pending', 'confirmed'].includes(liveStatus);
     const active = stepIndex(liveStatus, deliveryStatus);
@@ -144,6 +146,15 @@ export default function TrackOrderScreen() {
                                 </View>
                             </View>
                             <Text style={styles.trialDesc}>Your courier waits <Text style={{ fontFamily: fonts.bodyBold, color: colors.textStrong }}>15 minutes</Text>. Try everything on, keep what fits, hand back the rest.</Text>
+                        </View>
+                    )}
+
+                    {/* Delivery OTP — read it out to the partner at the door */}
+                    {deliveryOtp && (
+                        <View style={styles.otpCard}>
+                            <ZText variant="eyebrow">Delivery OTP</ZText>
+                            <Text style={styles.otpValue}>{deliveryOtp}</Text>
+                            <Text style={styles.otpNote}>Share this code with your delivery partner only after you receive the order.</Text>
                         </View>
                     )}
 
@@ -225,6 +236,10 @@ const styles = StyleSheet.create({
     trialDesc: { fontFamily: fonts.bodyRegular, fontSize: 13, lineHeight: 19, color: colors.textMuted },
 
     card: { backgroundColor: colors.surfaceCard, borderWidth: 1, borderColor: palette.neutral200, borderRadius: radius.lg, padding: 18, marginBottom: 16 },
+    otpCard: { backgroundColor: colors.surfaceCard, borderWidth: 1, borderColor: palette.yellow500, borderRadius: radius.lg, padding: 18, marginBottom: 16, alignItems: 'center' },
+    otpValue: { fontFamily: fonts.displaySemiBold, fontSize: 34, letterSpacing: 8, color: colors.textStrong, marginTop: 6 },
+    otpNote: { fontFamily: fonts.bodyRegular, fontSize: 12, color: colors.textFaint, marginTop: 6, textAlign: 'center' },
+
     tlRow: { flexDirection: 'row' },
     tlLeft: { width: 26, marginRight: 15, alignItems: 'center' },
     tlDot: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
