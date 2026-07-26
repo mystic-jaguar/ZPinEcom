@@ -554,7 +554,11 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
     // ready — so COD no longer needs to be born 'confirmed' to reach delivery.
     // Prepaid still flips to 'confirmed' on Razorpay payment verify.
     const orderStatus = 'pending';
-    const groupId = generateId();
+    // Single-seller cart = ONE plain order, no split: the group is that order
+    // itself (group_id = its own id), so the customer sees one number and one
+    // shipment. Only a genuinely multi-seller cart gets a separate group id.
+    const subIds = sellerIds.map(() => generateId());
+    const groupId = sellerIds.length > 1 ? generateId() : subIds[0];
     const groupOrderNumber = `ZP-${groupId}`;
 
     const subOrders: Array<{
@@ -570,7 +574,7 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
       const sFee = feeSplit[s];
       const sDisc = discSplit[s];
       const sFinal = Math.max(0, round2(sSubtotal + sShip + sTax + sFee - sDisc));
-      const subId = generateId();
+      const subId = subIds[s];
       const subNumber = `ZP-${subId}`;
 
       await client.query(

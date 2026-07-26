@@ -243,8 +243,11 @@ describe('POST /orders', () => {
     expect(res.body.data.order.orderNumber).toMatch(/^ZP-/);
     expect(res.body.data.order.finalAmount).toBe(1180);
     expect(res.body.data.order.groupId).toBeTruthy();
-    // One seller → exactly one order row, one stock decrement
+    // One seller → exactly one order row, one stock decrement, and NO separate
+    // group: group_id is the order's own id so the customer sees one number.
     expect(res.body.data.orders).toHaveLength(1);
+    expect(res.body.data.order.groupId).toBe(res.body.data.order.id);
+    expect(res.body.data.orders[0].id).toBe(res.body.data.order.id);
     expect(orderInserts(calls)).toHaveLength(1);
     expect(stockDecrements(calls)).toHaveLength(1);
   });
