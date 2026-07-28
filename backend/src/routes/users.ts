@@ -5,6 +5,7 @@ import { addressLimiter } from '../middleware/rateLimits';
 import { decryptAddressPayload, encryptAddressPayload } from '../utils/encryption';
 import { generateId } from '../utils/id';
 import { ensureModerationSchema } from '../utils/moderationSchema';
+import { markupItems } from '../utils/pricing';
 import { safeIdentifier } from '../utils/sql';
 
 const router = Router();
@@ -55,7 +56,8 @@ function normalizeOrder(row: any) {
     estimatedDelivery: row.estimated_delivery,
     trackingNumber: row.tracking_number,
     notes: row.notes,
-    items: Array.isArray(row.items) ? row.items : [],
+    // Customer-facing line items carry the 20% ZPIN markup (see utils/pricing).
+    items: markupItems(row.items),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     date: row.created_at,

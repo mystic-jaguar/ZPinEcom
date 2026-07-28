@@ -3,6 +3,7 @@ import { pool } from '../db';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { cartWriteLimiter } from '../middleware/rateLimits';
 import { generateId, isValidShortId } from '../utils/id';
+import { withMarkup } from '../utils/pricing';
 import { safeIdentifier } from '../utils/sql';
 
 const router = Router();
@@ -36,12 +37,14 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response): Promise<v
       cartItemId: r.id,
       productId: r.product_id,
       quantity: r.quantity,
-      priceAtAdd: Number(r.price_at_add),
+      // price_at_add / products.price are raw vendor prices; the customer sees
+      // them with the 20% ZPIN platform fee applied (never stored).
+      priceAtAdd: withMarkup(r.price_at_add),
       isAvailable: r.in_stock && r.stock_qty >= r.quantity,
       product: {
         productId: r.product_id,
         productName: r.product_name,
-        price: Number(r.current_price),
+        price: withMarkup(r.current_price),
         images: r.images,
         inStock: r.in_stock,
       },

@@ -5,6 +5,7 @@ import { orderCreateLimiter } from '../middleware/rateLimits';
 import { decryptAddressPayload, encryptAddressPayload } from '../utils/encryption';
 import { generateId } from '../utils/id';
 import { recordOrderStatus } from '../utils/orderHistory';
+import { markupItems, withMarkup } from '../utils/pricing';
 import { cacheDel, cacheDelPattern } from '../utils/redis';
 import { safeIdentifier } from '../utils/sql';
 
@@ -184,7 +185,11 @@ function normalizeOrder(row: any) {
     estimatedDelivery: row.estimated_delivery,
     trackingNumber: row.tracking_number,
     notes: row.notes,
-    items: row.items || [],
+    // order_items.price is the raw VENDOR price (that's what the seller is paid
+    // and what the seller dashboard reports). The customer is shown — and was
+    // charged — that price plus the 20% ZPIN platform fee, which is why these
+    // marked-up line items sum to the stored total_amount.
+    items: markupItems(row.items),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     date: row.created_at,
@@ -443,8 +448,14 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
     };
     const encryptedShippingAddress = encryptAddressPayload(shippingAddress);
 
+    // Every money figure below is the CUSTOMER-charged amount, so it is computed
+    // on the marked-up price (vendor price + 20% ZPIN platform fee). Tax and the
+    // free-delivery threshold therefore apply to the marked-up subtotal. The raw
+    // `item.price` is still what we write to order_items — that is the seller's
+    // money, and the seller must never see the markup.
+    const chargedLine = (i: any) => withMarkup(i.price) * i.quantity;
     const totalAmount = cartResult.rows.reduce(
-      (sum: number, item: any) => sum + Number(item.price) * item.quantity, 0
+      (sum: number, item: any) => sum + chargedLine(item), 0
     );
     // Free delivery at/above ₹599 — MUST match the client free-delivery bar
     // (frontend cart.tsx FREE_DELIVERY_MIN). Enforced server-side so a tampered
@@ -523,7 +534,7 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
       (itemsBySeller.get(sid) ?? itemsBySeller.set(sid, []).get(sid)!).push(row);
     }
     const sellerIds = [...itemsBySeller.keys()];
-    const subtotalOf = (rows: any[]) => rows.reduce((s, i) => s + Number(i.price) * i.quantity, 0);
+    const subtotalOf = (rows: any[]) => rows.reduce((s, i) => s + chargedLine(i), 0);
     const sellerSubtotals = sellerIds.map((id) => subtotalOf(itemsBySeller.get(id)!));
 
     // Split a group-level charge proportionally by each seller's subtotal. The
@@ -679,7 +690,7 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
       productId: i.product_id,
       productName: i.product_name,
       quantity: i.quantity,
-      price: Number(i.price),
+      price: withMarkup(i.price),
       image: i.image || null,
     }));
 
@@ -708,6 +719,10 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
     // Notify each seller about their own sub-order (its own id/number/total).
     for (const sub of subOrders) {
       const itemNames = sub.items.map((i: any) => i.product_name).join(', ');
+      // The seller is told THEIR money: the raw line-item total. `sub.finalAmount`
+      // is what the customer was charged (tax, shipping and the ZPIN markup on
+      // top) and must never reach a seller surface.
+      const sellerTotal = round2(sub.items.reduce((s: number, i: any) => s + Number(i.price) * i.quantity, 0));
       await client.query(
         `INSERT INTO notifications (id, user_id, title, message, type, data, is_read, created_at)
          VALUES ($1, $2, $3, $4, 'new_order', $5, false, (NOW() AT TIME ZONE 'Asia/Kolkata'))`,
@@ -715,13 +730,13 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
           generateId(),
           sub.sellerId,
           `New Order: ${sub.orderNumber}`,
-          `You have a new order for ${sub.items.length} item(s): ${itemNames}. Total: ₹${sub.finalAmount.toFixed(2)}`,
+          `You have a new order for ${sub.items.length} item(s): ${itemNames}. Total: ₹${sellerTotal.toFixed(2)}`,
           JSON.stringify({
             orderId: sub.id,
             orderNumber: sub.orderNumber,
             groupId,
             itemCount: sub.items.length,
-            total: sub.finalAmount,
+            total: sellerTotal,
             items: sub.items.map((i: any) => ({
               productId: i.product_id,
               productName: i.product_name,

@@ -2,6 +2,7 @@ import { Response, Router } from 'express';
 import { pool } from '../db';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { generateId } from '../utils/id';
+import { withMarkup } from '../utils/pricing';
 import { cacheDelPattern } from '../utils/redis';
 import { safeIdentifier } from '../utils/sql';
 
@@ -58,7 +59,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response): Promise<v
       data: result.rows.map((r: any) => ({
         productId: r.product_id,
         productName: r.product_name,
-        price: Number(r.price),
+        price: withMarkup(r.price),
         inStock: r.in_stock,
         images: r.images,
       })),

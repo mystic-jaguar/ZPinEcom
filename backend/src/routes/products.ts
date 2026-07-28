@@ -5,6 +5,7 @@ import { authenticate, AuthRequest } from '../middleware/auth';
 import { productListLimiter, reviewLimiter } from '../middleware/rateLimits';
 import { generateId } from '../utils/id';
 import { AUTO_HIDE_THRESHOLD, ensureModerationSchema } from '../utils/moderationSchema';
+import { withMarkup, withoutMarkup } from '../utils/pricing';
 import { cacheDel, cacheDelPattern, cacheGet, cacheSet } from '../utils/redis';
 
 // TTLs (seconds)
@@ -36,7 +37,9 @@ function normalizeProduct(row: any) {
     categoryId: row.category_id,
     deepestCategoryName: row.deepest_category_name,
     categoryPath: row.category_path || 'All',
-    price: Number(row.price),
+    // Customer-facing price = vendor price + 20% ZPIN platform fee. The DB keeps
+    // the raw vendor price; the markup is applied here, on read.
+    price: withMarkup(row.price),
     quantity: row.quantity,
     inStock: row.in_stock,
     images: row.images || [],
@@ -471,11 +474,13 @@ router.get('/category/:categoryName', productListLimiter, async (req: Request, r
       )`;
 
     // Price bands → OR group, e.g. (price >= 0 AND price < 500) OR (price >= 5000)
+    // The bands the user picked are DISPLAY prices (markup included), but p.price
+    // is the raw vendor price — so convert the bounds back before comparing.
     if (priceBands.length > 0) {
       const bandConds = priceBands.map((b) => {
         const parts: string[] = [];
-        if (b.min !== null) { params.push(b.min); parts.push(`p.price >= $${params.length}`); }
-        if (b.max !== null) { params.push(b.max); parts.push(`p.price < $${params.length}`); }
+        if (b.min !== null) { params.push(withoutMarkup(b.min)); parts.push(`p.price >= $${params.length}`); }
+        if (b.max !== null) { params.push(withoutMarkup(b.max)); parts.push(`p.price < $${params.length}`); }
         return `(${parts.join(' AND ')})`;
       });
       where += ` AND (${bandConds.join(' OR ')})`;
