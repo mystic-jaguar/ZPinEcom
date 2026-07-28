@@ -150,7 +150,7 @@ export default function OrderDetailsScreen() {
                         <View style={styles.addrIcon}><MapPin size={20} color={colors.textStrong} /></View>
                         <View style={{ flex: 1 }}>
                             <Text style={styles.addrName}>{addr.name || '—'}</Text>
-                            <Text style={styles.addrLine}>{[addr.address, addr.city, addr.state, addr.pincode].filter(Boolean).join(', ') || 'Address not available'}</Text>
+                            <Text style={styles.addrLine}>{[addr.address_line1 || addr.address, addr.address_line2, addr.landmark, addr.city, addr.state, addr.pincode].filter(Boolean).join(', ') || 'Address not available'}</Text>
                         </View>
                     </View>
 
@@ -261,7 +261,7 @@ export default function OrderDetailsScreen() {
                     <View style={styles.addrIcon}><MapPin size={20} color={colors.textStrong} /></View>
                     <View style={{ flex: 1 }}>
                         <Text style={styles.addrName}>{addr.name || '—'}</Text>
-                        <Text style={styles.addrLine}>{[addr.address, addr.city, addr.state, addr.pincode].filter(Boolean).join(', ') || 'Address not available'}</Text>
+                        <Text style={styles.addrLine}>{[addr.address_line1 || addr.address, addr.address_line2, addr.landmark, addr.city, addr.state, addr.pincode].filter(Boolean).join(', ') || 'Address not available'}</Text>
                     </View>
                 </View>
 

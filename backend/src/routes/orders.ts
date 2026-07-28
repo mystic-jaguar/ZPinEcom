@@ -432,10 +432,13 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
     }
 
     const addr = decryptAddressPayload(addrResult.rows[0]);
+    // The one shipping-address contract, shared with the website, seller app and
+    // delivery app. Same keys as `addresses`, every value encrypted.
     const shippingAddress = {
       name: addr.name, phone: addr.phone,
-      address: addr.address_line1, city: addr.city,
-      state: addr.state, pincode: addr.pincode, country: addr.country,
+      address_line1: addr.address_line1, address_line2: addr.address_line2,
+      city: addr.city, state: addr.state, pincode: addr.pincode,
+      country: addr.country, landmark: addr.landmark,
     };
     const encryptedShippingAddress = encryptAddressPayload(shippingAddress);
 

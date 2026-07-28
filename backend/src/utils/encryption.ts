@@ -9,6 +9,8 @@ const ADDRESS_KEYS = [
   'phone',
   'address_line1',
   'address_line2',
+  // Legacy: orders written before the shared address contract (Phase 2) used a
+  // single `address` line. Kept so historical notification payloads still decrypt.
   'address',
   'city',
   'state',
@@ -16,6 +18,15 @@ const ADDRESS_KEYS = [
   'country',
   'landmark',
 ] as const;
+
+// Columns that physically exist on `addresses` (ADDRESS_KEYS also carries the
+// legacy jsonb-only `address` key).
+const ADDRESS_COLUMNS = ADDRESS_KEYS.filter((k) => k !== 'address');
+
+// Boot backfill is a safety net, not a migration tool: it repairs at most this
+// many rows per start, so a cold boot can never turn into a full-table scan-and-
+// rewrite. Anything larger is a one-off script's job.
+const BACKFILL_LIMIT = 500;
 
 let sensitiveDataPrepared = false;
 
@@ -187,9 +198,13 @@ export async function prepareSensitiveDataEncryption(pool: Pool): Promise<void> 
         ALTER COLUMN country TYPE TEXT
       `);
 
+      // Bounded: let Postgres find the rows that still hold plaintext instead of
+      // pulling every address into Node on every boot. Steady state = 0 rows.
       const addressRows = await client.query(
         `SELECT id, name, phone, address_line1, address_line2, city, state, pincode, country, landmark
-         FROM addresses`
+           FROM addresses
+          WHERE ${ADDRESS_COLUMNS.map((k) => `(${k} IS NOT NULL AND ${k} <> '' AND ${k} NOT LIKE '${ENCRYPTION_PREFIX}%')`).join(' OR ')}
+          LIMIT ${BACKFILL_LIMIT}`
       );
 
       for (const row of addressRows.rows) {
@@ -237,7 +252,19 @@ export async function prepareSensitiveDataEncryption(pool: Pool): Promise<void> 
     }
 
     if (await tableExists(client, 'orders')) {
-      const orderRows = await client.query('SELECT id, shipping_address FROM orders');
+      // Bounded, same reason as `addresses` above: the plaintext test runs in
+      // Postgres over the jsonb, so a healthy database returns zero rows instead
+      // of streaming every order ever placed into Node.
+      const orderRows = await client.query(
+        `SELECT id, shipping_address FROM orders
+          WHERE jsonb_typeof(shipping_address) = 'object'
+            AND EXISTS (
+              SELECT 1 FROM jsonb_each_text(shipping_address) AS kv(k, v)
+               WHERE kv.k = ANY($1::text[]) AND kv.v <> '' AND kv.v NOT LIKE $2
+            )
+          LIMIT ${BACKFILL_LIMIT}`,
+        [[...ADDRESS_KEYS], `${ENCRYPTION_PREFIX}%`]
+      );
       for (const row of orderRows.rows) {
         if (!hasPlainAddressField(row.shipping_address || {})) {
           continue;
