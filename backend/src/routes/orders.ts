@@ -4,6 +4,7 @@ import { authenticate, AuthRequest } from '../middleware/auth';
 import { orderCreateLimiter } from '../middleware/rateLimits';
 import { decryptAddressPayload, encryptAddressPayload } from '../utils/encryption';
 import { generateId } from '../utils/id';
+import { recordOrderStatus } from '../utils/orderHistory';
 import { cacheDel, cacheDelPattern } from '../utils/redis';
 import { safeIdentifier } from '../utils/sql';
 
@@ -618,6 +619,9 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
         }
       }
 
+      // Open the shared timeline every other surface reads.
+      await recordOrderStatus(client, subId, orderStatus, 'Order placed');
+
       subOrders.push({ id: subId, orderNumber: subNumber, sellerId, items: sellerItems, subtotal: sSubtotal, finalAmount: sFinal });
     }
 
@@ -842,6 +846,7 @@ router.post('/:id/return', authenticate, async (req: AuthRequest, res: Response)
       `UPDATE ${ORDERS} SET status = 'return_requested', updated_at = NOW() WHERE id = $1`,
       [req.params.id]
     );
+    await recordOrderStatus(null, req.params.id, 'return_requested', `Return requested: ${reason}`);
 
     res.json({
       success: true,
@@ -966,6 +971,7 @@ router.patch('/:id/return-status', authenticate, async (req: AuthRequest, res: R
          WHERE id = $1`,
         [req.params.id]
       );
+      await recordOrderStatus(client, req.params.id, 'returned', 'Return refunded');
     }
 
     await client.query('COMMIT');
@@ -1090,6 +1096,7 @@ router.patch('/:id/cancel', authenticate, async (req: AuthRequest, res: Response
        WHERE id = $2`,
       [newPaymentStatus, req.params.id]
     );
+    await recordOrderStatus(client, req.params.id, 'cancelled', `Cancelled by customer: ${reason}`);
 
     // Restore inventory for each cancelled order item
     const cancelledItems = await client.query(
@@ -1175,6 +1182,8 @@ router.patch('/:id/confirm', authenticate, async (req: AuthRequest, res: Respons
     }
 
     const order = result.rows[0];
+
+    await recordOrderStatus(null, order.id, 'confirmed', 'Order accepted by seller');
 
     // Notify the customer
     await pool.query(

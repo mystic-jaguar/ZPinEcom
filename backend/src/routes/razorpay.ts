@@ -4,6 +4,7 @@ import Razorpay from 'razorpay';
 import { pool } from '../db';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { generateId } from '../utils/id';
+import { recordOrderStatus } from '../utils/orderHistory';
 import { safeIdentifier } from '../utils/sql';
 
 const router = Router();
@@ -168,6 +169,11 @@ router.post('/verify', authenticate, async (req: AuthRequest, res: Response): Pr
     );
 
     const groupTotal = groupRows.reduce((s: number, r: any) => s + Number(r.final_amount), 0);
+
+    // Shared timeline: every sub-order of the group was just confirmed.
+    for (const row of groupRows) {
+      await recordOrderStatus(client, row.id, 'confirmed', `Payment verified (${razorpayPaymentId})`);
+    }
 
     // Notify the customer that payment succeeded (audit trail via notifications).
     const txnId = generateId();
