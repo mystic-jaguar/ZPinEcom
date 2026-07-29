@@ -239,9 +239,10 @@ describe('POST /orders', () => {
       .send({ shippingAddressId: addressId, paymentMethod: 'cod' });
 
     expect(res.status).toBe(201);
-    // Customer-facing group number + total: 1000 + 0 (free shipping ≥599) + 180 tax
+    // Customer-facing group number + total: 1000 -> charm-priced 1209 + 0 shipping
+    // (≥599) + 218 tax (18% of 1209)
     expect(res.body.data.order.orderNumber).toMatch(/^ZP-/);
-    expect(res.body.data.order.finalAmount).toBe(1180);
+    expect(res.body.data.order.finalAmount).toBe(1427);
     expect(res.body.data.order.groupId).toBeTruthy();
     // One seller → exactly one order row, one stock decrement, and NO separate
     // group: group_id is the order's own id so the customer sees one number.
@@ -263,8 +264,8 @@ describe('POST /orders', () => {
       .send({ shippingAddressId: addressId, paymentMethod: 'cod' });
 
     expect(res.status).toBe(201);
-    // total 300 → shipping 49, tax 54 → final 403
-    expect(res.body.data.order.finalAmount).toBe(403);
+    // 300 -> charm-priced 369, still < 599 → shipping 49, tax 66 → final 484
+    expect(res.body.data.order.finalAmount).toBe(484);
   });
 
   it('splits a 2-seller cart into 2 order rows sharing one group_id, amounts summing to the cart total', async () => {
@@ -281,8 +282,8 @@ describe('POST /orders', () => {
 
     expect(res.status).toBe(201);
 
-    // Group total: 1500 + 0 shipping (≥599) + 270 tax = 1770
-    expect(res.body.data.order.finalAmount).toBe(1770);
+    // 1000->1209, 500->609. Group total: 1818 + 0 shipping (≥599) + 327 tax = 2145
+    expect(res.body.data.order.finalAmount).toBe(2145);
     expect(res.body.data.orders).toHaveLength(2);
 
     // Two order rows, both carrying the SAME group_id (INSERT param $5 = group_id)
@@ -295,8 +296,8 @@ describe('POST /orders', () => {
 
     // Per-seller finals ($10) sum EXACTLY to the group total (no cents lost/created)
     const finals = inserts.map(c => Number(c.params[9]));
-    expect(finals.reduce((a, b) => a + b, 0)).toBe(1770);
-    expect(res.body.data.orders.reduce((s: number, o: any) => s + o.finalAmount, 0)).toBe(1770);
+    expect(finals.reduce((a, b) => a + b, 0)).toBe(2145);
+    expect(res.body.data.orders.reduce((s: number, o: any) => s + o.finalAmount, 0)).toBe(2145);
 
     // Stock decremented exactly once per item
     expect(stockDecrements(calls)).toHaveLength(2);

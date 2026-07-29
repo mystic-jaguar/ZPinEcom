@@ -52,7 +52,7 @@ describe('GET /cart', () => {
     const res = await request(app).get(CART_BASE).set(bearerHeader(token));
     expect(res.status).toBe(200);
     expect(res.body.data.cart).toHaveLength(1);
-    expect(res.body.data.totalAmount).toBe(998);
+    expect(res.body.data.totalAmount).toBe(1198); // 499 -> markup 598.8 -> charm-rounded 599, x2
   });
 
   it('flags price changes when current price differs from price_at_add', async () => {

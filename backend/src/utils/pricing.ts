@@ -10,11 +10,20 @@
 // and must keep seeing the raw vendor price — so never mark up on that side.
 export const MARKUP_MULTIPLIER = 1.2;
 
-/** vendor price → customer-facing display/charge price, rounded to 2 decimals. */
+// Charm pricing: every customer-facing price is rounded UP to the next whole
+// rupee ending in 9 (e.g. 718.80 → 719, 720 → 729). Always up, never down —
+// ZPIN must never collect less than the 20% fee it's owed.
+function roundToNext9(n: number): number {
+  const ceiled = Math.ceil(n);
+  const rem = ceiled % 10;
+  return rem === 9 ? ceiled : ceiled + (9 - rem);
+}
+
+/** vendor price → customer-facing display/charge price (whole rupees, ending in 9). */
 export function withMarkup(vendorPrice: number | string | null | undefined): number {
   const n = Number(vendorPrice);
-  if (!Number.isFinite(n)) return 0;
-  return Math.round(n * MARKUP_MULTIPLIER * 100) / 100;
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  return roundToNext9(n * MARKUP_MULTIPLIER);
 }
 
 /** customer-facing price → vendor price (for filtering raw DB prices by a display range). */
