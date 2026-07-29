@@ -69,7 +69,11 @@ export default function CheckoutPaymentScreen() {
 
         let createdOrderId: string | null = null;
         try {
-            const cartPayload = cartItems.map(item => ({ productId: item.productId, quantity: item.quantity }));
+            const cartPayload = cartItems.map(item => ({
+                productId: item.productId,
+                quantity: item.quantity,
+                variant: item.selectedSize,
+            }));
             const orderResponse = await orderService.createOrder({
                 shippingAddressId: selectedAddressId,
                 paymentMethod: backendMethod,

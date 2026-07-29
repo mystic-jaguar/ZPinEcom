@@ -4,10 +4,15 @@ import apiClient, { handleApiError } from './api';
 export interface AddToCartData {
     productId: string;
     quantity: number;
+    // The size this line is in. Stored as cart_items.variant, the same column the
+    // website writes, and carried through to order_items at checkout.
+    variant?: string;
 }
 
 export interface UpdateCartData {
     quantity: number;
+    variant?: string;      // which line (same product can be in the cart twice)
+    newVariant?: string;   // change that line's size
 }
 
 export const cartService = {
@@ -53,10 +58,11 @@ export const cartService = {
     /**
      * Remove item from cart
      */
-    async removeFromCart(productId: string) {
+    async removeFromCart(productId: string, variant?: string) {
         try {
-            // DELETE :- /api/v1/cart/:productId
-            const response = await apiClient.delete<ApiSuccessResponse<{ message: string }>>(`cart/${productId}`);
+            // DELETE :- /api/v1/cart/:productId?variant=M
+            const query = variant ? `?variant=${encodeURIComponent(variant)}` : '';
+            const response = await apiClient.delete<ApiSuccessResponse<{ message: string }>>(`cart/${productId}${query}`);
             return response.data;
         } catch (error) {
             throw new Error(handleApiError(error));

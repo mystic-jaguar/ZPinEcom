@@ -96,6 +96,80 @@ describe('GET /cart/count', () => {
   });
 });
 
+// ─── Sizes (Phase 11) ─────────────────────────────────────────────────────────
+
+describe('cart sizes', () => {
+  const sized = { price: '499', in_stock: true, size_quantities: { S: 3, M: 0 } };
+
+  it('refuses to add a sized product with no size chosen', async () => {
+    getDbMock().mockResolvedValueOnce({ rows: [sized] });
+    const res = await request(app)
+      .post(CART_BASE).set(bearerHeader(token))
+      .send({ productId: uuid, quantity: 1 });
+    expect(res.status).toBe(400);
+    expect(res.body.message).toMatch(/select a size/i);
+  });
+
+  it('refuses a sold-out size', async () => {
+    getDbMock().mockResolvedValueOnce({ rows: [sized] });
+    const res = await request(app)
+      .post(CART_BASE).set(bearerHeader(token))
+      .send({ productId: uuid, quantity: 1, variant: 'M' });
+    expect(res.status).toBe(400);
+    expect(res.body.message).toMatch(/out of stock/i);
+  });
+
+  it('stores the chosen size on a new line', async () => {
+    getDbMock()
+      .mockResolvedValueOnce({ rows: [sized] })   // product
+      .mockResolvedValueOnce({ rows: [] })        // no existing line for size S
+      .mockResolvedValueOnce({ rows: [] });       // insert
+    const res = await request(app)
+      .post(CART_BASE).set(bearerHeader(token))
+      .send({ productId: uuid, quantity: 1, variant: 'S' });
+    expect(res.status).toBe(201);
+    const insert = getDbMock().mock.calls[2];
+    expect(insert[0]).toMatch(/INSERT INTO/);
+    expect(insert[1]).toContain('S');
+  });
+
+  it('returns the line size and the sizes it can switch to', async () => {
+    getDbMock().mockResolvedValueOnce({
+      rows: [{
+        id: 'CRT0001', product_id: uuid, quantity: 1, variant: 'S',
+        price_at_add: '499', product_name: 'Shirt', current_price: '499',
+        in_stock: true, stock_qty: 10, size_quantities: { S: 3, M: 0 },
+        images: [], created_at: new Date(),
+      }],
+    });
+    const res = await request(app).get(CART_BASE).set(bearerHeader(token));
+    expect(res.status).toBe(200);
+    expect(res.body.data.cart[0].selectedSize).toBe('S');
+    expect(res.body.data.cart[0].sizeQuantities).toEqual({ S: 3, M: 0 });
+  });
+
+  it('marks a line unavailable once its size sells out', async () => {
+    getDbMock().mockResolvedValueOnce({
+      rows: [{
+        id: 'CRT0001', product_id: uuid, quantity: 1, variant: 'M',
+        price_at_add: '499', product_name: 'Shirt', current_price: '499',
+        in_stock: true, stock_qty: 10, size_quantities: { S: 3, M: 0 },
+        images: [], created_at: new Date(),
+      }],
+    });
+    const res = await request(app).get(CART_BASE).set(bearerHeader(token));
+    expect(res.body.data.cart[0].isAvailable).toBe(false);
+  });
+
+  it('rejects switching a line to a sold-out size', async () => {
+    getDbMock().mockResolvedValueOnce({ rows: [{ size_quantities: { S: 3, M: 0 } }] });
+    const res = await request(app)
+      .put(`${CART_BASE}/${uuid}`).set(bearerHeader(token))
+      .send({ quantity: 1, variant: 'S', newVariant: 'M' });
+    expect(res.status).toBe(400);
+  });
+});
+
 describe('POST /cart', () => {
   it('returns 400 when productId is missing', async () => {
     const res = await request(app)

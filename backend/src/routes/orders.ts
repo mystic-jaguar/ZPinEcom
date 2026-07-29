@@ -60,6 +60,10 @@ export async function ensureOrderSupportTables() {
       `ALTER TABLE ${ORDERS} ADD COLUMN IF NOT EXISTS is_trial BOOLEAN NOT NULL DEFAULT false`,
       `ALTER TABLE ${ORDERS} ADD COLUMN IF NOT EXISTS trial_expires_at TIMESTAMP`,
       `ALTER TABLE ${ORDER_ITEMS} ADD COLUMN IF NOT EXISTS is_returned BOOLEAN NOT NULL DEFAULT false`,
+      // Phase 11 — the size a line was bought in. Shared with the website, which
+      // writes the same column (it calls it `selected_size` in its cart payload).
+      `ALTER TABLE ${CART} ADD COLUMN IF NOT EXISTS variant VARCHAR(50)`,
+      `ALTER TABLE ${ORDER_ITEMS} ADD COLUMN IF NOT EXISTS variant VARCHAR(255)`,
     ];
     for (const sql of alterColumns) {
       try {
@@ -417,19 +421,32 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
     // We trust the client only for WHICH items/quantities are in the cart — prices
     // are always looked up server-side below, never taken from the client.
     if (Array.isArray(bodyCartItems) && bodyCartItems.length > 0) {
-      const wantedIds = bodyCartItems.map((i: any) => i.productId).filter(Boolean);
+      // A cart line is (product, size) — reconciling on product alone would
+      // collapse "2 × size M + 1 × size L" into one line and lose a size.
+      const wantedLines = bodyCartItems
+        .filter((i: any) => i.productId)
+        .map((i: any) => ({
+          productId: i.productId,
+          quantity: i.quantity || 1,
+          variant: typeof i.variant === 'string' && i.variant.trim() !== ''
+            ? i.variant.trim().slice(0, 50)
+            : (typeof i.selectedSize === 'string' && i.selectedSize.trim() !== ''
+              ? i.selectedSize.trim().slice(0, 50) : null),
+        }));
 
       // Drop server-cart rows the user no longer has in their reviewed cart.
-      if (wantedIds.length > 0) {
-        const placeholders = wantedIds.map((_: string, i: number) => `$${i + 2}::uuid`).join(', ');
+      if (wantedLines.length > 0) {
+        const tuples = wantedLines
+          .map((_: any, i: number) => `($${i * 2 + 2}::uuid, $${i * 2 + 3})`)
+          .join(', ');
         await client.query(
-          `DELETE FROM ${CART} WHERE user_id = $1 AND product_id NOT IN (${placeholders})`,
-          [req.userId, ...wantedIds]
+          `DELETE FROM ${CART} WHERE user_id = $1
+            AND (product_id, COALESCE(variant, '')) NOT IN (${tuples})`,
+          [req.userId, ...wantedLines.flatMap((l: any) => [l.productId, l.variant ?? ''])]
         );
       }
 
-      for (const item of bodyCartItems) {
-        if (!item.productId) continue;
+      for (const item of wantedLines) {
         const product = await client.query(
           'SELECT price, in_stock, product_name, user_id FROM products WHERE id = $1::uuid',
           [item.productId]
@@ -437,19 +454,20 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
         if (product.rows.length === 0 || !product.rows[0].in_stock) continue;
 
         const existing = await client.query(
-          `SELECT id FROM ${CART} WHERE user_id = $1 AND product_id = $2::uuid`,
-          [req.userId, item.productId]
+          `SELECT id FROM ${CART}
+            WHERE user_id = $1 AND product_id = $2::uuid AND variant IS NOT DISTINCT FROM $3`,
+          [req.userId, item.productId, item.variant]
         );
         if (existing.rows.length > 0) {
           await client.query(
             `UPDATE ${CART} SET quantity = $1, updated_at = NOW() WHERE id = $2`,
-            [item.quantity || 1, existing.rows[0].id]
+            [item.quantity, existing.rows[0].id]
           );
         } else {
           await client.query(
-            `INSERT INTO ${CART} (id, user_id, product_id, quantity, price_at_add, created_at, updated_at)
-             VALUES ($1,$2,$3::uuid,$4,$5,NOW(),NOW())`,
-            [generateId(), req.userId, item.productId, item.quantity || 1, product.rows[0].price]
+            `INSERT INTO ${CART} (id, user_id, product_id, quantity, price_at_add, variant, created_at, updated_at)
+             VALUES ($1,$2,$3::uuid,$4,$5,$6,NOW(),NOW())`,
+            [generateId(), req.userId, item.productId, item.quantity, product.rows[0].price, item.variant]
           );
         }
       }
@@ -689,9 +707,10 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
 
       for (const item of sellerItems) {
         await client.query(
-          `INSERT INTO ${ORDER_ITEMS} (id, order_id, product_id, product_name, quantity, price, image, created_at)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,(NOW() AT TIME ZONE 'Asia/Kolkata'))`,
-          [generateId(), subId, item.product_id, item.product_name, item.quantity, item.price, item.image || '']
+          `INSERT INTO ${ORDER_ITEMS} (id, order_id, product_id, product_name, quantity, price, image, variant, created_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,(NOW() AT TIME ZONE 'Asia/Kolkata'))`,
+          [generateId(), subId, item.product_id, item.product_name, item.quantity, item.price,
+           item.image || '', item.variant || null]
         );
         if (dealPrices.size > 0 && dealPrices.has(String(item.product_id))) {
           await consumeDealStock(client, item.product_id, item.quantity);
@@ -829,6 +848,8 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
               quantity: i.quantity,
               price: Number(i.price),
               image: i.image || null,
+              // The seller has to know which size to pack.
+              variant: i.variant || null,
             })),
             shippingAddress: encryptedShippingAddress,
             paymentMethod,

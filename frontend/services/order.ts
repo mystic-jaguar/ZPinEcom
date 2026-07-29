@@ -2,7 +2,9 @@ import { ApiPaginatedResponse, ApiSuccessResponse, OrderObject } from '../types/
 import apiClient, { handleApiError } from './api';
 
 export interface CreateOrderData {
-    cartItems: { productId: string; quantity: number }[];
+    // `variant` is the size — it identifies the cart line server-side and is
+    // what gets written to order_items.variant.
+    cartItems: { productId: string; quantity: number; variant?: string }[];
     shippingAddressId: string;
     paymentMethod: 'razorpay' | 'cod';
     paymentId?: string;

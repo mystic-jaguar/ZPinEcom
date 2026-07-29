@@ -13,6 +13,7 @@ interface CartContextType {
     addToCart: (product: ProductObject, selectedColor?: string, selectedSize?: string) => void;
     removeFromCart: (cartItemId: string) => void;
     updateQuantity: (cartItemId: string, quantity: number) => void;
+    changeSize: (cartItemId: string, size: string) => Promise<void>;
     clearCart: () => void;
     totalPrice: number;
     totalItems: number;
@@ -74,6 +75,11 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
                                 priceAtAdd: Number(item.priceAtAdd || item.price_at_add || 0),
                                 isAvailable: item.isAvailable ?? true,
                                 timeStamp: item.timeStamp || item.created_at || new Date().toISOString(),
+                                // The size the line was added in, plus the sizes it can be
+                                // switched to (per-size stock), so the cart row can offer
+                                // an inline size change like the website does.
+                                selectedSize: item.selectedSize || item.variant || undefined,
+                                sizeQuantities: item.sizeQuantities || undefined,
                             }));
                             setCartItems(normalized);
                             await AsyncStorage.setItem(CART_STORAGE_KEY, JSON.stringify(normalized));
@@ -144,7 +150,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
         try {
             const token = await tokenManager.getAccessToken();
             if (token) {
-                await cartService.addToCart({ productId: product.productId, quantity: 1 });
+                await cartService.addToCart({ productId: product.productId, quantity: 1, variant: selectedSize });
             }
         } catch (error) {
             console.error('Error syncing add to cart:', error);
@@ -159,6 +165,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
         // Since cartItemId is composite, we need finding the item
         const itemToRemove = cartItemsRef.current.find(item => item.cartItemId === cartItemId);
         const productId = itemToRemove?.productId;
+        const variant = itemToRemove?.selectedSize;
 
         const previousItems = cartItemsRef.current;
         setCartItems(prevItems => prevItems.filter(item => item.cartItemId !== cartItemId));
@@ -167,7 +174,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
             try {
                 const token = await tokenManager.getAccessToken();
                 if (token) {
-                    await cartService.removeFromCart(productId);
+                    await cartService.removeFromCart(productId, variant);
                 }
             } catch (error) {
                 console.error('Error syncing remove from cart:', error);
@@ -185,6 +192,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
         }
         const itemToUpdate = cartItemsRef.current.find(item => item.cartItemId === cartItemId);
         const productId = itemToUpdate?.productId;
+        const variant = itemToUpdate?.selectedSize;
 
         const previousItems = cartItemsRef.current;
         setCartItems(prevItems => prevItems.map(item =>
@@ -197,7 +205,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
             try {
                 const token = await tokenManager.getAccessToken();
                 if (token) {
-                    await cartService.updateCartItem(productId, { quantity });
+                    await cartService.updateCartItem(productId, { quantity, variant });
                 }
             } catch (error) {
                 console.error('Error syncing update quantity:', error);
@@ -207,6 +215,36 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
             }
         }
     }, [removeFromCart]);
+
+    // Change a cart line's size in place (website parity: the cart lets you fix a
+    // wrong size without removing and re-adding the item). Reloads from the server
+    // afterwards because the backend merges the line if that size is already in
+    // the cart, and only it knows the merged result.
+    const changeSize = useCallback(async (cartItemId: string, size: string) => {
+        const item = cartItemsRef.current.find(i => i.cartItemId === cartItemId);
+        if (!item || item.selectedSize === size) return;
+
+        const previousItems = cartItemsRef.current;
+        setCartItems(prev => prev.map(i =>
+            i.cartItemId === cartItemId ? { ...i, selectedSize: size } : i
+        ));
+
+        try {
+            const token = await tokenManager.getAccessToken();
+            if (token) {
+                await cartService.updateCartItem(item.productId, {
+                    quantity: item.quantity,
+                    variant: item.selectedSize,
+                    newVariant: size,
+                });
+                await loadCart();
+            }
+        } catch (error) {
+            console.error('Error syncing size change:', error);
+            setCartItems(previousItems);
+            throw error;
+        }
+    }, []);
 
     const clearCart = async () => {
         setCartItems([]);
@@ -292,6 +330,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
             addToCart,
             removeFromCart,
             updateQuantity,
+            changeSize,
             clearCart,
             totalPrice,
             totalItems,

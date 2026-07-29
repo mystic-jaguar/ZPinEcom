@@ -248,6 +248,9 @@ export interface CartItemObject {
     // Additional fields from current implementation
     selectedColor?: string;
     selectedSize?: string;
+    // Per-size stock for this line's product ({ S: 10, M: 0 }), so the cart row
+    // can offer an inline size change and grey out sold-out sizes.
+    sizeQuantities?: Record<string, number>;
 }
 
 /**

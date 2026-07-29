@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { ArrowRight, Minus, Plus, ShoppingCart, X, Zap } from 'lucide-react-native';
+import { ArrowRight, ChevronDown, Minus, Plus, ShoppingCart, X, Zap } from 'lucide-react-native';
 import React, { useCallback, useEffect, useRef } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -12,10 +12,24 @@ interface CartItemProps {
     item: any;
     onRemove: (cartItemId: string) => void;
     onUpdateQuantity: (cartItemId: string, quantity: number) => void;
+    onChangeSize: (cartItemId: string, size: string) => void;
 }
 
-function CartItem({ item, onRemove, onUpdateQuantity }: CartItemProps) {
+// Sizes read naturally as XS→XXL, or numerically for shoes. Same ordering the
+// website's cart uses.
+const SIZE_ORDER = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '2XL', '3XL'];
+function sortSizes(sizes: string[]) {
+    if (sizes.every(s => !isNaN(Number(s)))) return [...sizes].sort((a, b) => Number(a) - Number(b));
+    return [...sizes].sort((a, b) => {
+        const ai = SIZE_ORDER.indexOf(a.toUpperCase());
+        const bi = SIZE_ORDER.indexOf(b.toUpperCase());
+        return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+    });
+}
+
+function CartItem({ item, onRemove, onUpdateQuantity, onChangeSize }: CartItemProps) {
     const router = useRouter();
+    const [changingSize, setChangingSize] = React.useState(false);
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(50)).current;
 
@@ -39,6 +53,7 @@ function CartItem({ item, onRemove, onUpdateQuantity }: CartItemProps) {
         ? (typeof item.product.images[0] === 'string' ? { uri: item.product.images[0] } : item.product.images[0])
         : (typeof item.image === 'string' ? { uri: item.image } : (item.image || { uri: 'https://via.placeholder.com/80' }));
     const brand = item.product?.brand || item.brand || 'ZPIN';
+    const hasSizes = !!item.sizeQuantities && Object.keys(item.sizeQuantities).length > 0;
 
     return (
         <Animated.View style={[styles.item, { opacity: fadeAnim, transform: [{ translateX: slideAnim }] }]}>
@@ -52,15 +67,46 @@ function CartItem({ item, onRemove, onUpdateQuantity }: CartItemProps) {
                         <Pressable onPress={handleRemove} hitSlop={8}><X size={17} color={colors.textFaint} /></Pressable>
                     </View>
                     <Text style={styles.itemName} numberOfLines={1}>{item.product?.productName || item.name}</Text>
-                    {(item.selectedColor || item.selectedSize) && (
+                    {(item.selectedColor || item.selectedSize || hasSizes) && (
                         <View style={styles.chips}>
-                            {item.selectedSize ? <View style={styles.chip}><Text style={styles.chipText}>{item.selectedSize}</Text></View> : null}
+                            {(item.selectedSize || hasSizes) ? (
+                                // Tap the size chip to swap size in place, like the website's cart.
+                                <Pressable
+                                    style={styles.chip}
+                                    onPress={() => hasSizes && setChangingSize(v => !v)}
+                                    disabled={!hasSizes}
+                                    hitSlop={6}
+                                >
+                                    <Text style={styles.chipText}>{item.selectedSize || 'SIZE'}</Text>
+                                    {hasSizes ? <ChevronDown size={11} color={colors.textFaint} /> : null}
+                                </Pressable>
+                            ) : null}
                             {item.selectedColor ? (
                                 <View style={styles.chip}>
                                     <View style={[styles.swatch, { backgroundColor: item.selectedColor }]} />
                                     <Text style={styles.chipText}>{String(item.selectedColor).toUpperCase()}</Text>
                                 </View>
                             ) : null}
+                        </View>
+                    )}
+                    {changingSize && hasSizes && (
+                        <View style={styles.sizeRow}>
+                            {sortSizes(Object.keys(item.sizeQuantities)).map((size: string) => {
+                                const qty = Number(item.sizeQuantities[size] || 0);
+                                const active = item.selectedSize === size;
+                                return (
+                                    <Pressable
+                                        key={size}
+                                        disabled={qty === 0}
+                                        onPress={() => { setChangingSize(false); onChangeSize(item.cartItemId, size); }}
+                                        style={[styles.sizeBtn, active && styles.sizeBtnActive, qty === 0 && styles.sizeBtnOut]}
+                                    >
+                                        <Text style={[styles.sizeBtnText, active && styles.sizeBtnTextActive, qty === 0 && styles.sizeBtnTextOut]}>
+                                            {size}
+                                        </Text>
+                                    </Pressable>
+                                );
+                            })}
                         </View>
                     )}
                 </View>
@@ -82,7 +128,7 @@ function CartItem({ item, onRemove, onUpdateQuantity }: CartItemProps) {
 const MemoCartItem = React.memo(CartItem);
 
 export default function CartScreen() {
-    const { cartItems, updateQuantity, removeFromCart, totalPrice, totalSavings } = useCart();
+    const { cartItems, updateQuantity, removeFromCart, changeSize, totalPrice, totalSavings } = useCart();
     const router = useRouter();
     const insets = useSafeAreaInsets();
 
@@ -95,9 +141,9 @@ export default function CartScreen() {
 
     const renderItem = useCallback(
         ({ item }: { item: any }) => (
-            <MemoCartItem item={item} onRemove={removeFromCart} onUpdateQuantity={updateQuantity} />
+            <MemoCartItem item={item} onRemove={removeFromCart} onUpdateQuantity={updateQuantity} onChangeSize={changeSize} />
         ),
-        [removeFromCart, updateQuantity]
+        [removeFromCart, updateQuantity, changeSize]
     );
 
     return (
@@ -187,6 +233,13 @@ const styles = StyleSheet.create({
     chip: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.surfaceSunken, borderRadius: radius.xs, paddingHorizontal: 8, paddingVertical: 3 },
     chipText: { fontFamily: fonts.monoBold, fontSize: 10, color: colors.textBody },
     swatch: { width: 9, height: 9, borderRadius: 5 },
+    sizeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 7 },
+    sizeBtn: { minWidth: 32, alignItems: 'center', borderWidth: 1.5, borderColor: colors.borderSubtle, borderRadius: radius.xs, paddingHorizontal: 8, paddingVertical: 4 },
+    sizeBtnActive: { borderColor: palette.yellow500, backgroundColor: colors.surfaceSunken },
+    sizeBtnOut: { opacity: 0.4 },
+    sizeBtnText: { fontFamily: fonts.monoBold, fontSize: 10, color: colors.textBody },
+    sizeBtnTextActive: { color: colors.textStrong },
+    sizeBtnTextOut: { textDecorationLine: 'line-through' },
     itemBottom: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     itemPrice: { fontFamily: fonts.displayBold, fontSize: 17, color: colors.textStrong },
     stepper: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1.5, borderColor: colors.borderSubtle, borderRadius: 100, paddingHorizontal: 12, paddingVertical: 5 },
