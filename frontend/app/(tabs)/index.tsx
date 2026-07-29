@@ -11,6 +11,7 @@ import { ProductCard, SectionHeader, ZText } from '../../components/ui';
 import { DELIVERY_CITY, isPuneLocation } from '../../constants/delivery';
 import { colors, fonts, palette, radius, shadow } from '../../constants/theme';
 import { useSearch } from '../../context/SearchContext';
+import { FlashDeal, flashDealService } from '../../services/flashDeals';
 import { productService } from '../../services/product';
 
 const CATEGORIES = [
@@ -75,6 +76,8 @@ export default function HomeScreen() {
     const router = useRouter();
     const { recentSearches, isLoading: searchLoading } = useSearch();
     const [freshArrivals, setFreshArrivals] = useState<any[]>(FRESH_ARRIVALS);
+    // Admin-managed flash deals. The strip only exists while a deal is live.
+    const [flashDeals, setFlashDeals] = useState<FlashDeal[]>([]);
     const [recommended, setRecommended] = useState<any[]>(RECOMMENDED);
     const [nearby, setNearby] = useState<any[]>(NEARBY_FALLBACK);
     const [locationLabel, setLocationLabel] = useState<string>('Your Area');
@@ -154,6 +157,12 @@ export default function HomeScreen() {
         }
         setRefreshing(false);
     };
+
+    // Flash deals load independently of location/products — an empty list simply
+    // hides the strip.
+    useEffect(() => {
+        flashDealService.getFlashDeals().then(setFlashDeals).catch(() => setFlashDeals([]));
+    }, []);
 
     useEffect(() => {
         // Do NOT prompt for location at launch (App Store 5.1.1 — request in-context).
@@ -574,6 +583,35 @@ export default function HomeScreen() {
                         />
                     ))}
                 </ScrollView>
+
+                {/* Flash Deals — admin-managed, hidden when nothing is running */}
+                {flashDeals.length > 0 && (
+                    <>
+                        <SectionHeader
+                            eyebrow="Ends soon"
+                            title="Flash deals"
+                            actionLabel="See all"
+                            onAction={() => router.push('/flash-deals' as any)}
+                            style={styles.section}
+                        />
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hList}>
+                            {flashDeals.slice(0, 8).map((deal) => (
+                                <ProductCard
+                                    key={deal.id}
+                                    width={168}
+                                    style={styles.hCard}
+                                    image={deal.images?.[0] || ''}
+                                    brand={deal.label}
+                                    name={deal.productName}
+                                    price={deal.dealPrice}
+                                    originalPrice={deal.originalPrice}
+                                    discount={deal.discountPercent > 0 ? `${deal.discountPercent}%` : undefined}
+                                    onPress={() => router.push(`/product/${deal.productId}`)}
+                                />
+                            ))}
+                        </ScrollView>
+                    </>
+                )}
 
                 {/* Fresh Arrivals */}
                 <SectionHeader eyebrow="Just dropped" title="Fresh arrivals" style={styles.section} />

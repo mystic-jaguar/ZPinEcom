@@ -3,6 +3,7 @@ import { pool } from '../db';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { orderCreateLimiter } from '../middleware/rateLimits';
 import { decryptAddressPayload, encryptAddressPayload } from '../utils/encryption';
+import { consumeDealStock, liveDealPrices } from '../utils/flashDeals';
 import { generateId } from '../utils/id';
 import { recordOrderStatus } from '../utils/orderHistory';
 import { markupItems, withMarkup } from '../utils/pricing';
@@ -493,6 +494,17 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
     };
     const encryptedShippingAddress = encryptAddressPayload(shippingAddress);
 
+    // Flash deals (admin-managed, Phase 10): a live deal REPLACES the vendor
+    // price for that product, so the customer is charged the price the deal
+    // advertises and the seller is credited the deal price they agreed to.
+    const dealPrices = await liveDealPrices(client, cartResult.rows.map((r: any) => r.product_id));
+    if (dealPrices.size > 0) {
+      for (const row of cartResult.rows) {
+        const deal = dealPrices.get(String(row.product_id));
+        if (deal != null) row.price = deal;
+      }
+    }
+
     // Every money figure below is the CUSTOMER-charged amount, so it is computed
     // on the marked-up price (vendor price + 20% ZPIN platform fee). Tax and the
     // free-delivery threshold therefore apply to the marked-up subtotal. The raw
@@ -681,6 +693,9 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
            VALUES ($1,$2,$3,$4,$5,$6,$7,(NOW() AT TIME ZONE 'Asia/Kolkata'))`,
           [generateId(), subId, item.product_id, item.product_name, item.quantity, item.price, item.image || '']
         );
+        if (dealPrices.size > 0 && dealPrices.has(String(item.product_id))) {
+          await consumeDealStock(client, item.product_id, item.quantity);
+        }
         // Decrement inventory atomically. The `quantity >= $1` guard makes the
         // check-and-decrement a single locked operation, so concurrent orders for
         // the same low-stock item can't oversell. No row updated → not enough stock.

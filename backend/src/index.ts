@@ -11,6 +11,7 @@ import { requestLogger } from './middleware/requestLogger';
 import authRoutes, { ensureAppleColumn } from './routes/auth';
 import cartRoutes from './routes/cart';
 import couponRoutes from './routes/coupons';
+import flashDealRoutes from './routes/flashDeals';
 import notificationRoutes from './routes/notifications';
 import orderRoutes, { ensureOrderSupportTables } from './routes/orders';
 import productRoutes from './routes/products';
@@ -19,6 +20,7 @@ import userRoutes from './routes/users';
 import wishlistRoutes from './routes/wishlist';
 import { prepareSensitiveDataEncryption } from './utils/encryption';
 import { logger } from './utils/logger';
+import { ensureFlashDealsSchema } from './utils/flashDeals';
 import { ensureModerationSchema } from './utils/moderationSchema';
 import redis from './utils/redis';
 
@@ -99,6 +101,7 @@ app.use('/api/v1/cart', cartRoutes);
 app.use('/api/v1/wishlist', wishlistRoutes);
 app.use('/api/v1/orders', orderRoutes);
 app.use('/api/v1/coupons', couponRoutes);
+app.use('/api/v1/flash-deals', flashDealRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
 app.use('/api/v1/razorpay', razorpayRoutes);
 
@@ -130,7 +133,7 @@ async function startServer() {
   // user request path — removes first-request latency and keeps schema management
   // out of request handlers. The per-route ensure* calls remain as a safety net
   // but become no-ops once these have run.
-  for (const ensure of [ensureOrderSupportTables, ensureModerationSchema, ensureAppleColumn]) {
+  for (const ensure of [ensureOrderSupportTables, ensureModerationSchema, ensureAppleColumn, ensureFlashDealsSchema]) {
     try {
       await ensure();
     } catch (err: any) {

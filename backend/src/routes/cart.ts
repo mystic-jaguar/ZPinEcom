@@ -3,6 +3,7 @@ import { pool } from '../db';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { cartWriteLimiter } from '../middleware/rateLimits';
 import { generateId, isValidShortId } from '../utils/id';
+import { LIVE_DEAL_PREDICATE } from '../utils/flashDeals';
 import { withMarkup } from '../utils/pricing';
 import { safeIdentifier } from '../utils/sql';
 
@@ -24,6 +25,8 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response): Promise<v
   try {
     const result = await pool.query(
       `SELECT ci.*, p.product_name, p.price as current_price, p.in_stock, p.quantity as stock_qty,
+        (SELECT MIN(fd.deal_price) FROM flash_deals fd
+          WHERE fd.product_id = ci.product_id AND ${LIVE_DEAL_PREDICATE}) as deal_price,
         COALESCE(json_agg(pi.image_url) FILTER (WHERE pi.image_url IS NOT NULL), '[]') as images
        FROM ${T} ci
        JOIN products p ON p.id = ci.product_id
@@ -33,23 +36,29 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response): Promise<v
       [req.userId]
     );
 
-    const cart = result.rows.map((r: any) => ({
+    const cart = result.rows.map((r: any) => {
+      // A live flash deal replaces the price everywhere it is shown, because it
+      // is also the price checkout charges (see orders.ts). Never advertise a
+      // deal price we don't actually bill.
+      const effective = r.deal_price != null ? Number(r.deal_price) : Number(r.current_price);
+      return {
       cartItemId: r.id,
       productId: r.product_id,
       quantity: r.quantity,
       // price_at_add / products.price are raw vendor prices; the customer sees
       // them with the 20% ZPIN platform fee applied (never stored).
-      priceAtAdd: withMarkup(r.price_at_add),
+      priceAtAdd: withMarkup(effective),
       isAvailable: r.in_stock && r.stock_qty >= r.quantity,
       product: {
         productId: r.product_id,
         productName: r.product_name,
-        price: withMarkup(r.current_price),
+        price: withMarkup(effective),
         images: r.images,
         inStock: r.in_stock,
       },
       timeStamp: r.created_at,
-    }));
+      };
+    });
 
     const totalAmount = cart.reduce((sum: number, item: any) => sum + item.priceAtAdd * item.quantity, 0);
 
