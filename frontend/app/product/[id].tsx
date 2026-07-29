@@ -348,6 +348,11 @@ export default function ProductDetails() {
                         <Text style={styles.subtitle}>{product.subtitle}</Text>
                     )}
 
+                    {/* Seller name inline; the address stays behind the accordion below */}
+                    {product.sellerName && (
+                        <Text style={styles.sellerLine}>Sold by {product.sellerName}</Text>
+                    )}
+
                     <View style={styles.priceRow}>
                         <Text style={styles.price}>₹{product.price.toLocaleString()}</Text>
                         {product.originalPrice && (
@@ -461,6 +466,17 @@ export default function ProductDetails() {
                             {product.details || product.description}
                         </Text>
                     </AccordionItem>
+
+                    {(product.sellerName || product.sellerAddress) && (
+                        <AccordionItem title="More information">
+                            {product.sellerName && (
+                                <Text style={styles.bodyText}>Seller: {product.sellerName}</Text>
+                            )}
+                            <Text style={styles.bodyText}>
+                                Address: {product.sellerAddress || 'Not provided'}
+                            </Text>
+                        </AccordionItem>
+                    )}
 
                     <AccordionItem title={`Reviews${reviewTotal > 0 ? ` (${reviewTotal})` : ''}`}>
                         {showReviewForm ? (
@@ -764,6 +780,11 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#666',
         marginBottom: 15
+    },
+    sellerLine: {
+        fontSize: 13,
+        color: '#666',
+        marginBottom: 12
     },
     priceRow: {
         flexDirection: 'row',

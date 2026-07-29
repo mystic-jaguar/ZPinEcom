@@ -201,6 +201,8 @@ export interface ProductObject {
     sizes?: string[];
     details?: string;
     isLightningFast?: boolean;
+    sellerName?: string;                   // detail endpoint only
+    sellerAddress?: string;                // detail endpoint only, revealed on tap
 }
 
 // ============================================================================

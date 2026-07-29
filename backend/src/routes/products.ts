@@ -635,12 +635,16 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
     const result = await pool.query(
       `SELECT p.*,
         COALESCE(json_agg(DISTINCT pi.image_url) FILTER (WHERE pi.image_url IS NOT NULL), '[]') as images,
-        COALESCE(AVG(pr.rating), 0) as average_rating
+        COALESCE(AVG(pr.rating), 0) as average_rating,
+        u.name as seller_name,
+        sp.personal_address as seller_address
        FROM products p
        LEFT JOIN product_images pi ON pi.product_id = p.id
        LEFT JOIN product_reviews pr ON pr.product_id = p.id
+       LEFT JOIN users u ON u.id = p.user_id
+       LEFT JOIN seller_profiles sp ON sp.user_id = p.user_id
        WHERE p.id = $1::uuid
-       GROUP BY p.id`,
+       GROUP BY p.id, u.name, sp.personal_address`,
       [id]
     );
 
@@ -649,7 +653,16 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const response = { success: true, data: normalizeProduct(result.rows[0]) };
+    // Seller name is inline; the address is detail-only and the app keeps it
+    // behind a "More information" reveal (never in listings or search).
+    const response = {
+      success: true,
+      data: {
+        ...normalizeProduct(result.rows[0]),
+        sellerName: result.rows[0].seller_name || undefined,
+        sellerAddress: result.rows[0].seller_address || undefined,
+      },
+    };
     await cacheSet(cacheKey, response, TTL_PRODUCT);
     res.json(response);
   } catch (err) {
