@@ -1,6 +1,8 @@
 import ActionModal from '@/components/common/ActionModal';
+import LegalDocModal, { LegalDocType } from '@/components/common/LegalDocModal';
+import SupportChatBot from '@/components/common/SupportChatBot';
 import { useRouter } from 'expo-router';
-import { Bike, ChevronDown, ChevronRight, ChevronUp, CreditCard, Mail, MessageCircle, Phone, RotateCcw, Search, Shirt } from 'lucide-react-native';
+import { Bike, ChevronDown, ChevronRight, ChevronUp, CreditCard, FileText, Mail, MessageCircle, Phone, RotateCcw, Search, Shield, Shirt } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -22,8 +24,11 @@ const ALL_FAQS: FAQ[] = [
     { id: '5', category: 'Returns', question: 'What is Try-at-Door?', answer: 'Try products at your door for 15 minutes. Keep what fits, hand the rest back to the courier — no box, no label.' },
     { id: '6', category: 'Returns', question: 'How do I return a product?', answer: 'Open the order and tap "Return items". Choose a reason and refund method. Returns are accepted within 7 days of delivery.' },
     { id: '7', category: 'Returns', question: 'When will I get my refund?', answer: 'Refunds are processed within 5–7 business days after we receive the returned product.' },
+    { id: '8', category: 'Orders', question: 'Can I cancel an order?', answer: 'Yes, until it is dispatched. Open the order from My Orders and tap Cancel. If the option is gone the order is already on its way — contact support and we will help.' },
     { id: '10', category: 'Payment', question: 'What payment methods do you accept?', answer: 'UPI, Credit/Debit cards, Net Banking and Cash on Delivery via Razorpay.' },
-    { id: '14', category: 'Account', question: 'How do I change my delivery address?', answer: 'Go to Profile → Saved addresses to add, edit or set a default address.' },
+    { id: '11', category: 'Payment', question: 'How does Cash on Delivery work for Instant Delivery?', answer: 'For Instant Delivery orders paid by COD, the ₹50 delivery fee is prepaid online at checkout and only the product amount is collected at your door. Standard COD orders are paid in full on delivery.' },
+    { id: '12', category: 'Payment', question: 'How do I use a coupon?', answer: 'Tap "Apply coupon" on the payment step at checkout, or browse the coupons you can use from Profile → Coupons.' },
+    { id: '14', category: 'Account', question: 'How do I change my delivery address?', answer: 'Go to Profile → Saved addresses to add, edit or set a default address. On an order already placed, an address change is only possible shortly after checkout — contact support right away.' },
 ];
 
 export default function HelpCenterScreen() {
@@ -32,6 +37,10 @@ export default function HelpCenterScreen() {
     const [expandedFaq, setExpandedFaq] = useState<string | null>(null);
     const [infoModalVisible, setInfoModalVisible] = useState(false);
     const [infoModalConfig, setInfoModalConfig] = useState({ title: '', message: '', icon: 'info' as any });
+    const [chatOpen, setChatOpen] = useState(false);
+    const [legalModalVisible, setLegalModalVisible] = useState(false);
+    const [legalDocType, setLegalDocType] = useState<LegalDocType>('privacy');
+    const openLegal = (docType: LegalDocType) => { setLegalDocType(docType); setLegalModalVisible(true); };
 
     const filteredFaqs = searchQuery.trim()
         ? ALL_FAQS.filter(f => f.question.toLowerCase().includes(searchQuery.toLowerCase()) || f.answer.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -44,7 +53,7 @@ export default function HelpCenterScreen() {
     const emailSupport = () => contact(() => Linking.openURL('mailto:support@zpin.com?subject=Support Request'), 'Error', 'Unable to open email. Please email support@zpin.com');
 
     const QUICK = [
-        { icon: MessageCircle, title: 'Live chat', sub: 'Avg 2 min', onPress: emailSupport },
+        { icon: MessageCircle, title: 'Live chat', sub: 'Replies instantly', onPress: () => setChatOpen(true) },
         { icon: Phone, title: 'Call us', sub: '8am–11pm', onPress: callSupport },
         { icon: Mail, title: 'Email', sub: '24h reply', onPress: emailSupport },
     ];
@@ -117,8 +126,36 @@ export default function HelpCenterScreen() {
                         <ZText variant="muted" style={{ marginTop: 14 }}>No results for “{searchQuery}”</ZText>
                     </View>
                 )}
+                {/* Still need help */}
+                {!searchQuery && (
+                    <>
+                        <ZText variant="eyebrow" style={{ marginTop: 24, marginBottom: 12 }}>Still need help?</ZText>
+                        <Pressable style={styles.helpCard} onPress={() => setChatOpen(true)}>
+                            <Text style={styles.helpTitle}>Chat with the ZPIN Assistant</Text>
+                            <Text style={styles.helpSub}>Instant answers on delivery, returns, payments and tracking — with a hand-off to our team if it can’t help.</Text>
+                            <View style={styles.helpCta}><Text style={styles.helpCtaText}>Start chat →</Text></View>
+                        </Pressable>
+
+                        <ZText variant="eyebrow" style={{ marginTop: 24, marginBottom: 12 }}>Legal</ZText>
+                        <View style={styles.card}>
+                            <Pressable style={[styles.topicRow, styles.rowBorder]} onPress={() => openLegal('privacy')}>
+                                <View style={styles.topicIcon}><Shield size={18} color={colors.textBody} /></View>
+                                <Text style={styles.topicLabel}>Privacy Policy</Text>
+                                <ChevronRight size={18} color={colors.borderStrong} />
+                            </Pressable>
+                            <Pressable style={styles.topicRow} onPress={() => openLegal('terms')}>
+                                <View style={styles.topicIcon}><FileText size={18} color={colors.textBody} /></View>
+                                <Text style={styles.topicLabel}>Terms &amp; Conditions</Text>
+                                <ChevronRight size={18} color={colors.borderStrong} />
+                            </Pressable>
+                        </View>
+                    </>
+                )}
                 <View style={{ height: 30 }} />
             </ScrollView>
+
+            <SupportChatBot visible={chatOpen} onClose={() => setChatOpen(false)} />
+            <LegalDocModal visible={legalModalVisible} docType={legalDocType} onClose={() => setLegalModalVisible(false)} />
 
             <ActionModal visible={infoModalVisible} title={infoModalConfig.title} message={infoModalConfig.message} icon={infoModalConfig.icon} primaryButtonText="OK" onPrimaryPress={() => setInfoModalVisible(false)} onClose={() => setInfoModalVisible(false)} />
         </SafeAreaView>
@@ -149,4 +186,10 @@ const styles = StyleSheet.create({
     faqQ: { fontFamily: fonts.bodySemiBold, fontSize: 14, color: colors.textStrong },
     faqA: { fontFamily: fonts.bodyRegular, fontSize: 13, lineHeight: 20, color: colors.textMuted, paddingHorizontal: 16, paddingBottom: 16, marginTop: -4 },
     noResults: { alignItems: 'center', paddingVertical: 40 },
+
+    helpCard: { backgroundColor: palette.yellow100, borderRadius: radius.lg, padding: 18 },
+    helpTitle: { fontFamily: fonts.displaySemiBold, fontSize: 15, color: colors.textStrong },
+    helpSub: { fontFamily: fonts.bodyRegular, fontSize: 13, lineHeight: 19, color: colors.textBody, marginTop: 6 },
+    helpCta: { marginTop: 12 },
+    helpCtaText: { fontFamily: fonts.bodySemiBold, fontSize: 13, color: palette.yellow700 },
 });
