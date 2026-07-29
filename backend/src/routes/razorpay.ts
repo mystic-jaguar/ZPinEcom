@@ -3,6 +3,7 @@ import { Response, Router } from 'express';
 import Razorpay from 'razorpay';
 import { pool } from '../db';
 import { authenticate, AuthRequest } from '../middleware/auth';
+import { amountToCharge } from '../utils/collect';
 import { generateId } from '../utils/id';
 import { recordOrderStatus } from '../utils/orderHistory';
 import { safeIdentifier } from '../utils/sql';
@@ -33,7 +34,8 @@ router.post('/create-order', authenticate, async (req: AuthRequest, res: Respons
   try {
     // Fetch the order and verify ownership
     const result = await pool.query(
-      `SELECT id, group_id, final_amount, payment_status FROM ${ORDERS} WHERE id = $1 AND user_id = $2`,
+      `SELECT id, group_id, final_amount, payment_status, payment_method, delivery_type, delivery_fee
+         FROM ${ORDERS} WHERE id = $1 AND user_id = $2`,
       [orderId, req.userId]
     );
 
@@ -47,21 +49,25 @@ router.post('/create-order', authenticate, async (req: AuthRequest, res: Respons
     // Multi-seller: a checkout is split into one order row per seller sharing a
     // group_id. Charge the whole group once (sum of the sub-order finals). Legacy
     // orders have a NULL group_id → group of one (just this row).
-    let chargeAmount = Number(order.final_amount);
-    let anyPaid = order.payment_status === 'paid';
+    // An instant+COD order only prepays its delivery fee, so the group charge is
+    // summed per row through amountToCharge rather than straight from final_amount.
+    let groupRows: any[] = [order];
     if (order.group_id) {
-      const group = await pool.query(
-        `SELECT COALESCE(SUM(final_amount), 0) AS total,
-                BOOL_OR(payment_status = 'paid') AS any_paid
-         FROM ${ORDERS} WHERE group_id = $1 AND user_id = $2`,
+      groupRows = (await pool.query(
+        `SELECT id, final_amount, payment_status, payment_method, delivery_type, delivery_fee
+           FROM ${ORDERS} WHERE group_id = $1 AND user_id = $2`,
         [order.group_id, req.userId]
-      );
-      chargeAmount = Number(group.rows[0].total);
-      anyPaid = group.rows[0].any_paid === true;
+      )).rows;
     }
+    const chargeAmount = groupRows.reduce((s, r) => s + amountToCharge(r), 0);
+    const anyPaid = groupRows.some((r) => r.payment_status === 'paid' || r.payment_status === 'partial');
 
     if (anyPaid) {
       res.status(400).json({ success: false, message: 'Order is already paid' });
+      return;
+    }
+    if (chargeAmount <= 0) {
+      res.status(400).json({ success: false, message: 'Nothing to pay for this order' });
       return;
     }
 
@@ -121,7 +127,8 @@ router.post('/verify', authenticate, async (req: AuthRequest, res: Response): Pr
 
     // Verify order ownership and current status
     const orderResult = await client.query(
-      `SELECT id, group_id, final_amount, payment_status, order_number FROM ${ORDERS} WHERE id = $1 AND user_id = $2`,
+      `SELECT id, group_id, final_amount, payment_status, order_number, payment_method, delivery_type, delivery_fee
+         FROM ${ORDERS} WHERE id = $1 AND user_id = $2`,
       [appOrderId, req.userId]
     );
 
@@ -137,12 +144,13 @@ router.post('/verify', authenticate, async (req: AuthRequest, res: Response): Pr
     // legacy NULL-group orders) so a single payment confirms the whole group.
     const groupRows = order.group_id
       ? (await client.query(
-          `SELECT id, final_amount, payment_status FROM ${ORDERS} WHERE group_id = $1 AND user_id = $2`,
+          `SELECT id, final_amount, payment_status, payment_method, delivery_type, delivery_fee
+             FROM ${ORDERS} WHERE group_id = $1 AND user_id = $2`,
           [order.group_id, req.userId]
         )).rows
       : [order];
 
-    if (groupRows.every((r: any) => r.payment_status === 'paid')) {
+    if (groupRows.every((r: any) => r.payment_status === 'paid' || r.payment_status === 'partial')) {
       await client.query('ROLLBACK');
       res.json({ success: true, message: 'Payment already recorded', data: { orderId: appOrderId } });
       return;
@@ -159,20 +167,32 @@ router.post('/verify', authenticate, async (req: AuthRequest, res: Response): Pr
       return;
     }
 
-    // Mark every sub-order in the group paid + confirmed, store the payment id on
-    // each. group_id IS NOT DISTINCT FROM handles the legacy NULL-group single row.
-    await client.query(
-      `UPDATE ${ORDERS}
-       SET payment_status = 'paid', status = 'confirmed', payment_id = $1, payment_method = 'razorpay', updated_at = NOW()
-       WHERE user_id = $2 AND (group_id IS NOT DISTINCT FROM $3 AND ($3 IS NOT NULL OR id = $4))`,
-      [razorpayPaymentId, req.userId, order.group_id, appOrderId]
-    );
-
-    const groupTotal = groupRows.reduce((s: number, r: any) => s + Number(r.final_amount), 0);
-
-    // Shared timeline: every sub-order of the group was just confirmed.
+    // Mark every sub-order in the group settled, each judged on its own amount so
+    // the rows stay individually honest. An instant+COD order only prepaid its
+    // delivery fee, so it becomes 'partial' (not 'paid') and keeps its COD
+    // payment_method — the delivery app must still collect the balance at the door.
+    let groupTotal = 0;
     for (const row of groupRows) {
-      await recordOrderStatus(client, row.id, 'confirmed', `Payment verified (${razorpayPaymentId})`);
+      const charged = amountToCharge(row);
+      groupTotal += charged;
+      const isFull = charged >= Number(row.final_amount);
+      await client.query(
+        `UPDATE ${ORDERS}
+            SET payment_status = $1,
+                status         = CASE WHEN $1 = 'paid' THEN 'confirmed' ELSE status END,
+                payment_id     = $2,
+                payment_method = CASE WHEN $1 = 'paid' THEN 'razorpay' ELSE payment_method END,
+                prepaid_amount = $3,
+                updated_at     = NOW()
+          WHERE id = $4`,
+        [isFull ? 'paid' : 'partial', razorpayPaymentId, charged, row.id]
+      );
+      await recordOrderStatus(
+        client,
+        row.id,
+        isFull ? 'confirmed' : 'pending',
+        `Payment of ₹${charged.toFixed(2)} verified (${razorpayPaymentId})`
+      );
     }
 
     // Notify the customer that payment succeeded (audit trail via notifications).

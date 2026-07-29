@@ -185,6 +185,12 @@ function normalizeOrder(row: any) {
     estimatedDelivery: row.estimated_delivery,
     trackingNumber: row.tracking_number,
     notes: row.notes,
+    // Shared delivery columns (Phase 9). 'flash' is the stored value behind the
+    // user-facing "Instant Delivery"; prepaidAmount is what was already settled
+    // online, so the courier collects finalAmount − prepaidAmount in cash.
+    deliveryType: row.delivery_type ?? 'standard',
+    deliveryFee: Number(row.delivery_fee || 0),
+    prepaidAmount: Number(row.prepaid_amount || 0),
     // order_items.price is the raw VENDOR price (that's what the seller is paid
     // and what the seller dashboard reports). The customer is shown — and was
     // charged — that price plus the 20% ZPIN platform fee, which is why these
@@ -466,7 +472,14 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
     // Instant "Try-at-Door" trial fee. Amount is fixed server-side (₹50) — we only
     // trust the client's delivery-type selection (notes flag), never a client amount.
     // Must match the frontend fee in checkout/summary.tsx + payment.tsx.
-    const deliveryFee = notes === 'instant_delivery' ? 50 : 0;
+    // The fee is charged on COD too (same as the website): it is folded into
+    // final_amount here, and razorpay.ts prepays exactly it for instant+COD.
+    const isInstant = notes === 'instant_delivery';
+    // orders.delivery_type is the shared column all four backends read. Its stored
+    // vocabulary is unchanged ('standard' | 'flash') — "Instant Delivery" is the
+    // user-facing name of 'flash', renamed in Phase 9.
+    const deliveryType = isInstant ? 'flash' : 'standard';
+    const deliveryFee = isInstant ? 50 : 0;
 
     // SECURITY: Never trust client-supplied coupon discount.
     // Validate the coupon code server-side if provided.
@@ -595,13 +608,15 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
       await client.query(
         `INSERT INTO ${ORDERS}
           (id, order_number, user_id, seller_id, group_id, status, payment_status, total_amount, shipping_amount,
-           tax_amount, final_amount, shipping_address, payment_method, notes, estimated_delivery, created_at, updated_at)
-         VALUES ($1,$2,$3,$4,$5,$6,'pending',$7,$8,$9,$10,$11,$12,$13,
+           tax_amount, final_amount, shipping_address, payment_method, notes,
+           delivery_type, delivery_fee, prepaid_amount, estimated_delivery, created_at, updated_at)
+         VALUES ($1,$2,$3,$4,$5,$6,'pending',$7,$8,$9,$10,$11,$12,$13,$14,$15,0,
            (NOW() AT TIME ZONE 'Asia/Kolkata') + INTERVAL '5 days',
            (NOW() AT TIME ZONE 'Asia/Kolkata'),
            (NOW() AT TIME ZONE 'Asia/Kolkata'))`,
         [subId, subNumber, req.userId, sellerId, groupId, orderStatus, sSubtotal, sShip, sTax, sFinal,
-         JSON.stringify(encryptedShippingAddress), paymentMethod, notes || '']
+         JSON.stringify(encryptedShippingAddress), paymentMethod, notes || '',
+         deliveryType, sFee]
       );
 
       for (const item of sellerItems) {
@@ -1085,7 +1100,7 @@ router.patch('/:id/cancel', authenticate, async (req: AuthRequest, res: Response
 
     // Lock the order row and verify ownership + cancellable status
     const result = await client.query(
-      `SELECT id, final_amount, payment_status, payment_method
+      `SELECT id, final_amount, payment_status, payment_method, prepaid_amount
        FROM ${ORDERS}
        WHERE id = $1 AND user_id = $2 AND status IN ('pending','confirmed')
        FOR UPDATE`,
@@ -1099,10 +1114,12 @@ router.patch('/:id/cancel', authenticate, async (req: AuthRequest, res: Response
     }
 
     const order = result.rows[0];
-    const refundAmount = Number(order.final_amount);
-
-    // Only mark as refunded if the order was actually paid
-    const wasPaid = order.payment_status === 'paid';
+    // Refund only what actually reached us. An instant+COD order is 'partial':
+    // just the prepaid delivery fee was charged, never the whole final_amount.
+    const wasPaid = order.payment_status === 'paid' || order.payment_status === 'partial';
+    const refundAmount = order.payment_status === 'partial'
+      ? Number(order.prepaid_amount || 0)
+      : Number(order.final_amount);
     const newPaymentStatus = wasPaid ? 'refunded' : order.payment_status;
 
     await client.query(

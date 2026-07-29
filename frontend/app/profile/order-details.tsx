@@ -197,6 +197,11 @@ export default function OrderDetailsScreen() {
     const inferredCouponDiscount = Math.max(0, Number((preDiscountTotal - Number(order?.finalAmount || 0)).toFixed(2)));
     const couponDiscount = Math.max(noteCouponDiscount, inferredCouponDiscount);
 
+    // Instant+COD prepays only the delivery fee online (payment_status 'partial'),
+    // so what the courier actually collects is final_amount − prepaid_amount.
+    const prepaidAmount = Number(order?.prepaidAmount || 0);
+    const dueAtDoor = Math.max(0, Number(order?.finalAmount || 0) - prepaidAmount);
+
     const canCancel = order && ['pending', 'confirmed'].includes(order.status);
     const canReturn = order && order.status === 'delivered';
 
@@ -279,6 +284,21 @@ export default function OrderDetailsScreen() {
                     </View>
                 </View>
 
+                {/* Cash-on-delivery: what is still due at the door, and the change warning. */}
+                {order.paymentMethod === 'cod' && !cancelled && order.status !== 'returned' && (
+                    <View style={styles.card}>
+                        <ZText variant="eyebrow" style={{ marginBottom: 14 }}>Due at your door</ZText>
+                        {prepaidAmount > 0 && <BillRow label="Already paid online" value={`−${money(prepaidAmount)}`} red />}
+                        <View style={styles.billTotal}>
+                            <Text style={styles.payLabel}>To pay on delivery</Text>
+                            <Text style={styles.payValue}>{money(dueAtDoor)}</Text>
+                        </View>
+                        <Text style={styles.codNoteText}>
+                            If paying by cash, please keep exact change — the delivery partner cannot provide change. You can also scan the partner&apos;s UPI QR at the door.
+                        </Text>
+                    </View>
+                )}
+
                 <View style={styles.actions}>
                     {canReturn && (
                         <Pressable style={styles.outlineBtn} onPress={() => router.push('/profile/returns')}>
@@ -356,6 +376,7 @@ const styles = StyleSheet.create({
     billMono: { fontFamily: fonts.monoBold, fontSize: 12, color: palette.green500 },
     billTotal: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', borderTopWidth: 1, borderTopColor: colors.borderSubtle, borderStyle: 'dashed', paddingTop: 12, marginTop: 2 },
     payLabel: { fontFamily: fonts.displaySemiBold, fontSize: 15, color: colors.textStrong },
+    codNoteText: { fontFamily: fonts.bodyRegular, fontSize: 12, lineHeight: 17, color: colors.textBody, marginTop: 12 },
     payValue: { fontFamily: fonts.displayBold, fontSize: 20, color: colors.textStrong },
 
     actions: { flexDirection: 'row', gap: 10 },

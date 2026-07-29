@@ -59,6 +59,8 @@ export default function CheckoutPaymentScreen() {
             : isRazorpayMethod ? 'razorpay'
             : 'cod';
 
+        const needsFeePrepay = backendMethod === 'cod' && isInstant && deliveryFee > 0;
+
         let createdOrderId: string | null = null;
         try {
             const cartPayload = cartItems.map(item => ({ productId: item.productId, quantity: item.quantity }));
@@ -76,7 +78,10 @@ export default function CheckoutPaymentScreen() {
             createdOrderId = appOrder.id;
             if (appOrder.finalAmount) setConfirmedFinalAmount(Number(appOrder.finalAmount));
 
-            if (backendMethod === 'razorpay') {
+            // Instant Delivery on COD still prepays the delivery fee online (same
+            // rule as the website): the server charges only the fee and leaves the
+            // order 'partial', so the courier collects the balance at the door.
+            if (backendMethod === 'razorpay' || needsFeePrepay) {
                 const rzpOrderResponse = await paymentService.createRazorpayOrder(appOrder.id);
                 if (!rzpOrderResponse.success || !rzpOrderResponse.data) throw new Error('Failed to initiate payment');
                 const { razorpayOrderId, amount, currency, keyId } = rzpOrderResponse.data;
@@ -174,6 +179,18 @@ export default function CheckoutPaymentScreen() {
                 </View>
                 <Option id="net_banking" icon={Landmark} label="Net Banking" sub="All major banks" />
                 <Option id="cod" icon={Banknote} label="Cash on Delivery" sub="Pay the courier at your door" />
+                {selectedPaymentMethod === 'cod' && (
+                    <View style={styles.codNote}>
+                        <Text style={styles.codNoteText}>
+                            If paying by cash, please keep exact change — the delivery partner cannot provide change. You can also scan the partner&apos;s UPI QR at the door.
+                        </Text>
+                        {isInstant && deliveryFee > 0 && (
+                            <Text style={styles.codNoteText}>
+                                Instant Delivery: {money(deliveryFee)} delivery charge is paid now; the rest is collected at your door.
+                            </Text>
+                        )}
+                    </View>
+                )}
 
                 <View style={styles.secure}>
                     <Lock size={14} color={colors.textFaint} />
@@ -238,6 +255,9 @@ const styles = StyleSheet.create({
     brandChips: { flexDirection: 'row', gap: 8, marginLeft: 58, marginTop: -2, marginBottom: 22 },
     brandChip: { borderWidth: 1, borderColor: colors.borderSubtle, borderRadius: radius.xs, paddingHorizontal: 8, paddingVertical: 4 },
     brandChipText: { fontFamily: fonts.monoBold, fontSize: 10, color: colors.textBody },
+
+    codNote: { backgroundColor: colors.surfaceSunken, borderRadius: radius.md, padding: 12, marginTop: -2, marginBottom: 12, gap: 6 },
+    codNoteText: { fontFamily: fonts.bodyRegular, fontSize: 12, lineHeight: 17, color: colors.textBody },
 
     secure: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, marginTop: 10 },
     secureText: { fontFamily: fonts.monoBold, fontSize: 10, letterSpacing: 0.6, color: colors.textFaint },

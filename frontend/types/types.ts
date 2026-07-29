@@ -309,7 +309,9 @@ export interface OrderObject {
     // for legacy pre-split orders, which are treated as a group of one.
     groupId?: string | null;
     status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'returned' | 'return_requested';
-    paymentStatus: 'pending' | 'paid' | 'failed' | 'refunded';
+    // 'partial' = only part of the order was settled online (Instant Delivery on
+    // COD prepays just the delivery fee); the balance is collected at the door.
+    paymentStatus: 'pending' | 'paid' | 'partial' | 'failed' | 'refunded';
     totalAmount: number;
     shippingAmount: number;
     taxAmount: number;
@@ -320,6 +322,10 @@ export interface OrderObject {
     deliveryBoyId?: string;
     deliveryStatus?: 'assigned' | 'accepted' | 'picked_up' | 'in_transit' | 'delivered';
     deliveryFee?: number;
+    // Stored vocabulary is unchanged: 'flash' is the Instant Delivery option.
+    deliveryType?: 'standard' | 'flash';
+    // How much of finalAmount was already settled online.
+    prepaidAmount?: number;
     partnerEarning?: number;
     distance?: number;                     // km
     estimatedTime?: number;                // minutes
