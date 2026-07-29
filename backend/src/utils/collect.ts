@@ -14,12 +14,18 @@ export interface ChargeableOrder {
   payment_method?: string | null;
   prepaid_amount?: number | string | null;
   payment_status?: string | null;
+  is_trial?: boolean | null;
 }
 
 const money = (v: unknown) => Math.max(0, Number(v) || 0);
 
+/** How long the customer gets to keep/return items after the partner's /pickup. */
+export const TRIAL_WINDOW_MINUTES = 15;
+
 /**
  * What must be paid online now, in rupees.
+ *  - Instant Delivery try-first ('trial', Phase 9A) → only the delivery fee is
+ *    prepaid, whatever payment method was picked: the goods aren't chosen yet.
  *  - Instant Delivery ('flash') + COD → only the delivery fee is prepaid; the
  *    goods are paid in cash at the door.
  *  - everything else → the whole final_amount.
@@ -27,10 +33,10 @@ const money = (v: unknown) => Math.max(0, Number(v) || 0);
 export function amountToCharge(order: ChargeableOrder): number {
   const total = money(order.final_amount);
   const fee = money(order.delivery_fee);
-  const isInstantCod =
-    String(order.delivery_type || 'standard').toLowerCase() === 'flash' &&
-    String(order.payment_method || 'cod').toLowerCase() === 'cod';
-  return isInstantCod ? Math.min(fee, total) : total;
+  const isInstant = String(order.delivery_type || 'standard').toLowerCase() === 'flash';
+  const isCod = String(order.payment_method || 'cod').toLowerCase() === 'cod';
+  const feeOnly = (isInstant && isCod) || (isInstant && !!order.is_trial);
+  return feeOnly ? Math.min(fee, total) : total;
 }
 
 /**

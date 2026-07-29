@@ -52,6 +52,13 @@ export async function ensureOrderSupportTables() {
       // Multi-seller split: one checkout = one group_id shared by every seller's
       // sub-order row (NULL for legacy pre-split orders = a group of one).
       `ALTER TABLE ${ORDERS} ADD COLUMN IF NOT EXISTS group_id VARCHAR(7)`,
+      // Phase 9A — Instant Delivery "try first". is_trial marks the order at
+      // checkout; trial_expires_at is stamped by the delivery backend at /pickup
+      // and is the deadline for the customer's keep/return selection.
+      // order_items.is_returned records that per-item choice.
+      `ALTER TABLE ${ORDERS} ADD COLUMN IF NOT EXISTS is_trial BOOLEAN NOT NULL DEFAULT false`,
+      `ALTER TABLE ${ORDERS} ADD COLUMN IF NOT EXISTS trial_expires_at TIMESTAMP`,
+      `ALTER TABLE ${ORDER_ITEMS} ADD COLUMN IF NOT EXISTS is_returned BOOLEAN NOT NULL DEFAULT false`,
     ];
     for (const sql of alterColumns) {
       try {
@@ -165,6 +172,23 @@ function buildTrackingHistory(order: any, returnRequest?: any) {
   return steps;
 }
 
+/**
+ * Phase 9A timeout rule: a trial the customer never answered defaults to KEEP
+ * EVERYTHING, so the amounts stay exactly as ordered and only the status moves
+ * on. That makes the timeout a single idempotent UPDATE we can run lazily on any
+ * read (here and in the delivery backend) instead of running a scheduler.
+ */
+async function finalizeExpiredTrials(): Promise<void> {
+  try {
+    await pool.query(
+      `UPDATE ${ORDERS} SET status = 'awaiting_collection', trial_expires_at = NULL, updated_at = NOW()
+        WHERE status = 'trial_pending' AND trial_expires_at IS NOT NULL AND trial_expires_at < NOW()`
+    );
+  } catch (err: any) {
+    console.warn('finalizeExpiredTrials:', err?.message);
+  }
+}
+
 function normalizeOrder(row: any) {
   return {
     id: row.id,
@@ -191,6 +215,12 @@ function normalizeOrder(row: any) {
     deliveryType: row.delivery_type ?? 'standard',
     deliveryFee: Number(row.delivery_fee || 0),
     prepaidAmount: Number(row.prepaid_amount || 0),
+    // Phase 9A "try first": the 15-minute keep/return window opens at the
+    // partner's pickup, so trialExpiresAt is null until then. The app runs the
+    // countdown (and its 1-min-before / 1-min-after warnings) off this timestamp.
+    isTrial: !!row.is_trial,
+    trialExpiresAt: row.trial_expires_at ?? null,
+    trialSecondsLeft: row.trial_seconds_left != null ? Math.round(Number(row.trial_seconds_left)) : null,
     // order_items.price is the raw VENDOR price (that's what the seller is paid
     // and what the seller dashboard reports). The customer is shown — and was
     // charged — that price plus the 20% ZPIN platform fee, which is why these
@@ -209,6 +239,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response): Promise<v
   const offset = (page - 1) * limit;
 
   try {
+    await finalizeExpiredTrials();
     const countResult = await pool.query(
       `SELECT COUNT(*) FROM ${ORDERS} WHERE user_id = $1 AND NOT (status = 'pending' AND payment_status = 'pending')`,
       [req.userId]
@@ -223,7 +254,8 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response): Promise<v
           'quantity', oi.quantity,
           'price', oi.price,
           'image', oi.image,
-          'variant', oi.variant
+          'variant', oi.variant,
+          'isReturned', oi.is_returned
         )) FILTER (WHERE oi.id IS NOT NULL), '[]') as items
        FROM ${ORDERS} o
        LEFT JOIN ${ORDER_ITEMS} oi ON oi.order_id = o.id
@@ -255,14 +287,21 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response): Promise<v
 // GET /api/v1/orders/:id
 router.get('/:id', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
+    await finalizeExpiredTrials();
     const result = await pool.query(
       `SELECT o.*,
+        -- Server-clock countdown for the Phase 9A trial window. Sent as a
+        -- duration, not a timestamp, so the app never has to reconcile the
+        -- device clock or the column's timezone with ours.
+        EXTRACT(EPOCH FROM (o.trial_expires_at - NOW())) AS trial_seconds_left,
         COALESCE(json_agg(json_build_object(
               'orderItemId', oi.id,
           'productName', oi.product_name,
           'quantity', oi.quantity,
           'price', oi.price,
-          'image', oi.image
+          'image', oi.image,
+          'productId', oi.product_id,
+          'isReturned', oi.is_returned
         )) FILTER (WHERE oi.id IS NOT NULL), '[]') as items
        FROM ${ORDERS} o
        LEFT JOIN ${ORDER_ITEMS} oi ON oi.order_id = o.id
@@ -480,6 +519,12 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
     // user-facing name of 'flash', renamed in Phase 9.
     const deliveryType = isInstant ? 'flash' : 'standard';
     const deliveryFee = isInstant ? 50 : 0;
+    // Phase 9A — "Try items for 15 minutes before paying". Only offered on Instant
+    // Delivery. The customer prepays just the (non-refundable) delivery fee online;
+    // the goods are settled at the door AFTER the keep/return selection, so a trial
+    // order is always a door-collection order regardless of the method picked.
+    const isTrial = isInstant && req.body.tryFirst === true;
+    const effectivePaymentMethod = isTrial ? 'cod' : paymentMethod;
 
     // SECURITY: Never trust client-supplied coupon discount.
     // Validate the coupon code server-side if provided.
@@ -547,6 +592,17 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
       (itemsBySeller.get(sid) ?? itemsBySeller.set(sid, []).get(sid)!).push(row);
     }
     const sellerIds = [...itemsBySeller.keys()];
+    // A "try first" checkout produces ONE trial: the courier carries one parcel
+    // and waits at one door. A multi-seller cart would split into several
+    // independent trials with separate couriers — refuse rather than pretend.
+    if (isTrial && sellerIds.length > 1) {
+      await client.query('ROLLBACK');
+      res.status(409).json({
+        success: false,
+        message: 'Try-before-you-pay is only available when every item in your cart is from the same seller. Please order them separately or uncheck the option.',
+      });
+      return;
+    }
     const subtotalOf = (rows: any[]) => rows.reduce((s, i) => s + chargedLine(i), 0);
     const sellerSubtotals = sellerIds.map((id) => subtotalOf(itemsBySeller.get(id)!));
 
@@ -609,14 +665,14 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
         `INSERT INTO ${ORDERS}
           (id, order_number, user_id, seller_id, group_id, status, payment_status, total_amount, shipping_amount,
            tax_amount, final_amount, shipping_address, payment_method, notes,
-           delivery_type, delivery_fee, prepaid_amount, estimated_delivery, created_at, updated_at)
-         VALUES ($1,$2,$3,$4,$5,$6,'pending',$7,$8,$9,$10,$11,$12,$13,$14,$15,0,
+           delivery_type, delivery_fee, prepaid_amount, is_trial, estimated_delivery, created_at, updated_at)
+         VALUES ($1,$2,$3,$4,$5,$6,'pending',$7,$8,$9,$10,$11,$12,$13,$14,$15,0,$16,
            (NOW() AT TIME ZONE 'Asia/Kolkata') + INTERVAL '5 days',
            (NOW() AT TIME ZONE 'Asia/Kolkata'),
            (NOW() AT TIME ZONE 'Asia/Kolkata'))`,
         [subId, subNumber, req.userId, sellerId, groupId, orderStatus, sSubtotal, sShip, sTax, sFinal,
-         JSON.stringify(encryptedShippingAddress), paymentMethod, notes || '',
-         deliveryType, sFee]
+         JSON.stringify(encryptedShippingAddress), effectivePaymentMethod, notes || '',
+         deliveryType, sFee, isTrial]
       );
 
       for (const item of sellerItems) {
@@ -1173,6 +1229,182 @@ router.patch('/:id/cancel', authenticate, async (req: AuthRequest, res: Response
     client.release();
   }
 });
+
+// POST /api/v1/orders/:id/trial-selection — Phase 9A
+// The customer's keep/return answer for an Instant Delivery "try first" order,
+// within the 15-minute window the partner's /pickup opened. Body:
+//   { returnItemIds: string[] }   // order_items.id the customer is sending back
+// Everything not listed is kept. Recomputes the order's money on the kept items
+// and hands the order to the partner as 'awaiting_collection'.
+router.post('/:id/trial-selection', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+  const returnItemIds: string[] = Array.isArray(req.body?.returnItemIds)
+    ? req.body.returnItemIds.map(String)
+    : [];
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Lock the order so a concurrent second submit (or the lazy timeout sweep)
+    // can't finalise it twice.
+    const orderResult = await client.query(
+      `SELECT id, order_number, user_id, status, is_trial, trial_expires_at, total_amount,
+              shipping_amount, tax_amount, final_amount, delivery_fee, prepaid_amount,
+              payment_id, payment_status
+         FROM ${ORDERS} WHERE id = $1 AND user_id = $2 FOR UPDATE`,
+      [req.params.id, req.userId]
+    );
+    if (orderResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      res.status(404).json({ success: false, message: 'Order not found' });
+      return;
+    }
+    const order = orderResult.rows[0];
+    if (!order.is_trial || order.status !== 'trial_pending') {
+      await client.query('ROLLBACK');
+      res.status(409).json({ success: false, message: 'This order is not awaiting a trial selection' });
+      return;
+    }
+    if (order.trial_expires_at && new Date(order.trial_expires_at) < new Date()) {
+      await client.query('ROLLBACK');
+      res.status(409).json({ success: false, message: 'The 15-minute trial window has closed — all items were kept.' });
+      return;
+    }
+
+    const itemsResult = await client.query(
+      `SELECT id, product_id, product_name, quantity, price FROM ${ORDER_ITEMS} WHERE order_id = $1`,
+      [order.id]
+    );
+    const returnSet = new Set(returnItemIds);
+    const unknown = returnItemIds.filter((id) => !itemsResult.rows.some((r: any) => r.id === id));
+    if (unknown.length) {
+      await client.query('ROLLBACK');
+      res.status(400).json({ success: false, message: 'Unknown item in selection' });
+      return;
+    }
+
+    await client.query(
+      `UPDATE ${ORDER_ITEMS} SET is_returned = (id = ANY($2)) WHERE order_id = $1`,
+      [order.id, returnItemIds]
+    );
+
+    // Returned goods go straight back on the shelf — the partner is carrying them.
+    for (const item of itemsResult.rows.filter((r: any) => returnSet.has(r.id))) {
+      await client.query(
+        `UPDATE products SET quantity = quantity + $1, in_stock = true, updated_at = NOW() WHERE id = $2`,
+        [item.quantity, item.product_id]
+      );
+    }
+
+    // Money, on the customer-charged (marked-up) prices — same basis createOrder used.
+    const round2 = (n: number) => Math.round(n * 100) / 100;
+    const keptSubtotal = round2(
+      itemsResult.rows
+        .filter((r: any) => !returnSet.has(r.id))
+        .reduce((s: number, r: any) => s + withMarkup(r.price) * r.quantity, 0)
+    );
+    const originalSubtotal = Number(order.total_amount) || 0;
+    const shipping = Number(order.shipping_amount) || 0;
+    const fee = Number(order.delivery_fee) || 0;
+    const prepaid = Number(order.prepaid_amount) || 0;
+    // Any coupon discount is implicit in the original final_amount; keep it in
+    // proportion to what the customer actually kept.
+    const originalDiscount = Math.max(
+      0,
+      round2(originalSubtotal + shipping + Number(order.tax_amount || 0) + fee - Number(order.final_amount || 0))
+    );
+    const keptRatio = originalSubtotal > 0 ? keptSubtotal / originalSubtotal : 0;
+    const newDiscount = round2(originalDiscount * keptRatio);
+    const newTax = Math.round(keptSubtotal * 0.18);
+    // Delivery is charged even on a full return — the fee is non-refundable and
+    // was what the customer prepaid.
+    const newFinal = Math.max(0, round2(keptSubtotal + shipping + newTax + fee - newDiscount));
+    // Positive → the partner collects it. Negative → we owe the customer money
+    // back (they kept less than the fee they prepaid).
+    const dueAtDoor = round2(newFinal - prepaid);
+    const refundAmount = dueAtDoor < 0 ? round2(-dueAtDoor) : 0;
+
+    await client.query(
+      `UPDATE ${ORDERS}
+          SET status = 'awaiting_collection', trial_expires_at = NULL,
+              total_amount = $2, tax_amount = $3, final_amount = $4, updated_at = NOW()
+        WHERE id = $1`,
+      [order.id, keptSubtotal, newTax, newFinal]
+    );
+
+    await recordOrderStatus(
+      client,
+      order.id,
+      'awaiting_collection',
+      `Trial selection confirmed — ${itemsResult.rows.length - returnSet.size} item(s) kept, ${returnSet.size} returned. ` +
+        (refundAmount > 0 ? `Refund due ₹${refundAmount.toFixed(2)}.` : `₹${Math.max(0, dueAtDoor).toFixed(2)} to collect.`)
+    );
+
+    await client.query(
+      `INSERT INTO notifications (id, user_id, type, title, message, data, created_at)
+       VALUES ($1,$2,'order_update',$3,$4,$5, NOW())`,
+      [
+        generateId(),
+        order.user_id,
+        `Selection confirmed: ${order.order_number}`,
+        refundAmount > 0
+          ? `We'll refund ₹${refundAmount.toFixed(2)} to your original payment method.`
+          : `Please pay ₹${Math.max(0, dueAtDoor).toFixed(2)} to the delivery partner.`,
+        JSON.stringify({ orderId: order.id, orderNumber: order.order_number, status: 'awaiting_collection', dueAtDoor, refundAmount }),
+      ]
+    );
+
+    await client.query('COMMIT');
+
+    // Refund outside the transaction — a gateway failure must not undo the
+    // customer's selection. It is retried by support, not silently swallowed.
+    if (refundAmount > 0) {
+      await issueTrialRefund(order.id, order.payment_id, refundAmount);
+    }
+
+    res.json({
+      success: true,
+      data: {
+        orderId: order.id,
+        status: 'awaiting_collection',
+        finalAmount: newFinal,
+        prepaidAmount: prepaid,
+        dueAtDoor: Math.max(0, dueAtDoor),
+        refundAmount,
+        keptItemIds: itemsResult.rows.filter((r: any) => !returnSet.has(r.id)).map((r: any) => r.id),
+      },
+    });
+  } catch (err) {
+    try { await client.query('ROLLBACK'); } catch { /* ignore */ }
+    console.error('trialSelection error:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  } finally {
+    client.release();
+  }
+});
+
+// Refund the over-payment on a trial order back to the card/UPI that paid the
+// delivery fee. Logged either way — a failed gateway call leaves an auditable
+// 'refund_failed' row rather than a silent loss.
+async function issueTrialRefund(orderId: string, paymentId: string | null, amount: number): Promise<void> {
+  try {
+    if (!paymentId) throw new Error('order has no payment_id to refund against');
+    if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+      throw new Error('Razorpay credentials not configured');
+    }
+    const Razorpay = require('razorpay');
+    const rzp = new Razorpay({
+      key_id: process.env.RAZORPAY_KEY_ID,
+      key_secret: process.env.RAZORPAY_KEY_SECRET,
+    });
+    await rzp.payments.refund(paymentId, { amount: Math.round(amount * 100), speed: 'normal' });
+    await recordOrderStatus(null, orderId, 'awaiting_collection', `Refund of ₹${amount.toFixed(2)} issued to the original payment method`);
+  } catch (err: any) {
+    console.error('issueTrialRefund failed:', orderId, err?.message);
+    await recordOrderStatus(null, orderId, 'awaiting_collection', `Refund of ₹${amount.toFixed(2)} FAILED (${err?.message}) — needs manual action`)
+      .catch(() => { /* history is best-effort */ });
+  }
+}
 
 // PATCH /api/v1/orders/:id/confirm — Vendor accepts the order
 router.patch('/:id/confirm', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {

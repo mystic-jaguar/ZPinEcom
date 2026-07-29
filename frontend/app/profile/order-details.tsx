@@ -2,7 +2,7 @@ import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Bike, Check, Download, MapPin, Package, RotateCcw, Zap } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
 import { AppHeader, ZButton, ZText } from '../../components/ui';
@@ -39,6 +39,7 @@ export default function OrderDetailsScreen() {
     const [fetchedOrder, setFetchedOrder] = useState<OrderObject | null>(null);
     const [isFetching, setIsFetching] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [trialDeadlineMs, setTrialDeadlineMs] = useState<number | null>(null);
 
     const fetchOrder = useCallback(async (silent = false) => {
         try {
@@ -46,6 +47,12 @@ export default function OrderDetailsScreen() {
             const response = await orderService.getOrderById(singleId);
             const o = (response as any)?.data?.order || (response as any)?.data;
             if (o) {
+                // The server sends the trial window as a remaining duration; anchor it
+                // to this device's clock once, then count down locally.
+                // Only ever moved forward by the server — once the window closes the
+                // column is cleared, and we keep the last deadline so the "time
+                // expired" warning can stay up for its minute.
+                if (o.trialSecondsLeft != null) setTrialDeadlineMs(Date.now() + Number(o.trialSecondsLeft) * 1000);
                 setFetchedOrder({
                     id: o.id, userId: o.userId, sellerId: o.sellerId || '', orderNumber: o.orderNumber,
                     groupId: o.groupId ?? null,
@@ -56,8 +63,12 @@ export default function OrderDetailsScreen() {
                     items: Array.isArray(o.items) ? o.items.map((item: any) => ({
                         orderItemId: item.orderItemId || item.id, productId: item.productId, productName: item.productName,
                         quantity: item.quantity, price: Number(item.price || 0), image: item.image || '', variant: item.variant,
+                        isReturned: !!item.isReturned,
                     })) : [],
                     estimatedDelivery: o.estimatedDelivery || '', trackingNumber: o.trackingNumber, notes: o.notes,
+                    deliveryType: o.deliveryType, deliveryFee: Number(o.deliveryFee || 0),
+                    prepaidAmount: Number(o.prepaidAmount || 0),
+                    isTrial: !!o.isTrial, trialExpiresAt: o.trialExpiresAt ?? null,
                     createdAt: o.createdAt, updatedAt: o.updatedAt,
                 } as OrderObject);
             }
@@ -73,6 +84,41 @@ export default function OrderDetailsScreen() {
         setRefreshing(true);
         if (isMultiGroup) await refreshOrders(); else await fetchOrder(true);
         setRefreshing(false);
+    };
+
+    // ----- Phase 9A: Instant Delivery "try first" 15-minute window -----
+    // The window opens when the courier picks the order up (status 'trial_pending',
+    // trialExpiresAt stamped by the delivery backend). We tick locally for the
+    // countdown and its warnings, and re-fetch so the resolved state arrives.
+    const [showTrialModal, setShowTrialModal] = useState(false);
+    const [returnIds, setReturnIds] = useState<string[]>([]);
+    const [trialSubmitting, setTrialSubmitting] = useState(false);
+    const [trialError, setTrialError] = useState<string | null>(null);
+    const [nowMs, setNowMs] = useState(() => Date.now());
+    const trialActive = fetchedOrder?.status === 'trial_pending';
+
+    useEffect(() => {
+        if (!trialActive && trialDeadlineMs == null) return;
+        const tick = setInterval(() => setNowMs(Date.now()), 1000);
+        const poll = trialActive ? setInterval(() => fetchOrder(true), 15000) : null;
+        return () => { clearInterval(tick); if (poll) clearInterval(poll); };
+    }, [trialActive, trialDeadlineMs, fetchOrder]);
+
+    const toggleReturn = (itemId: string) =>
+        setReturnIds(prev => prev.includes(itemId) ? prev.filter(x => x !== itemId) : [...prev, itemId]);
+
+    const submitTrialSelection = async () => {
+        if (!fetchedOrder || trialSubmitting) return;
+        setTrialSubmitting(true);
+        try {
+            await orderService.submitTrialSelection(fetchedOrder.id, returnIds);
+            setShowTrialModal(false);
+            await fetchOrder(true);
+        } catch (e: any) {
+            setTrialError(e?.message || 'Could not save your selection. Please try again.');
+        } finally {
+            setTrialSubmitting(false);
+        }
     };
 
     // ----- Multi-shipment group: one parcel per seller, each with its own status -----
@@ -202,6 +248,20 @@ export default function OrderDetailsScreen() {
     const prepaidAmount = Number(order?.prepaidAmount || 0);
     const dueAtDoor = Math.max(0, Number(order?.finalAmount || 0) - prepaidAmount);
 
+    // Trial countdown. Warnings: yellow from 1 minute before the deadline, red
+    // from the moment it passes (the server then keeps everything by default).
+    const trialMsLeft = trialDeadlineMs != null ? trialDeadlineMs - nowMs : 0;
+    const trialExpired = trialDeadlineMs != null && trialMsLeft <= 0;
+    const trialWarning = trialActive && !trialExpired && trialMsLeft <= 60_000;
+    // The red "time expired" notice outlives the status change: the server keeps
+    // everything by default the moment the window closes, and the customer should
+    // still be told why, for a minute afterwards.
+    const showExpiredNotice = !!order?.isTrial && trialExpired && trialMsLeft > -60_000;
+    const trialClock = (() => {
+        const s = Math.max(0, Math.floor(trialMsLeft / 1000));
+        return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+    })();
+
     const canCancel = order && ['pending', 'confirmed'].includes(order.status);
     const canReturn = order && order.status === 'delivered';
 
@@ -246,6 +306,34 @@ export default function OrderDetailsScreen() {
                     </View>
                 </View>
 
+                {/* Phase 9A — the 15-minute keep/return window */}
+                {(trialActive || showExpiredNotice) && (
+                    <View style={[styles.trialCard, trialExpired ? styles.trialCardRed : trialWarning ? styles.trialCardYellow : null]}>
+                        <Text style={styles.trialTitle}>
+                            {trialExpired ? 'Time expired' : trialWarning ? 'Less than a minute left' : 'Choose what to keep'}
+                        </Text>
+                        <Text style={styles.trialBody}>
+                            {trialExpired
+                                ? 'The 15 minutes are up, so every item has been kept and the delivery partner will collect the balance at your door.'
+                                : `You have ${trialClock} to decide which items to keep. Anything you return goes straight back with the delivery partner and you are not charged for it. The delivery charge is not refundable.`}
+                        </Text>
+                        {trialActive && !trialExpired && (
+                            <Pressable style={styles.trialBtn} onPress={() => { setReturnIds([]); setShowTrialModal(true); }}>
+                                <Text style={styles.trialBtnText}>Select items</Text>
+                            </Pressable>
+                        )}
+                    </View>
+                )}
+                {order.isTrial && order.status === 'awaiting_collection' && !showExpiredNotice && (
+                    <View style={styles.trialCard}>
+                        <Text style={styles.trialTitle}>Selection confirmed</Text>
+                        <Text style={styles.trialBody}>
+                            Your final amount is ready. Pay {money(dueAtDoor)} to the delivery partner
+                            {dueAtDoor === 0 ? ' — nothing is due' : ''}.
+                        </Text>
+                    </View>
+                )}
+
                 {/* Items */}
                 <View style={styles.card}>
                     <ZText variant="eyebrow" style={{ marginBottom: 14 }}>{order.items.length} item{order.items.length !== 1 ? 's' : ''}</ZText>
@@ -254,7 +342,7 @@ export default function OrderDetailsScreen() {
                             <Image source={it.image ? { uri: it.image as string } : require('../../assets/images/icon_backup.png')} style={styles.itemImg} contentFit="cover" />
                             <View style={{ flex: 1 }}>
                                 <Text style={styles.itemName} numberOfLines={1}>{it.productName}</Text>
-                                <Text style={styles.itemVariant}>{it.variant ? `${it.variant} · ` : ''}Qty {it.quantity}</Text>
+                                <Text style={styles.itemVariant}>{it.variant ? `${it.variant} · ` : ''}Qty {it.quantity}{it.isReturned ? ' · Returned' : ''}</Text>
                             </View>
                             <Text style={styles.itemPrice}>{money(it.price)}</Text>
                         </View>
@@ -325,6 +413,53 @@ export default function OrderDetailsScreen() {
             </ScrollView>
 
             <ActionModal visible={showInvoiceModal} title="Invoice Download" message="Invoice will be downloaded to your device." icon="file-text" primaryButtonText="OK" onPrimaryPress={() => setShowInvoiceModal(false)} onClose={() => setShowInvoiceModal(false)} />
+
+            {/* Phase 9A — per-item Keep / Return. Everything defaults to Keep. */}
+            <Modal visible={showTrialModal} transparent animationType="slide" onRequestClose={() => setShowTrialModal(false)}>
+                <View style={styles.modalBackdrop}>
+                    <View style={styles.modalSheet}>
+                        <ZText variant="eyebrow" style={{ marginBottom: 4 }}>Keep or return</ZText>
+                        <Text style={styles.trialBody}>
+                            Tap an item to send it back. You pay only for what you keep, plus tax and the delivery charge.
+                        </Text>
+                        <ScrollView style={{ maxHeight: 300, marginVertical: 12 }}>
+                            {order.items.map((it) => {
+                                const id = String(it.orderItemId || '');
+                                const returning = returnIds.includes(id);
+                                return (
+                                    <Pressable key={id} style={[styles.itemRow, styles.itemRowBorder]} onPress={() => toggleReturn(id)}>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={styles.itemName} numberOfLines={1}>{it.productName}</Text>
+                                            <Text style={styles.itemVariant}>Qty {it.quantity} · {money(it.price * it.quantity)}</Text>
+                                        </View>
+                                        <Text style={[styles.trialChoice, returning && { color: palette.red500 }]}>
+                                            {returning ? 'Return' : 'Keep'}
+                                        </Text>
+                                    </Pressable>
+                                );
+                            })}
+                        </ScrollView>
+                        <ZButton
+                            label="Confirm selection"
+                            onPress={submitTrialSelection}
+                            loading={trialSubmitting}
+                            fullWidth
+                        />
+                        <Pressable onPress={() => setShowTrialModal(false)} style={{ paddingVertical: 12 }}>
+                            <Text style={[styles.trialBody, { textAlign: 'center' }]}>Cancel</Text>
+                        </Pressable>
+                    </View>
+                </View>
+            </Modal>
+            <ActionModal
+                visible={!!trialError}
+                title="Selection not saved"
+                message={trialError || ''}
+                icon="x-circle"
+                primaryButtonText="OK"
+                onPrimaryPress={() => setTrialError(null)}
+                onClose={() => setTrialError(null)}
+            />
         </SafeAreaView>
     );
 }
@@ -339,6 +474,19 @@ function BillRow({ label, value, mono, red }: { label: string; value: string; mo
 }
 
 const styles = StyleSheet.create({
+    // Phase 9A trial window. Neutral by default; yellow at 1 min to go, red once
+    // the window has closed — no new palette entries, same tokens as everywhere.
+    trialCard: { backgroundColor: colors.surfaceCard, borderRadius: radius.lg, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: colors.borderSubtle },
+    trialCardYellow: { borderWidth: 2, borderColor: palette.yellow500 },
+    trialCardRed: { borderWidth: 2, borderColor: palette.red500 },
+    trialTitle: { fontFamily: fonts.displaySemiBold, fontSize: 15, color: colors.textStrong, marginBottom: 6 },
+    trialBody: { fontFamily: fonts.bodyRegular, fontSize: 12, lineHeight: 18, color: colors.textBody },
+    trialBtn: { marginTop: 12, height: 44, borderRadius: radius.md, backgroundColor: palette.yellow500, alignItems: 'center', justifyContent: 'center' },
+    trialBtnText: { fontFamily: fonts.bodyBlack, fontSize: 13, color: colors.textOnYellow },
+    trialChoice: { fontFamily: fonts.bodyBlack, fontSize: 12, color: colors.textStrong },
+    modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+    modalSheet: { backgroundColor: palette.paperWarm, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, padding: 20, paddingBottom: 28 },
+
     container: { flex: 1, backgroundColor: palette.paperWarm },
     content: { padding: 20, paddingTop: 4 },
     banner: { backgroundColor: colors.surfaceInverse, borderRadius: radius.lg, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 13, marginBottom: 16, overflow: 'hidden' },

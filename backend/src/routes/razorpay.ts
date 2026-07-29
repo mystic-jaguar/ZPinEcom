@@ -34,7 +34,7 @@ router.post('/create-order', authenticate, async (req: AuthRequest, res: Respons
   try {
     // Fetch the order and verify ownership
     const result = await pool.query(
-      `SELECT id, group_id, final_amount, payment_status, payment_method, delivery_type, delivery_fee
+      `SELECT id, group_id, final_amount, payment_status, payment_method, delivery_type, delivery_fee, is_trial
          FROM ${ORDERS} WHERE id = $1 AND user_id = $2`,
       [orderId, req.userId]
     );
@@ -54,7 +54,7 @@ router.post('/create-order', authenticate, async (req: AuthRequest, res: Respons
     let groupRows: any[] = [order];
     if (order.group_id) {
       groupRows = (await pool.query(
-        `SELECT id, final_amount, payment_status, payment_method, delivery_type, delivery_fee
+        `SELECT id, final_amount, payment_status, payment_method, delivery_type, delivery_fee, is_trial
            FROM ${ORDERS} WHERE group_id = $1 AND user_id = $2`,
         [order.group_id, req.userId]
       )).rows;
@@ -127,7 +127,7 @@ router.post('/verify', authenticate, async (req: AuthRequest, res: Response): Pr
 
     // Verify order ownership and current status
     const orderResult = await client.query(
-      `SELECT id, group_id, final_amount, payment_status, order_number, payment_method, delivery_type, delivery_fee
+      `SELECT id, group_id, final_amount, payment_status, order_number, payment_method, delivery_type, delivery_fee, is_trial
          FROM ${ORDERS} WHERE id = $1 AND user_id = $2`,
       [appOrderId, req.userId]
     );
@@ -144,7 +144,7 @@ router.post('/verify', authenticate, async (req: AuthRequest, res: Response): Pr
     // legacy NULL-group orders) so a single payment confirms the whole group.
     const groupRows = order.group_id
       ? (await client.query(
-          `SELECT id, final_amount, payment_status, payment_method, delivery_type, delivery_fee
+          `SELECT id, final_amount, payment_status, payment_method, delivery_type, delivery_fee, is_trial
              FROM ${ORDERS} WHERE group_id = $1 AND user_id = $2`,
           [order.group_id, req.userId]
         )).rows

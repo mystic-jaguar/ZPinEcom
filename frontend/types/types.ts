@@ -295,6 +295,9 @@ export interface OrderItemObject {
     price: number;
     image: string;                         // Cloudinary URL
     variant?: string;
+    // Phase 9A: the customer sent this line back during the 15-minute Instant
+    // Delivery trial, so it is not part of the recalculated final amount.
+    isReturned?: boolean;
 }
 
 /**
@@ -308,7 +311,9 @@ export interface OrderObject {
     // Ties a checkout's per-seller sub-orders together (ZP-<groupId>). Null/absent
     // for legacy pre-split orders, which are treated as a group of one.
     groupId?: string | null;
-    status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'returned' | 'return_requested';
+    // 'trial_pending'      = Instant Delivery try-first, customer is choosing what to keep
+    // 'awaiting_collection' = choice made (or the 15 min lapsed), partner collects the balance
+    status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'returned' | 'return_requested' | 'trial_pending' | 'awaiting_collection';
     // 'partial' = only part of the order was settled online (Instant Delivery on
     // COD prepays just the delivery fee); the balance is collected at the door.
     paymentStatus: 'pending' | 'paid' | 'partial' | 'failed' | 'refunded';
@@ -326,6 +331,10 @@ export interface OrderObject {
     deliveryType?: 'standard' | 'flash';
     // How much of finalAmount was already settled online.
     prepaidAmount?: number;
+    // Phase 9A "try first". trialExpiresAt is null until the partner picks the
+    // order up — that is when the 15-minute selection window opens.
+    isTrial?: boolean;
+    trialExpiresAt?: string | null;
     partnerEarning?: number;
     distance?: number;                     // km
     estimatedTime?: number;                // minutes

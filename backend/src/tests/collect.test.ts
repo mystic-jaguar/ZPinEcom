@@ -24,6 +24,12 @@ describe('online charge split', () => {
   it('never charges more than the order total', () => {
     expect(amountToCharge({ ...instantCod, final_amount: 30 })).toBe(30);
   });
+
+  // Phase 9A: a "try first" order prepays only the delivery fee even when the
+  // customer picked Pay Online — the goods aren't chosen yet.
+  it('charges only the delivery fee for an Instant Delivery trial', () => {
+    expect(amountToCharge({ ...online, is_trial: true })).toBe(50);
+  });
 });
 
 describe('amount collected at the door', () => {

@@ -11,6 +11,9 @@ export interface CreateOrderData {
     couponCode?: string;
     deliveryFee?: number;
     couponDiscount?: number; // kept for backward compat but ignored by backend
+    // Phase 9A — Instant Delivery only: pay just the delivery fee now and choose
+    // which items to keep within 15 minutes of the partner picking the order up.
+    tryFirst?: boolean;
 }
 
 export interface OrderListParams {
@@ -87,6 +90,27 @@ export const orderService = {
             }>>(`orders/${id}/cancel`, data);
             return response.data;
         } catch (error: any) {
+            throw new Error(handleApiError(error));
+        }
+    },
+
+    /**
+     * Phase 9A — confirm which items to keep during the 15-minute Instant
+     * Delivery trial. Anything not listed in `returnItemIds` is kept.
+     */
+    async submitTrialSelection(id: string, returnItemIds: string[]) {
+        try {
+            // POST :- /api/v1/orders/:id/trial-selection
+            const response = await apiClient.post<ApiSuccessResponse<{
+                orderId: string;
+                status: string;
+                finalAmount: number;
+                prepaidAmount: number;
+                dueAtDoor: number;
+                refundAmount: number;
+            }>>(`orders/${id}/trial-selection`, { returnItemIds });
+            return response.data;
+        } catch (error) {
             throw new Error(handleApiError(error));
         }
     },

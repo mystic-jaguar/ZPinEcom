@@ -27,6 +27,9 @@ export default function CheckoutPaymentScreen() {
     const [orderError, setOrderError] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [confirmedFinalAmount, setConfirmedFinalAmount] = useState<number | null>(null);
+    // Phase 9A — Instant Delivery only: pay just the delivery fee now, then pick
+    // which items to keep within 15 minutes of the courier collecting the order.
+    const [tryFirst, setTryFirst] = useState(false);
 
     const hasRedirectedRef = React.useRef(false);
     useFocusEffect(
@@ -59,7 +62,10 @@ export default function CheckoutPaymentScreen() {
             : isRazorpayMethod ? 'razorpay'
             : 'cod';
 
-        const needsFeePrepay = backendMethod === 'cod' && isInstant && deliveryFee > 0;
+        // A trial order settles the goods at the door whatever method was picked,
+        // so it always prepays exactly the delivery fee online.
+        const isTrial = isInstant && tryFirst;
+        const needsFeePrepay = isInstant && deliveryFee > 0 && (isTrial || backendMethod === 'cod');
 
         let createdOrderId: string | null = null;
         try {
@@ -70,6 +76,7 @@ export default function CheckoutPaymentScreen() {
                 cartItems: cartPayload,
                 notes: isInstant ? 'instant_delivery' : 'standard_delivery',
                 deliveryFee: isInstant ? 50 : 0,
+                tryFirst: isTrial,
                 couponCode: appliedCoupon?.code,
             });
             if (!orderResponse.success || !orderResponse.data) throw new Error('Failed to create order');
@@ -174,6 +181,27 @@ export default function CheckoutPaymentScreen() {
                     ))}
                 </View>
 
+                {isInstant && (
+                    <Pressable
+                        style={[styles.tryCard, tryFirst && styles.tryCardOn]}
+                        onPress={() => setTryFirst(v => !v)}
+                        accessibilityRole="checkbox"
+                        accessibilityState={{ checked: tryFirst }}
+                    >
+                        <View style={[styles.checkbox, tryFirst && styles.checkboxOn]}>
+                            {tryFirst && <Check size={13} color={palette.yellow500} />}
+                        </View>
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.optLabel}>Try items for 15 minutes before paying</Text>
+                            <Text style={styles.optSub}>
+                                Pay only the {money(deliveryFee)} delivery charge now (non-refundable). When the
+                                courier picks up your order you get 15 minutes to choose which items to keep — you
+                                pay for those at your door and hand the rest back.
+                            </Text>
+                        </View>
+                    </Pressable>
+                )}
+
                 <View style={styles.eyebrowRow}>
                     <ZText variant="eyebrow" color={colors.textMuted}>Other options</ZText>
                 </View>
@@ -200,8 +228,10 @@ export default function CheckoutPaymentScreen() {
 
             <View style={[styles.footer, { paddingBottom: 14 + insets.bottom }]}>
                 <View>
-                    <ZText variant="eyebrow" color={colors.textMuted} style={{ marginBottom: 2 }}>Total to pay</ZText>
-                    <Text style={styles.footerTotal}>{money(finalTotal)}</Text>
+                    <ZText variant="eyebrow" color={colors.textMuted} style={{ marginBottom: 2 }}>
+                        {isInstant && tryFirst ? 'Pay now' : 'Total to pay'}
+                    </ZText>
+                    <Text style={styles.footerTotal}>{money(isInstant && tryFirst ? deliveryFee : finalTotal)}</Text>
                 </View>
                 <Pressable style={[styles.payBtn, isSubmitting && { opacity: 0.6 }]} onPress={handleConfirm} disabled={isSubmitting}>
                     {isSubmitting ? <ActivityIndicator color={colors.textOnYellow} /> : (
@@ -255,6 +285,11 @@ const styles = StyleSheet.create({
     brandChips: { flexDirection: 'row', gap: 8, marginLeft: 58, marginTop: -2, marginBottom: 22 },
     brandChip: { borderWidth: 1, borderColor: colors.borderSubtle, borderRadius: radius.xs, paddingHorizontal: 8, paddingVertical: 4 },
     brandChipText: { fontFamily: fonts.monoBold, fontSize: 10, color: colors.textBody },
+
+    tryCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, backgroundColor: colors.surfaceCard, borderRadius: 18, paddingVertical: 15, paddingHorizontal: 16, marginBottom: 12, borderWidth: 1, borderColor: palette.neutral200 },
+    tryCardOn: { borderWidth: 2, borderColor: colors.borderInk },
+    checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: colors.borderSubtle, alignItems: 'center', justifyContent: 'center', marginTop: 1 },
+    checkboxOn: { backgroundColor: colors.surfaceInverse, borderWidth: 0 },
 
     codNote: { backgroundColor: colors.surfaceSunken, borderRadius: radius.md, padding: 12, marginTop: -2, marginBottom: 12, gap: 6 },
     codNoteText: { fontFamily: fonts.bodyRegular, fontSize: 12, lineHeight: 17, color: colors.textBody },
