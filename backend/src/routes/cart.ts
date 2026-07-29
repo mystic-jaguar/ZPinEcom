@@ -52,6 +52,8 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response): Promise<v
       // is also the price checkout charges (see orders.ts). Never advertise a
       // deal price we don't actually bill.
       const effective = r.deal_price != null ? Number(r.deal_price) : Number(r.current_price);
+      const priceAtAddValue = withMarkup(Number(r.price_at_add));
+      const currentPrice = withMarkup(effective);
       const sizeQuantities = r.size_quantities || {};
       const hasSizes = Object.keys(sizeQuantities).length > 0;
       return {
@@ -64,7 +66,8 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response): Promise<v
       sizeQuantities: hasSizes ? sizeQuantities : undefined,
       // price_at_add / products.price are raw vendor prices; the customer sees
       // them with the 20% ZPIN platform fee applied (never stored).
-      priceAtAdd: withMarkup(effective),
+      priceAtAdd: priceAtAddValue,
+      priceChanged: priceAtAddValue !== currentPrice,
       // A sold-out size makes the line unavailable even when the product itself
       // still has stock in other sizes.
       isAvailable: r.in_stock && r.stock_qty >= r.quantity
@@ -80,7 +83,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response): Promise<v
       };
     });
 
-    const totalAmount = cart.reduce((sum: number, item: any) => sum + item.priceAtAdd * item.quantity, 0);
+    const totalAmount = cart.reduce((sum: number, item: any) => sum + item.product.price * item.quantity, 0);
 
     res.json({
       success: true,
@@ -89,7 +92,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response): Promise<v
         totalItems: cart.length,
         totalAmount,
         hasUnavailableItems: cart.some((i: any) => !i.isAvailable),
-        hasPriceChanges: cart.some((i: any) => i.priceAtAdd !== i.product.price),
+        hasPriceChanges: cart.some((i: any) => i.priceChanged),
       },
     });
   } catch (err) {
