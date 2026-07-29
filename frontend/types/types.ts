@@ -318,7 +318,7 @@ export interface OrderObject {
     groupId?: string | null;
     // 'trial_pending'      = Instant Delivery try-first, customer is choosing what to keep
     // 'awaiting_collection' = choice made (or the 15 min lapsed), partner collects the balance
-    status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'returned' | 'return_requested' | 'trial_pending' | 'awaiting_collection';
+    status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'in_transit' | 'out_for_delivery' | 'delivered' | 'cancelled' | 'returned' | 'return_requested' | 'trial_pending' | 'awaiting_collection';
     // 'partial' = only part of the order was settled online (Instant Delivery on
     // COD prepays just the delivery fee); the balance is collected at the door.
     paymentStatus: 'pending' | 'paid' | 'partial' | 'failed' | 'refunded';
@@ -330,7 +330,7 @@ export interface OrderObject {
     paymentMethod: 'razorpay' | 'cod';
     paymentId?: string;
     deliveryBoyId?: string;
-    deliveryStatus?: 'assigned' | 'accepted' | 'picked_up' | 'in_transit' | 'delivered';
+    deliveryStatus?: 'assigned' | 'accepted' | 'picked_up' | 'in_transit' | 'out_for_delivery' | 'delivered';
     deliveryFee?: number;
     // Stored vocabulary is unchanged: 'flash' is the Instant Delivery option.
     deliveryType?: 'standard' | 'flash';

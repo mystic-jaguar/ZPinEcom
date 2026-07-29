@@ -11,15 +11,17 @@ import { useOrder } from '../../context/OrderContext';
 import { orderService } from '../../services/order';
 import { OrderObject } from '../../types/types';
 import { groupOrders } from '../../utils/orderGroups';
+import { statusLabel } from '../../utils/orderStatus';
 
 const money = (n: number) => `₹${Number(n).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 
 function parcelStatusMeta(status: string) {
     if (status === 'delivered') return { label: 'Delivered', color: palette.green500 };
     if (status === 'cancelled') return { label: 'Cancelled', color: palette.red500 };
-    if (status === 'shipped') return { label: 'Out for delivery', color: palette.yellow600 };
+    if (status === 'out_for_delivery') return { label: 'Out for delivery', color: palette.yellow600 };
+    if (status === 'shipped' || status === 'in_transit') return { label: 'In transit', color: palette.yellow600 };
     if (status === 'returned' || status === 'return_requested') return { label: 'Return', color: palette.yellow600 };
-    return { label: status.charAt(0).toUpperCase() + status.slice(1), color: palette.yellow600 };
+    return { label: statusLabel(status), color: palette.yellow600 };
 }
 
 export default function OrderDetailsScreen() {
@@ -406,7 +408,7 @@ export default function OrderDetailsScreen() {
                 {canCancel && (
                     <ZButton label="Cancel order" variant="outline" style={{ marginTop: 12 }} onPress={() => router.push({ pathname: '/profile/cancel-order', params: { orderId: order.id } })} />
                 )}
-                {['processing', 'shipped'].includes(order.status) && (
+                {['processing', 'shipped', 'in_transit', 'out_for_delivery'].includes(order.status) && (
                     <ZButton label="Contact delivery partner" variant="light" style={{ marginTop: 12 }} onPress={() => Linking.openURL('tel:+919876543210')} />
                 )}
                 <View style={{ height: 30 }} />

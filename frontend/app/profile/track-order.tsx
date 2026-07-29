@@ -8,26 +8,14 @@ import { AppHeader, ZButton, ZText } from '../../components/ui';
 import { colors, fonts, palette, radius } from '../../constants/theme';
 import { useOrder } from '../../context/OrderContext';
 import { orderService } from '../../services/order';
-
-const TIMELINE = [
-    { key: 'confirmed', title: 'Order confirmed', note: 'Accepted by the vendor' },
-    { key: 'shipped', title: 'Out for delivery', note: 'On the way to you' },
-    { key: 'delivered', title: 'Delivered', note: 'Have your size ready' },
-];
+import { stepIndex, TRACK_STEPS } from '../../utils/orderStatus';
 
 const ELECTRIC_DELAY_MS = 5 * 60 * 1000; // 5 min after delivery before the surge kicks in
 
 const POLL_MS = 15 * 1000; // refresh the track screen every 15s while it's focused
 
-// delivery_status (written by the delivery app) is finer-grained than order.status:
-// accepted = courier assigned but not yet picked up; picked_up = out for delivery.
-// Prefer it when present so the hero/timeline advance live to "Out for delivery".
-function stepIndex(status?: string, deliveryStatus?: string | null) {
-    if (deliveryStatus === 'delivered' || status === 'delivered') return 2;
-    if (deliveryStatus === 'picked_up' || status === 'shipped') return 1;
-    if (deliveryStatus === 'accepted' || status === 'processing') return 1;
-    return 0; // pending / confirmed
-}
+// The five stages and their status mapping live in utils/orderStatus — the same
+// vocabulary the customer website's OrderTracking page uses.
 
 export default function TrackOrderScreen() {
     const router = useRouter();
@@ -73,7 +61,8 @@ export default function TrackOrderScreen() {
     const liveEta = trackingData?.estimatedDelivery || order?.estimatedDelivery;
     const canCancel = order && ['pending', 'confirmed'].includes(liveStatus);
     const active = stepIndex(liveStatus, deliveryStatus);
-    const phase: RoutePhase = active === 2 ? 'delivered' : active === 1 ? 'shipped' : 'confirmed';
+    // RouteTrack only draws three phases; collapse the five stages onto them.
+    const phase: RoutePhase = active >= 4 ? 'delivered' : active >= 2 ? 'shipped' : 'confirmed';
 
     // Instant-trial celebration: once delivered, wait a beat, then run the electric surge.
     const [electric, setElectric] = useState(false);
@@ -114,7 +103,7 @@ export default function TrackOrderScreen() {
                         <View>
                             <View style={styles.arrivingRow}>
                                 <View style={styles.pulse} />
-                                <Text style={styles.arriving}>ARRIVING · {phase === 'delivered' ? 'DELIVERED' : phase === 'shipped' ? 'ON THE WAY' : 'CONFIRMED'}</Text>
+                                <Text style={styles.arriving}>ARRIVING · {TRACK_STEPS[active].short}</Text>
                             </View>
                             <View style={styles.etaRow}>
                                 <Text style={styles.etaValue}>{etaLabel}</Text>
@@ -161,10 +150,10 @@ export default function TrackOrderScreen() {
                     {/* Timeline */}
                     <View style={styles.card}>
                         <ZText variant="eyebrow" style={{ marginBottom: 18 }}>Order status</ZText>
-                        {TIMELINE.map((step, i) => {
+                        {TRACK_STEPS.map((step, i) => {
                             const done = i < active;
                             const current = i === active;
-                            const last = i === TIMELINE.length - 1;
+                            const last = i === TRACK_STEPS.length - 1;
                             return (
                                 <View key={step.key} style={styles.tlRow}>
                                     <View style={styles.tlLeft}>

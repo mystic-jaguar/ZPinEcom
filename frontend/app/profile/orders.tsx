@@ -9,13 +9,16 @@ import { AppHeader, ZText } from '../../components/ui';
 import { colors, fonts, palette, radius } from '../../constants/theme';
 import { useOrder } from '../../context/OrderContext';
 import { groupOrders, groupStatus, OrderGroup } from '../../utils/orderGroups';
+import { isInProgress, statusLabel, TERMINATED } from '../../utils/orderStatus';
 
 const FILTERS = ['All', 'In Progress', 'Completed', 'Cancelled'];
 
 function statusMeta(status: string) {
     if (status === 'delivered') return { label: 'DELIVERED', bg: palette.green50, fg: palette.green500, dot: null };
     if (status === 'cancelled') return { label: 'CANCELLED', bg: '#F7E3E2', fg: palette.red500, dot: null };
-    if (status === 'shipped') return { label: 'OUT FOR DELIVERY', bg: palette.yellow100, fg: palette.yellow800, dot: palette.yellow600 };
+    if (status === 'out_for_delivery') return { label: 'OUT FOR DELIVERY', bg: palette.yellow100, fg: palette.yellow800, dot: palette.yellow600 };
+    if (status === 'shipped' || status === 'in_transit') return { label: 'IN TRANSIT', bg: palette.yellow100, fg: palette.yellow800, dot: palette.yellow600 };
+    if (TERMINATED.has(status)) return { label: statusLabel(status).toUpperCase(), bg: '#F7E3E2', fg: palette.red500, dot: null };
     return { label: 'IN PROGRESS', bg: palette.yellow100, fg: palette.yellow800, dot: palette.yellow600 };
 }
 
@@ -38,7 +41,7 @@ export default function AllOrdersScreen() {
     const filteredGroups = useMemo(() => groups.filter((g) => {
         if (activeFilter === 'All') return true;
         const s = g.orders.map(o => o.status);
-        if (activeFilter === 'In Progress') return s.some(x => ['pending', 'processing', 'shipped', 'confirmed'].includes(x));
+        if (activeFilter === 'In Progress') return s.some(isInProgress);
         if (activeFilter === 'Completed') return s.every(x => x === 'delivered');
         if (activeFilter === 'Cancelled') return s.every(x => x === 'cancelled');
         return true;
@@ -51,7 +54,7 @@ export default function AllOrdersScreen() {
         const items = group.orders.flatMap(o => o.items || []);
         const thumbs = items.slice(0, 2);
         const extra = items.length - thumbs.length;
-        const inProgress = ['pending', 'processing', 'shipped', 'confirmed'].includes(status);
+        const inProgress = isInProgress(status);
         const delivered = status === 'delivered';
         const cancelled = status === 'cancelled';
         const dateLabel = new Date(group.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });

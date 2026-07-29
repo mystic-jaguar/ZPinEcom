@@ -80,10 +80,12 @@ export async function ensureOrderSupportTables() {
     );
 
     await pool.query(
+      // order_id/user_id are 36 wide: website orders carry uuid ids and users.id
+      // is VARCHAR(36). The prod table was widened from 7 in parity Phase 12.
       `CREATE TABLE IF NOT EXISTS ${ORDER_CANCELLATIONS} (
         id VARCHAR(7) PRIMARY KEY,
-        order_id VARCHAR(7) NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-        user_id VARCHAR(7) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        order_id VARCHAR(36) NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+        user_id VARCHAR(36) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         reason TEXT NOT NULL,
         refund_method VARCHAR(50) NOT NULL DEFAULT 'original',
         created_at TIMESTAMP NOT NULL DEFAULT NOW()
@@ -121,7 +123,10 @@ function buildTrackingHistory(order: any, returnRequest?: any) {
     { status: 'pending', title: 'Order placed', timestamp: order.created_at },
   ];
 
-  const flow = ['confirmed', 'processing', 'shipped', 'delivered'];
+  // Same vocabulary the customer website understands (frontend/utils/orderStatus.ts).
+  // 'shipped' and 'in_transit' are the same stage under two names — an order carries
+  // one of them, never both, so keeping both in the flow is safe.
+  const flow = ['confirmed', 'processing', 'shipped', 'in_transit', 'out_for_delivery', 'delivered'];
   for (const status of flow) {
     if (order.status === status || flow.indexOf(order.status) > flow.indexOf(status)) {
       steps.push({

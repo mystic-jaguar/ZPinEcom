@@ -45,6 +45,7 @@ export function groupStatus(g: OrderGroup): OrderObject['status'] {
     const s = g.orders.map(o => o.status);
     if (s.every(x => x === 'delivered')) return 'delivered';
     if (s.every(x => x === 'cancelled')) return 'cancelled';
-    if (s.some(x => x === 'shipped')) return 'shipped';
+    if (s.some(x => x === 'out_for_delivery')) return 'out_for_delivery';
+    if (s.some(x => x === 'shipped' || x === 'in_transit')) return 'in_transit';
     return 'processing'; // in progress
 }

@@ -1,43 +1,14 @@
 import { Feather } from '@expo/vector-icons';
 import React, { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
+import { stepIndex, TRACK_STEPS } from '../../utils/orderStatus';
 
-const STEPS = [
-    {
-        key: 'confirmed',
-        title: 'Order Confirmed',
-        subtext: 'Your order has been accepted by the vendor.',
-    },
-    {
-        key: 'processing',
-        title: 'Order Picked',
-        subtext: 'Your order has been picked up by the delivery partner.',
-    },
-    {
-        key: 'delivered',
-        title: 'Delivered',
-        subtext: 'Package delivered successfully.',
-    },
-];
-
-// Map backend status → active step index (0-based)
-function statusToStep(status?: string): number {
-    switch (status) {
-        case 'pending':
-        case 'confirmed':
-        case 'processing':   // vendor accepts → sets processing → show as "Order Confirmed"
-            return 0;
-        case 'shipped':      // delivery partner picks up → show as "Order Picked"
-            return 1;
-        case 'delivered':
-            return 2;
-        default:
-            return 0;
-    }
-}
+// Five stages, shared with the customer website (see utils/orderStatus).
+const STEPS = TRACK_STEPS;
 
 interface OrderTimelineProps {
     status?: string;
+    deliveryStatus?: string | null;
     dates?: string[];
 }
 
@@ -92,8 +63,8 @@ function TimelineStep({ title, subtext, date, isCompleted, isActive, isLast, lin
     );
 }
 
-export default function OrderTimeline({ status, dates }: OrderTimelineProps) {
-    const activeStep = statusToStep(status);
+export default function OrderTimeline({ status, deliveryStatus, dates }: OrderTimelineProps) {
+    const activeStep = stepIndex(status, deliveryStatus);
 
     // One Animated.Value per connector line (one less than steps count)
     const lineAnims = useRef(STEPS.slice(0, -1).map(() => new Animated.Value(0))).current;
@@ -123,7 +94,7 @@ export default function OrderTimeline({ status, dates }: OrderTimelineProps) {
                     <TimelineStep
                         key={step.key}
                         title={step.title}
-                        subtext={step.subtext}
+                        subtext={step.note}
                         date={dates?.[i]}
                         isCompleted={i < activeStep}
                         isActive={i === activeStep}
