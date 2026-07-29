@@ -42,7 +42,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response): Promise<v
        FROM ${T} ci
        JOIN products p ON p.id = ci.product_id
        LEFT JOIN product_images pi ON pi.product_id = p.id
-       WHERE ci.user_id = $1
+       WHERE ci.user_id = $1 AND p.is_approved = true
        GROUP BY ci.id, p.product_name, p.price, p.in_stock, p.quantity, p.size_quantities`,
       [req.userId]
     );
@@ -123,7 +123,7 @@ router.post('/', authenticate, cartWriteLimiter, async (req: AuthRequest, res: R
 
   try {
     const product = await pool.query(
-      'SELECT price, in_stock, size_quantities FROM products WHERE id = $1::uuid', [productId]
+      'SELECT price, in_stock, size_quantities FROM products WHERE id = $1::uuid AND is_approved = true', [productId]
     );
     if (product.rows.length === 0) {
       res.status(404).json({ success: false, message: 'Product not found' });

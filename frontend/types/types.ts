@@ -203,6 +203,7 @@ export interface ProductObject {
     isLightningFast?: boolean;
     sellerName?: string;                   // detail endpoint only
     sellerAddress?: string;                // detail endpoint only, revealed on tap
+    sellerIsLive?: boolean;                // users.is_live — false blocks buying
 }
 
 // ============================================================================

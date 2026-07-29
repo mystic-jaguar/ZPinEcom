@@ -319,6 +319,15 @@ describe('GET /wishlist', () => {
 });
 
 describe('POST /wishlist', () => {
+  it('returns 404 when the product is not approved', async () => {
+    getDbMock().mockResolvedValueOnce({ rows: [] }); // catalogue predicate excludes it
+    const res = await request(app)
+      .post(WISH_BASE)
+      .set(bearerHeader(token))
+      .send({ productId: uuid });
+    expect(res.status).toBe(404);
+  });
+
   it('returns 400 when productId is missing', async () => {
     const res = await request(app)
       .post(WISH_BASE)
@@ -328,6 +337,7 @@ describe('POST /wishlist', () => {
   });
 
   it('returns 409 when product is already in wishlist', async () => {
+    getDbMock().mockResolvedValueOnce({ rows: [{ id: uuid }] });      // approved product
     getDbMock().mockResolvedValueOnce({ rows: [{ id: 'WSH0001' }] }); // already exists
     const res = await request(app)
       .post(WISH_BASE)
@@ -337,6 +347,7 @@ describe('POST /wishlist', () => {
   });
 
   it('adds product to wishlist', async () => {
+    getDbMock().mockResolvedValueOnce({ rows: [{ id: uuid }] }); // approved product
     getDbMock().mockResolvedValueOnce({ rows: [] }); // not in wishlist
     getDbMock().mockResolvedValueOnce({ rows: [] }); // INSERT
 

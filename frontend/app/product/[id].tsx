@@ -234,6 +234,12 @@ export default function ProductDetails() {
     const handleAddToCart = (tryAtDoor = false) => {
         if (!product) return;
 
+        // users.is_live — same rule and same wording as the website's ProductDetail.
+        if (product.sellerIsLive === false) {
+            setUnavailableMessage('This seller is not live yet. Their products are currently unavailable.');
+            return;
+        }
+
         // Validate variant selection if product has variants
         const requiresColor = product.colors && product.colors.length > 0;
         const requiresSize = product.sizes && product.sizes.length > 0;
@@ -351,6 +357,12 @@ export default function ProductDetails() {
                     {/* Seller name inline; the address stays behind the accordion below */}
                     {product.sellerName && (
                         <Text style={styles.sellerLine}>Sold by {product.sellerName}</Text>
+                    )}
+
+                    {product.sellerIsLive === false && (
+                        <Text style={styles.sellerOfflineLine}>
+                            This seller is not live yet — their products are currently unavailable for purchase.
+                        </Text>
                     )}
 
                     <View style={styles.priceRow}>
@@ -784,6 +796,11 @@ const styles = StyleSheet.create({
     sellerLine: {
         fontSize: 13,
         color: '#666',
+        marginBottom: 12
+    },
+    sellerOfflineLine: {
+        fontSize: 13,
+        color: '#b3261e',
         marginBottom: 12
     },
     priceRow: {

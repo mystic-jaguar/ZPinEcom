@@ -18,7 +18,7 @@ router.get('/', async (_req: Request, res: Response) => {
        JOIN products p ON p.id = fd.product_id
        LEFT JOIN product_images pi ON pi.product_id = p.id
        LEFT JOIN product_reviews pr ON pr.product_id = p.id AND pr.is_hidden = false
-       WHERE ${LIVE_DEAL_PREDICATE} AND p.in_stock = true
+       WHERE ${LIVE_DEAL_PREDICATE} AND p.in_stock = true AND p.is_approved = true
        GROUP BY fd.id, p.product_name, p.price, p.description, p.in_stock
        ORDER BY fd.ends_at ASC
        LIMIT 20`

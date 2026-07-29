@@ -412,10 +412,12 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
 
     let cartResult = await client.query(
       `SELECT ci.*, p.price, p.product_name, p.user_id as seller_id,
+        (u.is_live IS NOT FALSE) as seller_is_live,
         (SELECT image_url FROM product_images WHERE product_id = p.id LIMIT 1) as image
        FROM ${CART} ci
        JOIN products p ON p.id = ci.product_id
-       WHERE ci.user_id = $1`,
+       LEFT JOIN users u ON u.id = p.user_id
+       WHERE ci.user_id = $1 AND p.is_approved = true`,
       [req.userId]
     );
 
@@ -453,7 +455,7 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
 
       for (const item of wantedLines) {
         const product = await client.query(
-          'SELECT price, in_stock, product_name, user_id FROM products WHERE id = $1::uuid',
+          'SELECT price, in_stock, product_name, user_id FROM products WHERE id = $1::uuid AND is_approved = true',
           [item.productId]
         );
         if (product.rows.length === 0 || !product.rows[0].in_stock) continue;
@@ -480,10 +482,12 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
       // Re-fetch cart after reconcile
       cartResult = await client.query(
         `SELECT ci.*, p.price, p.product_name, p.user_id as seller_id,
+          (u.is_live IS NOT FALSE) as seller_is_live,
           (SELECT image_url FROM product_images WHERE product_id = p.id LIMIT 1) as image
          FROM ${CART} ci
          JOIN products p ON p.id = ci.product_id
-         WHERE ci.user_id = $1`,
+         LEFT JOIN users u ON u.id = p.user_id
+         WHERE ci.user_id = $1 AND p.is_approved = true`,
         [req.userId]
       );
     }
@@ -492,6 +496,20 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
       await client.query('ROLLBACK');
       client.release();
       res.status(400).json({ success: false, message: 'Cart is empty' });
+      return;
+    }
+
+    // users.is_live — a seller who has gone offline cannot be bought from. The
+    // catalogue predicate (is_approved) decides what is listed; is_live decides
+    // what can be ordered right now, and this is the one place it is enforced.
+    const offline = cartResult.rows.find((r: any) => r.seller_is_live === false);
+    if (offline) {
+      await client.query('ROLLBACK');
+      client.release();
+      res.status(409).json({
+        success: false,
+        message: `${offline.product_name} is unavailable right now — the seller is offline. Please remove it and try again.`,
+      });
       return;
     }
 
