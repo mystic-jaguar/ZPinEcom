@@ -151,7 +151,7 @@ export default function OrderDetailsScreen() {
                         const meta = parcelStatusMeta(parcel.status);
                         const canCancel = ['pending', 'confirmed'].includes(parcel.status);
                         const canReturn = parcel.status === 'delivered';
-                        const canTrack = !['cancelled', 'returned'].includes(parcel.status);
+                        const canTrack = !['cancelled', 'returned', 'delivered'].includes(parcel.status);
                         return (
                             <View key={parcel.id} style={styles.card}>
                                 <View style={styles.parcelHead}>
@@ -402,7 +402,7 @@ export default function OrderDetailsScreen() {
                     </Pressable>
                 </View>
 
-                {!cancelled && order.status !== 'returned' && (
+                {!cancelled && !delivered && order.status !== 'returned' && (
                     <ZButton label="Track order" style={{ marginTop: 12 }} onPress={() => router.push({ pathname: '/profile/track-order', params: { orderId: order.id } })} />
                 )}
                 {canCancel && (
