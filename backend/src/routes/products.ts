@@ -7,6 +7,7 @@ import { generateId } from '../utils/id';
 import { AUTO_HIDE_THRESHOLD, ensureModerationSchema } from '../utils/moderationSchema';
 import { withMarkup, withoutMarkup } from '../utils/pricing';
 import { cacheDel, cacheDelPattern, cacheGet, cacheSet } from '../utils/redis';
+import { logger } from '../utils/logger';
 
 // TTLs (seconds)
 const TTL_PRODUCT = 7200;       // 2h — individual product
@@ -231,7 +232,7 @@ router.get('/recommended', authenticate, async (req: AuthRequest, res: Response)
 
     res.json({ success: true, products: result.rows.map(normalizeProduct), source: 'personalized' });
   } catch (err) {
-    console.error('recommended error:', err);
+    logger.error('recommended_error', { error: (err as any)?.message ?? String(err) });
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
@@ -297,7 +298,7 @@ router.get('/search', productListLimiter, async (req: Request, res: Response): P
 
     res.json({ success: true, products, related });
   } catch (err) {
-    console.error('search error:', err);
+    logger.error('search_error', { error: (err as any)?.message ?? String(err) });
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
@@ -354,7 +355,7 @@ router.get('/nearby', async (req: Request, res: Response): Promise<void> => {
     await cacheSet(cacheKey, response, TTL_NEARBY);
     res.json(response);
   } catch (err) {
-    console.error('nearby error:', err);
+    logger.error('nearby_error', { error: (err as any)?.message ?? String(err) });
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
@@ -395,7 +396,7 @@ router.get('/fresh-categories', async (req: Request, res: Response): Promise<voi
     await cacheSet(cacheKey, response, TTL_FRESH_CAT);
     res.json(response);
   } catch (err) {
-    console.error('freshCategories error:', err);
+    logger.error('freshcategories_error', { error: (err as any)?.message ?? String(err) });
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
@@ -565,7 +566,7 @@ router.get('/category/:categoryName', productListLimiter, async (req: Request, r
     await cacheSet(cacheKey, response, TTL_PRODUCT_LIST);
     res.json(response);
   } catch (err) {
-    console.error('getProductsByCategory error:', err);
+    logger.error('getproductsbycategory_error', { error: (err as any)?.message ?? String(err) });
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
@@ -613,7 +614,7 @@ router.get('/', productListLimiter, async (req: Request, res: Response): Promise
     await cacheSet(cacheKey, response, TTL_PRODUCT_LIST);
     res.json(response);
   } catch (err) {
-    console.error('getProducts error:', err);
+    logger.error('getproducts_error', { error: (err as any)?.message ?? String(err) });
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
@@ -671,7 +672,7 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
     await cacheSet(cacheKey, response, TTL_PRODUCT);
     res.json(response);
   } catch (err) {
-    console.error('getProduct error:', err);
+    logger.error('getproduct_error', { error: (err as any)?.message ?? String(err) });
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
@@ -809,7 +810,7 @@ router.get('/:id/reviews', async (req: Request, res: Response): Promise<void> =>
 
     res.json(response);
   } catch (err) {
-    console.error('getReviews error:', err);
+    logger.error('getreviews_error', { error: (err as any)?.message ?? String(err) });
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
@@ -879,7 +880,7 @@ router.post('/:id/reviews', authenticate, reviewLimiter, async (req: AuthRequest
     ]);
     res.status(201).json({ success: true, message: 'Review added' });
   } catch (err) {
-    console.error('addReview error:', err);
+    logger.error('addreview_error', { error: (err as any)?.message ?? String(err) });
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
@@ -967,7 +968,7 @@ router.put('/:id/reviews/:reviewId', authenticate, async (req: AuthRequest, res:
 
     res.json({ success: true, message: 'Review updated' });
   } catch (err) {
-    console.error('updateReview error:', err);
+    logger.error('updatereview_error', { error: (err as any)?.message ?? String(err) });
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
@@ -1016,7 +1017,7 @@ router.delete('/:id/reviews/:reviewId', authenticate, async (req: AuthRequest, r
 
     res.json({ success: true, message: 'Review deleted' });
   } catch (err) {
-    console.error('deleteReview error:', err);
+    logger.error('deletereview_error', { error: (err as any)?.message ?? String(err) });
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
@@ -1077,7 +1078,7 @@ router.post('/:id/reviews/:reviewId/report', authenticate, reviewLimiter, async 
       hidden,
     });
   } catch (err) {
-    console.error('reportReview error:', err);
+    logger.error('reportreview_error', { error: (err as any)?.message ?? String(err) });
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });

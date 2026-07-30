@@ -5,6 +5,7 @@ import { generateId } from '../utils/id';
 import { withMarkup } from '../utils/pricing';
 import { cacheDelPattern } from '../utils/redis';
 import { safeIdentifier } from '../utils/sql';
+import { logger } from '../utils/logger';
 
 const router = Router();
 const T = safeIdentifier('wishlists');
@@ -73,7 +74,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response): Promise<v
       },
     });
   } catch (err) {
-    console.error('getWishlist error:', err);
+    logger.error('getwishlist_error', { error: (err as any)?.message ?? String(err) });
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
@@ -110,7 +111,7 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response): Promise<
     await cacheDelPattern(`user:${req.userId}:wishlist:*`);
     res.status(201).json({ success: true, message: 'Added to wishlist' });
   } catch (err) {
-    console.error('addWishlist error:', err);
+    logger.error('addwishlist_error', { error: (err as any)?.message ?? String(err) });
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });

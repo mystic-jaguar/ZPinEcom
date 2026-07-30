@@ -2,6 +2,7 @@ import { Response, Router } from 'express';
 import { pool } from '../db';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { decryptAddressPayload } from '../utils/encryption';
+import { logger } from '../utils/logger';
 
 const router = Router();
 
@@ -99,7 +100,7 @@ router.post('/new-order', authenticate, async (req: AuthRequest, res: Response):
       })),
     });
   } catch (err) {
-    console.error('notifications/new-order error:', err);
+    logger.error('notificationsneworder_error', { error: (err as any)?.message ?? String(err) });
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
@@ -120,7 +121,7 @@ router.get('/new-order/count', authenticate, async (req: AuthRequest, res: Respo
     );
     res.json({ success: true, count: Number(result.rows[0].count) });
   } catch (err) {
-    console.error('notifications count error:', err);
+    logger.error('notifications_count_error', { error: (err as any)?.message ?? String(err) });
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });

@@ -224,7 +224,7 @@ router.post('/signup', signupLimiter, async (req: Request, res: Response): Promi
     });
     logger.authSuccess('pending', req.ip || '', 'signup_pending');
   } catch (err: any) {
-    console.error('Signup error:', err.code);
+    logger.error('signup_error', { error: err.code });
     if (err.code === '23505') {
       const detail: string = err.detail || '';
       if (detail.includes('mobile')) {
@@ -308,7 +308,7 @@ router.post('/login', loginLimiter, async (req: Request, res: Response): Promise
     res.json({ success: true, message: 'Login successful', accessToken, refreshToken, user });
     logger.authSuccess(user.id, req.ip || '', 'login');
   } catch (err) {
-    console.error('Login error');
+    logger.error('login_error');
     res.status(500).json({ success: false, message: 'Server error during login' });
   }
 });
@@ -443,7 +443,7 @@ router.post('/forgetPassword/sendOTP', otpLimiter, async (req: Request, res: Res
     // Never return OTP in response
     res.json({ success: true, message: 'If that email exists, an OTP has been sent' });
   } catch (err) {
-    console.error('sendOTP error');
+    logger.error('sendotp_error');
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
@@ -496,7 +496,7 @@ router.post('/forgetPassword/verifyOTP', otpVerifyLimiter, async (req: Request, 
 
     res.json({ success: true, message: 'OTP verified', resetToken });
   } catch (err) {
-    console.error('verifyOTP error');
+    logger.error('verifyotp_error');
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
@@ -552,7 +552,7 @@ router.post('/forgetPassword/resetPassword', otpVerifyLimiter, async (req: Reque
     res.json({ success: true, message: 'Password reset successfully. Please log in again.' });
     logger.security('auth.password_reset', { userId, ip: req.ip || '' });
   } catch (err) {
-    console.error('resetPassword error');
+    logger.error('resetpassword_error');
     res.status(400).json({ success: false, message: 'Invalid or expired reset token' });
   }
 });
@@ -582,7 +582,7 @@ router.post('/verification/sendOTP', otpLimiter, async (req: Request, res: Respo
     );
     hasPending = updated.rows.length > 0;
   } catch (err) {
-    console.error('sendOTP db error');
+    logger.error('sendotp_db_error');
     res.status(500).json({ success: false, message: 'Server error' });
     return;
   }
@@ -682,7 +682,7 @@ router.post('/verification/verifyOTP', otpVerifyLimiter, async (req: Request, re
     });
     logger.authSuccess(user.id, req.ip || '', 'signup_verified');
   } catch (err) {
-    console.error('verifyOTP error');
+    logger.error('verifyotp_error');
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });

@@ -9,6 +9,7 @@ import { recordOrderStatus } from '../utils/orderHistory';
 import { markupItems, withMarkup } from '../utils/pricing';
 import { cacheDel, cacheDelPattern } from '../utils/redis';
 import { safeIdentifier } from '../utils/sql';
+import { logger } from '../utils/logger';
 
 const router = Router();
 const ORDERS = safeIdentifier('orders');
@@ -71,7 +72,7 @@ export async function ensureOrderSupportTables() {
       } catch (alterErr: any) {
         // Ignore "column already exists" errors (code 42701)
         if (alterErr?.code !== '42701') {
-          console.warn('[ensureOrderSupportTables] ALTER warning:', alterErr?.message);
+          logger.warn('ensureordersupporttables_alter_warning', { error: alterErr?.message });
         }
       }
     }
@@ -113,7 +114,7 @@ export async function ensureOrderSupportTables() {
 
     supportTablesReady = true;
   } catch (err: any) {
-    console.error('[ensureOrderSupportTables] Failed:', err?.message);
+    logger.error('ensureordersupporttables_failed', { error: err?.message });
     throw err;
   }
 }
@@ -195,7 +196,7 @@ async function finalizeExpiredTrials(): Promise<void> {
         WHERE status = 'trial_pending' AND trial_expires_at IS NOT NULL AND trial_expires_at < NOW()`
     );
   } catch (err: any) {
-    console.warn('finalizeExpiredTrials:', err?.message);
+    logger.warn('finalizeexpiredtrials', { error: err?.message });
   }
 }
 
@@ -289,7 +290,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response): Promise<v
       },
     });
   } catch (err) {
-    console.error('getOrders error:', err);
+    logger.error('getorders_error', { error: (err as any)?.message ?? String(err) });
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
@@ -327,7 +328,7 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response): Promis
 
     res.json({ success: true, data: { order: normalizeOrder(result.rows[0]) } });
   } catch (err) {
-    console.error('getOrder error:', err);
+    logger.error('getorder_error', { error: (err as any)?.message ?? String(err) });
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
@@ -388,7 +389,7 @@ router.get('/:id/track', authenticate, async (req: AuthRequest, res: Response): 
       },
     });
   } catch (err: any) {
-    console.error('trackOrder error:', err?.message, err?.code, err?.stack);
+    logger.error('trackorder_error', { error: err?.message, code: err?.code, stack: err?.stack });
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
@@ -611,7 +612,7 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
         }
       } catch (couponErr) {
         // Non-fatal — proceed without discount if coupon lookup fails
-        console.warn('Coupon validation error:', couponErr);
+        logger.warn('coupon_validation_error', { error: (couponErr as any)?.message ?? String(couponErr) });
       }
     }
     couponDiscount = Math.max(0, couponDiscount);
@@ -625,7 +626,7 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
     // unattributable for payouts — fail closed if any product has no owner.
     const orphan = cartResult.rows.find((i: any) => !i.seller_id);
     if (orphan) {
-      console.error('createOrder: product has no owner (products.user_id is NULL)', {
+      logger.error('createorder.product_has_no_owner', {
         userId: req.userId,
         productId: orphan.product_id,
         productName: orphan.product_name,
@@ -906,9 +907,9 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
     try {
       await client.query('ROLLBACK');
     } catch (rollbackErr) {
-      console.error('ROLLBACK error:', rollbackErr);
+      logger.error('rollback_error', { error: (rollbackErr as any)?.message ?? String(rollbackErr) });
     }
-    console.error('createOrder error:', err);
+    logger.error('createorder_error', { error: (err as any)?.message ?? String(err) });
     res.status(500).json({ success: false, message: 'Server error' });
   } finally {
     client.release();
@@ -1004,7 +1005,7 @@ router.post('/:id/return', authenticate, async (req: AuthRequest, res: Response)
       },
     });
   } catch (err) {
-    console.error('returnOrder error:', err);
+    logger.error('returnorder_error', { error: (err as any)?.message ?? String(err) });
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
@@ -1134,7 +1135,7 @@ router.patch('/:id/return-status', authenticate, async (req: AuthRequest, res: R
     });
   } catch (err) {
     try { await client.query('ROLLBACK'); } catch { /* ignore */ }
-    console.error('updateReturnStatus error:', err);
+    logger.error('updatereturnstatus_error', { error: (err as any)?.message ?? String(err) });
     res.status(500).json({ success: false, message: 'Server error' });
   } finally {
     client.release();
@@ -1194,7 +1195,7 @@ router.get('/:id/return-status', authenticate, async (req: AuthRequest, res: Res
       },
     });
   } catch (err) {
-    console.error('getReturnStatus error:', err);
+    logger.error('getreturnstatus_error', { error: (err as any)?.message ?? String(err) });
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
@@ -1282,7 +1283,7 @@ router.patch('/:id/cancel', authenticate, async (req: AuthRequest, res: Response
     });
   } catch (err) {
     try { await client.query('ROLLBACK'); } catch { /* ignore */ }
-    console.error('cancelOrder error:', err);
+    logger.error('cancelorder_error', { error: (err as any)?.message ?? String(err) });
     res.status(500).json({ success: false, message: 'Server error' });
   } finally {
     client.release();
@@ -1435,7 +1436,7 @@ router.post('/:id/trial-selection', authenticate, async (req: AuthRequest, res: 
     });
   } catch (err) {
     try { await client.query('ROLLBACK'); } catch { /* ignore */ }
-    console.error('trialSelection error:', err);
+    logger.error('trialselection_error', { error: (err as any)?.message ?? String(err) });
     res.status(500).json({ success: false, message: 'Server error' });
   } finally {
     client.release();
@@ -1459,7 +1460,7 @@ async function issueTrialRefund(orderId: string, paymentId: string | null, amoun
     await rzp.payments.refund(paymentId, { amount: Math.round(amount * 100), speed: 'normal' });
     await recordOrderStatus(null, orderId, 'awaiting_collection', `Refund of ₹${amount.toFixed(2)} issued to the original payment method`);
   } catch (err: any) {
-    console.error('issueTrialRefund failed:', orderId, err?.message);
+    logger.error('issuetrialrefund_failed', { orderId, error: err?.message });
     await recordOrderStatus(null, orderId, 'awaiting_collection', `Refund of ₹${amount.toFixed(2)} FAILED (${err?.message}) — needs manual action`)
       .catch(() => { /* history is best-effort */ });
   }
@@ -1527,7 +1528,7 @@ router.patch('/:id/confirm', authenticate, async (req: AuthRequest, res: Respons
       message: 'Order confirmed successfully',
     });
   } catch (err) {
-    console.error('confirmOrder error:', err);
+    logger.error('confirmorder_error', { error: (err as any)?.message ?? String(err) });
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });

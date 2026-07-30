@@ -6,6 +6,7 @@ import { generateId, isValidShortId } from '../utils/id';
 import { LIVE_DEAL_PREDICATE } from '../utils/flashDeals';
 import { withMarkup } from '../utils/pricing';
 import { safeIdentifier } from '../utils/sql';
+import { logger } from '../utils/logger';
 
 const router = Router();
 const T = safeIdentifier('cart_items');
@@ -96,7 +97,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response): Promise<v
       },
     });
   } catch (err) {
-    console.error('getCart error:', err);
+    logger.error('getcart_error', { error: (err as any)?.message ?? String(err) });
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
@@ -176,7 +177,7 @@ router.post('/', authenticate, cartWriteLimiter, async (req: AuthRequest, res: R
 
     res.status(201).json({ success: true, message: 'Added to cart' });
   } catch (err) {
-    console.error('addToCart error:', err);
+    logger.error('addtocart_error', { error: (err as any)?.message ?? String(err) });
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
@@ -247,7 +248,7 @@ router.put('/:productId', authenticate, async (req: AuthRequest, res: Response):
     }
     res.json({ success: true, message: 'Cart updated' });
   } catch (err) {
-    console.error('updateCart error:', err);
+    logger.error('updatecart_error', { error: (err as any)?.message ?? String(err) });
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });

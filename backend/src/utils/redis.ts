@@ -1,4 +1,5 @@
 import Redis from 'ioredis';
+import { logger } from './logger';
 
 const redis = new Redis({
   host: process.env.REDIS_HOST || 'localhost',
@@ -13,11 +14,11 @@ const redis = new Redis({
 
 redis.on('error', (err) => {
   // Log but don't crash — app works without cache
-  console.warn('[Redis] connection error:', err.message);
+  logger.warn('redis_connection_error', { error: err.message });
 });
 
 redis.on('connect', () => {
-  console.info('[Redis] connected');
+  logger.info('redis_connected');
 });
 
 /**

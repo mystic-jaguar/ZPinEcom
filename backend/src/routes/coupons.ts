@@ -3,6 +3,7 @@ import { pool } from '../db';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { couponLimiter } from '../middleware/rateLimits';
 import { cacheGet, cacheSet } from '../utils/redis';
+import { logger } from '../utils/logger';
 
 const COUPON_CACHE_KEY = 'coupons:all';
 const TTL_COUPONS = 3600; // 1h
@@ -52,7 +53,7 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
     await cacheSet(COUPON_CACHE_KEY, response, TTL_COUPONS);
     res.json(response);
   } catch (err) {
-    console.error('getCoupons error:', err);
+    logger.error('getcoupons_error', { error: (err as any)?.message ?? String(err) });
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
@@ -119,7 +120,7 @@ router.post('/validate', authenticate, couponLimiter, async (req: AuthRequest, r
       },
     });
   } catch (err) {
-    console.error('validateCoupon error:', err);
+    logger.error('validatecoupon_error', { error: (err as any)?.message ?? String(err) });
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });

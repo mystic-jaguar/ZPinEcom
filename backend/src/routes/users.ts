@@ -7,6 +7,7 @@ import { generateId } from '../utils/id';
 import { ensureModerationSchema } from '../utils/moderationSchema';
 import { markupItems } from '../utils/pricing';
 import { safeIdentifier } from '../utils/sql';
+import { logger } from '../utils/logger';
 
 const router = Router();
 
@@ -114,7 +115,7 @@ router.get('/orders', authenticate, async (req: AuthRequest, res: Response): Pro
       },
     });
   } catch (err) {
-    console.error('getUserOrders error:', err);
+    logger.error('getuserorders_error', { error: (err as any)?.message ?? String(err) });
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
@@ -129,7 +130,7 @@ router.get('/shipping-addresses', authenticate, async (req: AuthRequest, res: Re
     );
     res.json({ success: true, data: result.rows.map(normalizeAddress) });
   } catch (err) {
-    console.error('getAddresses error:', err);
+    logger.error('getaddresses_error', { error: (err as any)?.message ?? String(err) });
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
@@ -187,7 +188,7 @@ router.put('/profileDetails', authenticate, async (req: AuthRequest, res: Respon
 
     res.json({ success: true, message: 'Profile updated successfully', data: normalizeUser(updated.rows[0]) });
   } catch (err) {
-    console.error('updateProfile error:', err);
+    logger.error('updateprofile_error', { error: (err as any)?.message ?? String(err) });
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
@@ -297,7 +298,7 @@ router.delete('/me', authenticate, async (req: AuthRequest, res: Response): Prom
     res.json({ success: true, message: 'Account deleted' });
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});
-    console.error('deleteAccount error:', err);
+    logger.error('deleteaccount_error', { error: (err as any)?.message ?? String(err) });
     res.status(500).json({ success: false, message: 'Server error' });
   } finally {
     client.release();
@@ -323,7 +324,7 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response): Promis
     }
     res.json({ success: true, data: normalizeUser(result.rows[0]) });
   } catch (err) {
-    console.error('getUser error:', err);
+    logger.error('getuser_error', { error: (err as any)?.message ?? String(err) });
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
@@ -393,7 +394,7 @@ router.post('/shipping-address', authenticate, addressLimiter, async (req: AuthR
 
     res.status(201).json({ success: true, data: normalizeAddress(result.rows[0]) });
   } catch (err) {
-    console.error('addAddress error:', err);
+    logger.error('addaddress_error', { error: (err as any)?.message ?? String(err) });
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
@@ -469,7 +470,7 @@ router.put('/shipping-address/:addressId', authenticate, async (req: AuthRequest
 
     res.json({ success: true, data: normalizeAddress(result.rows[0]) });
   } catch (err) {
-    console.error('updateAddress error:', err);
+    logger.error('updateaddress_error', { error: (err as any)?.message ?? String(err) });
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
@@ -489,7 +490,7 @@ router.delete('/shipping-address/:addressId', authenticate, async (req: AuthRequ
     }
     res.json({ success: true, message: 'Address deleted' });
   } catch (err) {
-    console.error('deleteAddress error:', err);
+    logger.error('deleteaddress_error', { error: (err as any)?.message ?? String(err) });
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
@@ -528,7 +529,7 @@ router.post('/block', authenticate, async (req: AuthRequest, res: Response): Pro
 
     res.json({ success: true, message: 'User blocked' });
   } catch (err) {
-    console.error('blockUser error:', err);
+    logger.error('blockuser_error', { error: (err as any)?.message ?? String(err) });
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
@@ -545,7 +546,7 @@ router.delete('/block/:userId', authenticate, async (req: AuthRequest, res: Resp
     );
     res.json({ success: true, message: 'User unblocked' });
   } catch (err) {
-    console.error('unblockUser error:', err);
+    logger.error('unblockuser_error', { error: (err as any)?.message ?? String(err) });
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });

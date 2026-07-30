@@ -7,6 +7,7 @@ import { amountToCharge } from '../utils/collect';
 import { generateId } from '../utils/id';
 import { recordOrderStatus } from '../utils/orderHistory';
 import { safeIdentifier } from '../utils/sql';
+import { logger } from '../utils/logger';
 
 const router = Router();
 const ORDERS = safeIdentifier('orders');
@@ -95,7 +96,7 @@ router.post('/create-order', authenticate, async (req: AuthRequest, res: Respons
       },
     });
   } catch (err: any) {
-    console.error('razorpay.create-order error:', err);
+    logger.error('razorpay.createorder_error', { error: (err as any)?.message ?? String(err) });
     res.status(500).json({ success: false, message: 'Failed to create Razorpay order' });
   }
 });
@@ -218,7 +219,7 @@ router.post('/verify', authenticate, async (req: AuthRequest, res: Response): Pr
     });
   } catch (err: any) {
     await client.query('ROLLBACK');
-    console.error('razorpay.verify error:', err);
+    logger.error('razorpay.verify_error', { error: (err as any)?.message ?? String(err) });
     res.status(500).json({ success: false, message: 'Failed to verify payment' });
   } finally {
     client.release();
