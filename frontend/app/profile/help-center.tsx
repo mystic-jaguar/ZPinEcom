@@ -20,7 +20,7 @@ const TOPICS = [
 
 const ALL_FAQS: FAQ[] = [
     { id: '1', category: 'Orders', question: 'How do I track my order?', answer: 'Go to "My Orders" and open the order to see real-time tracking and estimated delivery time.' },
-    { id: '3', category: 'Orders', question: 'How long does delivery take?', answer: 'Standard delivery takes 2–4 days. Instant Try-at-Door delivery arrives in 2–12 hours in select cities.' },
+    { id: '3', category: 'Orders', question: 'How long does delivery take?', answer: 'Estimated delivery is within 12 hours for both Standard and Instant Try-at-Door orders in serviceable areas.' },
     { id: '5', category: 'Returns', question: 'What is Try-at-Door?', answer: 'Try products at your door for 15 minutes. Keep what fits, hand the rest back to the courier — no box, no label.' },
     { id: '6', category: 'Returns', question: 'How do I return a product?', answer: 'Open the order and tap "Return items". Choose a reason and refund method. Returns are accepted within 7 days of delivery.' },
     { id: '7', category: 'Returns', question: 'When will I get my refund?', answer: 'Refunds are processed within 5–7 business days after we receive the returned product.' },

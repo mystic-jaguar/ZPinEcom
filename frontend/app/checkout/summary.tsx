@@ -24,7 +24,7 @@ export default function CheckoutSummaryScreen() {
 
     // Fee logic — must match backend (orders.ts) and payment.tsx
     const instantTrialFee = 50.0;
-    const shippingFee = totalPrice >= 599 ? 0 : 49; // free-delivery threshold — must match server (orders.ts) + cart bar
+    const shippingFee = totalPrice > 999 ? 0 : 49; // free-delivery threshold — must match server (orders.ts) + cart bar
     const gst = Math.round(totalPrice * 0.18);
     const isInstant = deliveryType === 'Instant';
     const deliveryFee = isInstant ? instantTrialFee : 0;
@@ -83,14 +83,14 @@ export default function CheckoutSummaryScreen() {
                             {isInstant && <Check size={13} color={colors.textOnYellow} />}
                         </View>
                     </View>
-                    <Text style={styles.deliveryEta}>ARRIVES IN 2–12 HRS</Text>
+                    <Text style={styles.deliveryEta}>EST. DELIVERY WITHIN 12 HRS</Text>
                     <Text style={styles.deliveryDesc}>Try items for <Text style={{ fontFamily: fonts.bodyBold, color: '#fff' }}>15 min</Text> at the door. Keep what fits, hand back the rest. Trial fee is non-refundable.</Text>
                 </Pressable>
 
                 <Pressable style={styles.deliveryStd} onPress={() => setDeliveryType('Standard')}>
                     <View>
                         <Text style={styles.stdTitle}>Standard delivery</Text>
-                        <Text style={styles.stdSub}>2–4 days · free</Text>
+                        <Text style={styles.stdSub}>Est. delivery within 12 hrs</Text>
                     </View>
                     <View style={[styles.radioSmall, styles.radioLight, !isInstant && styles.radioSmallOnInk]}>
                         {!isInstant && <Check size={13} color={palette.yellow500} />}

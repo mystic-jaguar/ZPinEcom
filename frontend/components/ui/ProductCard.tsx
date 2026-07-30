@@ -8,6 +8,7 @@ export interface ProductCardProps {
   image: any; // uri string or require()
   brand?: string;
   name: string;
+  detail?: string; // single-line product detail, shown under the title
   price?: string | number;
   originalPrice?: string | number;
   discount?: string; // e.g. "41%"
@@ -24,7 +25,7 @@ const fmt = (v?: string | number) =>
 
 /** Product tile used on Home, Listing, Search and Wishlist. */
 export default function ProductCard({
-  image, brand, name, price, originalPrice, discount, tryAtDoor,
+  image, brand, name, detail, price, originalPrice, discount, tryAtDoor,
   wished, width, onPress, onWishlist, style,
 }: ProductCardProps) {
   const src = typeof image === 'string' ? { uri: image } : image;
@@ -46,6 +47,7 @@ export default function ProductCard({
       </View>
       {brand ? <Text style={styles.brand}>{brand}</Text> : null}
       <Text style={styles.name} numberOfLines={1}>{name}</Text>
+      {detail ? <Text style={styles.detail} numberOfLines={1}>{detail}</Text> : null}
       {price != null ? (
         <View style={styles.priceRow}>
           <Text style={styles.price}>{fmt(price)}</Text>
@@ -74,7 +76,8 @@ const styles = StyleSheet.create({
   },
   badgeText: { fontFamily: fonts.monoBold, fontSize: 8, letterSpacing: 0.6, color: colors.textInvert },
   brand: { fontFamily: fonts.monoBold, fontSize: 10, letterSpacing: 1.4, color: colors.textFaint, textTransform: 'uppercase', marginBottom: 3 },
-  name: { fontFamily: fonts.bodySemiBold, fontSize: 14, color: colors.textStrong, marginBottom: 5 },
+  name: { fontFamily: fonts.bodySemiBold, fontSize: 14, color: colors.textStrong, marginBottom: 3 },
+  detail: { fontFamily: fonts.bodyRegular, fontSize: 11.5, color: colors.textFaint, marginBottom: 5 },
   priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 7 },
   price: { fontFamily: fonts.displayBold, fontSize: 17, color: colors.textStrong },
   original: { fontFamily: fonts.bodyRegular, fontSize: 12, color: colors.textFaint, textDecorationLine: 'line-through' },

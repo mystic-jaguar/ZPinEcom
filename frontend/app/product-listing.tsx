@@ -12,6 +12,7 @@ import { colors, fonts, palette, radius } from '../constants/theme';
 import { useWishlist } from '../context/WishlistContext';
 import { productService, ProductListParams } from '../services/product';
 import { ProductObject } from '../types/types';
+import { productOneLiner } from '../utils/productDetail';
 
 const { width } = Dimensions.get('window');
 const PAGE_SIZE = 20;
@@ -191,6 +192,7 @@ export default function ProductListing() {
             image={item.images?.[0] ?? require('../assets/images/icon_backup.png')}
             brand={item.deepestCategoryName || item.subtitle || 'CLASSIC'}
             name={item.productName}
+            detail={productOneLiner(item)}
             price={item.price}
             originalPrice={item.originalPrice ?? undefined}
             discount={(item.discount ?? 0) > 0 ? `${item.discount}% OFF` : undefined}

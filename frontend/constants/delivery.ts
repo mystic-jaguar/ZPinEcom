@@ -1,3 +1,6 @@
+// Every order is promised the same window — show this, never a raw delivery time.
+export const DELIVERY_ETA = 'Within 12 hrs';
+
 // Delivery is currently restricted to Pune (core city 411xxx + greater/PCMC 412xxx).
 export const DELIVERY_CITY = 'Pune';
 

@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
 import { AppHeader, ZButton, ZText } from '../../components/ui';
 import { colors, fonts, palette, radius } from '../../constants/theme';
+import { DELIVERY_ETA } from '../../constants/delivery';
 import { useOrder } from '../../context/OrderContext';
 import { orderService } from '../../services/order';
 import { OrderObject } from '../../types/types';
@@ -304,7 +305,7 @@ export default function OrderDetailsScreen() {
                     </View>
                     <View>
                         <Text style={styles.bannerTitle}>{statusLabel}</Text>
-                        <Text style={styles.bannerSub}>{isInstantDelivery ? 'Try-at-Door · Instant' : 'Standard delivery'}{order.estimatedDelivery ? ` · by ${order.estimatedDelivery}` : ''}</Text>
+                        <Text style={styles.bannerSub}>{isInstantDelivery ? 'Try-at-Door · Instant' : 'Standard delivery'}{delivered ? '' : ` · est. ${DELIVERY_ETA.toLowerCase()}`}</Text>
                     </View>
                 </View>
 

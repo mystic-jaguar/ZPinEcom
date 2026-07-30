@@ -20,6 +20,7 @@ import { reviewService } from '../../services/review';
 import { userService } from '../../services/user';
 import { colors, fonts, palette, radius } from '../../constants/theme';
 import { ProductObject, ReviewObject } from '../../types/types';
+import { productOneLiner } from '../../utils/productDetail';
 
 export default function ProductDetails() {
     const { id } = useLocalSearchParams();
@@ -297,6 +298,10 @@ export default function ProductDetails() {
         );
     }
 
+    // Single-line detail shown right under the title: the explicit subtitle if the
+    // API sends one, else the first sentence of the description.
+    const oneLiner = productOneLiner(product);
+
     return (
         <View style={styles.container}>
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 130 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[palette.yellow500]} tintColor={palette.yellow500} />}>
@@ -329,6 +334,9 @@ export default function ProductDetails() {
                         )}
                     </View>
 
+                    {/* One-line product detail, directly under the title */}
+                    {oneLiner && <Text style={styles.subtitle} numberOfLines={1}>{oneLiner}</Text>}
+
                     {/* Rating summary row */}
                     {reviewTotal > 0 && (
                         <View style={styles.ratingSummaryRow}>
@@ -348,10 +356,6 @@ export default function ProductDetails() {
                             })}
                             <Text style={styles.ratingTotalText}>{reviewTotal} rating{reviewTotal !== 1 ? 's' : ''}</Text>
                         </View>
-                    )}
-
-                    {product.subtitle && (
-                        <Text style={styles.subtitle}>{product.subtitle}</Text>
                     )}
 
                     {/* Seller name inline; the address stays behind the accordion below */}
@@ -409,8 +413,8 @@ export default function ProductDetails() {
                     <View style={styles.promiseRow}>
                         <View style={styles.promiseCard}>
                             <Zap size={18} color={palette.yellow600} />
-                            <Text style={styles.promiseTitle}>2–12 hrs</Text>
-                            <Text style={styles.promiseSub}>To your door</Text>
+                            <Text style={styles.promiseTitle}>Within 12 hrs</Text>
+                            <Text style={styles.promiseSub}>Estimated delivery</Text>
                         </View>
                         <View style={styles.promiseCard}>
                             <RotateCcw size={18} color={palette.yellow600} />
@@ -454,7 +458,7 @@ export default function ProductDetails() {
                             <View style={styles.deliveryIcon}>
                                 <Feather name="zap" size={14} color="#1a1a1a" />
                             </View>
-                            <Text style={styles.deliveryText}>Delivery in 2-12 hrs</Text>
+                            <Text style={styles.deliveryText}>Est. delivery within 12 hrs</Text>
                         </View>
                         <View style={styles.deliveryItem}>
                             <View style={styles.deliveryIcon}>

@@ -555,11 +555,11 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
     const totalAmount = cartResult.rows.reduce(
       (sum: number, item: any) => sum + chargedLine(item), 0
     );
-    // Free delivery at/above ₹599 — MUST match the client free-delivery bar
+    // Free delivery above ₹999 — MUST match the client free-delivery bar
     // (frontend cart.tsx FREE_DELIVERY_MIN). Enforced server-side so a tampered
     // client can't skip the ₹49 fee below the threshold.
-    const FREE_DELIVERY_MIN = 599;
-    const shippingAmount = totalAmount >= FREE_DELIVERY_MIN ? 0 : 49;
+    const FREE_DELIVERY_MIN = 999;
+    const shippingAmount = totalAmount > FREE_DELIVERY_MIN ? 0 : 49;
     const taxAmount = Math.round(totalAmount * 0.18);
     // Instant "Try-at-Door" trial fee. Amount is fixed server-side (₹50) — we only
     // trust the client's delivery-type selection (notes flag), never a client amount.

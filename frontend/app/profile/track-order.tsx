@@ -6,6 +6,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import RouteTrack, { RoutePhase } from '../../components/profile/RouteTrack';
 import { AppHeader, ZButton, ZText } from '../../components/ui';
 import { colors, fonts, palette, radius } from '../../constants/theme';
+import { DELIVERY_ETA } from '../../constants/delivery';
 import { useOrder } from '../../context/OrderContext';
 import { orderService } from '../../services/order';
 import { stepIndex, TRACK_STEPS } from '../../utils/orderStatus';
@@ -76,13 +77,11 @@ export default function TrackOrderScreen() {
         return () => clearTimeout(t);
     }, [isInstant, liveStatus, order?.updatedAt]);
 
-    // Instant is same-day → show a clock time; standard is days out → show a date,
-    // otherwise a +5-day ETA renders as a meaningless time-of-day and reads like fast delivery.
-    const etaLabel = liveEta
-        ? (isInstant
-            ? new Date(liveEta).toLocaleString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true })
-            : new Date(liveEta).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' }))
-        : (isInstant ? '2–12 hrs' : '2–4 days');
+    // Instant shows the live clock ETA once the server has one; everything else shows
+    // the promised window — we never surface a raw multi-day delivery date.
+    const etaLabel = liveEta && isInstant
+        ? new Date(liveEta).toLocaleString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true })
+        : DELIVERY_ETA;
 
     return (
         <SafeAreaView style={styles.container} edges={['top']}>

@@ -9,6 +9,7 @@ import { colors, fonts, palette, radius } from '../constants/theme';
 import { useSearch } from '../context/SearchContext';
 import apiClient from '../services/api';
 import { ProductObject } from '../types/types';
+import { productOneLiner } from '../utils/productDetail';
 
 const TRENDING = ['Denim jeans', 'Anti-aging serum', 'Kurta sets', 'Sunglasses', 'Messenger bag'];
 
@@ -81,6 +82,7 @@ export default function ProductSearchScreen() {
             image={item.images?.[0] ?? require('../assets/images/icon_backup.png')}
             brand={item.deepestCategoryName}
             name={item.productName}
+            detail={productOneLiner(item)}
             price={item.price}
             originalPrice={item.originalPrice ?? undefined}
             discount={(item.discount ?? 0) > 0 ? `${item.discount}% OFF` : undefined}

@@ -6,6 +6,7 @@ import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ZButton, ZText } from '../../components/ui';
 import { colors, fonts, palette, radius, shadow } from '../../constants/theme';
+import { DELIVERY_ETA } from '../../constants/delivery';
 import { useCart } from '../../context/CartContext';
 
 interface CartItemProps {
@@ -134,8 +135,8 @@ export default function CartScreen() {
 
     const count = cartItems.length;
 
-    const FREE_DELIVERY_MIN = 599;
-    const freeDeliveryUnlocked = totalPrice >= FREE_DELIVERY_MIN;
+    const FREE_DELIVERY_MIN = 999; // free standard delivery above ₹999 — must match server (orders.ts)
+    const freeDeliveryUnlocked = totalPrice > FREE_DELIVERY_MIN;
     const freeDeliveryPct = Math.min(totalPrice / FREE_DELIVERY_MIN, 1) * 100;
     const amountToFree = Math.max(FREE_DELIVERY_MIN - totalPrice, 0);
 
@@ -198,7 +199,7 @@ export default function CartScreen() {
                             </View>
                             <View style={{ alignItems: 'flex-end' }}>
                                 <Text style={styles.freeDelivery}>{freeDeliveryUnlocked ? 'FREE DELIVERY' : 'DELIVERY'}</Text>
-                                <Text style={styles.eta}>{freeDeliveryUnlocked ? 'in 2–12 hrs' : `₹${amountToFree.toLocaleString('en-IN')} to free`}</Text>
+                                <Text style={styles.eta}>{freeDeliveryUnlocked ? DELIVERY_ETA : `₹${amountToFree.toLocaleString('en-IN')} to free`}</Text>
                             </View>
                         </View>
                         <ZButton label="Checkout" icon={ArrowRight} onPress={() => router.push('/checkout/address')} />

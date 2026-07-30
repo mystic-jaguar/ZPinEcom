@@ -17,7 +17,7 @@ const KB: { keywords: string[]; answer: string }[] = [
     },
     {
         keywords: ['how fast', 'how long', 'delivery time', 'when will', 'arrive', 'deliver', 'shipping time', 'eta'],
-        answer: 'Standard delivery takes 2–4 days. Instant Delivery arrives in 2–12 hours in select cities. You can follow either live from Profile > My Orders > Track order.',
+        answer: 'Estimated delivery is within 12 hours for both Standard and Instant orders. You can follow either live from Profile > My Orders > Track order.',
     },
     {
         keywords: ['track', 'tracking', 'where is my order', 'order status'],

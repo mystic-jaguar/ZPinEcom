@@ -9,6 +9,7 @@ import { colors, fonts, palette, radius } from '../../constants/theme';
 import { DELIVERY_CITY, isPuneCity, isPunePincode } from '../../constants/delivery';
 import { useAddress } from '../../context/AddressContext';
 import { useUser } from '../../context/UserContext';
+import { lookupPincode } from '../../services/location';
 
 const LABELS = [
     { key: 'Home', icon: Home },
@@ -81,6 +82,18 @@ export default function AddAddressScreen() {
         setShowSuccessModal(true);
     };
 
+    // Pincode → city/state autofill (India Post). Ignores stale responses.
+    const onPincodeChange = (t: string) => {
+        const pincode = t.replace(/[^0-9]/g, '');
+        setForm(f => ({ ...f, pincode }));
+        if (pincode.length !== 6) return;
+        lookupPincode(pincode).then(loc => {
+            if (!loc) return;
+            setForm(f => (f.pincode === pincode ? { ...f, city: loc.city || f.city, state: loc.state || f.state } : f));
+            setErrors(e => ({ ...e, city: '', state: '' }));
+        });
+    };
+
     const err = (k: string) => (errors[k] ? <Text style={styles.error}>{errors[k]}</Text> : null);
 
     return (
@@ -109,7 +122,7 @@ export default function AddAddressScreen() {
 
                     <View style={styles.row}>
                         <View style={{ flex: 1 }}>
-                            <ZInput label="Pincode" placeholder="400050" value={form.pincode} onChangeText={(t) => setForm({ ...form, pincode: t.replace(/[^0-9]/g, '') })} keyboardType="numeric" maxLength={6} containerStyle={{ marginBottom: 4 }} />
+                            <ZInput label="Pincode" placeholder="400050" value={form.pincode} onChangeText={onPincodeChange} keyboardType="numeric" maxLength={6} containerStyle={{ marginBottom: 4 }} />
                             {err('pincode')}
                         </View>
                         <View style={{ flex: 1.4 }}>

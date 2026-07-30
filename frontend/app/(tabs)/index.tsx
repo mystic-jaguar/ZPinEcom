@@ -13,6 +13,7 @@ import { colors, fonts, palette, radius, shadow } from '../../constants/theme';
 import { useSearch } from '../../context/SearchContext';
 import { FlashDeal, flashDealService } from '../../services/flashDeals';
 import { productService } from '../../services/product';
+import { productOneLiner } from '../../utils/productDetail';
 
 const CATEGORIES = [
     { id: 'fashion', name: 'Fashion', image: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=200&q=80' },
@@ -58,7 +59,7 @@ const BANNER_EVERY = 6;     // drop a banner card after every N products (even �
 // Rotating banner cards to break the grid monotony — different look + copy each.
 type ForYouBanner = { key: string; variant: 'dark' | 'yellow' | 'light' | 'green'; icon: 'zap' | 'star' | 'tag'; eyebrow: string; title: string; sub: string };
 const FORYOU_BANNERS: ForYouBanner[] = [
-    { key: 'delivery', variant: 'dark', icon: 'zap', eyebrow: 'LIVE IN YOUR AREA', title: 'Delivering to you in 2–12 hrs', sub: 'Bike-fast, straight to your door' },
+    { key: 'delivery', variant: 'dark', icon: 'zap', eyebrow: 'LIVE IN YOUR AREA', title: 'Estimated delivery within 12 hrs', sub: 'Bike-fast, straight to your door' },
     { key: 'try', variant: 'yellow', icon: 'zap', eyebrow: 'TRY-AT-DOOR', title: 'Try it on before you pay', sub: 'Keep what fits, send back the rest' },
     { key: 'rated', variant: 'light', icon: 'star', eyebrow: 'LOVED NEARBY', title: 'Rated 4.8 by shoppers near you', sub: 'Thousands are styling with ZPIN' },
     { key: 'deal', variant: 'green', icon: 'tag', eyebrow: 'MEGA HOURS', title: 'Up to 70% off, today only', sub: 'Fresh deals drop every few hours' },
@@ -519,9 +520,9 @@ export default function HomeScreen() {
                         <Zap size={120} color="rgba(255,196,0,0.14)" fill="rgba(255,196,0,0.14)" />
                     </View>
                     <View>
-                        <Text style={styles.deliveryEyebrow}>Bike-fast delivery</Text>
+                        <Text style={styles.deliveryEyebrow}>Estimated delivery within</Text>
                         <View style={styles.deliveryHrsRow}>
-                            <Text style={styles.deliveryHrs}>2–12</Text>
+                            <Text style={styles.deliveryHrs}>12</Text>
                             <Text style={styles.deliveryHrsUnit}>HRS</Text>
                         </View>
                     </View>
@@ -698,6 +699,7 @@ export default function HomeScreen() {
                                         image={node.data.images?.[0] ?? require('../../assets/images/icon_backup.png')}
                                         brand={node.data.deepestCategoryName || 'ZPIN'}
                                         name={node.data.productName}
+                                        detail={productOneLiner(node.data)}
                                         price={node.data.price}
                                         originalPrice={node.data.originalPrice ?? undefined}
                                         discount={(node.data.discount ?? 0) > 0 ? `${node.data.discount}% OFF` : undefined}
