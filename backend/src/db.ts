@@ -16,6 +16,9 @@ export const pool = new Pool({
     ? false
     : { rejectUnauthorized: false },
   max: 20,
+  // A runaway query must not hold a pool slot forever — Postgres cancels it at 30s
+  // and pg surfaces it as a normal query error (code 57014), not a crash.
+  statement_timeout: 30000,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 5000,
   allowExitOnIdle: false,

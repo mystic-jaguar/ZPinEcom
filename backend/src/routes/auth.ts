@@ -6,6 +6,7 @@ import rateLimit from 'express-rate-limit';
 import { OAuth2Client } from 'google-auth-library';
 import jwt from 'jsonwebtoken';
 import { pool } from '../db';
+import { revokeTokensFor } from '../middleware/auth';
 import { generateId } from '../utils/id';
 import { logger } from '../utils/logger';
 import { sendOTPEmail } from '../utils/mailer';
@@ -360,6 +361,8 @@ router.post('/refresh-token', refreshLimiter, async (req: Request, res: Response
 
 router.post('/logout', async (req: Request, res: Response): Promise<void> => {
   const { refreshToken } = req.body;
+  let userId: string | undefined;
+
   if (refreshToken) {
     try {
       // Verify the token signature before trusting the userId claim.
@@ -367,9 +370,34 @@ router.post('/logout', async (req: Request, res: Response): Promise<void> => {
       // with any userId and wipe that user's refresh tokens (session hijack).
       const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET!) as { userId?: string };
       if (decoded?.userId) {
+        userId = decoded.userId;
         await pool.query(`DELETE FROM ${REFRESH_TOKENS} WHERE user_id = $1`, [decoded.userId]);
       }
     } catch { /* ignore — invalid token, nothing to revoke */ }
+  }
+
+  // A client may log out with only the access token (no refresh token in the body);
+  // fall back to it so the revocation cut-off still gets written.
+  if (!userId) {
+    const header = req.headers['authorization'];
+    const accessToken = header?.startsWith('Bearer ')
+      ? header.slice(7)
+      : (req.headers['x-auth-token'] as string) || (req as any).cookies?.token;
+    if (accessToken) {
+      try {
+        const decoded = jwt.verify(accessToken, process.env.JWT_SECRET!) as { userId?: string };
+        userId = decoded?.userId;
+      } catch { /* ignore — invalid token, nothing to revoke */ }
+    }
+  }
+
+  // Close the stolen-access-token window: tokens minted at or before now are refused.
+  if (userId) {
+    try {
+      await revokeTokensFor(userId);
+    } catch (err: any) {
+      logger.error('auth.logout_revoke_failed', { userId, message: err?.message });
+    }
   }
   res.json({ success: true, message: 'Logged out' });
 });
