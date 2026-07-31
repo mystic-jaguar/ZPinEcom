@@ -220,6 +220,9 @@ export interface AddressObject {
     address: string;                       // Combined or line 1
     addressLine1?: string;
     addressLine2?: string;
+    // The orders API returns these snake_case (routes/orders.ts), the users API camelCase.
+    address_line1?: string;
+    address_line2?: string;
     city: string;
     state: string;
     pincode: string;

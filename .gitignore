@@ -86,3 +86,5 @@ backups/
 
 # Local staging for Cloudinary category artwork — not app assets
 cloudinary-upload/
+
+CLAUDE.md
