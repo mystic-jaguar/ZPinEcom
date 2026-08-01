@@ -6,6 +6,7 @@ import { authenticate, AuthRequest } from '../middleware/auth';
 import { amountToCharge } from '../utils/collect';
 import { generateId } from '../utils/id';
 import { recordOrderStatus } from '../utils/orderHistory';
+import { sendPush } from '../utils/push';
 import { safeIdentifier } from '../utils/sql';
 import { logger } from '../utils/logger';
 
@@ -211,6 +212,10 @@ router.post('/verify', authenticate, async (req: AuthRequest, res: Response): Pr
     );
 
     await client.query('COMMIT');
+
+    sendPush(req.userId, `Payment successful: ${order.order_number}`,
+      `Your payment of ₹${groupTotal.toFixed(2)} for order ${order.order_number} was successful.`,
+      { orderId: appOrderId, paymentId: razorpayPaymentId, type: 'payment_success' });
 
     res.json({
       success: true,

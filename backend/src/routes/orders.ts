@@ -8,6 +8,7 @@ import { generateId } from '../utils/id';
 import { recordOrderStatus } from '../utils/orderHistory';
 import { markupItems, withMarkup } from '../utils/pricing';
 import { cacheDel, cacheDelPattern } from '../utils/redis';
+import { sendPush } from '../utils/push';
 import { safeIdentifier } from '../utils/sql';
 import { logger } from '../utils/logger';
 
@@ -884,6 +885,17 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
 
     await client.query('COMMIT');
 
+    // Device push mirrors the notification rows written above — after COMMIT, so
+    // a rolled-back order never buzzes anyone's phone. Not awaited (best-effort).
+    sendPush(req.userId, `Order confirmed: ${groupOrderNumber}`,
+      `Your order for ${customerItems.length} item(s) is placed. Total ₹${finalAmount.toFixed(2)}.`,
+      { orderId, orderNumber: groupOrderNumber, groupId, type: 'order_update' });
+    for (const sub of subOrders) {
+      sendPush(sub.sellerId, `New order: ${sub.orderNumber}`,
+        `You have a new order for ${sub.items.length} item(s).`,
+        { orderId: sub.id, orderNumber: sub.orderNumber, type: 'new_order' });
+    }
+
     // Invalidate user's order list and cart caches
     await Promise.all([
       cacheDelPattern(`user:${req.userId}:orders:*`),
@@ -1416,6 +1428,12 @@ router.post('/:id/trial-selection', authenticate, async (req: AuthRequest, res: 
 
     await client.query('COMMIT');
 
+    sendPush(order.user_id, `Selection confirmed: ${order.order_number}`,
+      refundAmount > 0
+        ? `We'll refund ₹${refundAmount.toFixed(2)} to your original payment method.`
+        : `Please pay ₹${Math.max(0, dueAtDoor).toFixed(2)} to the delivery partner.`,
+      { orderId: order.id, orderNumber: order.order_number, status: 'awaiting_collection' });
+
     // Refund outside the transaction — a gateway failure must not undo the
     // customer's selection. It is retried by support, not silently swallowed.
     if (refundAmount > 0) {
@@ -1521,6 +1539,10 @@ router.patch('/:id/confirm', authenticate, async (req: AuthRequest, res: Respons
         JSON.stringify({ orderId: order.id, orderNumber: order.order_number, status: 'confirmed' }),
       ]
     );
+
+    sendPush(order.user_id, `Order confirmed: ${order.order_number}`,
+      `Your order ${order.order_number} has been accepted and is being prepared.`,
+      { orderId: order.id, orderNumber: order.order_number, status: 'confirmed' });
 
     res.json({
       success: true,

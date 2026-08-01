@@ -96,6 +96,12 @@
             "usesCleartextTraffic": false
           }
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#f4bd00"
+        }
       ]
     ],
     "experiments": {

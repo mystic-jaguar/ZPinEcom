@@ -6,10 +6,11 @@ import rateLimit from 'express-rate-limit';
 import { OAuth2Client } from 'google-auth-library';
 import jwt from 'jsonwebtoken';
 import { pool } from '../db';
-import { revokeTokensFor } from '../middleware/auth';
+import { authenticate, AuthRequest, revokeTokensFor } from '../middleware/auth';
 import { generateId } from '../utils/id';
 import { logger } from '../utils/logger';
 import { sendOTPEmail } from '../utils/mailer';
+import { registerPushToken, removePushToken } from '../utils/push';
 import { safeIdentifier } from '../utils/sql';
 
 const router = Router();
@@ -400,6 +401,21 @@ router.post('/logout', async (req: Request, res: Response): Promise<void> => {
     }
   }
   res.json({ success: true, message: 'Logged out' });
+});
+
+// ─── Device push tokens ──────────────────────────────────────────────────────
+// Registered after login, removed before logout (so the next person to use the
+// phone doesn't get this customer's order updates). Both no-op while the
+// `push_tokens` table is still unapplied — see SCHEMA_CHANGES.md.
+
+router.post('/push/register', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+  const registered = await registerPushToken(req.userId!, req.body?.token, req.body?.platform);
+  res.json({ success: true, registered });
+});
+
+router.post('/push/unregister', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+  await removePushToken(req.body?.token);
+  res.json({ success: true });
 });
 
 // ─── POST /api/v1/auth/forgetPassword/sendOTP ────────────────────────────────

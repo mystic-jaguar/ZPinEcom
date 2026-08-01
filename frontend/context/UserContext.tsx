@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 import { tokenManager } from '../services/api';
+import { registerForPushNotifications } from '../services/push';
 import { userService } from '../services/user';
 import { CompleteUserProfile, UserDetailsObject, UserObject } from '../types/types';
 
@@ -54,6 +55,13 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const loadUserInProgressRef = React.useRef(false);
+
+    // Whenever there's a signed-in customer — fresh login, or a session restored
+    // from storage — make sure this device is reachable by push. Registration is
+    // idempotent server-side (token is the primary key) and never blocks the UI.
+    useEffect(() => {
+        if (isAuthenticated && user.id) void registerForPushNotifications();
+    }, [isAuthenticated, user.id]);
 
     // Load User from Storage
     useEffect(() => {

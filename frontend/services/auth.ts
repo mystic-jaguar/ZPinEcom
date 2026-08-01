@@ -1,6 +1,7 @@
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { Platform } from 'react-native';
 import apiClient, { handleApiError, tokenManager, userDataManager } from './api';
+import { unregisterPushNotifications } from './push';
 
 // expo-crypto is loaded lazily (only during an Apple sign-in). A top-level import
 // would call requireNativeModule('ExpoCrypto') at module load, crashing any build
@@ -149,6 +150,10 @@ export const authService = {
      * Logout user
      */
     async logout() {
+        // Before the tokens go: otherwise this phone keeps buzzing with the
+        // previous customer's order updates.
+        await unregisterPushNotifications();
+
         try {
             // Clear Google Sign-In session if active
             await googleAuthService.signOut();
