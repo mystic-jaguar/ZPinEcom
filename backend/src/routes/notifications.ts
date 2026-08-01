@@ -7,6 +7,133 @@ import { logger } from '../utils/logger';
 const router = Router();
 
 /**
+ * Customer inbox — the rows already written across ZPIN (order placed, payment
+ * success, out for delivery, delivered, delivery failed) with nothing reading
+ * them on the customer side until now.
+ *
+ * `new_order` rows are excluded: a user can be both customer and seller
+ * (is_seller is additive), and those rows are addressed to them as a seller —
+ * the vendor app owns that inbox.
+ */
+const CUSTOMER_INBOX_FILTER = `user_id = $1 AND type <> 'new_order'`;
+
+function parseData(raw: any) {
+  try {
+    return typeof raw === 'string' ? JSON.parse(raw) : (raw ?? {});
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * GET /api/v1/notifications — paged customer inbox.
+ */
+router.get('/', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+  const page = Number(req.query.page) || 1;
+  const limit = Math.min(Number(req.query.limit) || 20, 50);
+  const offset = (page - 1) * limit;
+
+  try {
+    const [rows, totals] = await Promise.all([
+      pool.query(
+        `SELECT id, type, title, message, data, is_read, created_at
+           FROM notifications
+          WHERE ${CUSTOMER_INBOX_FILTER}
+          ORDER BY created_at DESC
+          LIMIT $2 OFFSET $3`,
+        [req.userId, limit, offset]
+      ),
+      pool.query(
+        `SELECT COUNT(*) AS total,
+                COUNT(*) FILTER (WHERE is_read = false) AS unread
+           FROM notifications
+          WHERE ${CUSTOMER_INBOX_FILTER}`,
+        [req.userId]
+      ),
+    ]);
+
+    const total = Number(totals.rows[0].total);
+    res.json({
+      success: true,
+      data: rows.rows.map((n: any) => ({
+        id: n.id,
+        type: n.type,
+        title: n.title,
+        message: n.message,
+        data: parseData(n.data),
+        isRead: n.is_read,
+        createdAt: n.created_at,
+      })),
+      unreadCount: Number(totals.rows[0].unread),
+      pagination: {
+        currentPage: page,
+        totalPages: Math.ceil(total / limit),
+        totalItems: total,
+        itemsPerPage: limit,
+        hasNextPage: page * limit < total,
+        hasPrevPage: page > 1,
+      },
+    });
+  } catch (err) {
+    logger.error('notifications_list_error', { error: (err as any)?.message ?? String(err) });
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+/**
+ * GET /api/v1/notifications/unread-count — badge count for the header bell.
+ */
+router.get('/unread-count', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const result = await pool.query(
+      `SELECT COUNT(*) FROM notifications WHERE ${CUSTOMER_INBOX_FILTER} AND is_read = false`,
+      [req.userId]
+    );
+    res.json({ success: true, count: Number(result.rows[0].count) });
+  } catch (err) {
+    logger.error('notifications_unread_count_error', { error: (err as any)?.message ?? String(err) });
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+/**
+ * POST /api/v1/notifications/read-all — mark the whole inbox read.
+ * Declared before /:id/read so "read-all" can't be read as an id.
+ */
+router.post('/read-all', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    await pool.query(
+      `UPDATE notifications SET is_read = true WHERE ${CUSTOMER_INBOX_FILTER} AND is_read = false`,
+      [req.userId]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    logger.error('notifications_read_all_error', { error: (err as any)?.message ?? String(err) });
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+/**
+ * POST /api/v1/notifications/:id/read — mark one read (own rows only).
+ */
+router.post('/:id/read', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const result = await pool.query(
+      `UPDATE notifications SET is_read = true WHERE id = $2 AND ${CUSTOMER_INBOX_FILTER}`,
+      [req.userId, req.params.id]
+    );
+    if (result.rowCount === 0) {
+      res.status(404).json({ success: false, message: 'Notification not found' });
+      return;
+    }
+    res.json({ success: true });
+  } catch (err) {
+    logger.error('notifications_read_error', { error: (err as any)?.message ?? String(err) });
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+/**
  * POST /api/v1/notifications/new-order
  *
  * Called by the seller website to fetch new order notifications.

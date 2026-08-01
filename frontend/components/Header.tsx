@@ -1,7 +1,8 @@
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import React from 'react';
-import { Dimensions, Image, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback, useState } from 'react';
+import { Dimensions, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { notificationService } from '../services/notification';
 
 const { width } = Dimensions.get('window');
 
@@ -11,6 +12,15 @@ interface HeaderProps {
 
 export default function Header({ }: HeaderProps) {
     const router = useRouter();
+    const [unread, setUnread] = useState(0);
+
+    useFocusEffect(useCallback(() => {
+        let cancelled = false;
+        notificationService.getUnreadCount()
+            .then(r => { if (!cancelled) setUnread(r.count ?? 0); })
+            .catch(() => { });
+        return () => { cancelled = true; };
+    }, []));
 
     return (
         <View style={styles.header}>
@@ -23,6 +33,14 @@ export default function Header({ }: HeaderProps) {
                 />
             </View>
             <View style={styles.headerIcons}>
+                <TouchableOpacity style={styles.iconButton} onPress={() => router.push('/profile/notifications' as any)}>
+                    <Feather name="bell" size={24} color="#333" />
+                    {unread > 0 && (
+                        <View style={styles.badge}>
+                            <Text style={styles.badgeText}>{unread > 9 ? '9+' : unread}</Text>
+                        </View>
+                    )}
+                </TouchableOpacity>
                 <TouchableOpacity style={styles.iconButton} onPress={() => router.push('/profile/wishlist')}>
                     <Feather name="heart" size={24} color="#333" />
                 </TouchableOpacity>
@@ -59,5 +77,22 @@ const styles = StyleSheet.create({
     },
     iconButton: {
         marginLeft: width * 0.038,
+    },
+    badge: {
+        position: 'absolute',
+        top: -4,
+        right: -6,
+        minWidth: 16,
+        height: 16,
+        borderRadius: 8,
+        paddingHorizontal: 4,
+        backgroundColor: '#E23B3B',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    badgeText: {
+        color: '#fff',
+        fontSize: 9,
+        fontWeight: '700',
     },
 });

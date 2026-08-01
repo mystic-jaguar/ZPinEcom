@@ -7,7 +7,7 @@ import { authService } from '@/services/auth';
 import { Image } from 'expo-image';
 import { useFocusEffect, useRouter } from 'expo-router';
 import {
-    ChevronRight, Heart, LifeBuoy, LogOut, MapPin, RotateCcw, Settings, Shield, ShoppingBag, Ticket, Trash2, User, Zap,
+    Bell, ChevronRight, Heart, LifeBuoy, LogOut, MapPin, RotateCcw, Settings, Shield, ShoppingBag, Ticket, Trash2, User, Zap,
 } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -91,6 +91,7 @@ export default function ProfileScreen() {
     ];
 
     const settings = [
+        { icon: Bell, label: 'Notifications', onPress: () => router.push('/profile/notifications' as any) },
         { icon: User, label: 'Edit profile', onPress: () => router.push('/profile/edit-profile') },
         { icon: MapPin, label: 'Saved addresses', onPress: () => router.push('/profile/addresses') },
         { icon: LifeBuoy, label: 'Help & support', onPress: () => router.push('/profile/help-center') },
