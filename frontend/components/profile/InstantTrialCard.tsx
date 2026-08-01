@@ -96,8 +96,8 @@ export default function InstantTrialCard({ isDelivered = false, deliveredAt }: I
                 {isExpired
                     ? 'Your 15-minute trial window has ended. Please return any unwanted items.'
                     : isRunning
-                        ? <>Our delivery partner is waiting. Try on your items and return them instantly if they don't fit. <Text style={styles.boldText}>{formatTime(secondsLeft)} remaining.</Text></>
-                        : <>Our delivery partner will stay for <Text style={styles.boldText}>15 minutes</Text> so you can try on your items and return them instantly if they don't fit.</>
+                        ? <>Our delivery partner is waiting. Try on your items and return them instantly if they don&apos;t fit. <Text style={styles.boldText}>{formatTime(secondsLeft)} remaining.</Text></>
+                        : <>Our delivery partner will stay for <Text style={styles.boldText}>15 minutes</Text> so you can try on your items and return them instantly if they don&apos;t fit.</>
                 }
             </Text>
         </View>
