@@ -4,6 +4,7 @@ import { tokenManager } from '../services/api';
 import { cartService } from '../services/cart';
 import { couponService } from '../services/coupon';
 import { CartItemObject, CouponObject, ProductObject } from '../types/types';
+import { useNetwork } from './NetworkContext';
 import { useUser } from './UserContext';
 
 const CART_STORAGE_KEY = '@ZPinEcom:cart';
@@ -36,6 +37,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     const [isLoading, setIsLoading] = useState(true);
 
     const { isAuthenticated, isLoading: isUserLoading } = useUser();
+    const { onReconnect } = useNetwork();
 
     // Always-current cart snapshot so the memoized handlers below can read the
     // latest items without listing cartItems as a dependency (which would give
@@ -274,6 +276,10 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     }, []);
 
     useEffect(() => { refreshCoupons(); }, [refreshCoupons]);
+
+    // Connectivity came back — re-pull the two things a dropped connection
+    // most likely left stale/empty, instead of waiting for the next screen focus.
+    useEffect(() => onReconnect(() => { loadCart(); refreshCoupons(); }), [onReconnect, refreshCoupons]);
 
     const totalPrice = cartItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
     const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0);

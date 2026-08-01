@@ -7,6 +7,7 @@ import { ArrowRight, Check, MapPin, Receipt, Ticket, Zap } from 'lucide-react-na
 import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useExitGuard } from '../../hooks/useExitGuard';
 import { AppHeader, CheckoutSteps, ZButton, ZText } from '../../components/ui';
 import { colors, fonts, palette, radius, shadow } from '../../constants/theme';
 
@@ -15,10 +16,20 @@ export default function CheckoutSummaryScreen() {
     const insets = useSafeAreaInsets();
     const { addresses } = useAddress();
     const { cartItems, totalPrice, totalSavings, appliedCoupon, couponDiscount, applyCoupon, removeCoupon } = useCart();
-    const { selectedAddressId, deliveryType, setDeliveryType } = useCheckout();
+    const { selectedAddressId, deliveryType, setDeliveryType, setLastStep } = useCheckout();
+
+    React.useEffect(() => { setLastStep(2); }, []);
 
     const selectedAddress = addresses.find(a => a.id === selectedAddressId);
     const [couponCode, setCouponCode] = useState('');
+    // An applied coupon is the one thing on this screen a user would hate to
+    // silently re-enter, so only guard once there is something to lose.
+    useExitGuard({
+        enabled: !!appliedCoupon,
+        title: 'Go back?',
+        message: 'Your applied coupon stays on the cart, but you will need to return here to place the order.',
+        discardLabel: 'Go back',
+    });
     const [modalVisible, setModalVisible] = useState(false);
     const [modalConfig, setModalConfig] = useState({ title: '', message: '', icon: 'check-circle' as any });
 

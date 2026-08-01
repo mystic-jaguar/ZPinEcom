@@ -8,6 +8,7 @@ import { ZButton, ZText } from '../../components/ui';
 import { colors, fonts, palette, radius, shadow } from '../../constants/theme';
 import { DELIVERY_ETA } from '../../constants/delivery';
 import { useCart } from '../../context/CartContext';
+import { useCheckout } from '../../context/CheckoutContext';
 
 interface CartItemProps {
     item: any;
@@ -135,6 +136,12 @@ export default function CartScreen() {
 
     const count = cartItems.length;
 
+    // Resume a checkout that was killed mid-flow instead of restarting at step 1.
+    // Payment (step 3) is deliberately not resumed into: the order/payment
+    // round-trip must be re-initiated from a screen the user chose to be on.
+    const { lastStep } = useCheckout();
+    const resumeRoute = lastStep >= 2 ? '/checkout/summary' : '/checkout/address';
+
     const FREE_DELIVERY_MIN = 999; // free standard delivery above ₹999 — must match server (orders.ts)
     const freeDeliveryUnlocked = totalPrice > FREE_DELIVERY_MIN;
     const freeDeliveryPct = Math.min(totalPrice / FREE_DELIVERY_MIN, 1) * 100;
@@ -202,7 +209,7 @@ export default function CartScreen() {
                                 <Text style={styles.eta}>{freeDeliveryUnlocked ? DELIVERY_ETA : `₹${amountToFree.toLocaleString('en-IN')} to free`}</Text>
                             </View>
                         </View>
-                        <ZButton label="Checkout" icon={ArrowRight} onPress={() => router.push('/checkout/address')} />
+                        <ZButton label="Checkout" icon={ArrowRight} onPress={() => router.push(resumeRoute)} />
                     </View>
                 </>
             )}

@@ -11,6 +11,7 @@ import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import RazorpayCheckout from 'react-native-razorpay';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useExitGuard } from '../../hooks/useExitGuard';
 import { AppHeader, CheckoutSteps, ZText } from '../../components/ui';
 import { colors, fonts, palette, radius, shadow } from '../../constants/theme';
 import { orderService } from '../../services/order';
@@ -19,7 +20,7 @@ import { paymentService } from '../../services/payment';
 export default function CheckoutPaymentScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
-    const { selectedPaymentMethod, setSelectedPaymentMethod, deliveryType, selectedAddressId } = useCheckout();
+    const { selectedPaymentMethod, setSelectedPaymentMethod, deliveryType, selectedAddressId, setLastStep, resetCheckout } = useCheckout();
     const { totalPrice, cartItems, clearCart, couponDiscount, appliedCoupon } = useCart();
     const { addOrder, refreshOrders } = useOrder();
     const { user } = useUser();
@@ -30,6 +31,20 @@ export default function CheckoutPaymentScreen() {
     // Phase 9A — Instant Delivery only: pay just the delivery fee now, then pick
     // which items to keep within 15 minutes of the courier collecting the order.
     const [tryFirst, setTryFirst] = useState(false);
+
+    React.useEffect(() => { setLastStep(3); }, []);
+
+    // Backing out while the order/payment round-trip is in flight is the one
+    // place in the app where leaving can cost the customer money, so this
+    // guard is armed for the whole submit, not just for unsaved input.
+    useExitGuard({
+        enabled: isSubmitting || !!selectedPaymentMethod,
+        title: isSubmitting ? 'Payment in progress' : 'Leave payment?',
+        message: isSubmitting
+            ? 'Your payment is still being processed. Leaving now may leave the order unpaid.'
+            : 'Your order has not been placed yet.',
+        discardLabel: 'Leave anyway',
+    });
 
     const hasRedirectedRef = React.useRef(false);
     useFocusEffect(
@@ -137,6 +152,7 @@ export default function CheckoutPaymentScreen() {
     const handleModalPrimary = () => {
         setShowSuccessModal(false);
         clearCart();
+        resetCheckout();
         router.dismissAll();
         router.replace('/(tabs)');
         setTimeout(() => router.push('/categories'), 200);
@@ -145,6 +161,7 @@ export default function CheckoutPaymentScreen() {
     const handleModalClose = () => {
         setShowSuccessModal(false);
         clearCart();
+        resetCheckout();
         router.dismissAll();
         router.replace('/(tabs)');
     };

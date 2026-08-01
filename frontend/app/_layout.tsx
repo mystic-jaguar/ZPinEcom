@@ -3,14 +3,19 @@ import { useEffect } from "react";
 import { Image, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import ErrorBoundary from "../components/common/ErrorBoundary";
+import OfflineBanner from "../components/common/OfflineBanner";
 import { AddressProvider } from "../context/AddressContext";
 import { CartProvider } from "../context/CartContext";
 import { CheckoutProvider } from "../context/CheckoutContext";
 import { OrderProvider } from "../context/OrderContext";
 import { SearchProvider } from "../context/SearchContext";
 import { UserProvider, useUser } from "../context/UserContext";
+import { NetworkProvider } from "../context/NetworkContext";
 import { WishlistProvider } from "../context/WishlistContext";
 import { startKeepAlive } from "../services/keepAlive";
+import { installRejectionHandler } from "../utils/rejectionHandler";
+
+installRejectionHandler();
 
 function AnimatedSplash() {
   return (
@@ -83,6 +88,7 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <ErrorBoundary>
+        <NetworkProvider>
         <SearchProvider>
           <UserProvider>
             <CartProvider>
@@ -98,6 +104,8 @@ export default function RootLayout() {
             </CartProvider>
           </UserProvider>
         </SearchProvider>
+        <OfflineBanner />
+        </NetworkProvider>
       </ErrorBoundary>
     </SafeAreaProvider>
   );

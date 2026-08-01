@@ -6,6 +6,7 @@ import { ArrowRight, Check, MapPin, Pencil, Plus, Trash2 } from 'lucide-react-na
 import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useExitGuard } from '../../hooks/useExitGuard';
 import { AppHeader, BottomBar, CheckoutSteps, ZButton, ZText } from '../../components/ui';
 import { DELIVERY_CITY, isPuneAddress } from '../../constants/delivery';
 import { colors, fonts, palette, radius } from '../../constants/theme';
@@ -13,14 +14,29 @@ import { colors, fonts, palette, radius } from '../../constants/theme';
 export default function CheckoutAddressScreen() {
     const router = useRouter();
     const { addresses, removeAddress } = useAddress();
-    const { selectedAddressId, setSelectedAddressId } = useCheckout();
+    const { selectedAddressId, setSelectedAddressId, setLastStep } = useCheckout();
     const [showModal, setShowModal] = useState(false);
     const [showAreaModal, setShowAreaModal] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [addressToDelete, setAddressToDelete] = useState<string | null>(null);
 
+    React.useEffect(() => { setLastStep(1); }, []);
+
+    // Leaving step 1 abandons the whole checkout — worth a confirm, but the
+    // selections themselves survive in CheckoutContext either way.
+    useExitGuard({
+        enabled: true,
+        title: 'Leave checkout?',
+        message: 'You can come back — your cart and address selection are saved.',
+        discardLabel: 'Leave',
+    });
+
     React.useEffect(() => {
-        if (!selectedAddressId && addresses.length > 0) {
+        if (addresses.length === 0) return;
+        // A restored selection can point at an address deleted since — fall back
+        // to the default rather than carrying a dangling id into the summary.
+        const stillExists = addresses.some(a => a.id === selectedAddressId);
+        if (!selectedAddressId || !stillExists) {
             const defaultAddr = addresses.find(a => a.isDefault) || addresses[0];
             setSelectedAddressId(defaultAddr.id);
         }
