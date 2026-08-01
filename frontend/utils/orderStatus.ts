@@ -22,6 +22,9 @@ const STEP_INDEX: Record<string, number> = {
     confirmed: 1, processing: 1, accepted: 1,
     shipped: 2, in_transit: 2, picked_up: 2, dispatched: 2,
     out_for_delivery: 3, out_delivery: 3, awaiting_collection: 3,
+    // Phase 9: a failed attempt does not move the order backwards — it is still
+    // out with the courier, who either retries or returns it.
+    delivery_failed: 3,
     delivered: 4, completed: 4,
 };
 
@@ -29,8 +32,20 @@ const STEP_INDEX: Record<string, number> = {
 const DELIVERY_STEP_INDEX: Record<string, number> = {
     assigned: 1, accepted: 1,
     picked_up: 2, in_transit: 2,
-    out_for_delivery: 3,
+    out_for_delivery: 3, failed: 3,
     delivered: 4,
+};
+
+/** A delivery was attempted and could not be completed (Phase 9). */
+export function isFailedAttempt(status?: string, deliveryStatus?: string | null): boolean {
+    return deliveryStatus === 'failed' || (status || '').toLowerCase() === 'delivery_failed';
+}
+
+/** Customer-facing wording per failure reason. */
+export const FAILURE_TEXT: Record<string, string> = {
+    unreachable: 'The courier could not reach you.',
+    refused: 'The order was refused at the door.',
+    other: 'The delivery could not be completed.',
 };
 
 /** Statuses that mean the order stopped progressing normally. */

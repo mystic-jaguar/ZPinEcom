@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import { Dimensions, Image, NativeScrollEvent, NativeSyntheticEvent, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import ImageZoomModal from './ImageZoomModal';
 
 const { width } = Dimensions.get('window');
 
@@ -14,6 +15,9 @@ interface ProductImageCarouselProps {
 
 export default function ProductImageCarousel({ images, isLightningFast, onBack, isWishlisted, onToggleWishlist }: ProductImageCarouselProps) {
     const [activeIndex, setActiveIndex] = useState(0);
+    // Tap an image to open it full-screen, where pinch-to-zoom lives. Swipe
+    // already works here and a pinch would fight the pager for the same touch.
+    const [zoomIndex, setZoomIndex] = useState<number | null>(null);
 
     // Ensure we always have at least one image to render
     const safeImages = images && images.length > 0 ? images : [null];
@@ -61,10 +65,12 @@ export default function ProductImageCarousel({ images, isLightningFast, onBack, 
                 {safeImages.map((img, index) => (
                     <View key={index} style={styles.imageContainer}>
                         {img ? (
-                            <Image
-                                source={typeof img === 'string' ? { uri: img } : img}
-                                style={styles.image}
-                            />
+                            <TouchableOpacity activeOpacity={0.9} style={styles.imageTouch} onPress={() => setZoomIndex(index)}>
+                                <Image
+                                    source={typeof img === 'string' ? { uri: img } : img}
+                                    style={styles.image}
+                                />
+                            </TouchableOpacity>
                         ) : (
                             <View style={[styles.image, { backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' }]} />
                         )}
@@ -78,6 +84,18 @@ export default function ProductImageCarousel({ images, isLightningFast, onBack, 
                     <Text style={styles.lightningText}>LIGHTNING FAST DELIVERY</Text>
                 </View>
             )}
+
+            <ImageZoomModal
+                visible={zoomIndex !== null}
+                source={
+                    zoomIndex !== null && safeImages[zoomIndex]
+                        ? (typeof safeImages[zoomIndex] === 'string'
+                            ? { uri: safeImages[zoomIndex] }
+                            : safeImages[zoomIndex])
+                        : undefined
+                }
+                onClose={() => setZoomIndex(null)}
+            />
 
             {/* Pagination Dots — only show if more than 1 image */}
             {safeImages.length > 1 && (
@@ -134,6 +152,10 @@ const styles = StyleSheet.create({
         height: 400,
         justifyContent: 'center',
         alignItems: 'center'
+    },
+    imageTouch: {
+        width: '100%',
+        height: '100%'
     },
     image: {
         width: '100%',

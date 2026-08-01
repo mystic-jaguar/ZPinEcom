@@ -139,6 +139,17 @@ function buildTrackingHistory(order: any, returnRequest?: any) {
     }
   }
 
+  // Phase 9 — a delivery attempt that did not complete. Shown as its own event
+  // so the customer can see an attempt happened rather than a stalled timeline.
+  if (order.delivery_status === 'failed') {
+    steps.push({
+      status: 'delivery_failed',
+      title: 'Delivery attempt failed',
+      timestamp: order.updated_at,
+      note: 'The courier will try again or return the order to the seller.',
+    });
+  }
+
   if (order.status === 'cancelled') {
     steps.push({
       status: 'cancelled',
@@ -345,7 +356,11 @@ router.get('/:id/track', authenticate, async (req: AuthRequest, res: Response): 
     const orderResult = await pool.query(
       `SELECT o.id, o.order_number, o.status, o.tracking_number, o.estimated_delivery,
               o.created_at, o.updated_at, o.delivery_status, o.delivery_boy_id,
-              o.delivery_otp, dp.name AS courier_name, dp.mobile AS courier_phone
+              o.delivery_otp, dp.name AS courier_name, dp.mobile AS courier_phone,
+              -- Phase 9 (failed delivery). Read through to_jsonb so this query
+              -- keeps working whether or not the delivery backend's DDL has
+              -- landed yet — a missing key is simply NULL, not a 42703 error.
+              to_jsonb(o) ->> 'delivery_failure_reason' AS delivery_failure_reason
        FROM ${ORDERS} o
        LEFT JOIN delivery_partner_profiles dp ON dp.id::text = o.delivery_boy_id::text
        WHERE o.id = $1 AND o.user_id = $2`,
@@ -385,6 +400,12 @@ router.get('/:id/track', authenticate, async (req: AuthRequest, res: Response): 
         // door. Only meaningful while the order is out for delivery; the
         // delivery backend clears it the moment the OTP is accepted.
         deliveryOtp: order.delivery_status === 'picked_up' ? order.delivery_otp || null : null,
+        // Phase 9 — an attempt was made and did not complete. The customer sees
+        // the reason so a second attempt is not a surprise. Only the fixed
+        // reason word is exposed; the partner's free-text note is internal.
+        deliveryFailure: order.delivery_status === 'failed'
+          ? { reason: String(order.delivery_failure_reason || 'other').split(':')[0], at: order.updated_at }
+          : null,
         estimatedDelivery: order.estimated_delivery,
         trackingHistory,
       },

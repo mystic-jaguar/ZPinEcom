@@ -9,7 +9,7 @@ import { colors, fonts, palette, radius } from '../../constants/theme';
 import { DELIVERY_ETA } from '../../constants/delivery';
 import { useOrder } from '../../context/OrderContext';
 import { orderService } from '../../services/order';
-import { stepIndex, TRACK_STEPS } from '../../utils/orderStatus';
+import { FAILURE_TEXT, stepIndex, TRACK_STEPS } from '../../utils/orderStatus';
 
 const ELECTRIC_DELAY_MS = 5 * 60 * 1000; // 5 min after delivery before the surge kicks in
 
@@ -59,6 +59,9 @@ export default function TrackOrderScreen() {
     const courier = trackingData?.courier ?? null;
     // Backend only sends this while the order is out for delivery.
     const deliveryOtp: string | null = trackingData?.deliveryOtp ?? null;
+    // Phase 9 — an attempt was made and did not complete. Non-null only while the
+    // order sits in that state; it clears on retry, return or delivery.
+    const deliveryFailure: { reason?: string } | null = trackingData?.deliveryFailure ?? null;
     const liveEta = trackingData?.estimatedDelivery || order?.estimatedDelivery;
     const canCancel = order && ['pending', 'confirmed'].includes(liveStatus);
     const active = stepIndex(liveStatus, deliveryStatus);
@@ -134,6 +137,20 @@ export default function TrackOrderScreen() {
                                 </View>
                             </View>
                             <Text style={styles.trialDesc}>Your courier waits <Text style={{ fontFamily: fonts.bodyBold, color: colors.textStrong }}>15 minutes</Text>. Try everything on, keep what fits, hand back the rest.</Text>
+                        </View>
+                    )}
+
+                    {/* Failed delivery attempt — say so plainly rather than letting
+                        the timeline look stuck at "Out for delivery". */}
+                    {deliveryFailure && (
+                        <View style={styles.failCard}>
+                            <ZText variant="eyebrow">Delivery attempt failed</ZText>
+                            <Text style={styles.failText}>
+                                {FAILURE_TEXT[deliveryFailure.reason || 'other'] || FAILURE_TEXT.other}
+                            </Text>
+                            <Text style={styles.failNote}>
+                                Your courier will try again or return the order to the seller. Keep your phone reachable.
+                            </Text>
                         </View>
                     )}
 
@@ -227,6 +244,10 @@ const styles = StyleSheet.create({
     otpCard: { backgroundColor: colors.surfaceCard, borderWidth: 1, borderColor: palette.yellow500, borderRadius: radius.lg, padding: 18, marginBottom: 16, alignItems: 'center' },
     otpValue: { fontFamily: fonts.displaySemiBold, fontSize: 34, letterSpacing: 8, color: colors.textStrong, marginTop: 6 },
     otpNote: { fontFamily: fonts.bodyRegular, fontSize: 12, color: colors.textFaint, marginTop: 6, textAlign: 'center' },
+
+    failCard: { backgroundColor: '#FDECEC', borderRadius: radius.lg, padding: 18, marginBottom: 16 },
+    failText: { fontFamily: fonts.bodyBold, fontSize: 15, color: colors.textStrong, marginTop: 6 },
+    failNote: { fontFamily: fonts.bodyRegular, fontSize: 12, color: colors.textFaint, marginTop: 6 },
 
     tlRow: { flexDirection: 'row' },
     tlLeft: { width: 26, marginRight: 15, alignItems: 'center' },

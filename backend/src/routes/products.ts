@@ -19,6 +19,43 @@ const TTL_NEARBY = 3600;        // 1h — nearby categories
 
 const router = Router();
 
+/**
+ * Phase 10 — typo-tolerant search.
+ *
+ * Postgres' own `pg_trgm` rather than a search service: the stack already has
+ * Postgres, and a trigram index answers "kurti" → "kurta" without a new
+ * dependency, a new container, or an index to keep in sync.
+ *
+ * Both the extension and the index are attempted once, at first search, and
+ * every failure is swallowed: on a DB role that may not CREATE EXTENSION the
+ * search simply stays exact-match, which is what it does today.
+ */
+let trigramReady: boolean | null = null;
+async function ensureTrigram(): Promise<boolean> {
+  if (trigramReady !== null) return trigramReady;
+  try {
+    const { rows } = await pool.query(`SELECT 1 FROM pg_extension WHERE extname = 'pg_trgm'`);
+    if (!rows.length) await pool.query('CREATE EXTENSION IF NOT EXISTS pg_trgm');
+    // Without this index every fuzzy search is a sequential scan over products.
+    await pool.query(
+      `CREATE INDEX IF NOT EXISTS idx_products_name_trgm
+         ON products USING gin (LOWER(product_name) gin_trgm_ops)`
+    );
+    trigramReady = true;
+  } catch (err) {
+    logger.warn('search.trigram_unavailable', {
+      error: (err as any)?.message ?? String(err),
+      impact: 'search stays exact-match only (see SCHEMA_CHANGES.md)',
+    });
+    trigramReady = false;
+  }
+  return trigramReady;
+}
+
+// How close a name has to be to count as a typo match. 0.3 is Postgres' own
+// default: below it "shirt" starts matching "shorts".
+const TRIGRAM_THRESHOLD = 0.3;
+
 function normalizeProduct(row: any) {
   // Extract sizes from size_quantities keys (e.g. {S:10, M:15} → ['S','M']).
   // Include out-of-stock sizes too so the UI can mark them as unavailable
@@ -270,7 +307,29 @@ router.get('/search', productListLimiter, async (req: Request, res: Response): P
       [`%${normalized}%`, `%${spaced}%`, limit]
     );
 
-    const products = result.rows.map(normalizeProduct);
+    // Nothing matched literally — try again allowing typos. Only on a miss, so
+    // the common case pays nothing for this.
+    let rows = result.rows;
+    if (rows.length === 0 && q.length >= 3 && await ensureTrigram()) {
+      const fuzzy = await pool.query(
+        `SELECT p.*,
+          COALESCE(json_agg(DISTINCT pi.image_url) FILTER (WHERE pi.image_url IS NOT NULL), '[]') as images,
+          COALESCE(AVG(pr.rating), 0) as average_rating,
+          similarity(LOWER(p.product_name), $1) AS match_score
+         FROM products p
+         LEFT JOIN product_images pi ON pi.product_id = p.id
+         LEFT JOIN product_reviews pr ON pr.product_id = p.id
+         WHERE p.in_stock = true AND p.is_approved = true
+           AND similarity(LOWER(p.product_name), $1) > $2
+         GROUP BY p.id
+         ORDER BY match_score DESC, p.created_at DESC
+         LIMIT $3`,
+        [q.toLowerCase(), TRIGRAM_THRESHOLD, limit]
+      );
+      rows = fuzzy.rows;
+    }
+
+    const products = rows.map(normalizeProduct);
 
     // Fetch related products — same deepest_category_name, excluding already found
     let related: any[] = [];
