@@ -24,7 +24,7 @@ export default function CheckoutAddressScreen() {
 
     // Leaving step 1 abandons the whole checkout — worth a confirm, but the
     // selections themselves survive in CheckoutContext either way.
-    useExitGuard({
+    const { ConfirmModal: ExitConfirmModal } = useExitGuard({
         enabled: true,
         title: 'Leave checkout?',
         message: 'You can come back — your cart and address selection are saved.',
@@ -128,6 +128,7 @@ export default function CheckoutAddressScreen() {
                 onSecondaryPress={() => { setShowDeleteModal(false); setAddressToDelete(null); }}
                 onClose={() => { setShowDeleteModal(false); setAddressToDelete(null); }}
             />
+            {ExitConfirmModal}
         </SafeAreaView>
     );
 }

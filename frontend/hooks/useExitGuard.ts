@@ -1,6 +1,7 @@
 import { useNavigation } from 'expo-router';
-import { useEffect } from 'react';
-import { Alert, BackHandler } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { BackHandler } from 'react-native';
+import ActionModal from '../components/common/ActionModal';
 
 interface ExitGuardOptions {
     /** Only guard while there is work worth losing. */
@@ -22,6 +23,9 @@ interface ExitGuardOptions {
  *  - header back / `router.back()` → `beforeRemove`
  *  - iOS swipe-back gesture → `beforeRemove` cannot reliably veto a native
  *    gesture mid-swipe, so the gesture is disabled while the guard is armed
+ *
+ * Returns a `ConfirmModal` element (built on the app's shared `ActionModal`,
+ * not the OS `Alert`) that the caller must render.
  */
 export function useExitGuard({
     enabled,
@@ -31,6 +35,9 @@ export function useExitGuard({
     onDiscard,
 }: ExitGuardOptions) {
     const navigation = useNavigation();
+    const [pendingProceed, setPendingProceed] = useState<(() => void) | null>(null);
+    const onDiscardRef = useRef(onDiscard);
+    onDiscardRef.current = onDiscard;
 
     useEffect(() => {
         // Native-stack swipe-back can't be vetoed once it starts — turn it off
@@ -41,16 +48,7 @@ export function useExitGuard({
     useEffect(() => {
         if (!enabled) return;
 
-        const confirm = (proceed: () => void) => {
-            Alert.alert(title, message, [
-                { text: 'Stay', style: 'cancel' },
-                {
-                    text: discardLabel,
-                    style: 'destructive',
-                    onPress: () => { onDiscard?.(); proceed(); },
-                },
-            ]);
-        };
+        const confirm = (proceed: () => void) => setPendingProceed(() => proceed);
 
         const back = BackHandler.addEventListener('hardwareBackPress', () => {
             confirm(() => navigation.dispatch({ type: 'POP', payload: {} } as any));
@@ -66,5 +64,24 @@ export function useExitGuard({
             back.remove();
             beforeRemove();
         };
-    }, [enabled, navigation, title, message, discardLabel, onDiscard]);
+    }, [enabled, navigation]);
+
+    const ConfirmModal = React.createElement(ActionModal, {
+        visible: !!pendingProceed,
+        title,
+        message,
+        icon: 'alert-triangle',
+        primaryButtonText: discardLabel,
+        onPrimaryPress: () => {
+            const proceed = pendingProceed;
+            setPendingProceed(null);
+            onDiscardRef.current?.();
+            proceed?.();
+        },
+        secondaryButtonText: 'Stay',
+        onSecondaryPress: () => setPendingProceed(null),
+        onClose: () => setPendingProceed(null),
+    });
+
+    return { ConfirmModal };
 }

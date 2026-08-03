@@ -37,7 +37,7 @@ export default function CheckoutPaymentScreen() {
     // Backing out while the order/payment round-trip is in flight is the one
     // place in the app where leaving can cost the customer money, so this
     // guard is armed for the whole submit, not just for unsaved input.
-    useExitGuard({
+    const { ConfirmModal: ExitConfirmModal } = useExitGuard({
         enabled: isSubmitting || !!selectedPaymentMethod,
         title: isSubmitting ? 'Payment in progress' : 'Leave payment?',
         message: isSubmitting
@@ -285,6 +285,7 @@ export default function CheckoutPaymentScreen() {
                 onClose={() => setOrderError(null)}
                 icon="x-circle"
             />
+            {ExitConfirmModal}
         </SafeAreaView>
     );
 }

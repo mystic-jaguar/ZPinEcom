@@ -24,7 +24,7 @@ export default function CheckoutSummaryScreen() {
     const [couponCode, setCouponCode] = useState('');
     // An applied coupon is the one thing on this screen a user would hate to
     // silently re-enter, so only guard once there is something to lose.
-    useExitGuard({
+    const { ConfirmModal: ExitConfirmModal } = useExitGuard({
         enabled: !!appliedCoupon,
         title: 'Go back?',
         message: 'Your applied coupon stays on the cart, but you will need to return here to place the order.',
@@ -165,6 +165,7 @@ export default function CheckoutSummaryScreen() {
             </View>
 
             <ActionModal visible={modalVisible} title={modalConfig.title} message={modalConfig.message} icon={modalConfig.icon} primaryButtonText="OK" onPrimaryPress={() => setModalVisible(false)} onClose={() => setModalVisible(false)} />
+            {ExitConfirmModal}
         </SafeAreaView>
     );
 }
