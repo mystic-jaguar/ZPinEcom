@@ -1,0 +1,37 @@
+diff --git a/node_modules/react-native-razorpay/android/src/main/java/com/razorpay/rn/RazorpayModuleImpl.java b/node_modules/react-native-razorpay/android/src/main/java/com/razorpay/rn/RazorpayModuleImpl.java
+index f0a4f34..3dd96eb 100644
+--- a/node_modules/react-native-razorpay/android/src/main/java/com/razorpay/rn/RazorpayModuleImpl.java
++++ b/node_modules/react-native-razorpay/android/src/main/java/com/razorpay/rn/RazorpayModuleImpl.java
+@@ -61,8 +61,16 @@ public class RazorpayModuleImpl {
+      * Handles payment error callback from Razorpay SDK.
+      */
+     public void onPaymentError(int code, String description, PaymentData paymentData) {
+-        WritableMap errorParams = Arguments.createMap();
+-        JSONObject paymentDataJson = paymentData.getData();
++        // The Razorpay SDK passes a null PaymentData when the user backs out of the
++        // checkout sheet before any payment attempt exists. Dereferencing it here
++        // threw an NPE inside onActivityResult and killed the app process.
++        JSONObject paymentDataJson = null;
++        if (paymentData != null) {
++            paymentDataJson = paymentData.getData();
++        }
++        if (paymentDataJson == null) {
++            paymentDataJson = new JSONObject();
++        }
+         try {
+             paymentDataJson.put(MAP_KEY_ERROR_CODE, code);
+             paymentDataJson.put(MAP_KEY_ERROR_DESC, description);
+diff --git a/node_modules/react-native-razorpay/android/src/main/java/com/razorpay/rn/Utils.java b/node_modules/react-native-razorpay/android/src/main/java/com/razorpay/rn/Utils.java
+index 09e8708..f2af301 100644
+--- a/node_modules/react-native-razorpay/android/src/main/java/com/razorpay/rn/Utils.java
++++ b/node_modules/react-native-razorpay/android/src/main/java/com/razorpay/rn/Utils.java
+@@ -78,6 +78,9 @@ public class Utils {
+ 
+ 	public static WritableMap jsonToWritableMap(JSONObject jsonObject) {
+ 		WritableMap writableMap = new WritableNativeMap();
++		if (jsonObject == null) {
++			return writableMap;
++		}
+ 		try {
+ 			Iterator iterator = jsonObject.keys();
+ 			while(iterator.hasNext()) {

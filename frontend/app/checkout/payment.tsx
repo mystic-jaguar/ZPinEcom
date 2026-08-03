@@ -132,11 +132,12 @@ export default function CheckoutPaymentScreen() {
             }
             setShowSuccessModal(true);
         } catch (error: any) {
+            // Razorpay rejects with a plain object, not an Error: { code, description }.
+            // code 2 === PAYMENT_CANCELED (0 is NETWORK_ERROR, don't match it).
+            const rzpText = `${error?.description ?? ''} ${error?.message ?? ''}`.toLowerCase();
             const isCancelled =
-                error?.code === 0 || error?.code === 'PAYMENT_CANCELLED' ||
-                error?.description === 'Payment cancelled by user' ||
-                error?.message?.toLowerCase().includes('cancel') ||
-                error?.message?.toLowerCase().includes('dismiss');
+                error?.code === 2 || error?.code === 'PAYMENT_CANCELLED' ||
+                rzpText.includes('cancel') || rzpText.includes('dismiss');
             if (createdOrderId) {
                 orderService.cancelOrder(createdOrderId, {
                     reason: isCancelled ? 'Payment cancelled by user' : 'Payment failed',
