@@ -423,6 +423,32 @@ export default function ProductDetails() {
                         </View>
                     </View>
 
+                    {/* Colors / Designs — sibling listings sharing a variant group */}
+                    {product.variants && product.variants.length > 0 && (
+                        <View style={{ marginTop: 20 }}>
+                            <Text style={styles.sectionLabel}>COLOR / DESIGN</Text>
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                                {product.variants.map((v) => (
+                                    <TouchableOpacity
+                                        key={v.id}
+                                        style={styles.variantSwatch}
+                                        disabled={v.id === product.productId}
+                                        onPress={() => router.push(`/product/${v.id}`)}
+                                    >
+                                        <View style={[styles.variantSwatchImage, v.id === product.productId && { borderColor: palette.yellow600 }]}>
+                                            {v.thumbnail ? (
+                                                <Image source={{ uri: v.thumbnail }} style={{ width: '100%', height: '100%', borderRadius: 8 }} resizeMode="cover" />
+                                            ) : (
+                                                <Feather name="image" size={18} color="#ccc" />
+                                            )}
+                                        </View>
+                                        <Text style={styles.variantSwatchLabel} numberOfLines={1}>{v.label}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </ScrollView>
+                        </View>
+                    )}
+
                     {/* Variants */}
                     <VariantSelector
                         colors={product.colors}
@@ -951,6 +977,27 @@ const styles = StyleSheet.create({
     recCard: {
         width: 140,
         marginRight: 15
+    },
+    variantSwatch: {
+        width: 64,
+        marginRight: 12,
+        alignItems: 'center',
+    },
+    variantSwatchImage: {
+        width: 56,
+        height: 56,
+        borderRadius: 8,
+        backgroundColor: '#f0f0f0',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 2,
+        borderColor: 'transparent',
+    },
+    variantSwatchLabel: {
+        fontSize: 11,
+        color: '#666',
+        marginTop: 4,
+        textAlign: 'center',
     },
     recImagePlaceholder: {
         width: 140,

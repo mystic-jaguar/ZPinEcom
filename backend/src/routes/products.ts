@@ -87,6 +87,7 @@ function normalizeProduct(row: any) {
     colors: colors.length > 0 ? colors : undefined,
     sizeQuantities: Object.keys(sizeQuantities).length > 0 ? sizeQuantities : undefined,
     attributes: Object.keys(attrs).length > 0 ? attrs : undefined,
+    variantGroupId: row.variant_group_id || undefined,
   };
 }
 
@@ -714,6 +715,29 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    // Sibling color/design variants (vendor-website feature: each color is its
+    // own product row, linked by variant_group_id). Absent for most products.
+    let variants: Array<{ id: string; label: string; thumbnail?: string; price: number; inStock: boolean }> = [];
+    const variantGroupId = result.rows[0].variant_group_id;
+    if (variantGroupId) {
+      const siblings = await pool.query(
+        `SELECT p.id, p.variant_label, p.price, p.in_stock,
+                (SELECT pi.image_url FROM product_images pi
+                 WHERE pi.product_id = p.id ORDER BY pi.display_order, pi.created_at LIMIT 1) AS thumbnail
+         FROM products p
+         WHERE p.variant_group_id = $1 AND p.is_approved = true
+         ORDER BY p.created_at`,
+        [variantGroupId]
+      );
+      variants = siblings.rows.map((v) => ({
+        id: v.id,
+        label: v.variant_label || 'Untitled',
+        thumbnail: v.thumbnail || undefined,
+        price: withMarkup(v.price),
+        inStock: v.in_stock,
+      }));
+    }
+
     // Seller name is inline; the address is detail-only and the app keeps it
     // behind a "More information" reveal (never in listings or search).
     const response = {
@@ -726,6 +750,7 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
         // meaning as the customer website's ProductDetail: advisory here, enforced
         // server-side at checkout.
         sellerIsLive: result.rows[0].seller_is_live !== false,
+        variants: variants.length > 1 ? variants : undefined,
       },
     };
     await cacheSet(cacheKey, response, TTL_PRODUCT);

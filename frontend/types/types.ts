@@ -204,6 +204,15 @@ export interface ProductObject {
     sellerName?: string;                   // detail endpoint only
     sellerAddress?: string;                // detail endpoint only, revealed on tap
     sellerIsLive?: boolean;                // users.is_live — false blocks buying
+    variants?: ProductVariant[];           // detail endpoint only, sibling colors/designs
+}
+
+export interface ProductVariant {
+    id: string;
+    label: string;
+    thumbnail?: string;
+    price: number;
+    inStock: boolean;
 }
 
 // ============================================================================
