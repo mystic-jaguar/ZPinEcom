@@ -139,10 +139,10 @@ export default function CheckoutPaymentScreen() {
                 error?.code === 2 || error?.code === 'PAYMENT_CANCELLED' ||
                 rzpText.includes('cancel') || rzpText.includes('dismiss');
             if (createdOrderId) {
-                orderService.cancelOrder(createdOrderId, {
-                    reason: isCancelled ? 'Payment cancelled by user' : 'Payment failed',
-                    refundMethod: 'original',
-                }).catch(() => { });
+                // Never paid for, so it is discarded outright rather than cancelled:
+                // a cancelled row still surfaces in the seller's app as a real order.
+                // The server falls back to refusing anything that IS paid.
+                orderService.abandonOrder(createdOrderId).catch(() => { });
             }
             setOrderError(isCancelled ? 'Payment was cancelled. Please try again.' : (error.message || 'Payment failed. Please try again.'));
         } finally {

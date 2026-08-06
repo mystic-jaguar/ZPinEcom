@@ -3,7 +3,7 @@ import { pool } from '../db';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { orderCreateLimiter } from '../middleware/rateLimits';
 import { decryptAddressPayload, encryptAddressPayload } from '../utils/encryption';
-import { consumeDealStock, liveDealPrices } from '../utils/flashDeals';
+import { consumeDealStock, liveDealPrices, releaseDealStock } from '../utils/flashDeals';
 import { generateId } from '../utils/id';
 import { recordOrderStatus } from '../utils/orderHistory';
 import { markupItems, withMarkup } from '../utils/pricing';
@@ -1317,6 +1317,98 @@ router.patch('/:id/cancel', authenticate, async (req: AuthRequest, res: Response
   } catch (err) {
     try { await client.query('ROLLBACK'); } catch { /* ignore */ }
     logger.error('cancelorder_error', { error: (err as any)?.message ?? String(err) });
+    res.status(500).json({ success: false, message: 'Server error' });
+  } finally {
+    client.release();
+  }
+});
+
+// DELETE /api/v1/orders/:id/abandon — the customer closed/failed the Razorpay
+// sheet, so the order was never paid for. Cancelling it (what we used to do) left
+// a real row behind that every seller saw in the vendor app as a cancelled order.
+// An order nobody ever paid for and no seller ever acted on has no accounting
+// value, so it is deleted outright and everything it consumed is put back.
+//
+// Fail-closed by construction: the WHERE clause only ever matches the caller's own
+// rows that are still status='pending' AND payment_status='pending' AND not COD —
+// i.e. provably untouched and unpaid. Anything paid, partially paid, confirmed or
+// COD falls through to the normal /cancel path and is left alone.
+router.delete('/:id/abandon', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // A checkout is one group. Delete every sub-order in it, not just the primary
+    // id the payment sheet referenced — otherwise a multi-seller cart leaves the
+    // other sellers' rows sitting unpaid in their app forever.
+    const orders = await client.query(
+      `SELECT id, group_id FROM ${ORDERS}
+        WHERE user_id = $2
+          AND group_id = (SELECT group_id FROM ${ORDERS} WHERE id = $1 AND user_id = $2)
+          AND status = 'pending'
+          AND payment_status = 'pending'
+          AND LOWER(COALESCE(payment_method, '')) NOT IN ('cod', 'cash', 'cash_on_delivery')
+        FOR UPDATE`,
+      [req.params.id, req.userId]
+    );
+
+    if (orders.rows.length === 0) {
+      await client.query('ROLLBACK');
+      res.status(400).json({ success: false, message: 'Order cannot be abandoned' });
+      return;
+    }
+
+    const ids = orders.rows.map((o: any) => o.id);
+
+    // Put back everything checkout took: product stock and flash-deal stock.
+    const items = await client.query(
+      `SELECT product_id, quantity FROM ${ORDER_ITEMS} WHERE order_id = ANY($1)`,
+      [ids]
+    );
+    for (const item of items.rows) {
+      await client.query(
+        `UPDATE products
+            SET quantity = quantity + $1, in_stock = true, updated_at = NOW()
+          WHERE id = $2`,
+        [item.quantity, item.product_id]
+      );
+      await releaseDealStock(client, item.product_id, item.quantity);
+    }
+
+    // Release the coupon too — it was never actually used.
+    const redeemed = await client.query(
+      `DELETE FROM ${COUPON_REDEMPTIONS} WHERE order_id = ANY($1) RETURNING coupon_code`,
+      [ids]
+    );
+    for (const r of redeemed.rows) {
+      await client.query(
+        `UPDATE coupons SET usage_count = GREATEST(usage_count - 1, 0), updated_at = NOW()
+          WHERE UPPER(code) = UPPER($1)`,
+        [r.coupon_code]
+      );
+    }
+
+    // The "New Order" rows written to the customer and to each seller at checkout.
+    // The seller's row carries its own sub-order id, the customer's carries the
+    // group id (which is a separate id only for a genuinely multi-seller cart).
+    const notifKeys = [...new Set([...ids, ...orders.rows.map((o: any) => o.group_id).filter(Boolean)])];
+    await client.query(
+      `DELETE FROM notifications
+        WHERE type = 'new_order'
+          AND (data->>'orderId' = ANY($1) OR data->>'groupId' = ANY($1))`,
+      [notifKeys]
+    );
+    await client.query(`DELETE FROM order_status_history WHERE order_id = ANY($1)`, [ids]);
+    await client.query(`DELETE FROM ${ORDER_ITEMS} WHERE order_id = ANY($1)`, [ids]);
+    await client.query(`DELETE FROM ${ORDERS} WHERE id = ANY($1)`, [ids]);
+
+    await client.query('COMMIT');
+    await cacheDelPattern(`user:${req.userId}:orders:*`);
+
+    res.json({ success: true, data: { message: 'Order discarded', deleted: ids.length } });
+  } catch (err) {
+    try { await client.query('ROLLBACK'); } catch { /* ignore */ }
+    logger.error('abandonorder_error', { error: (err as any)?.message ?? String(err) });
     res.status(500).json({ success: false, message: 'Server error' });
   } finally {
     client.release();

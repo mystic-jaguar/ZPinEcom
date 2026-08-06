@@ -78,3 +78,17 @@ export async function consumeDealStock(
     [productId, Math.max(1, Number(quantity) || 1)]
   );
 }
+
+/** Give deal stock back when a checkout is discarded before it was ever paid. */
+export async function releaseDealStock(
+  q: { query: (sql: string, params: any[]) => Promise<any> },
+  productId: string,
+  quantity: number
+): Promise<void> {
+  await q.query(
+    `UPDATE flash_deals fd
+        SET stock_remaining = fd.stock_remaining + $2
+      WHERE fd.product_id = $1::uuid AND ${LIVE_DEAL_PREDICATE}`,
+    [productId, Math.max(1, Number(quantity) || 1)]
+  );
+}

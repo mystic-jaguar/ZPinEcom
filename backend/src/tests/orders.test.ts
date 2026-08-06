@@ -324,6 +324,57 @@ describe('PATCH /orders/:id/cancel', () => {
   });
 });
 
+// ─── DELETE /orders/:id/abandon ───────────────────────────────────────────────
+
+describe('DELETE /orders/:id/abandon', () => {
+  // Route by SQL text rather than call order: `authenticate` fires its own
+  // token-revocation query first, which would eat a queued mockResolvedValueOnce.
+  const routeBySql = (unpaidRows: any[]) =>
+    getDbMock().mockImplementation((sql: string) => {
+      if (/FROM orders\s+WHERE user_id/i.test(sql) || /SELECT id, group_id/i.test(sql)) {
+        return Promise.resolve({ rows: unpaidRows });
+      }
+      return Promise.resolve({ rows: [] });
+    });
+
+  it('returns 401 without auth', async () => {
+    const res = await request(app).delete(`${BASE}/${orderId}/abandon`);
+    expect(res.status).toBe(401);
+  });
+
+  it('refuses when nothing matches the unpaid-pending guard', async () => {
+    // A paid / confirmed / COD order never matches the SELECT, so it is left alone
+    // for the normal cancel flow instead of being deleted.
+    routeBySql([]);
+
+    const res = await request(app)
+      .delete(`${BASE}/${orderId}/abandon`)
+      .set(bearerHeader(custToken));
+
+    expect(res.status).toBe(400);
+    const deleted = getDbMock().mock.calls.filter((c: any[]) => /^\s*DELETE FROM/i.test(c[0]));
+    expect(deleted).toHaveLength(0);
+  });
+
+  it('deletes every sub-order in the group, not just the one paid for', async () => {
+    routeBySql([
+      { id: 'ORD0001', group_id: 'GRP0001' },
+      { id: 'ORD0002', group_id: 'GRP0001' },
+    ]);
+
+    const res = await request(app)
+      .delete(`${BASE}/${orderId}/abandon`)
+      .set(bearerHeader(custToken));
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.deleted).toBe(2);
+
+    const ordersDelete = getDbMock().mock.calls.find((c: any[]) => /DELETE FROM "?orders"? WHERE id = ANY/i.test(c[0]));
+    expect(ordersDelete).toBeDefined();
+    expect(ordersDelete![1][0]).toEqual(['ORD0001', 'ORD0002']);
+  });
+});
+
 // ─── POST /orders/:id/return ──────────────────────────────────────────────────
 
 describe('POST /orders/:id/return', () => {

@@ -97,6 +97,23 @@ export const orderService = {
     },
 
     /**
+     * Discard an order the customer never paid for (Razorpay sheet closed or
+     * failed). The server deletes the whole checkout group instead of cancelling
+     * it, so an unpaid attempt never shows up as an order in the vendor app.
+     */
+    async abandonOrder(id: string) {
+        try {
+            // DELETE :- /api/v1/orders/:id/abandon
+            const response = await apiClient.delete<ApiSuccessResponse<{ message: string; deleted: number }>>(
+                `orders/${id}/abandon`
+            );
+            return response.data;
+        } catch (error: any) {
+            throw new Error(handleApiError(error));
+        }
+    },
+
+    /**
      * Phase 9A — confirm which items to keep during the 15-minute Instant
      * Delivery trial. Anything not listed in `returnItemIds` is kept.
      */
