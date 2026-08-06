@@ -20,6 +20,30 @@ const REFRESH_TOKENS = safeIdentifier('refresh_tokens');
 const AUTH_TOKENS = safeIdentifier('auth_tokens');
 const PENDING_SIGNUPS = safeIdentifier('pending_signups');
 
+/**
+ * Soft-deleted accounts must never get a session.
+ *
+ * `users.deleted_at` is set by the customer website's deletion flow
+ * (website-customer/backend/controllers/accountDeletionController.js) and by the
+ * vendor app's (ZPinVendorApp .../accountDeletionController.js). It is a column on
+ * the SHARED users row, so an account closed on either of those surfaces must stop
+ * working here too — it is deliberately NOT the same thing as `is_active`, which
+ * means "suspended by an admin".
+ *
+ * Applied to every path that mints tokens: password login, refresh, Google, Apple.
+ * The account stays recoverable for 30 days, so this is a refusal, not a 404.
+ */
+const isDeletedAccount = (row: any): boolean => Boolean(row?.deleted_at);
+
+const rejectDeletedAccount = (req: Request, res: Response, userId: string, method: string): void => {
+  logger.authFailure(req.ip || '', method, 'account_deleted', userId);
+  res.status(403).json({
+    success: false,
+    message: 'This account has been deleted. Contact support if you want it restored.',
+    code: 'ACCOUNT_DELETED',
+  });
+};
+
 // ─── Rate Limiters ────────────────────────────────────────────────────────────
 
 const isProd = process.env.NODE_ENV === 'production';
@@ -267,6 +291,11 @@ router.post('/login', loginLimiter, async (req: Request, res: Response): Promise
 
     const row = result.rows[0];
 
+    if (isDeletedAccount(row)) {
+      rejectDeletedAccount(req, res, row.id, 'login');
+      return;
+    }
+
     if (!row.is_active) {
       logger.authFailure(req.ip || '', 'login', 'account_deactivated', row.id);
       res.status(403).json({ success: false, message: 'Account is deactivated' });
@@ -338,6 +367,11 @@ router.post('/refresh-token', refreshLimiter, async (req: Request, res: Response
     const userResult = await pool.query(`SELECT * FROM ${USERS} WHERE id = $1`, [decoded.userId]);
     if (userResult.rows.length === 0) {
       res.status(401).json({ success: false, message: 'User not found' });
+      return;
+    }
+
+    if (isDeletedAccount(userResult.rows[0])) {
+      rejectDeletedAccount(req, res, decoded.userId, 'refresh_token');
       return;
     }
 
@@ -794,6 +828,13 @@ router.post('/google', loginLimiter, async (req: Request, res: Response): Promis
 
     let user = userResult.rows[0];
 
+    // Before the link/update branch below: a deleted account must not be
+    // silently revived (and re-verified) by signing in with Google.
+    if (isDeletedAccount(user)) {
+      rejectDeletedAccount(req, res, user.id, 'google_login');
+      return;
+    }
+
     if (!user) {
       // Create new user from Google account
       const userId = generateId();
@@ -930,6 +971,12 @@ router.post('/apple', loginLimiter, async (req: Request, res: Response): Promise
     if (!user && email) {
       userResult = await pool.query(`SELECT * FROM ${USERS} WHERE email = $1`, [email]);
       user = userResult.rows[0];
+    }
+
+    // Same as Google: signing in with Apple must not revive a deleted account.
+    if (isDeletedAccount(user)) {
+      rejectDeletedAccount(req, res, user.id, 'apple_login');
+      return;
     }
 
     if (!user) {
