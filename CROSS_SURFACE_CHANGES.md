@@ -55,3 +55,29 @@ the middleware already reads:
 
 **No schema change** — reads a column applied to prod 2026-08-06 (`account_deletion_ddl.sql`).
 **Needs a redeploy of the ecom backend to take effect.**
+
+---
+
+## Pune-only delivery area — now enforced server-side (2026-08-07)
+
+**What the rule is:** the *customer* may be anywhere; only the **delivery address** must be inside Pune (core `411xxx` / PCMC-greater `412xxx`, city text matching `pune|pimpri|chinchwad|pcmc`). Both pincode AND city must match.
+
+**Before this change** the rule existed only as a client-side guard in the ecom app frontend (`frontend/constants/delivery.ts`). It was bypassable via the customer website or by calling the ecom API directly.
+
+**What was added:**
+
+| Surface | Change | Status |
+|---|---|---|
+| **Ecom app backend** | New `src/utils/delivery.ts`. Enforced on `POST /users/shipping-address`, `PUT /users/shipping-address/:id`, and — authoritatively — at order creation in `routes/orders.ts` (after the address is decrypted, before anything is written). | ✅ done, needs redeploy |
+| **Ecom app frontend** | Already had the check; unchanged. | ✅ pre-existing |
+| **Customer website backend** | New `backend/utils/delivery.js` (identical logic). Enforced in `addressController.addAddress` / `updateAddress` and in `orderController` at order creation. | ✅ code done, **ayush must deploy** |
+| **Customer website frontend** | New `src/utils/delivery.js`. Checked in `AddAddress.jsx` validation and `Checkout.jsx` `handlePlaceOrder`. | ✅ code done, **ayush must deploy** |
+| **Vendor app / vendor website** | Not applicable — sellers do not create delivery addresses. | n/a |
+| **Delivery app** | Not applicable — it only receives orders that already passed the gate. | n/a |
+| **Admin website** | ⚠️ Not checked. If admin can create or edit a customer address, it can still bypass the rule. | ⚠️ unverified |
+
+**The order-creation gate is the one that actually matters** — it also catches addresses that were saved *before* this restriction existed, which a save-time check alone cannot.
+
+**No schema change.** Four copies of the rule now exist (ecom backend, ecom frontend, website backend, website frontend) — they must stay identical; each file names the other three in its header comment.
+
+**Known pre-existing quirk (not introduced here):** the website's `placeOrder` sends `addressId`, but `orderController` ignores it and uses the user's *default* address. The gate follows the backend's actual behaviour (it checks the default address), so it is correct either way — but that mismatch is worth fixing separately.

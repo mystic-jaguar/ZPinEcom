@@ -2,6 +2,7 @@ import { Response, Router } from 'express';
 import { pool } from '../db';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { addressLimiter } from '../middleware/rateLimits';
+import { isPuneAddress, OUT_OF_AREA_MESSAGE } from '../utils/delivery';
 import { decryptAddressPayload, encryptAddressPayload } from '../utils/encryption';
 import { generateId } from '../utils/id';
 import { ensureModerationSchema } from '../utils/moderationSchema';
@@ -351,6 +352,12 @@ router.post('/shipping-address', authenticate, addressLimiter, async (req: AuthR
     return;
   }
 
+  // Delivery is Pune-only. The customer can be anywhere; the address can't.
+  if (!isPuneAddress(city, pincode)) {
+    res.status(400).json({ success: false, message: OUT_OF_AREA_MESSAGE });
+    return;
+  }
+
   try {
     const encryptedAddress = encryptAddressPayload({
       name,
@@ -429,6 +436,12 @@ router.put('/shipping-address/:addressId', authenticate, async (req: AuthRequest
       || city || state || pincode || country || landmark !== undefined;
 
     if (hasAddressField) {
+      // Re-check the merged result, not just the fields sent — a partial update
+      // that moves city or pincode out of Pune must fail too.
+      if (!isPuneAddress(city ?? current.city, pincode ?? current.pincode)) {
+        res.status(400).json({ success: false, message: OUT_OF_AREA_MESSAGE });
+        return;
+      }
       const merged = encryptAddressPayload({
         name:          name          ?? current.name,
         phone:         phone         ?? current.phone,

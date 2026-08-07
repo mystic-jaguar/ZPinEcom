@@ -2,6 +2,7 @@ import { Response, Router } from 'express';
 import { pool } from '../db';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { orderCreateLimiter } from '../middleware/rateLimits';
+import { isPuneAddress, OUT_OF_AREA_MESSAGE } from '../utils/delivery';
 import { decryptAddressPayload, encryptAddressPayload } from '../utils/encryption';
 import { consumeDealStock, liveDealPrices, releaseDealStock } from '../utils/flashDeals';
 import { generateId } from '../utils/id';
@@ -548,6 +549,17 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
     }
 
     const addr = decryptAddressPayload(addrResult.rows[0]);
+
+    // Delivery is Pune-only. This is the authoritative gate — it also catches
+    // addresses saved before the restriction existed, which the save-time check
+    // can't. The customer's own location is irrelevant; only this address matters.
+    if (!isPuneAddress(addr.city, addr.pincode)) {
+      await client.query('ROLLBACK');
+      client.release();
+      res.status(400).json({ success: false, message: OUT_OF_AREA_MESSAGE });
+      return;
+    }
+
     // The one shipping-address contract, shared with the website, seller app and
     // delivery app. Same keys as `addresses`, every value encrypted.
     const shippingAddress = {
