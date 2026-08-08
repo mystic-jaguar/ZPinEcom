@@ -16,6 +16,12 @@ import { ZText } from '../../components/ui';
 import { colors, fonts, palette, radius, shadow } from '../../constants/theme';
 import { useUser } from '../../context/UserContext';
 
+// Delete-account entry point is hidden by request. The flow itself (modal +
+// authService.deleteAccount + backend route) is left intact — flip to true to
+// bring the button back. Note: Play/App Store require an in-app deletion path
+// for apps that let users create accounts.
+const SHOW_DELETE_ACCOUNT = false;
+
 function initialsOf(name?: string) {
     if (!name) return 'ZP';
     return name.trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() || '').join('') || 'ZP';
@@ -183,10 +189,12 @@ export default function ProfileScreen() {
                         <LogOut size={18} color={colors.textBody} />
                         <Text style={styles.outlineText}>Log out</Text>
                     </Pressable>
-                    <Pressable style={[styles.outlineBtn, styles.dangerBtn]} onPress={() => setDeleteModalVisible(true)}>
-                        <Trash2 size={18} color={palette.red500} />
-                        <Text style={[styles.outlineText, { color: palette.red500 }]}>Delete</Text>
-                    </Pressable>
+                    {SHOW_DELETE_ACCOUNT && (
+                        <Pressable style={[styles.outlineBtn, styles.dangerBtn]} onPress={() => setDeleteModalVisible(true)}>
+                            <Trash2 size={18} color={palette.red500} />
+                            <Text style={[styles.outlineText, { color: palette.red500 }]}>Delete</Text>
+                        </Pressable>
+                    )}
                 </View>
             </ScrollView>
 

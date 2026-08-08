@@ -81,3 +81,17 @@ the middleware already reads:
 **No schema change.** Four copies of the rule now exist (ecom backend, ecom frontend, website backend, website frontend) — they must stay identical; each file names the other three in its header comment.
 
 **Known pre-existing quirk (not introduced here):** the website's `placeOrder` sends `addressId`, but `orderController` ignores it and uses the user's *default* address. The gate follows the backend's actual behaviour (it checks the default address), so it is correct either way — but that mismatch is worth fixing separately.
+
+---
+
+## 2026-08-08 — Delete-account button hidden in all three apps; social-account auth errors
+
+**Hidden delete-account entry point** behind a `SHOW_DELETE_ACCOUNT = false` const in:
+- `ZPinEcom/frontend/app/(tabs)/profile.tsx`
+- `Z-PinApp/frontend/src/screens/ProfileScreen.tsx`
+- `ZPinVendorApp/frontend/src/screens/dashboard/MoreScreen.tsx`
+
+Only the UI is hidden — the backend delete routes and the OTP/recovery flows are untouched and still reachable by the customer/vendor **website**, which still shows its own delete-account option. If deletion should be off platform-wide, the website surfaces need the same change.
+**Store policy:** Google Play and the App Store require an in-app account-deletion path for apps that allow account creation. Keeping it hidden is a review risk unless a web deletion URL is declared in the store listing.
+
+**Auth error specificity (ecom backend only).** `/api/v1/auth/*` is now exempt from the global 300 req/15min limiter, so the route limiters' own 429 text is what users see. Signup / login / forgetPassword-sendOTP now return `code: 'SOCIAL_LOGIN_ACCOUNT'` and name the provider when the email belongs to a Google/Apple account with no password. The vendor, delivery and website backends have their own auth code and still return generic text — worth mirroring there.
