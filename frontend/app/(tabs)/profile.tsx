@@ -7,7 +7,7 @@ import { authService } from '@/services/auth';
 import { Image } from 'expo-image';
 import { useFocusEffect, useRouter } from 'expo-router';
 import {
-    Bell, ChevronRight, Heart, LifeBuoy, LogOut, MapPin, RotateCcw, Settings, Shield, ShoppingBag, Ticket, Trash2, User, Zap,
+    Bell, ChevronRight, Heart, LifeBuoy, LogOut, MapPin, RotateCcw, Settings, Shield, ShoppingBag, Ticket, User, Zap,
 } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -15,12 +15,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ZText } from '../../components/ui';
 import { colors, fonts, palette, radius, shadow } from '../../constants/theme';
 import { useUser } from '../../context/UserContext';
-
-// Delete-account entry point is hidden by request. The flow itself (modal +
-// authService.deleteAccount + backend route) is left intact — flip to true to
-// bring the button back. Note: Play/App Store require an in-app deletion path
-// for apps that let users create accounts.
-const SHOW_DELETE_ACCOUNT = false;
 
 function initialsOf(name?: string) {
     if (!name) return 'ZP';
@@ -49,10 +43,6 @@ export default function ProfileScreen() {
         try { await refreshAll(); } finally { setRefreshing(false); }
     }, [refreshAll]);
     const [logoutModalVisible, setLogoutModalVisible] = useState(false);
-    const [deleteModalVisible, setDeleteModalVisible] = useState(false);
-    const [deleting, setDeleting] = useState(false);
-    const [deleteErrorVisible, setDeleteErrorVisible] = useState(false);
-    const [deleteErrorMessage, setDeleteErrorMessage] = useState('');
     const [legalModalVisible, setLegalModalVisible] = useState(false);
     const [legalDocType, setLegalDocType] = useState<LegalDocType>('terms');
 
@@ -72,26 +62,6 @@ export default function ProfileScreen() {
         } catch (error) {
             console.error('Logout error:', error);
             setLogoutModalVisible(false);
-        }
-    };
-
-    const handleDeleteAccount = async () => {
-        if (deleting) return;
-        setDeleting(true);
-        try {
-            await authService.deleteAccount();
-            resetUser();
-            clearCart();
-            clearWishlist();
-            setDeleteModalVisible(false);
-            router.replace('/auth/login');
-        } catch (error: any) {
-            console.error('Delete account error:', error);
-            setDeleteModalVisible(false);
-            setDeleteErrorMessage(error?.message || 'Something went wrong. Please try again later.');
-            setDeleteErrorVisible(true);
-        } finally {
-            setDeleting(false);
         }
     };
 
@@ -189,12 +159,6 @@ export default function ProfileScreen() {
                         <LogOut size={18} color={colors.textBody} />
                         <Text style={styles.outlineText}>Log out</Text>
                     </Pressable>
-                    {SHOW_DELETE_ACCOUNT && (
-                        <Pressable style={[styles.outlineBtn, styles.dangerBtn]} onPress={() => setDeleteModalVisible(true)}>
-                            <Trash2 size={18} color={palette.red500} />
-                            <Text style={[styles.outlineText, { color: palette.red500 }]}>Delete</Text>
-                        </Pressable>
-                    )}
                 </View>
             </ScrollView>
 
@@ -208,26 +172,6 @@ export default function ProfileScreen() {
                 secondaryButtonText="CANCEL"
                 onSecondaryPress={() => setLogoutModalVisible(false)}
                 onClose={() => setLogoutModalVisible(false)}
-            />
-            <ActionModal
-                visible={deleteModalVisible}
-                title="Delete Account"
-                message="This permanently deletes your account and personal data — profile, addresses, cart, wishlist and reviews. Order/invoice records are kept in anonymized form as required by law. This cannot be undone."
-                icon="trash-2"
-                primaryButtonText={deleting ? 'DELETING…' : 'DELETE ACCOUNT'}
-                onPrimaryPress={handleDeleteAccount}
-                secondaryButtonText="CANCEL"
-                onSecondaryPress={() => { if (!deleting) setDeleteModalVisible(false); }}
-                onClose={() => { if (!deleting) setDeleteModalVisible(false); }}
-            />
-            <ActionModal
-                visible={deleteErrorVisible}
-                title="Could not delete account"
-                message={deleteErrorMessage}
-                icon="alert-circle"
-                primaryButtonText="OK"
-                onPrimaryPress={() => setDeleteErrorVisible(false)}
-                onClose={() => setDeleteErrorVisible(false)}
             />
             <LegalDocModal visible={legalModalVisible} docType={legalDocType} onClose={() => setLegalModalVisible(false)} />
         </SafeAreaView>

@@ -1,13 +1,17 @@
 import ActionModal from '@/components/common/ActionModal';
 import LegalDocModal, { LegalDocType } from '@/components/common/LegalDocModal';
 import SupportChatBot from '@/components/common/SupportChatBot';
+import { useCart } from '@/context/CartContext';
+import { useWishlist } from '@/context/WishlistContext';
+import { authService } from '@/services/auth';
 import { useRouter } from 'expo-router';
-import { Bike, ChevronDown, ChevronRight, ChevronUp, CreditCard, FileText, Mail, MessageCircle, Phone, RotateCcw, Search, Shield, Shirt } from 'lucide-react-native';
+import { Bike, ChevronDown, ChevronRight, ChevronUp, CreditCard, FileText, Mail, MessageCircle, Phone, RotateCcw, Search, Shield, Shirt, Trash2 } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader, ZText } from '../../components/ui';
 import { colors, fonts, palette, radius } from '../../constants/theme';
+import { useUser } from '../../context/UserContext';
 
 type FAQ = { id: string; category: string; question: string; answer: string };
 
@@ -33,6 +37,9 @@ const ALL_FAQS: FAQ[] = [
 
 export default function HelpCenterScreen() {
     const router = useRouter();
+    const { resetUser } = useUser();
+    const { clearCart } = useCart();
+    const { clearWishlist } = useWishlist();
     const [searchQuery, setSearchQuery] = useState('');
     const [expandedFaq, setExpandedFaq] = useState<string | null>(null);
     const [infoModalVisible, setInfoModalVisible] = useState(false);
@@ -41,6 +48,31 @@ export default function HelpCenterScreen() {
     const [legalModalVisible, setLegalModalVisible] = useState(false);
     const [legalDocType, setLegalDocType] = useState<LegalDocType>('privacy');
     const openLegal = (docType: LegalDocType) => { setLegalDocType(docType); setLegalModalVisible(true); };
+
+    const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+    const [deleting, setDeleting] = useState(false);
+    const [deleteErrorVisible, setDeleteErrorVisible] = useState(false);
+    const [deleteErrorMessage, setDeleteErrorMessage] = useState('');
+
+    const handleDeleteAccount = async () => {
+        if (deleting) return;
+        setDeleting(true);
+        try {
+            await authService.deleteAccount();
+            resetUser();
+            clearCart();
+            clearWishlist();
+            setDeleteModalVisible(false);
+            router.replace('/auth/login');
+        } catch (error: any) {
+            console.error('Delete account error:', error);
+            setDeleteModalVisible(false);
+            setDeleteErrorMessage(error?.message || 'Something went wrong. Please try again later.');
+            setDeleteErrorVisible(true);
+        } finally {
+            setDeleting(false);
+        }
+    };
 
     const filteredFaqs = searchQuery.trim()
         ? ALL_FAQS.filter(f => f.question.toLowerCase().includes(searchQuery.toLowerCase()) || f.answer.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -149,6 +181,12 @@ export default function HelpCenterScreen() {
                                 <ChevronRight size={18} color={colors.borderStrong} />
                             </Pressable>
                         </View>
+
+                        <ZText variant="eyebrow" style={{ marginTop: 24, marginBottom: 12 }}>Account</ZText>
+                        <Pressable style={styles.deleteRow} onPress={() => setDeleteModalVisible(true)}>
+                            <Trash2 size={16} color={palette.red500} />
+                            <Text style={styles.deleteRowText}>Delete account</Text>
+                        </Pressable>
                     </>
                 )}
                 <View style={{ height: 30 }} />
@@ -158,6 +196,27 @@ export default function HelpCenterScreen() {
             <LegalDocModal visible={legalModalVisible} docType={legalDocType} onClose={() => setLegalModalVisible(false)} />
 
             <ActionModal visible={infoModalVisible} title={infoModalConfig.title} message={infoModalConfig.message} icon={infoModalConfig.icon} primaryButtonText="OK" onPrimaryPress={() => setInfoModalVisible(false)} onClose={() => setInfoModalVisible(false)} />
+
+            <ActionModal
+                visible={deleteModalVisible}
+                title="Delete Account"
+                message="This permanently deletes your account and personal data — profile, addresses, cart, wishlist and reviews. Order/invoice records are kept in anonymized form as required by law. This cannot be undone."
+                icon="trash-2"
+                primaryButtonText={deleting ? 'DELETING…' : 'DELETE ACCOUNT'}
+                onPrimaryPress={handleDeleteAccount}
+                secondaryButtonText="CANCEL"
+                onSecondaryPress={() => { if (!deleting) setDeleteModalVisible(false); }}
+                onClose={() => { if (!deleting) setDeleteModalVisible(false); }}
+            />
+            <ActionModal
+                visible={deleteErrorVisible}
+                title="Could not delete account"
+                message={deleteErrorMessage}
+                icon="alert-circle"
+                primaryButtonText="OK"
+                onPrimaryPress={() => setDeleteErrorVisible(false)}
+                onClose={() => setDeleteErrorVisible(false)}
+            />
         </SafeAreaView>
     );
 }
@@ -192,4 +251,7 @@ const styles = StyleSheet.create({
     helpSub: { fontFamily: fonts.bodyRegular, fontSize: 13, lineHeight: 19, color: colors.textBody, marginTop: 6 },
     helpCta: { marginTop: 12 },
     helpCtaText: { fontFamily: fonts.bodySemiBold, fontSize: 13, color: palette.yellow700 },
+
+    deleteRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.surfaceCard, borderWidth: 1, borderColor: palette.neutral200, borderRadius: radius.lg, padding: 16 },
+    deleteRowText: { fontFamily: fonts.bodySemiBold, fontSize: 14, color: palette.red500 },
 });
