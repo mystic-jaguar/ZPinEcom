@@ -52,7 +52,7 @@ const isProd = process.env.NODE_ENV === 'production';
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: isProd ? 10 : 1000,
-  message: { success: false, message: 'Too many login attempts. Please try again in 15 minutes.' },
+  message: { success: false, code: 'RATE_LIMITED', message: 'Too many login attempts. Please wait 15 minutes and try again. If you signed up with Google, use "Continue with Google" instead of a password.' },
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -61,7 +61,7 @@ const loginLimiter = rateLimit({
 const otpLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: isProd ? 5 : 1000,
-  message: { success: false, message: 'Too many OTP requests. Please try again in 15 minutes.' },
+  message: { success: false, code: 'RATE_LIMITED', message: 'Too many verification codes requested. Please wait 15 minutes before requesting another — check your spam folder for the last one.' },
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -70,7 +70,7 @@ const otpLimiter = rateLimit({
 const otpVerifyLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: isProd ? 3 : 1000,
-  message: { success: false, message: 'Too many OTP verification attempts. Please request a new OTP.' },
+  message: { success: false, code: 'RATE_LIMITED', message: 'Too many incorrect codes entered. Please wait 15 minutes, then request a fresh code.' },
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -83,10 +83,12 @@ const refreshLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 });
+// 10 signups per hour per IP. Was 3, which real users hit on shared mobile-carrier
+// NAT while retrying a signup that kept failing for another reason.
 const signupLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
-  max: isProd ? 3 : 1000,
-  message: { success: false, message: 'Too many signup attempts. Please try again later.' },
+  max: isProd ? 10 : 1000,
+  message: { success: false, code: 'RATE_LIMITED', message: 'Too many signup attempts from this network. Please wait an hour and try again — or log in if you already have an account.' },
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -178,11 +180,19 @@ router.post('/signup', signupLimiter, async (req: Request, res: Response): Promi
 
   try {
     const existing = await pool.query(
-      `SELECT id, is_verified FROM ${USERS} WHERE email = $1`, [email.toLowerCase()]
+      `SELECT id, is_verified, google_id, apple_id, password_hash FROM ${USERS} WHERE email = $1`, [email.toLowerCase()]
     );
     if (existing.rows.length > 0) {
       if (existing.rows[0].is_verified) {
-        res.status(409).json({ success: false, message: 'Email already registered' });
+        const row = existing.rows[0];
+        const provider = !row.password_hash && row.google_id ? 'Google' : !row.password_hash && row.apple_id ? 'Apple' : null;
+        res.status(409).json({
+          success: false,
+          code: provider ? 'SOCIAL_LOGIN_ACCOUNT' : 'EMAIL_TAKEN',
+          message: provider
+            ? `This email already has a ZPIN account created with ${provider} Sign-In. Go to log in and tap "Continue with ${provider}" — no password needed.`
+            : 'Email already registered. Please log in instead, or use "Forgot password" if you don\'t remember it.',
+        });
         return;
       }
       // Legacy unverified account (created before the verify-first flow). Remove it
@@ -304,7 +314,14 @@ router.post('/login', loginLimiter, async (req: Request, res: Response): Promise
 
     if (!row.password_hash) {
       logger.authFailure(req.ip || '', 'login', 'social_login_account', row.id);
-      res.status(401).json({ success: false, message: 'This account uses social login. Please sign in with Google.' });
+      const provider = row.google_id ? 'Google' : row.apple_id ? 'Apple' : null;
+      res.status(401).json({
+        success: false,
+        code: 'SOCIAL_LOGIN_ACCOUNT',
+        message: provider
+          ? `This email is registered with ${provider} Sign-In. Tap "Continue with ${provider}" below — this account has no password.`
+          : 'This account uses social sign-in. Use the social sign-in button below instead of a password.',
+      });
       return;
     }
 
@@ -463,12 +480,27 @@ router.post('/forgetPassword/sendOTP', otpLimiter, async (req: Request, res: Res
 
   try {
     const userResult = await pool.query(
-      `SELECT id FROM ${USERS} WHERE email = $1`, [email.toLowerCase()]
+      `SELECT id, google_id, apple_id, password_hash FROM ${USERS} WHERE email = $1`, [email.toLowerCase()]
     );
 
     // Always return the same response to prevent email enumeration
     if (userResult.rows.length === 0) {
       res.json({ success: true, message: 'If that email exists, an OTP has been sent' });
+      return;
+    }
+
+    // Social-only account: there is no password to reset. Say so instead of mailing
+    // an OTP for a password the account never had. Same disclosure the login route
+    // already makes for these accounts, so no new enumeration surface.
+    if (!userResult.rows[0].password_hash) {
+      const provider = userResult.rows[0].google_id ? 'Google' : userResult.rows[0].apple_id ? 'Apple' : null;
+      res.status(409).json({
+        success: false,
+        code: 'SOCIAL_LOGIN_ACCOUNT',
+        message: provider
+          ? `This email is registered with ${provider} Sign-In, so it has no password to reset. Go back and tap "Continue with ${provider}" to sign in.`
+          : 'This account uses social sign-in, so it has no password to reset. Go back and sign in with the provider you signed up with.',
+      });
       return;
     }
 

@@ -16,7 +16,11 @@ export const globalLimiter = rateLimit({
   message: json429('Too many requests. Please slow down.'),
   standardHeaders: true,
   legacyHeaders: false,
-  skip: (req) => req.path === '/health',
+  // Auth routes carry their own limiters with action-specific messages ("Too many
+  // OTP requests…", "Too many signup attempts…"). Letting the global limiter fire
+  // first replaced those with a useless generic 429 — and on mobile carrier NAT,
+  // where many users share one IP, it tripped far earlier than intended.
+  skip: (req) => req.path === '/health' || req.path.startsWith('/api/v1/auth/'),
 });
 
 // ── Product listing — public, high-value scraping target ─────────────────────
