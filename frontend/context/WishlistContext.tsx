@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
+import React, { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react';
 import { tokenManager } from '../services/api';
 import { wishlistService } from '../services/wishlist';
 import { ProductObject } from '../types/types';
@@ -14,6 +14,7 @@ interface WishlistContextType {
     isInWishlist: (productId: string) => boolean;
     clearWishlist: () => void;
     isLoading: boolean;
+    refreshWishlist: () => Promise<void>;
 }
 
 const WishlistContext = createContext<WishlistContextType | undefined>(undefined);
@@ -24,14 +25,7 @@ export const WishlistProvider = ({ children }: { children: ReactNode }) => {
 
     const { isAuthenticated, isLoading: isUserLoading } = useUser();
 
-    // Load wishlist from AsyncStorage on mount and sync if auth changes
-    useEffect(() => {
-        if (!isUserLoading) {
-            loadWishlist();
-        }
-    }, [isAuthenticated, isUserLoading]);
-
-    const loadWishlist = async () => {
+    const loadWishlist = useCallback(async () => {
         try {
             if (isAuthenticated) {
                 const token = await tokenManager.getAccessToken();
@@ -72,8 +66,11 @@ export const WishlistProvider = ({ children }: { children: ReactNode }) => {
                 }
             }
 
+            // Reached either as a guest, or when the authenticated fetch failed
+            // for a non-auth reason. Fall back to the cached copy so a transient
+            // network/500 shows the last known wishlist instead of 0.
             const wishlistData = await AsyncStorage.getItem(WISHLIST_STORAGE_KEY);
-            if (!isAuthenticated && wishlistData) {
+            if (wishlistData) {
                 setWishlistItems(JSON.parse(wishlistData));
             }
         } catch (error) {
@@ -81,7 +78,14 @@ export const WishlistProvider = ({ children }: { children: ReactNode }) => {
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [isAuthenticated]);
+
+    // Load wishlist from AsyncStorage on mount and sync if auth changes
+    useEffect(() => {
+        if (!isUserLoading) {
+            loadWishlist();
+        }
+    }, [isUserLoading, loadWishlist]);
 
     // Persist the wishlist whenever it changes (after the initial load). One
     // centralized write covers optimistic updates and rollbacks, instead of
@@ -161,7 +165,8 @@ export const WishlistProvider = ({ children }: { children: ReactNode }) => {
             removeFromWishlist,
             isInWishlist,
             clearWishlist,
-            isLoading
+            isLoading,
+            refreshWishlist: loadWishlist
         }}>
             {children}
         </WishlistContext.Provider>

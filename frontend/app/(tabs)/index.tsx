@@ -522,7 +522,7 @@ export default function HomeScreen() {
                     <View>
                         <Text style={styles.deliveryEyebrow}>Estimated delivery within</Text>
                         <View style={styles.deliveryHrsRow}>
-                            <Text style={styles.deliveryHrs}>12</Text>
+                            <Text style={styles.deliveryHrs}>2-12</Text>
                             <Text style={styles.deliveryHrsUnit}>HRS</Text>
                         </View>
                     </View>
@@ -559,7 +559,6 @@ export default function HomeScreen() {
                             <Text style={styles.tryBadgeText}>TRY-AT-DOOR</Text>
                         </View>
                         <Text style={styles.heroTitle}>Wear it before you buy it.</Text>
-                        <Text style={styles.heroTitleItalic}>Bike-fast.</Text>
                         <Pressable style={styles.heroCta} onPress={() => router.push('/product-listing')}>
                             <Text style={styles.heroCtaText}>Shop new in</Text>
                             <ArrowRight size={16} color={palette.yellow500} />

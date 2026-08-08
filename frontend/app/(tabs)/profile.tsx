@@ -10,7 +10,7 @@ import {
     Bell, ChevronRight, Heart, LifeBuoy, LogOut, MapPin, RotateCcw, Settings, Shield, ShoppingBag, Ticket, Trash2, User, Zap,
 } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ZText } from '../../components/ui';
 import { colors, fonts, palette, radius, shadow } from '../../constants/theme';
@@ -25,17 +25,23 @@ export default function ProfileScreen() {
     const { user, resetUser } = useUser();
     const { clearCart, availableCoupons, refreshCoupons } = useCart();
     const { orders, refreshOrders } = useOrder();
-    const { wishlistItems, clearWishlist } = useWishlist();
+    const { wishlistItems, clearWishlist, refreshWishlist } = useWishlist();
     const router = useRouter();
+    const [refreshing, setRefreshing] = useState(false);
+
+    const refreshAll = useCallback(
+        () => Promise.all([refreshOrders(), refreshCoupons(), refreshWishlist()]),
+        [refreshOrders, refreshCoupons, refreshWishlist]
+    );
 
     // Re-fetch the counts each time the profile is focused so a failed cold-start
     // load (Render backend waking up) self-heals instead of showing a stale 0.
-    useFocusEffect(
-        useCallback(() => {
-            refreshOrders();
-            refreshCoupons();
-        }, [refreshOrders, refreshCoupons])
-    );
+    useFocusEffect(useCallback(() => { refreshAll(); }, [refreshAll]));
+
+    const onRefresh = useCallback(async () => {
+        setRefreshing(true);
+        try { await refreshAll(); } finally { setRefreshing(false); }
+    }, [refreshAll]);
     const [logoutModalVisible, setLogoutModalVisible] = useState(false);
     const [deleteModalVisible, setDeleteModalVisible] = useState(false);
     const [deleting, setDeleting] = useState(false);
@@ -100,7 +106,11 @@ export default function ProfileScreen() {
 
     return (
         <SafeAreaView style={styles.container} edges={['top']}>
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+            <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.scroll}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[palette.yellow500]} tintColor={palette.yellow500} />}
+            >
                 <View style={styles.headerRow}>
                     <ZText variant="h2">Profile</ZText>
                     <Pressable style={styles.settingsBtn} onPress={() => router.push('/profile/edit-profile')}>

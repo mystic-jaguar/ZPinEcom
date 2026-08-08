@@ -1,8 +1,8 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { Heart, ShoppingCart } from 'lucide-react-native';
-import React from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader, ZButton, ZText } from '../../components/ui';
 import { colors, fonts, palette, radius } from '../../constants/theme';
@@ -10,7 +10,13 @@ import { useWishlist } from '../../context/WishlistContext';
 
 export default function WishlistScreen() {
     const router = useRouter();
-    const { wishlistItems, removeFromWishlist } = useWishlist();
+    const { wishlistItems, removeFromWishlist, refreshWishlist } = useWishlist();
+    const [refreshing, setRefreshing] = useState(false);
+
+    const onRefresh = useCallback(async () => {
+        setRefreshing(true);
+        try { await refreshWishlist(); } finally { setRefreshing(false); }
+    }, [refreshWishlist]);
 
     const renderItem = ({ item }: { item: any }) => (
         <View style={styles.card}>
@@ -48,6 +54,7 @@ export default function WishlistScreen() {
                     columnWrapperStyle={{ justifyContent: 'space-between' }}
                     contentContainerStyle={styles.list}
                     showsVerticalScrollIndicator={false}
+                    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[palette.yellow500]} tintColor={palette.yellow500} />}
                 />
             ) : (
                 <View style={styles.empty}>

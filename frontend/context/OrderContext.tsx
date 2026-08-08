@@ -1,4 +1,4 @@
-import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
+import React, { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react';
 import { tokenManager } from '../services/api';
 import { CancelOrderData, orderService } from '../services/order';
 import { OrderObject } from '../types/types';
@@ -22,13 +22,7 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
 
     const { isAuthenticated, isLoading: isUserLoading } = useUser();
 
-    useEffect(() => {
-        if (!isUserLoading) {
-            loadOrders();
-        }
-    }, [isAuthenticated, isUserLoading]);
-
-    const loadOrders = async () => {
+    const loadOrders = useCallback(async () => {
         if (!isAuthenticated) {
             setOrders([]);
             setIsLoading(false);
@@ -37,7 +31,7 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
         try {
             const token = await tokenManager.getAccessToken();
             if (!token || token === 'null' || token === 'undefined') {
-                setOrders([]);
+                setIsLoading(false);
                 return;
             }
             const response = await orderService.getOrders();
@@ -79,12 +73,19 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
                 setOrders(normalized.filter(o => !(o.status === 'pending' && o.paymentStatus === 'pending')));
             }
         } catch (error: any) {
+            // Keep whatever we already have — a transient network/500 must not
+            // blank the order list (and the profile "ORDERS" count) out to 0.
             console.error('Failed to load orders:', error);
-            setOrders([]);
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [isAuthenticated]);
+
+    useEffect(() => {
+        if (!isUserLoading) {
+            loadOrders();
+        }
+    }, [isUserLoading, loadOrders]);
 
     const addOrder = (order: OrderObject) => {
         const safe: OrderObject = {
