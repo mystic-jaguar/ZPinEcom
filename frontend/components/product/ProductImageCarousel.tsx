@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Dimensions, Image, NativeScrollEvent, NativeSyntheticEvent, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import ImageZoomModal from './ImageZoomModal';
 
@@ -18,6 +18,7 @@ export default function ProductImageCarousel({ images, isLightningFast, onBack, 
     // Tap an image to open it full-screen, where pinch-to-zoom lives. Swipe
     // already works here and a pinch would fight the pager for the same touch.
     const [zoomIndex, setZoomIndex] = useState<number | null>(null);
+    const scrollRef = useRef<ScrollView>(null);
 
     // Ensure we always have at least one image to render
     const safeImages = images && images.length > 0 ? images : [null];
@@ -55,6 +56,7 @@ export default function ProductImageCarousel({ images, isLightningFast, onBack, 
             </View>
 
             <ScrollView
+                ref={scrollRef}
                 horizontal
                 pagingEnabled
                 showsHorizontalScrollIndicator={false}
@@ -87,13 +89,12 @@ export default function ProductImageCarousel({ images, isLightningFast, onBack, 
 
             <ImageZoomModal
                 visible={zoomIndex !== null}
-                source={
-                    zoomIndex !== null && safeImages[zoomIndex]
-                        ? (typeof safeImages[zoomIndex] === 'string'
-                            ? { uri: safeImages[zoomIndex] }
-                            : safeImages[zoomIndex])
-                        : undefined
-                }
+                images={safeImages}
+                initialIndex={zoomIndex ?? 0}
+                onIndexChange={(i) => {
+                    setActiveIndex(i);
+                    scrollRef.current?.scrollTo({ x: i * width, animated: false });
+                }}
                 onClose={() => setZoomIndex(null)}
             />
 

@@ -1,17 +1,21 @@
 import { Ionicons } from '@expo/vector-icons';
-import React, { useEffect, useRef } from 'react';
-import { Animated, Dimensions, Modal, PanResponder, Pressable, StyleSheet, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Animated, Dimensions, Modal, PanResponder, Platform, Pressable, StyleSheet, View } from 'react-native';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
 const MIN_SCALE = 1;
 const MAX_SCALE = 4;
 const DOUBLE_TAP_MS = 280;
+const TAP_MOVE_THRESHOLD = 10;
+const TAP_MAX_DURATION_MS = 250;
+const EDGE_SWITCH_THRESHOLD = 60;
+const SWIPE_THRESHOLD = 60;
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
 /**
- * Full-screen pinch-to-zoom viewer for one product image.
+ * Full-screen pinch-to-zoom viewer for a product's image gallery.
  *
  * Built on RN's own Animated + PanResponder rather than gesture-handler /
  * reanimated: both are installed (transitively, via expo-router) but nothing in
@@ -24,13 +28,18 @@ const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v
  */
 export default function ImageZoomModal({
     visible,
-    source,
+    images,
+    initialIndex,
     onClose,
+    onIndexChange,
 }: {
     visible: boolean;
-    source: any;
+    images: any[];
+    initialIndex: number;
     onClose: () => void;
+    onIndexChange?: (index: number) => void;
 }) {
+    const [index, setIndex] = useState(initialIndex);
     const scale = useRef(new Animated.Value(1)).current;
     const tx = useRef(new Animated.Value(0)).current;
     const ty = useRef(new Animated.Value(0)).current;
@@ -39,7 +48,7 @@ export default function ImageZoomModal({
     // into refs — the pan handlers need them mid-gesture.
     const live = useRef({ scale: 1, x: 0, y: 0 });
     // Where the current gesture started from.
-    const start = useRef({ scale: 1, x: 0, y: 0, dist: 0 });
+    const start = useRef({ scale: 1, x: 0, y: 0, dist: 0, time: 0, multiTouch: false });
     const lastTap = useRef(0);
 
     useEffect(() => {
@@ -59,15 +68,26 @@ export default function ImageZoomModal({
         else { scale.setValue(1); tx.setValue(0); ty.setValue(0); }
     };
 
-    // Reopening on a different image must not inherit the previous zoom.
-    useEffect(() => { if (visible) reset(false); }, [visible, source]);
+    // Reopening (or switching photos) must not inherit the previous zoom.
+    useEffect(() => { if (visible) { setIndex(initialIndex); reset(false); } }, [visible, initialIndex]);
+
+    const goTo = (next: number) => {
+        const clamped = clamp(next, 0, images.length - 1);
+        if (clamped === index) { clampPan(); return; }
+        setIndex(clamped);
+        onIndexChange?.(clamped);
+        reset(false);
+    };
 
     // Keep the image from being dragged entirely off-screen: at scale s only
     // (s-1)/2 of each edge can be hidden.
+    const bounds = (s: number) => ({
+        maxX: (SCREEN_W * (s - 1)) / 2,
+        maxY: (SCREEN_H * (s - 1)) / 2,
+    });
+
     const clampPan = () => {
-        const s = live.current.scale;
-        const maxX = (SCREEN_W * (s - 1)) / 2;
-        const maxY = (SCREEN_H * (s - 1)) / 2;
+        const { maxX, maxY } = bounds(live.current.scale);
         const x = clamp(live.current.x, -maxX, maxX);
         const y = clamp(live.current.y, -maxY, maxY);
         if (x !== live.current.x) Animated.spring(tx, { toValue: x, useNativeDriver: true }).start();
@@ -79,53 +99,89 @@ export default function ImageZoomModal({
             onStartShouldSetPanResponder: () => true,
             onMoveShouldSetPanResponder: () => true,
             onPanResponderGrant: (e) => {
-                start.current = { scale: live.current.scale, x: live.current.x, y: live.current.y, dist: 0 };
-
-                // Double-tap toggles between fit and 2x, the gesture people
-                // reach for before they think to pinch.
-                const now = Date.now();
-                if (now - lastTap.current < DOUBLE_TAP_MS && e.nativeEvent.touches.length === 1) {
-                    lastTap.current = 0;
-                    if (live.current.scale > 1) reset();
-                    else Animated.timing(scale, { toValue: 2, duration: 180, useNativeDriver: true }).start();
-                    return;
-                }
-                lastTap.current = now;
+                start.current = {
+                    scale: live.current.scale, x: live.current.x, y: live.current.y,
+                    dist: 0, time: Date.now(), multiTouch: e.nativeEvent.touches.length >= 2,
+                };
             },
             onPanResponderMove: (e, gesture) => {
                 const touches = e.nativeEvent.touches;
                 if (touches.length >= 2) {
+                    start.current.multiTouch = true;
                     const dx = touches[0].pageX - touches[1].pageX;
                     const dy = touches[0].pageY - touches[1].pageY;
                     const dist = Math.hypot(dx, dy);
                     if (!start.current.dist) { start.current.dist = dist; return; }
                     scale.setValue(clamp(start.current.scale * (dist / start.current.dist), MIN_SCALE, MAX_SCALE));
                 } else if (live.current.scale > 1) {
-                    tx.setValue(start.current.x + gesture.dx);
-                    ty.setValue(start.current.y + gesture.dy);
+                    // Follow the finger, but clamped live so the image can never be
+                    // dragged fully off-screen mid-gesture (previously this only
+                    // snapped back after the finger lifted).
+                    const { maxX, maxY } = bounds(live.current.scale);
+                    tx.setValue(clamp(start.current.x + gesture.dx, -maxX, maxX));
+                    ty.setValue(clamp(start.current.y + gesture.dy, -maxY, maxY));
                 }
             },
-            onPanResponderRelease: () => {
-                if (live.current.scale <= 1.01) reset();
-                else clampPan();
+            onPanResponderRelease: (e, gesture) => {
+                if (start.current.multiTouch) {
+                    if (live.current.scale <= 1.01) reset(); else clampPan();
+                    return;
+                }
+
+                const moved = Math.hypot(gesture.dx, gesture.dy);
+                const isTap = moved < TAP_MOVE_THRESHOLD && (Date.now() - start.current.time) < TAP_MAX_DURATION_MS;
+
+                if (isTap) {
+                    const now = Date.now();
+                    if (now - lastTap.current < DOUBLE_TAP_MS) {
+                        lastTap.current = 0;
+                        if (live.current.scale > 1) reset();
+                        else Animated.timing(scale, { toValue: 2, duration: 180, useNativeDriver: true }).start();
+                    } else {
+                        lastTap.current = now;
+                    }
+                    return;
+                }
+
+                if (start.current.scale > 1) {
+                    // Zoomed: only switch photos once the drag has pushed past the
+                    // pan boundary (i.e. there's nowhere left to pan to).
+                    const { maxX } = bounds(start.current.scale);
+                    const attemptedX = start.current.x + gesture.dx;
+                    if (attemptedX - maxX > EDGE_SWITCH_THRESHOLD) { goTo(index - 1); return; }
+                    if (-maxX - attemptedX > EDGE_SWITCH_THRESHOLD) { goTo(index + 1); return; }
+                    clampPan();
+                } else if (Math.abs(gesture.dx) > SWIPE_THRESHOLD && Math.abs(gesture.dx) > Math.abs(gesture.dy)) {
+                    goTo(gesture.dx > 0 ? index - 1 : index + 1);
+                }
             },
-            onPanResponderTerminate: () => clampPan(),
+            onPanResponderTerminate: () => {
+                if (live.current.scale <= 1.01) reset(); else clampPan();
+            },
         })
     ).current;
+
+    const raw = images[index];
+    const source = raw ? (typeof raw === 'string' ? { uri: raw } : raw) : undefined;
 
     return (
         <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
             <View style={styles.backdrop}>
+                <View style={styles.stage} {...pan.panHandlers}>
+                    {source && (
+                        <Animated.Image
+                            source={source}
+                            style={[styles.image, { transform: [{ scale }, { translateX: tx }, { translateY: ty }] }]}
+                            resizeMode="contain"
+                        />
+                    )}
+                </View>
+                {/* Rendered after the image so it always stays on top, even when the
+                    image is scaled up — zIndex alone isn't reliably respected across
+                    platforms for transformed siblings. */}
                 <Pressable style={styles.close} onPress={onClose} hitSlop={12}>
                     <Ionicons name="close" size={26} color="#FFFFFF" />
                 </Pressable>
-                <View style={styles.stage} {...pan.panHandlers}>
-                    <Animated.Image
-                        source={source}
-                        style={[styles.image, { transform: [{ scale }, { translateX: tx }, { translateY: ty }] }]}
-                        resizeMode="contain"
-                    />
-                </View>
             </View>
         </Modal>
     );
@@ -138,6 +194,7 @@ const styles = StyleSheet.create({
         width: 40, height: 40, borderRadius: 20,
         alignItems: 'center', justifyContent: 'center',
         backgroundColor: 'rgba(255,255,255,0.18)',
+        ...Platform.select({ android: { elevation: 10 } }),
     },
     stage: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     image: { width: SCREEN_W, height: SCREEN_H },
