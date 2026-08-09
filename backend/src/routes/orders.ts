@@ -1356,9 +1356,10 @@ router.patch('/:id/cancel', authenticate, async (req: AuthRequest, res: Response
 // value, so it is deleted outright and everything it consumed is put back.
 //
 // Fail-closed by construction: the WHERE clause only ever matches the caller's own
-// rows that are still status='pending' AND payment_status='pending' AND not COD —
+// rows that are still status='pending' AND payment_status='pending' AND had an
+// online step to cancel (not COD, or COD-but-Instant which prepays its fee) —
 // i.e. provably untouched and unpaid. Anything paid, partially paid, confirmed or
-// COD falls through to the normal /cancel path and is left alone.
+// plain COD falls through to the normal /cancel path and is left alone.
 router.delete('/:id/abandon', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
   const client = await pool.connect();
   try {
@@ -1373,7 +1374,15 @@ router.delete('/:id/abandon', authenticate, async (req: AuthRequest, res: Respon
           AND group_id = (SELECT group_id FROM ${ORDERS} WHERE id = $1 AND user_id = $2)
           AND status = 'pending'
           AND payment_status = 'pending'
-          AND LOWER(COALESCE(payment_method, '')) NOT IN ('cod', 'cash', 'cash_on_delivery')
+          AND (
+            LOWER(COALESCE(payment_method, '')) NOT IN ('cod', 'cash', 'cash_on_delivery')
+            -- Instant Delivery prepays its ₹50 fee online even on COD, so an
+            -- instant COD order also went through the payment sheet. Still
+            -- payment_status='pending' means that prepay never succeeded, so
+            -- there is nothing real here either. (A successful prepay leaves
+            -- 'partial' + prepaid_amount, which this can never match.)
+            OR (delivery_type = 'flash' AND COALESCE(delivery_fee, 0) > 0)
+          )
         FOR UPDATE`,
       [req.params.id, req.userId]
     );
