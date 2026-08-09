@@ -341,6 +341,8 @@ export default function ProductDetails() {
                         images={product.images || []}
                         isLightningFast={product.isLightningFast}
                         onBack={() => router.back()}
+                        productId={product.productId}
+                        productName={product.productName}
                         isWishlisted={isInWishlist(product.productId)}
                         onToggleWishlist={() => {
                             if (isInWishlist(product.productId)) {

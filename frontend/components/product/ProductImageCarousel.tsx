@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useRef, useState } from 'react';
-import { Dimensions, Image, NativeScrollEvent, NativeSyntheticEvent, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, Image, NativeScrollEvent, NativeSyntheticEvent, ScrollView, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import ImageZoomModal from './ImageZoomModal';
 
 const { width } = Dimensions.get('window');
@@ -11,9 +11,11 @@ interface ProductImageCarouselProps {
     onBack?: () => void;
     isWishlisted?: boolean;
     onToggleWishlist?: () => void;
+    productId?: string;
+    productName?: string;
 }
 
-export default function ProductImageCarousel({ images, isLightningFast, onBack, isWishlisted, onToggleWishlist }: ProductImageCarouselProps) {
+export default function ProductImageCarousel({ images, isLightningFast, onBack, isWishlisted, onToggleWishlist, productId, productName }: ProductImageCarouselProps) {
     const [activeIndex, setActiveIndex] = useState(0);
     // Tap an image to open it full-screen, where pinch-to-zoom lives. Swipe
     // already works here and a pinch would fight the pager for the same touch.
@@ -39,7 +41,14 @@ export default function ProductImageCarousel({ images, isLightningFast, onBack, 
                     <Ionicons name="arrow-back" size={24} color="#333" />
                 </TouchableOpacity>
                 <View style={styles.rightActions}>
-                    <TouchableOpacity style={styles.iconButton}>
+                    <TouchableOpacity
+                        style={styles.iconButton}
+                        onPress={() => {
+                            if (!productId) return;
+                            const url = `https://www.zpinservices.com/product/${productId}`;
+                            Share.share({ message: `Check out ${productName || 'this product'} on ZPIN — ${url}`, url });
+                        }}
+                    >
                         <Ionicons name="share-social-outline" size={24} color="#333" />
                     </TouchableOpacity>
                     <TouchableOpacity
