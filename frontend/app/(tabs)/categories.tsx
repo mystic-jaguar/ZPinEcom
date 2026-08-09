@@ -1,8 +1,8 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, ArrowUpRight, ChevronDown, ChevronRight, Search, Zap } from 'lucide-react-native';
-import React, { useState } from 'react';
-import { Dimensions, Image, LayoutAnimation, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, UIManager, View } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import { BackHandler, Dimensions, Image, LayoutAnimation, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, UIManager, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ZText } from '../../components/ui';
 import { CATEGORY_DATA, CategoryNode } from '../../constants/categories';
@@ -238,6 +238,19 @@ export default function CategoriesScreen() {
 
     const drilledCategory = drilledId ? CATEGORY_DATA.find(c => c.id === drilledId) : null;
     const { addSearch } = useSearch();
+
+    // Android hardware back while drilled in must collapse to "all categories"
+    // instead of falling through to the tab navigator's history pop (→ Home).
+    useFocusEffect(
+        useCallback(() => {
+            if (!drilledId) return;
+            const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+                setDrilledId(null);
+                return true;
+            });
+            return () => sub.remove();
+        }, [drilledId])
+    );
 
     const handleLeafPress = (itemName: string, rootCategory: string) => {
         addSearch(itemName);
