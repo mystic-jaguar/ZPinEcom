@@ -1,9 +1,11 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { ArrowRight, ChevronDown, Minus, Plus, ShoppingCart, X, Zap } from 'lucide-react-native';
-import React, { useCallback, useEffect, useRef } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import ActionModal from '../../components/common/ActionModal';
 import { ZButton, ZText } from '../../components/ui';
 import { colors, fonts, palette, radius, shadow } from '../../constants/theme';
 import { DELIVERY_ETA } from '../../constants/delivery';
@@ -56,6 +58,7 @@ function CartItem({ item, onRemove, onUpdateQuantity, onChangeSize }: CartItemPr
         : (typeof item.image === 'string' ? { uri: item.image } : (item.image || { uri: 'https://via.placeholder.com/80' }));
     const brand = item.product?.brand || item.brand || 'ZPIN';
     const hasSizes = !!item.sizeQuantities && Object.keys(item.sizeQuantities).length > 0;
+    const atStockLimit = typeof item.availableStock === 'number' && item.quantity >= item.availableStock;
 
     return (
         <Animated.View style={[styles.item, { opacity: fadeAnim, transform: [{ translateX: slideAnim }] }]}>
@@ -117,9 +120,14 @@ function CartItem({ item, onRemove, onUpdateQuantity, onChangeSize }: CartItemPr
                     <View style={styles.stepper}>
                         <Pressable onPress={() => onUpdateQuantity(item.cartItemId, item.quantity - 1)} hitSlop={6}><Minus size={14} color={colors.textStrong} /></Pressable>
                         <Text style={styles.qty}>{item.quantity}</Text>
-                        <Pressable onPress={() => onUpdateQuantity(item.cartItemId, item.quantity + 1)} hitSlop={6}><Plus size={14} color={colors.textStrong} /></Pressable>
+                        <Pressable onPress={() => onUpdateQuantity(item.cartItemId, item.quantity + 1)} hitSlop={6}>
+                            <Plus size={14} color={atStockLimit ? colors.textFaint : colors.textStrong} />
+                        </Pressable>
                     </View>
                 </View>
+                {atStockLimit && (
+                    <Text style={styles.stockNote}>Only {item.availableStock} left in stock</Text>
+                )}
             </View>
         </Animated.View>
     );
@@ -130,9 +138,17 @@ function CartItem({ item, onRemove, onUpdateQuantity, onChangeSize }: CartItemPr
 const MemoCartItem = React.memo(CartItem);
 
 export default function CartScreen() {
-    const { cartItems, updateQuantity, removeFromCart, changeSize, totalPrice, totalSavings } = useCart();
+    const { cartItems, updateQuantity, removeFromCart, changeSize, totalPrice, totalSavings, refreshCart } = useCart();
     const router = useRouter();
     const insets = useSafeAreaInsets();
+    const [stockMessage, setStockMessage] = useState<string | null>(null);
+    // The absolute footer's real height, measured rather than guessed: a fixed
+    // padding left the last row half-hidden behind it on taller devices.
+    const [footerHeight, setFooterHeight] = useState(0);
+
+    // Prices and stock are edited in the vendor app/website, so re-pull the cart
+    // every time this screen is looked at instead of trusting the mount-time copy.
+    useFocusEffect(useCallback(() => { refreshCart(); }, [refreshCart]));
 
     const count = cartItems.length;
 
@@ -147,11 +163,21 @@ export default function CartScreen() {
     const freeDeliveryPct = Math.min(totalPrice / FREE_DELIVERY_MIN, 1) * 100;
     const amountToFree = Math.max(FREE_DELIVERY_MIN - totalPrice, 0);
 
+    // Asking for more than the seller has is refused with the real number, both
+    // here and again on the server.
+    const handleUpdateQuantity = useCallback(async (cartItemId: string, quantity: number) => {
+        try {
+            await updateQuantity(cartItemId, quantity);
+        } catch (err: any) {
+            setStockMessage(err?.message || 'Could not update quantity.');
+        }
+    }, [updateQuantity]);
+
     const renderItem = useCallback(
         ({ item }: { item: any }) => (
-            <MemoCartItem item={item} onRemove={removeFromCart} onUpdateQuantity={updateQuantity} onChangeSize={changeSize} />
+            <MemoCartItem item={item} onRemove={removeFromCart} onUpdateQuantity={handleUpdateQuantity} onChangeSize={changeSize} />
         ),
-        [removeFromCart, updateQuantity, changeSize]
+        [removeFromCart, handleUpdateQuantity, changeSize]
     );
 
     return (
@@ -190,11 +216,14 @@ export default function CartScreen() {
                         data={cartItems}
                         renderItem={renderItem}
                         keyExtractor={(item) => item.cartItemId}
-                        contentContainerStyle={styles.list}
+                        contentContainerStyle={[styles.list, { paddingBottom: footerHeight + 24 }]}
                         showsVerticalScrollIndicator={false}
                     />
 
-                    <View style={[styles.footer, { paddingBottom: insets.bottom + 78 }]}>
+                    <View
+                        style={[styles.footer, { paddingBottom: insets.bottom + 78 }]}
+                        onLayout={e => setFooterHeight(e.nativeEvent.layout.height)}
+                    >
                         <View style={styles.summaryRow}>
                             <View>
                                 {totalSavings > 0 && (
@@ -213,6 +242,16 @@ export default function CartScreen() {
                     </View>
                 </>
             )}
+
+            <ActionModal
+                visible={!!stockMessage}
+                title="Not enough stock"
+                message={stockMessage || ''}
+                icon="alert-triangle"
+                primaryButtonText="OK"
+                onPrimaryPress={() => setStockMessage(null)}
+                onClose={() => setStockMessage(null)}
+            />
         </SafeAreaView>
     );
 }
@@ -252,6 +291,7 @@ const styles = StyleSheet.create({
     itemPrice: { fontFamily: fonts.displayBold, fontSize: 17, color: colors.textStrong },
     stepper: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1.5, borderColor: colors.borderSubtle, borderRadius: 100, paddingHorizontal: 12, paddingVertical: 5 },
     qty: { fontFamily: fonts.displayBold, fontSize: 14, color: colors.textStrong },
+    stockNote: { fontFamily: fonts.bodySemiBold, fontSize: 11, color: palette.red500, marginTop: 6, textAlign: 'right' },
 
     footer: {
         position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: colors.surfaceCard,

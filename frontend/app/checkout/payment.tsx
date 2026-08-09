@@ -142,7 +142,11 @@ export default function CheckoutPaymentScreen() {
                 // Never paid for, so it is discarded outright rather than cancelled:
                 // a cancelled row still surfaces in the seller's app as a real order.
                 // The server falls back to refusing anything that IS paid.
-                orderService.abandonOrder(createdOrderId).catch(() => { });
+                //
+                // Awaited, not fire-and-forget: the user is one tap from leaving this
+                // screen, and an unawaited request can be torn down mid-flight, which
+                // leaves the order sitting pending forever.
+                await orderService.abandonOrder(createdOrderId).catch(() => { });
             }
             setOrderError(isCancelled ? 'Payment was cancelled. Please try again.' : (error.message || 'Payment failed. Please try again.'));
         } finally {

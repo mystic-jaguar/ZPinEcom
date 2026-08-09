@@ -21,6 +21,21 @@ function normalizeVariant(v: any): string | null {
   return t === '' ? null : t.slice(0, 50);
 }
 
+// Units of a product a customer may hold: the chosen size's stock for a sized
+// product, `products.quantity` otherwise. One definition, used by the cart
+// payload and by both write paths.
+export function availableStock(productRow: any, variant: string | null): number {
+  const sizeQuantities = productRow.size_quantities || {};
+  if (variant && Object.keys(sizeQuantities).length > 0) return Number(sizeQuantities[variant] || 0);
+  return Number(productRow.quantity || 0);
+}
+
+export function outOfStockMessage(available: number): string {
+  return available <= 0
+    ? 'This item is out of stock.'
+    : `Only ${available} left in stock.`;
+}
+
 // GET /api/v1/cart/count
 router.get('/count', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -65,6 +80,12 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response): Promise<v
       // the cart screen's inline size change needs both (website parity).
       selectedSize: r.variant || undefined,
       sizeQuantities: hasSizes ? sizeQuantities : undefined,
+      // How many units this line can hold: the size's own stock for a sized
+      // product, the product's stock otherwise. The cart stepper caps on this,
+      // and POST/PUT below reject anything above it.
+      availableStock: hasSizes && r.variant
+        ? Number(sizeQuantities[r.variant] || 0)
+        : Number(r.stock_qty || 0),
       // price_at_add / products.price are raw vendor prices; the customer sees
       // them with the 20% ZPIN platform fee applied (never stored).
       priceAtAdd: priceAtAddValue,
@@ -124,7 +145,7 @@ router.post('/', authenticate, cartWriteLimiter, async (req: AuthRequest, res: R
 
   try {
     const product = await pool.query(
-      'SELECT price, in_stock, size_quantities FROM products WHERE id = $1::uuid AND is_approved = true', [productId]
+      'SELECT price, in_stock, quantity, size_quantities FROM products WHERE id = $1::uuid AND is_approved = true', [productId]
     );
     if (product.rows.length === 0) {
       res.status(404).json({ success: false, message: 'Product not found' });
@@ -156,10 +177,19 @@ router.post('/', authenticate, cartWriteLimiter, async (req: AuthRequest, res: R
     }
 
     const existing = await pool.query(
-      `SELECT id FROM ${T}
+      `SELECT id, quantity FROM ${T}
         WHERE user_id = $1 AND product_id = $2::uuid AND variant IS NOT DISTINCT FROM $3`,
       [req.userId, productId, sizes.length > 0 ? variant : null]
     );
+
+    // Never let the cart hold more units than the seller actually has. The client
+    // caps its own stepper, but this is the trust boundary that decides it.
+    const available = availableStock(product.rows[0], sizes.length > 0 ? variant : null);
+    const wouldBe = Number(existing.rows[0]?.quantity || 0) + parsedQty;
+    if (wouldBe > available) {
+      res.status(400).json({ success: false, message: outOfStockMessage(available), availableStock: available });
+      return;
+    }
 
     if (existing.rows.length > 0) {
       await pool.query(
@@ -203,11 +233,22 @@ router.put('/:productId', authenticate, async (req: AuthRequest, res: Response):
     const variant = normalizeVariant(req.body.variant ?? req.body.selectedSize);
     const newVariant = 'newVariant' in req.body ? normalizeVariant(req.body.newVariant) : variant;
 
+    // Same cap as POST: the stepper can ask for any number, stock decides.
+    const stockRes = await pool.query(
+      'SELECT quantity, size_quantities FROM products WHERE id = $1::uuid', [req.params.productId]
+    );
+    if (stockRes.rows.length === 0) {
+      res.status(404).json({ success: false, message: 'Product not found' });
+      return;
+    }
+    const available = availableStock(stockRes.rows[0], newVariant);
+    if (parsedQty > available) {
+      res.status(400).json({ success: false, message: outOfStockMessage(available), availableStock: available });
+      return;
+    }
+
     if (newVariant !== variant) {
-      const sizeRes = await pool.query(
-        'SELECT size_quantities FROM products WHERE id = $1::uuid', [req.params.productId]
-      );
-      const sq = sizeRes.rows[0]?.size_quantities || {};
+      const sq = stockRes.rows[0].size_quantities || {};
       if (!newVariant || !(newVariant in sq) || Number(sq[newVariant]) <= 0) {
         res.status(400).json({ success: false, message: 'Size unavailable' });
         return;
@@ -226,7 +267,8 @@ router.put('/:productId', authenticate, async (req: AuthRequest, res: Response):
         );
         await pool.query(
           `UPDATE ${T} SET quantity = LEAST($1, 100), updated_at = NOW() WHERE id = $2`,
-          [Number(dupe.rows[0].quantity) + parsedQty, dupe.rows[0].id]
+          // The merged line is still one line of one size — cap it at that size's stock.
+          [Math.min(Number(dupe.rows[0].quantity) + parsedQty, available), dupe.rows[0].id]
         );
         res.json({ success: true, message: 'Cart updated' });
         return;

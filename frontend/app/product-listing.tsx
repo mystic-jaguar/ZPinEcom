@@ -1,5 +1,5 @@
 import { Image } from 'expo-image';
-import { Stack, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { ChevronLeft, PackageSearch, Search, ShoppingBag, SlidersHorizontal } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Dimensions, FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -159,32 +159,14 @@ export default function ProductListing() {
         ? 'Latest arrivals'
         : (currentCategoryNode?.name || (subCategoryName as string) || (categoryName as string) || 'Products');
 
-    // Deterministic parent: a subcategory view belongs to the Categories tab
-    // (restoring the drilled root), everything else ("Latest arrivals") to Home.
+    // Plain stack back. This screen used to force every exit — header, hardware
+    // back and swipe — to a computed "parent" (the Categories tab, re-drilled),
+    // which sent people somewhere they had never been. Back now means back;
+    // `dismissTo` only covers the case of nothing left to pop.
     const goBack = useCallback(() => {
-        if (!rootTarget) { router.replace('/(tabs)'); return; }
-        const rootId = CATEGORY_DATA.find(c => c.name === categoryName)?.id;
-        router.replace(rootId
-            ? { pathname: '/(tabs)/categories', params: { categoryId: rootId } }
-            : '/(tabs)/categories');
-    }, [rootTarget, categoryName, router]);
-
-    // Route the hardware back button (Android) and swipe-back gesture (iOS)
-    // through the same deterministic parent instead of letting either pop
-    // raw navigation history.
-    const navigation = useNavigation();
-    const leavingRef = useRef(false);
-    useEffect(() => {
-        return navigation.addListener('beforeRemove', (e) => {
-            // goBack() navigates via router.replace, which removes this screen and
-            // re-fires beforeRemove — let that second pass through instead of
-            // re-intercepting it (otherwise it loops → max update depth).
-            if (leavingRef.current) return;
-            e.preventDefault();
-            leavingRef.current = true;
-            goBack();
-        });
-    }, [navigation, goBack]);
+        if (router.canGoBack()) router.back();
+        else router.replace('/(tabs)');
+    }, [router]);
 
     const renderProductItem = ({ item }: { item: ProductObject }) => (
         <ProductCard

@@ -1,8 +1,20 @@
 diff --git a/node_modules/react-native-razorpay/android/src/main/java/com/razorpay/rn/RazorpayModuleImpl.java b/node_modules/react-native-razorpay/android/src/main/java/com/razorpay/rn/RazorpayModuleImpl.java
-index f0a4f34..3dd96eb 100644
+index f0a4f34..56cc1bb 100644
 --- a/node_modules/react-native-razorpay/android/src/main/java/com/razorpay/rn/RazorpayModuleImpl.java
 +++ b/node_modules/react-native-razorpay/android/src/main/java/com/razorpay/rn/RazorpayModuleImpl.java
-@@ -61,8 +61,16 @@ public class RazorpayModuleImpl {
+@@ -54,15 +54,27 @@ public class RazorpayModuleImpl {
+      * Handles successful payment callback from Razorpay SDK.
+      */
+     public void onPaymentSuccess(String razorpayPaymentId, PaymentData paymentData) {
+-        sendEvent("Razorpay::PAYMENT_SUCCESS", Utils.jsonToWritableMap(paymentData.getData()));
++        // Same null-PaymentData hazard as onPaymentError below: dereferencing it
++        // here throws inside onActivityResult, which kills the app process rather
++        // than surfacing an error to JS.
++        sendEvent("Razorpay::PAYMENT_SUCCESS",
++            Utils.jsonToWritableMap(paymentData == null ? null : paymentData.getData()));
+     }
+ 
+     /**
       * Handles payment error callback from Razorpay SDK.
       */
      public void onPaymentError(int code, String description, PaymentData paymentData) {
@@ -21,6 +33,39 @@ index f0a4f34..3dd96eb 100644
          try {
              paymentDataJson.put(MAP_KEY_ERROR_CODE, code);
              paymentDataJson.put(MAP_KEY_ERROR_DESC, description);
+@@ -76,7 +88,8 @@ public class RazorpayModuleImpl {
+      * Handles external wallet selection callback from Razorpay SDK.
+      */
+     public void onExternalWalletSelected(String walletName, PaymentData paymentData) {
+-        sendEvent("Razorpay::EXTERNAL_WALLET_SELECTED", Utils.jsonToWritableMap(paymentData.getData()));
++        sendEvent("Razorpay::EXTERNAL_WALLET_SELECTED",
++            Utils.jsonToWritableMap(paymentData == null ? null : paymentData.getData()));
+     }
+ 
+     /**
+@@ -84,8 +97,19 @@ public class RazorpayModuleImpl {
+      * This works in both old and new architecture.
+      */
+     private void sendEvent(String eventName, WritableMap params) {
+-        reactContext
+-            .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter.class)
+-            .emit(eventName, params);
++        // These run from onActivityResult. If the JS context has gone away (the
++        // host activity was recreated while the checkout sheet was open), emitting
++        // throws there — and an exception in onActivityResult takes the whole app
++        // down instead of just losing the event.
++        try {
++            if (reactContext == null) {
++                return;
++            }
++            reactContext
++                .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter.class)
++                .emit(eventName, params);
++        } catch (Exception e) {
++            // Nothing useful to do: the payment result is reconciled server-side.
++        }
+     }
+ }
 diff --git a/node_modules/react-native-razorpay/android/src/main/java/com/razorpay/rn/Utils.java b/node_modules/react-native-razorpay/android/src/main/java/com/razorpay/rn/Utils.java
 index 09e8708..f2af301 100644
 --- a/node_modules/react-native-razorpay/android/src/main/java/com/razorpay/rn/Utils.java

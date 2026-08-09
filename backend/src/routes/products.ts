@@ -10,9 +10,14 @@ import { cacheDel, cacheDelPattern, cacheGet, cacheSet } from '../utils/redis';
 import { logger } from '../utils/logger';
 
 // TTLs (seconds)
-const TTL_PRODUCT = 7200;       // 2h — individual product
-const TTL_PRODUCT_LIST = 3600;  // 1h — paginated lists / categories
-const TTL_SEARCH = 1800;        // 30m — search results
+// Price/stock edits are made in OTHER backends (vendor app, vendor website) that
+// have no access to this Redis, so nothing can invalidate these keys on write.
+// The detail key is therefore validated against products.updated_at on every hit
+// (see below) and can keep a long TTL; the list keys can't be validated cheaply,
+// so they are kept short enough that an edit shows up within a minute.
+const TTL_PRODUCT = 7200;       // 2h — individual product (revalidated per hit)
+const TTL_PRODUCT_LIST = 60;    // 1m — paginated lists / categories
+const TTL_SEARCH = 60;          // 1m — search results
 const TTL_REVIEWS = 1800;       // 30m — reviews
 const TTL_FRESH_CAT = 7200;     // 2h — fresh categories
 const TTL_NEARBY = 3600;        // 1h — nearby categories
@@ -688,9 +693,21 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
     return;
   }
 
+  // A cached detail page is only served if products.updated_at still matches the
+  // stamp taken when it was cached. A vendor price edit (any backend, plus the
+  // `update_products_updated_at` trigger) bumps that column, so the next request
+  // rebuilds instead of serving the old price for up to 2h.
   const cacheKey = `product:${id}`;
-  const cached = await cacheGet(cacheKey);
-  if (cached) { res.json(cached); return; }
+  const cached = await cacheGet<{ stamp: string; response: unknown }>(cacheKey);
+  let freshStamp: string | null = null;
+  try {
+    const stampRow = await pool.query('SELECT updated_at FROM products WHERE id = $1::uuid', [id]);
+    freshStamp = stampRow.rows[0] ? String(stampRow.rows[0].updated_at?.valueOf?.() ?? stampRow.rows[0].updated_at) : null;
+  } catch { /* fall through to a full rebuild */ }
+  if (cached?.response && freshStamp && cached.stamp === freshStamp) {
+    res.json(cached.response);
+    return;
+  }
 
   try {
     const result = await pool.query(
@@ -753,7 +770,7 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
         variants: variants.length > 1 ? variants : undefined,
       },
     };
-    await cacheSet(cacheKey, response, TTL_PRODUCT);
+    if (freshStamp) await cacheSet(cacheKey, { stamp: freshStamp, response }, TTL_PRODUCT);
     res.json(response);
   } catch (err) {
     logger.error('getproduct_error', { error: (err as any)?.message ?? String(err) });

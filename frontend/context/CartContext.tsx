@@ -6,8 +6,22 @@ import { couponService } from '../services/coupon';
 import { CartItemObject, CouponObject, ProductObject } from '../types/types';
 import { useNetwork } from './NetworkContext';
 import { useUser } from './UserContext';
+import { useWishlist } from './WishlistContext';
 
 const CART_STORAGE_KEY = '@ZPinEcom:cart';
+
+/**
+ * Thrown when a cart write would exceed what the seller actually has in stock.
+ * The server is the authority (it re-checks and 400s), but the client knows the
+ * per-line stock from GET /cart and refuses first so the user gets the real
+ * number — "Only 5 left in stock" — instead of a generic failure.
+ */
+export class StockLimitError extends Error {
+    constructor(public available: number) {
+        super(available <= 0 ? 'This item is out of stock.' : `Only ${available} left in stock.`);
+        this.name = 'StockLimitError';
+    }
+}
 
 interface CartContextType {
     cartItems: CartItemObject[];
@@ -16,6 +30,9 @@ interface CartContextType {
     updateQuantity: (cartItemId: string, quantity: number) => void;
     changeSize: (cartItemId: string, size: string) => Promise<void>;
     clearCart: () => void;
+    refreshCart: () => Promise<void>;
+    /** Units of `product` still addable, given what is already in the cart. */
+    remainingStock: (product: ProductObject, selectedSize?: string) => number;
     totalPrice: number;
     totalItems: number;
     totalSavings: number;
@@ -38,6 +55,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
 
     const { isAuthenticated, isLoading: isUserLoading } = useUser();
     const { onReconnect } = useNetwork();
+    const { isInWishlist, removeFromWishlist } = useWishlist();
 
     // Always-current cart snapshot so the memoized handlers below can read the
     // latest items without listing cartItems as a dependency (which would give
@@ -82,6 +100,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
                                 // an inline size change like the website does.
                                 selectedSize: item.selectedSize || item.variant || undefined,
                                 sizeQuantities: item.sizeQuantities || undefined,
+                                availableStock: item.availableStock ?? undefined,
                             }));
                             setCartItems(normalized);
                             await AsyncStorage.setItem(CART_STORAGE_KEY, JSON.stringify(normalized));
@@ -116,10 +135,35 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
         );
     }, [cartItems, isLoading]);
 
+    // Stock for one product/size combination, preferring the value the server sent
+    // with the cart line (authoritative and fresh) over the product payload.
+    const stockFor = useCallback((product: ProductObject, selectedSize?: string) => {
+        const line = cartItemsRef.current.find(
+            i => i.productId === product.productId && (i.selectedSize || undefined) === (selectedSize || undefined)
+        );
+        if (typeof line?.availableStock === 'number') return line.availableStock;
+        const sq = (product as any).sizeQuantities as Record<string, number> | undefined;
+        if (selectedSize && sq && selectedSize in sq) return Number(sq[selectedSize] || 0);
+        return Number(product.quantity ?? 0);
+    }, []);
+
+    const remainingStock = useCallback((product: ProductObject, selectedSize?: string) => {
+        const inCart = cartItemsRef.current
+            .filter(i => i.productId === product.productId && (i.selectedSize || undefined) === (selectedSize || undefined))
+            .reduce((s, i) => s + i.quantity, 0);
+        return Math.max(stockFor(product, selectedSize) - inCart, 0);
+    }, [stockFor]);
+
     const addToCart = async (product: ProductObject, selectedColor?: string, selectedSize?: string) => {
         // Optimistic update
         const cartItemId = `${product.productId}-${selectedColor || 'default'}-${selectedSize || 'default'}`;
         const previousItems = cartItems;
+
+        // Refuse before touching state: one more unit than the seller has is not
+        // an error the user should discover at checkout.
+        if (remainingStock(product, selectedSize) < 1) {
+            throw new StockLimitError(stockFor(product, selectedSize));
+        }
 
         setCartItems(prevItems => {
             const existingItem = prevItems.find(item => item.cartItemId === cartItemId);
@@ -153,6 +197,11 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
             const token = await tokenManager.getAccessToken();
             if (token) {
                 await cartService.addToCart({ productId: product.productId, quantity: 1, variant: selectedSize });
+            }
+            // An item that made it into the cart is no longer something to save for
+            // later — drop it from the wishlist, whichever screen added it.
+            if (isInWishlist(product.productId)) {
+                removeFromWishlist(product.productId);
             }
         } catch (error) {
             console.error('Error syncing add to cart:', error);
@@ -196,6 +245,16 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
         const productId = itemToUpdate?.productId;
         const variant = itemToUpdate?.selectedSize;
 
+        // Cap on real stock. Increasing past it is refused with the actual number
+        // so the caller can say "Only N left in stock"; decreasing is always fine
+        // (a line can already sit above stock if the seller cut it after adding).
+        if (itemToUpdate && quantity > itemToUpdate.quantity) {
+            const available = typeof itemToUpdate.availableStock === 'number'
+                ? itemToUpdate.availableStock
+                : stockFor(itemToUpdate.product, variant);
+            if (quantity > available) throw new StockLimitError(available);
+        }
+
         const previousItems = cartItemsRef.current;
         setCartItems(prevItems => prevItems.map(item =>
             item.cartItemId === cartItemId
@@ -216,7 +275,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
                 throw error;
             }
         }
-    }, [removeFromCart]);
+    }, [removeFromCart, stockFor]);
 
     // Change a cart line's size in place (website parity: the cart lets you fix a
     // wrong size without removing and re-adding the item). Reloads from the server
@@ -338,6 +397,8 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
             updateQuantity,
             changeSize,
             clearCart,
+            refreshCart: loadCart,
+            remainingStock,
             totalPrice,
             totalItems,
             totalSavings,

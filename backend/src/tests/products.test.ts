@@ -176,6 +176,9 @@ describe('GET /products/:id', () => {
   const uuid = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11';
 
   it('returns 404 for non-existent product UUID', async () => {
+    // Detail responses are cache-revalidated against products.updated_at, so the
+    // route asks for that stamp before the main query. No row → no stamp.
+    getDbMock().mockResolvedValueOnce({ rows: [] });
     getDbMock().mockResolvedValueOnce({ rows: [] });
     const res = await request(app).get(`${BASE}/00000000-0000-0000-0000-000000000000`);
     expect(res.status).toBe(404);
@@ -188,6 +191,8 @@ describe('GET /products/:id', () => {
   });
 
   it('returns 200 with product details including size and color variants', async () => {
+    // 1) the updated_at freshness stamp, 2) the product itself
+    getDbMock().mockResolvedValueOnce({ rows: [{ updated_at: new Date() }] });
     getDbMock().mockResolvedValueOnce({ rows: [productRow()] });
 
     const res = await request(app).get(`${BASE}/${uuid}`);

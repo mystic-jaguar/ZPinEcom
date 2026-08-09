@@ -1,7 +1,8 @@
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { RotateCcw, Shirt, ShoppingCart, Zap } from 'lucide-react-native';
-import React, { useEffect, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AccordionItem from '../../components/common/AccordionItem';
@@ -27,7 +28,7 @@ export default function ProductDetails() {
     const productId = Array.isArray(id) ? id[0] : id;
     const router = useRouter();
     const insets = useSafeAreaInsets();
-    const { addToCart } = useCart();
+    const { addToCart, remainingStock } = useCart();
     const { setDeliveryType } = useCheckout();
     const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
     const { user, isAuthenticated } = useUser();
@@ -95,6 +96,18 @@ export default function ProductDetails() {
             loadProduct(productId);
         }
     }, [productId]);
+
+    // The seller can change the price or the stock at any moment from the vendor
+    // app/website, and this screen survives in the navigation stack — so re-pull
+    // (silently, no spinner) every time it comes back into view rather than
+    // showing whatever the price was when it was first opened.
+    const firstFocusRef = React.useRef(true);
+    useFocusEffect(
+        useCallback(() => {
+            if (firstFocusRef.current) { firstFocusRef.current = false; return; }
+            if (productId) loadProduct(productId, true);
+        }, [productId])
+    );
 
     useEffect(() => {
         if (ownReview) {
@@ -232,7 +245,7 @@ export default function ProductDetails() {
         }
     };
 
-    const handleAddToCart = (tryAtDoor = false) => {
+    const handleAddToCart = async (tryAtDoor = false) => {
         if (!product) return;
 
         // users.is_live — same rule and same wording as the website's ProductDetail.
@@ -263,7 +276,24 @@ export default function ProductDetails() {
             return;
         }
 
-        addToCart(product, selectedColor, selectedSize);
+        // What's already in the cart counts against the seller's stock, so adding
+        // the 6th unit of a 5-in-stock product is refused here with the number.
+        if (remainingStock(product, selectedSize) < 1) {
+            const held = requiresSize && sizeQuantities && selectedSize
+                ? Number(sizeQuantities[selectedSize] || 0)
+                : Number(product.quantity ?? 0);
+            setUnavailableMessage(held <= 0
+                ? 'This product is currently out of stock.'
+                : `Only ${held} left in stock — that many are already in your cart.`);
+            return;
+        }
+
+        try {
+            await addToCart(product, selectedColor, selectedSize);
+        } catch (err: any) {
+            setUnavailableMessage(err?.message || 'Could not add this item to your cart.');
+            return;
+        }
 
         if (tryAtDoor) {
             setDeliveryType('Instant');

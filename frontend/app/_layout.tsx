@@ -91,8 +91,10 @@ export default function RootLayout() {
         <NetworkProvider>
         <SearchProvider>
           <UserProvider>
-            <CartProvider>
-              <WishlistProvider>
+            {/* Wishlist wraps Cart: adding to the cart removes the item from the
+                wishlist, so the cart needs to read the wishlist, not the reverse. */}
+            <WishlistProvider>
+              <CartProvider>
                 <CheckoutProvider>
                   <AddressProvider>
                     <OrderProvider>
@@ -100,8 +102,8 @@ export default function RootLayout() {
                     </OrderProvider>
                   </AddressProvider>
                 </CheckoutProvider>
-              </WishlistProvider>
-            </CartProvider>
+              </CartProvider>
+            </WishlistProvider>
           </UserProvider>
         </SearchProvider>
         <OfflineBanner />

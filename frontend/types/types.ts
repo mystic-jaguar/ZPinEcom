@@ -264,6 +264,9 @@ export interface CartItemObject {
     // Per-size stock for this line's product ({ S: 10, M: 0 }), so the cart row
     // can offer an inline size change and grey out sold-out sizes.
     sizeQuantities?: Record<string, number>;
+    // Units of this line the seller actually has (the selected size's stock for a
+    // sized product, the product's stock otherwise). The stepper caps on it.
+    availableStock?: number;
 }
 
 /**

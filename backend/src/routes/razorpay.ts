@@ -7,6 +7,7 @@ import { amountToCharge } from '../utils/collect';
 import { generateId } from '../utils/id';
 import { recordOrderStatus } from '../utils/orderHistory';
 import { sendPush } from '../utils/push';
+import { notifySellersOfPaidOrders, pushSellersOfPaidOrders } from '../utils/sellerOrderNotify';
 import { safeIdentifier } from '../utils/sql';
 import { logger } from '../utils/logger';
 
@@ -211,7 +212,15 @@ router.post('/verify', authenticate, async (req: AuthRequest, res: Response): Pr
       ]
     );
 
+    // The sellers were deliberately NOT told at checkout — a prepaid order that
+    // is never paid for gets deleted, and the seller must not have been buzzed
+    // about it in the meantime. Now that the money is in, tell them.
+    const paidOrderIds = groupRows.map((r: any) => r.id);
+    await notifySellersOfPaidOrders(client, paidOrderIds);
+
     await client.query('COMMIT');
+
+    await pushSellersOfPaidOrders(client, paidOrderIds);
 
     sendPush(req.userId, `Payment successful: ${order.order_number}`,
       `Your payment of ₹${groupTotal.toFixed(2)} for order ${order.order_number} was successful.`,

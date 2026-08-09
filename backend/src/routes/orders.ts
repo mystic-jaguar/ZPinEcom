@@ -879,8 +879,22 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
       ]
     );
 
+    // A prepaid order isn't a real order until the payment goes through: the
+    // customer is still on the Razorpay sheet and may close it, in which case the
+    // order is deleted (DELETE /:id/abandon). Telling the seller now means every
+    // abandoned checkout buzzes their phone with an order that never existed —
+    // exactly what the seller list's `unpaidPrepaid` filter already refuses to
+    // show. So the seller is notified from payment verification instead
+    // (utils/sellerOrderNotify). COD is genuinely unpaid-but-real: notify now.
+    // Instant Delivery prepays its fee online even on COD, so that checkout also
+    // goes through the payment sheet and also has something to cancel.
+    const isCod = ['cod', 'cash', 'cash_on_delivery'].includes(
+      String(effectivePaymentMethod || '').toLowerCase()
+    );
+    const notifySellersNow = isCod && !(isInstant && deliveryFee > 0);
+
     // Notify each seller about their own sub-order (its own id/number/total).
-    for (const sub of subOrders) {
+    for (const sub of notifySellersNow ? subOrders : []) {
       const itemNames = sub.items.map((i: any) => i.product_name).join(', ');
       // The seller is told THEIR money: the raw line-item total. `sub.finalAmount`
       // is what the customer was charged (tax, shipping and the ZPIN markup on
@@ -923,7 +937,7 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
     sendPush(req.userId, `Order confirmed: ${groupOrderNumber}`,
       `Your order for ${customerItems.length} item(s) is placed. Total ₹${finalAmount.toFixed(2)}.`,
       { orderId, orderNumber: groupOrderNumber, groupId, type: 'order_update' });
-    for (const sub of subOrders) {
+    for (const sub of notifySellersNow ? subOrders : []) {
       sendPush(sub.sellerId, `New order: ${sub.orderNumber}`,
         `You have a new order for ${sub.items.length} item(s).`,
         { orderId: sub.id, orderNumber: sub.orderNumber, type: 'new_order' });
