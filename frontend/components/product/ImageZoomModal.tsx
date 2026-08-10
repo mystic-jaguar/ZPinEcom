@@ -11,7 +11,14 @@ const MAX_SCALE = 4;
 const EDGE_SWITCH_THRESHOLD = 60;
 const SWIPE_THRESHOLD = 60;
 
-const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+// 'worklet' is mandatory: this is called from the pinch/pan gesture callbacks,
+// which run on the UI thread. A plain JS function invoked from there aborts the
+// runtime ("tried to synchronously call a non-worklet function") and the app
+// dies instantly — which is exactly what a two-finger pinch used to do.
+const clamp = (v: number, lo: number, hi: number) => {
+    'worklet';
+    return Math.min(hi, Math.max(lo, v));
+};
 
 // Keep the image from being dragged entirely off-screen: at scale s only
 // (s-1)/2 of each edge can be hidden. Marked 'worklet' so it can be called
@@ -176,6 +183,13 @@ export default function ImageZoomModal({
                     <Pressable style={styles.close} onPress={onClose} hitSlop={12}>
                         <Ionicons name="close" size={26} color="#FFFFFF" />
                     </Pressable>
+                    {images.length > 1 && (
+                        <View style={styles.pagination}>
+                            {images.map((_, i) => (
+                                <View key={i} style={[styles.dot, i === index ? styles.activeDot : styles.inactiveDot]} />
+                            ))}
+                        </View>
+                    )}
                 </View>
             </GestureHandlerRootView>
         </Modal>
@@ -192,5 +206,16 @@ const styles = StyleSheet.create({
         ...Platform.select({ android: { elevation: 10 } }),
     },
     stage: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+    // Mirrors the carousel's dots so the position indicator survives the jump
+    // to full-screen; sits above the transformed image via elevation, as with
+    // the close button.
+    pagination: {
+        position: 'absolute', bottom: 40, alignSelf: 'center',
+        flexDirection: 'row', zIndex: 10,
+        ...Platform.select({ android: { elevation: 10 } }),
+    },
+    dot: { height: 4, borderRadius: 2, marginHorizontal: 3 },
+    activeDot: { width: 20, backgroundColor: '#FBBF24' },
+    inactiveDot: { width: 10, backgroundColor: 'rgba(255,255,255,0.35)' },
     image: { width: SCREEN_W, height: SCREEN_H },
 });
