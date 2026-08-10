@@ -264,6 +264,10 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response): Promise<v
 
   try {
     await finalizeExpiredTrials();
+    // Second trigger point: the customer whose app was killed mid-payment almost
+    // always reopens to the orders tab. Sweeping here clears their own ghost order
+    // (and its held stock) without waiting for another shopper to hit checkout.
+    await sweepStaleCheckouts();
     const countResult = await pool.query(
       `SELECT COUNT(*) FROM ${ORDERS} WHERE user_id = $1 AND NOT (status = 'pending' AND payment_status = 'pending')`,
       [req.userId]
@@ -429,6 +433,13 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
   // Ensure the coupon_redemptions table exists before the checkout transaction
   // may write to it (idempotent; a no-op after the first call / startup).
   await ensureOrderSupportTables();
+
+  // Give back stock held by checkouts that were abandoned without telling us,
+  // BEFORE this checkout's own decrement runs — otherwise the last unit of a
+  // contended item stays locked to a dead order and this buyer gets a spurious
+  // "Insufficient stock". Runs on its own connection/transaction, outside the
+  // checkout transaction below, so a sweep failure can't roll this order back.
+  await sweepStaleCheckouts();
 
   const client = await pool.connect();
   try {
@@ -1349,6 +1360,120 @@ router.patch('/:id/cancel', authenticate, async (req: AuthRequest, res: Response
   }
 });
 
+// How long an unpaid checkout may hold its stock before the sweep reclaims it.
+// This is NOT a UI timeout — it is the outer bound on a real payment. A UPI
+// app-switch is ~30-90s, a UPI collect request runs up to 5 min, and card 3DS /
+// netbanking OTP pages routinely take 2-5 min. Razorpay's own order validity is
+// 15 min. Reclaiming sooner than the gateway gives up would delete the order out
+// from under a customer who then pays successfully — /razorpay/verify looks the
+// order up by id and would answer 404 AFTER the money left their account. 30 min
+// is deliberately past every one of those limits: stock is cheap, a charge with
+// no order is not.
+const STALE_CHECKOUT_MINUTES = 30;
+
+// Undo everything a checkout consumed, for orders already SELECT ... FOR UPDATE'd
+// by the caller inside an open transaction. Shared by the customer-initiated
+// abandon route and the stale-checkout sweep so the two can never drift — a
+// reclaim path that forgets one of these leaks stock, coupons or seller noise.
+async function reclaimOrders(client: any, rows: any[]): Promise<string[]> {
+  const ids = rows.map((o: any) => o.id);
+
+  // Put back everything checkout took: product stock and flash-deal stock.
+  const items = await client.query(
+    `SELECT product_id, quantity FROM ${ORDER_ITEMS} WHERE order_id = ANY($1)`,
+    [ids]
+  );
+  for (const item of items.rows) {
+    await client.query(
+      `UPDATE products
+          SET quantity = quantity + $1, in_stock = true, updated_at = NOW()
+        WHERE id = $2`,
+      [item.quantity, item.product_id]
+    );
+    await releaseDealStock(client, item.product_id, item.quantity);
+  }
+
+  // Release the coupon too — it was never actually used.
+  const redeemed = await client.query(
+    `DELETE FROM ${COUPON_REDEMPTIONS} WHERE order_id = ANY($1) RETURNING coupon_code`,
+    [ids]
+  );
+  for (const r of redeemed.rows) {
+    await client.query(
+      `UPDATE coupons SET usage_count = GREATEST(usage_count - 1, 0), updated_at = NOW()
+        WHERE UPPER(code) = UPPER($1)`,
+      [r.coupon_code]
+    );
+  }
+
+  // The "New Order" rows written to the customer and to each seller at checkout.
+  // The seller's row carries its own sub-order id, the customer's carries the
+  // group id (which is a separate id only for a genuinely multi-seller cart).
+  const notifKeys = [...new Set([...ids, ...rows.map((o: any) => o.group_id).filter(Boolean)])];
+  await client.query(
+    `DELETE FROM notifications
+      WHERE type = 'new_order'
+        AND (data->>'orderId' = ANY($1) OR data->>'groupId' = ANY($1))`,
+    [notifKeys]
+  );
+  await client.query(`DELETE FROM order_status_history WHERE order_id = ANY($1)`, [ids]);
+  await client.query(`DELETE FROM ${ORDER_ITEMS} WHERE order_id = ANY($1)`, [ids]);
+  await client.query(`DELETE FROM ${ORDERS} WHERE id = ANY($1)`, [ids]);
+
+  return ids;
+}
+
+/**
+ * Reclaim checkouts that took stock and then went silent. The frontend calls
+ * DELETE /:id/abandon when the customer closes the Razorpay sheet, but that call
+ * dies with the app — force-quit, killed process, dropped network — and the stock
+ * those orders decremented stays reserved for an order nobody will ever pay for.
+ *
+ * Lazy sweep rather than a scheduler, matching finalizeExpiredTrials above: the
+ * only party harmed by stock sitting reserved is someone trying to buy that item,
+ * and they necessarily run one of the call sites. Nobody buying = nobody harmed.
+ */
+async function sweepStaleCheckouts(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    // Same fail-closed predicate as /abandon — pending+unpaid and online-paid, so
+    // anything paid, partial, confirmed or plain COD is untouchable — plus an age
+    // bound. created_at is written as (NOW() AT TIME ZONE 'Asia/Kolkata'), so the
+    // cutoff MUST be built from that same expression; comparing it against a bare
+    // NOW() would read every order as 5h30m in the future and silently sweep
+    // nothing. SKIP LOCKED so a concurrent checkout or verify is never blocked.
+    const stale = await client.query(
+      `SELECT id, group_id FROM ${ORDERS}
+        WHERE status = 'pending'
+          AND payment_status = 'pending'
+          AND created_at < (NOW() AT TIME ZONE 'Asia/Kolkata') - ($1 || ' minutes')::interval
+          AND (
+            LOWER(COALESCE(payment_method, '')) NOT IN ('cod', 'cash', 'cash_on_delivery')
+            OR (delivery_type = 'flash' AND COALESCE(delivery_fee, 0) > 0)
+          )
+        FOR UPDATE SKIP LOCKED`,
+      [String(STALE_CHECKOUT_MINUTES)]
+    );
+
+    if (stale.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return;
+    }
+
+    const ids = await reclaimOrders(client, stale.rows);
+    await client.query('COMMIT');
+    logger.info('sweepstalecheckouts_reclaimed', { count: ids.length });
+  } catch (err: any) {
+    try { await client.query('ROLLBACK'); } catch { /* ignore */ }
+    // Best-effort, exactly like finalizeExpiredTrials: a failed sweep must never
+    // fail the request that triggered it.
+    logger.warn('sweepstalecheckouts_failed', { error: err?.message });
+  } finally {
+    client.release();
+  }
+}
+
 // DELETE /api/v1/orders/:id/abandon — the customer closed/failed the Razorpay
 // sheet, so the order was never paid for. Cancelling it (what we used to do) left
 // a real row behind that every seller saw in the vendor app as a cancelled order.
@@ -1393,49 +1518,7 @@ router.delete('/:id/abandon', authenticate, async (req: AuthRequest, res: Respon
       return;
     }
 
-    const ids = orders.rows.map((o: any) => o.id);
-
-    // Put back everything checkout took: product stock and flash-deal stock.
-    const items = await client.query(
-      `SELECT product_id, quantity FROM ${ORDER_ITEMS} WHERE order_id = ANY($1)`,
-      [ids]
-    );
-    for (const item of items.rows) {
-      await client.query(
-        `UPDATE products
-            SET quantity = quantity + $1, in_stock = true, updated_at = NOW()
-          WHERE id = $2`,
-        [item.quantity, item.product_id]
-      );
-      await releaseDealStock(client, item.product_id, item.quantity);
-    }
-
-    // Release the coupon too — it was never actually used.
-    const redeemed = await client.query(
-      `DELETE FROM ${COUPON_REDEMPTIONS} WHERE order_id = ANY($1) RETURNING coupon_code`,
-      [ids]
-    );
-    for (const r of redeemed.rows) {
-      await client.query(
-        `UPDATE coupons SET usage_count = GREATEST(usage_count - 1, 0), updated_at = NOW()
-          WHERE UPPER(code) = UPPER($1)`,
-        [r.coupon_code]
-      );
-    }
-
-    // The "New Order" rows written to the customer and to each seller at checkout.
-    // The seller's row carries its own sub-order id, the customer's carries the
-    // group id (which is a separate id only for a genuinely multi-seller cart).
-    const notifKeys = [...new Set([...ids, ...orders.rows.map((o: any) => o.group_id).filter(Boolean)])];
-    await client.query(
-      `DELETE FROM notifications
-        WHERE type = 'new_order'
-          AND (data->>'orderId' = ANY($1) OR data->>'groupId' = ANY($1))`,
-      [notifKeys]
-    );
-    await client.query(`DELETE FROM order_status_history WHERE order_id = ANY($1)`, [ids]);
-    await client.query(`DELETE FROM ${ORDER_ITEMS} WHERE order_id = ANY($1)`, [ids]);
-    await client.query(`DELETE FROM ${ORDERS} WHERE id = ANY($1)`, [ids]);
+    const ids = await reclaimOrders(client, orders.rows);
 
     await client.query('COMMIT');
     await cacheDelPattern(`user:${req.userId}:orders:*`);
