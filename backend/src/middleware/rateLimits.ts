@@ -8,11 +8,15 @@ const json429 = (msg: string) => ({
 const isProd = process.env.NODE_ENV === 'production';
 
 // ── Global API limiter — applied to every route ───────────────────────────────
-// Production: 300 req/15min — blocks scrapers and bots
+// Production: 1000 req/15min — blocks scrapers and bots
 // Development: 2000 req/15min — allows normal dev/testing without hitting limits
+//
+// 300 was too tight for a real browsing session: this limiter keys on IP, and on
+// mobile carrier NAT one key covers many customers, so an ordinary shop-and-check-
+// out run tripped it. 1000/15min (~1.1 rps sustained) still stops scraping.
 export const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: isProd ? 300 : 2000,
+  max: isProd ? 1000 : 2000,
   message: json429('Too many requests. Please slow down.'),
   standardHeaders: true,
   legacyHeaders: false,

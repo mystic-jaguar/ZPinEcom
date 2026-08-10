@@ -187,8 +187,12 @@ export default function CartScreen() {
         } catch (err: any) {
             setStockMessageTitle(err instanceof StockLimitError ? 'Not enough stock' : 'Could not update cart');
             setStockMessage(err?.message || 'Could not update quantity.');
+            // A client-side stock refusal never touched the cart, so there is
+            // nothing to resync. A server failure might have — re-pull the truth
+            // so the stepper can't keep showing a quantity the server rejected.
+            if (!(err instanceof StockLimitError)) refreshCart();
         }
-    }, [updateQuantity]);
+    }, [updateQuantity, refreshCart]);
 
     const renderItem = useCallback(
         ({ item }: { item: any }) => (

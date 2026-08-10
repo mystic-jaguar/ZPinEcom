@@ -63,14 +63,21 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     const cartItemsRef = useRef(cartItems);
     cartItemsRef.current = cartItems;
 
-    // Load cart from AsyncStorage on mount and sync if auth changes
-    useEffect(() => {
-        if (!isUserLoading) {
-            loadCart();
-        }
-    }, [isAuthenticated, isUserLoading]);
+    // Sequence counters used by loadCart to discard responses that have been
+    // overtaken — by a newer fetch, or by a local write started after it.
+    const loadSeqRef = useRef(0);
+    const writeSeqRef = useRef(0);
 
-    const loadCart = async () => {
+    // Stable identity: cart.tsx passes refreshCart to useFocusEffect, and a new
+    // function every render made that effect re-fire on every render — an endless
+    // GET /cart loop that both tripped the rate limiter and flickered the stepper
+    // (a stale in-flight response overwriting the optimistic quantity).
+    const loadCart = useCallback(async () => {
+        // Drop a server cart that was fetched before a local write: it is older
+        // than what the user just did, and applying it rewinds the stepper.
+        const seq = ++loadSeqRef.current;
+        const writesAtStart = writeSeqRef.current;
+        const isStale = () => seq !== loadSeqRef.current || writesAtStart !== writeSeqRef.current;
         try {
             if (isAuthenticated) {
                 const token = await tokenManager.getAccessToken();
@@ -102,6 +109,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
                                 sizeQuantities: item.sizeQuantities || undefined,
                                 availableStock: item.availableStock ?? undefined,
                             }));
+                            if (isStale()) return;
                             setCartItems(normalized);
                             await AsyncStorage.setItem(CART_STORAGE_KEY, JSON.stringify(normalized));
                             return;
@@ -114,7 +122,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
 
             // Fallback to local storage
             const cartData = await AsyncStorage.getItem(CART_STORAGE_KEY);
-            if (cartData) {
+            if (cartData && !isStale()) {
                 setCartItems(JSON.parse(cartData));
             }
         } catch (error) {
@@ -122,7 +130,14 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [isAuthenticated]);
+
+    // Load cart from AsyncStorage on mount and sync if auth changes
+    useEffect(() => {
+        if (!isUserLoading) {
+            loadCart();
+        }
+    }, [isUserLoading, loadCart]);
 
     // Persist the cart whenever it changes (after the initial load). Centralizing
     // the write here means every committed change — optimistic updates and
@@ -164,6 +179,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
         if (remainingStock(product, selectedSize) < 1) {
             throw new StockLimitError(stockFor(product, selectedSize));
         }
+        writeSeqRef.current++;
 
         setCartItems(prevItems => {
             const existingItem = prevItems.find(item => item.cartItemId === cartItemId);
@@ -218,6 +234,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
         const productId = itemToRemove?.productId;
         const variant = itemToRemove?.selectedSize;
 
+        writeSeqRef.current++;
         const previousItems = cartItemsRef.current;
         setCartItems(prevItems => prevItems.filter(item => item.cartItemId !== cartItemId));
 
@@ -255,6 +272,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
             if (quantity > available) throw new StockLimitError(available);
         }
 
+        writeSeqRef.current++;
         const previousItems = cartItemsRef.current;
         setCartItems(prevItems => prevItems.map(item =>
             item.cartItemId === cartItemId
@@ -285,6 +303,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
         const item = cartItemsRef.current.find(i => i.cartItemId === cartItemId);
         if (!item || item.selectedSize === size) return;
 
+        writeSeqRef.current++;
         const previousItems = cartItemsRef.current;
         setCartItems(prev => prev.map(i =>
             i.cartItemId === cartItemId ? { ...i, selectedSize: size } : i
@@ -305,7 +324,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
             setCartItems(previousItems);
             throw error;
         }
-    }, []);
+    }, [loadCart]);
 
     const clearCart = async () => {
         setCartItems([]);
@@ -338,7 +357,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
 
     // Connectivity came back — re-pull the two things a dropped connection
     // most likely left stale/empty, instead of waiting for the next screen focus.
-    useEffect(() => onReconnect(() => { loadCart(); refreshCoupons(); }), [onReconnect, refreshCoupons]);
+    useEffect(() => onReconnect(() => { loadCart(); refreshCoupons(); }), [onReconnect, refreshCoupons, loadCart]);
 
     const totalPrice = cartItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
     const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0);
