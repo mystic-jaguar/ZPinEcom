@@ -9,7 +9,7 @@ import ActionModal from '../../components/common/ActionModal';
 import { ZButton, ZText } from '../../components/ui';
 import { colors, fonts, palette, radius, shadow } from '../../constants/theme';
 import { DELIVERY_ETA } from '../../constants/delivery';
-import { useCart } from '../../context/CartContext';
+import { StockLimitError, useCart } from '../../context/CartContext';
 import { useCheckout } from '../../context/CheckoutContext';
 
 interface CartItemProps {
@@ -157,6 +157,7 @@ export default function CartScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const [stockMessage, setStockMessage] = useState<string | null>(null);
+    const [stockMessageTitle, setStockMessageTitle] = useState('Not enough stock');
     // The absolute footer's real height, measured rather than guessed: a fixed
     // padding left the last row half-hidden behind it on taller devices.
     const [footerHeight, setFooterHeight] = useState(0);
@@ -184,6 +185,7 @@ export default function CartScreen() {
         try {
             await updateQuantity(cartItemId, quantity);
         } catch (err: any) {
+            setStockMessageTitle(err instanceof StockLimitError ? 'Not enough stock' : 'Could not update cart');
             setStockMessage(err?.message || 'Could not update quantity.');
         }
     }, [updateQuantity]);
@@ -260,7 +262,7 @@ export default function CartScreen() {
 
             <ActionModal
                 visible={!!stockMessage}
-                title="Not enough stock"
+                title={stockMessageTitle}
                 message={stockMessage || ''}
                 icon="alert-triangle"
                 primaryButtonText="OK"
