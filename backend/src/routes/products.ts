@@ -321,12 +321,18 @@ router.get('/search', productListLimiter, async (req: Request, res: Response): P
         `SELECT p.*,
           COALESCE(json_agg(DISTINCT pi.image_url) FILTER (WHERE pi.image_url IS NOT NULL), '[]') as images,
           COALESCE(AVG(pr.rating), 0) as average_rating,
-          similarity(LOWER(p.product_name), $1) AS match_score
+          GREATEST(
+            similarity(LOWER(p.product_name), $1),
+            similarity(LOWER(COALESCE(p.deepest_category_name, '')), $1)
+          ) AS match_score
          FROM products p
          LEFT JOIN product_images pi ON pi.product_id = p.id
          LEFT JOIN product_reviews pr ON pr.product_id = p.id
          WHERE p.in_stock = true AND p.is_approved = true
-           AND similarity(LOWER(p.product_name), $1) > $2
+           AND GREATEST(
+                 similarity(LOWER(p.product_name), $1),
+                 similarity(LOWER(COALESCE(p.deepest_category_name, '')), $1)
+               ) > $2
          GROUP BY p.id
          ORDER BY match_score DESC, p.created_at DESC
          LIMIT $3`,

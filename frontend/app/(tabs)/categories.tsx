@@ -1,6 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, ArrowUpRight, ChevronDown, ChevronRight, Search, Zap } from 'lucide-react-native';
+import { ArrowLeft, ArrowUpRight, ChevronDown, ChevronRight, Search, X, Zap } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
 import { BackHandler, Dimensions, Image, LayoutAnimation, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, UIManager, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -9,6 +9,7 @@ import { CATEGORY_DATA, CategoryNode } from '../../constants/categories';
 import { categoryImageUrl } from '../../constants/cloudinary';
 import { colors, fonts, palette, radius } from '../../constants/theme';
 import { useSearch } from '../../context/SearchContext';
+import { fuzzyScore } from '../../utils/fuzzy';
 
 // Landing-card artwork + unit noun per root category (reused from home).
 const CATEGORY_META: Record<string, { image: any; unit: string }> = {
@@ -239,17 +240,19 @@ export default function CategoriesScreen() {
     const drilledCategory = drilledId ? CATEGORY_DATA.find(c => c.id === drilledId) : null;
     const { addSearch } = useSearch();
 
-    // Android hardware back while drilled in must collapse to "all categories"
-    // instead of falling through to the tab navigator's history pop (→ Home).
+    // Android hardware back must unwind this screen's own state first — clear the
+    // search, then collapse to "all categories" — instead of falling through to
+    // the tab navigator's history pop (→ Home).
     useFocusEffect(
         useCallback(() => {
-            if (!drilledId) return;
+            if (!drilledId && !searchQuery) return;
             const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-                setDrilledId(null);
+                if (searchQuery) setSearchQuery('');
+                else setDrilledId(null);
                 return true;
             });
             return () => sub.remove();
-        }, [drilledId])
+        }, [drilledId, searchQuery])
     );
 
     const handleLeafPress = (itemName: string, rootCategory: string) => {
@@ -259,18 +262,24 @@ export default function CategoriesScreen() {
 
     const searchResults = React.useMemo(() => {
         if (!searchQuery) return [];
-        const q = searchQuery.toLowerCase();
+        const q = searchQuery.trim();
         let all: { name: string; category: string; root: string }[] = [];
         CATEGORY_DATA.forEach(root => {
             if (root.children) getAllNodes(root.children, root.name).forEach(l => all.push({ ...l, root: root.name }));
         });
         const seen = new Set<string>();
-        return all.filter(l => {
-            const key = `${l.name}|${l.root}`;
-            if (seen.has(key)) return false;
-            seen.add(key);
-            return l.name.toLowerCase().includes(q) || l.category.toLowerCase().includes(q);
-        });
+        return all
+            .filter(l => {
+                const key = `${l.name}|${l.root}`;
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+            })
+            // Typo-tolerant: the parent name matches at half weight so a leaf's own
+            // name always outranks its section heading.
+            .map(l => ({ ...l, score: Math.max(fuzzyScore(l.name, q), fuzzyScore(l.category, q) / 2) }))
+            .filter(l => l.score > 0)
+            .sort((a, b) => b.score - a.score);
     }, [searchQuery]);
 
     return (
@@ -302,6 +311,11 @@ export default function CategoriesScreen() {
                         value={searchQuery}
                         onChangeText={setSearchQuery}
                     />
+                    {searchQuery.length > 0 && (
+                        <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={8}>
+                            <X size={18} color={colors.textFaint} />
+                        </TouchableOpacity>
+                    )}
                 </View>
             </View>
 
