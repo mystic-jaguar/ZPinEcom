@@ -40,6 +40,10 @@ export default function ImageZoomModal({
     onIndexChange?: (index: number) => void;
 }) {
     const [index, setIndex] = useState(initialIndex);
+    // PanResponder.create runs once (useRef keeps only the first render's
+    // closure), so its handlers can never see fresh `index` state — mirror it
+    // into a ref they can read live instead.
+    const indexRef = useRef(initialIndex);
     const scale = useRef(new Animated.Value(1)).current;
     const tx = useRef(new Animated.Value(0)).current;
     const ty = useRef(new Animated.Value(0)).current;
@@ -69,11 +73,12 @@ export default function ImageZoomModal({
     };
 
     // Reopening (or switching photos) must not inherit the previous zoom.
-    useEffect(() => { if (visible) { setIndex(initialIndex); reset(false); } }, [visible, initialIndex]);
+    useEffect(() => { if (visible) { setIndex(initialIndex); indexRef.current = initialIndex; reset(false); } }, [visible, initialIndex]);
 
     const goTo = (next: number) => {
         const clamped = clamp(next, 0, images.length - 1);
-        if (clamped === index) { clampPan(); return; }
+        if (clamped === indexRef.current) { clampPan(); return; }
+        indexRef.current = clamped;
         setIndex(clamped);
         onIndexChange?.(clamped);
         reset(false);
@@ -148,11 +153,11 @@ export default function ImageZoomModal({
                     // pan boundary (i.e. there's nowhere left to pan to).
                     const { maxX } = bounds(start.current.scale);
                     const attemptedX = start.current.x + gesture.dx;
-                    if (attemptedX - maxX > EDGE_SWITCH_THRESHOLD) { goTo(index - 1); return; }
-                    if (-maxX - attemptedX > EDGE_SWITCH_THRESHOLD) { goTo(index + 1); return; }
+                    if (attemptedX - maxX > EDGE_SWITCH_THRESHOLD) { goTo(indexRef.current - 1); return; }
+                    if (-maxX - attemptedX > EDGE_SWITCH_THRESHOLD) { goTo(indexRef.current + 1); return; }
                     clampPan();
                 } else if (Math.abs(gesture.dx) > SWIPE_THRESHOLD && Math.abs(gesture.dx) > Math.abs(gesture.dy)) {
-                    goTo(gesture.dx > 0 ? index - 1 : index + 1);
+                    goTo(gesture.dx > 0 ? indexRef.current - 1 : indexRef.current + 1);
                 }
             },
             onPanResponderTerminate: () => {
