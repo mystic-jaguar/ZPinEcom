@@ -1,6 +1,7 @@
 import { Stack, useRouter, useSegments } from "expo-router";
 import { useEffect } from "react";
 import { Image, View } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import ErrorBoundary from "../components/common/ErrorBoundary";
 import OfflineBanner from "../components/common/OfflineBanner";
@@ -86,29 +87,31 @@ export default function RootLayout() {
   // so they are registered by family name at startup — no runtime useFonts()
   // asset resolution, which used to hang the splash under expo-updates/OTA.
   return (
-    <SafeAreaProvider>
-      <ErrorBoundary>
-        <NetworkProvider>
-        <SearchProvider>
-          <UserProvider>
-            {/* Wishlist wraps Cart: adding to the cart removes the item from the
-                wishlist, so the cart needs to read the wishlist, not the reverse. */}
-            <WishlistProvider>
-              <CartProvider>
-                <CheckoutProvider>
-                  <AddressProvider>
-                    <OrderProvider>
-                      <RootLayoutNav />
-                    </OrderProvider>
-                  </AddressProvider>
-                </CheckoutProvider>
-              </CartProvider>
-            </WishlistProvider>
-          </UserProvider>
-        </SearchProvider>
-        <OfflineBanner />
-        </NetworkProvider>
-      </ErrorBoundary>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <ErrorBoundary>
+          <NetworkProvider>
+          <SearchProvider>
+            <UserProvider>
+              {/* Wishlist wraps Cart: adding to the cart removes the item from the
+                  wishlist, so the cart needs to read the wishlist, not the reverse. */}
+              <WishlistProvider>
+                <CartProvider>
+                  <CheckoutProvider>
+                    <AddressProvider>
+                      <OrderProvider>
+                        <RootLayoutNav />
+                      </OrderProvider>
+                    </AddressProvider>
+                  </CheckoutProvider>
+                </CartProvider>
+              </WishlistProvider>
+            </UserProvider>
+          </SearchProvider>
+          <OfflineBanner />
+          </NetworkProvider>
+        </ErrorBoundary>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
