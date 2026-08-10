@@ -321,5 +321,5 @@ const styles = StyleSheet.create({
     emptyIcon: { width: 76, height: 76, borderRadius: 38, backgroundColor: colors.surfaceSunken, alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
     emptyTitle: { marginBottom: 8 },
     emptyText: { textAlign: 'center', lineHeight: 21, marginBottom: 22 },
-    emptyBtn: { paddingHorizontal: 28 },
+    emptyBtn: { paddingHorizontal: 28, alignSelf: 'center' },
 });
