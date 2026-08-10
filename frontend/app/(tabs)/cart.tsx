@@ -236,7 +236,12 @@ export default function CartScreen() {
                     <Animated.FlatList
                         data={cartItems}
                         renderItem={renderItem}
-                        keyExtractor={(item) => item.cartItemId}
+                        // Keyed on product+size, not cartItemId: a freshly added line
+                        // carries a locally synthesized id until the server cart is
+                        // pulled, and keying on that made the row remount (replaying
+                        // its fade-in) the moment the real UUID arrived. The backend
+                        // allows only one line per product+size, so this is unique.
+                        keyExtractor={(item) => `${item.productId}-${item.selectedSize || ''}`}
                         contentContainerStyle={[styles.list, { paddingBottom: footerHeight + 24 }]}
                         showsVerticalScrollIndicator={false}
                     />

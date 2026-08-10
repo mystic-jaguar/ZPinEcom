@@ -172,7 +172,13 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     const addToCart = async (product: ProductObject, selectedColor?: string, selectedSize?: string) => {
         // Optimistic update
         const cartItemId = `${product.productId}-${selectedColor || 'default'}-${selectedSize || 'default'}`;
-        const previousItems = cartItems;
+        const previousItems = cartItemsRef.current;
+        // A line already in the cart is identified by product + size, NOT by the id
+        // synthesized above: once the cart has been loaded from the server the line
+        // carries a server UUID, so an id match always missed and re-adding the same
+        // product appended a second row that vanished on the next refresh.
+        const sameLine = (i: CartItemObject) =>
+            i.productId === product.productId && (i.selectedSize || undefined) === (selectedSize || undefined);
 
         // Refuse before touching state: one more unit than the seller has is not
         // an error the user should discover at checkout.
@@ -182,12 +188,12 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
         writeSeqRef.current++;
 
         setCartItems(prevItems => {
-            const existingItem = prevItems.find(item => item.cartItemId === cartItemId);
+            const existingItem = prevItems.find(sameLine);
             let newItems: CartItemObject[];
 
             if (existingItem) {
                 newItems = prevItems.map(item =>
-                    item.cartItemId === cartItemId
+                    sameLine(item)
                         ? { ...item, quantity: item.quantity + 1 }
                         : item
                 );
