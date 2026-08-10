@@ -15,7 +15,7 @@ import { useCheckout } from '../../context/CheckoutContext';
 interface CartItemProps {
     item: any;
     onRemove: (cartItemId: string) => void;
-    onUpdateQuantity: (cartItemId: string, quantity: number) => void;
+    onUpdateQuantity: (cartItemId: string, quantity: number) => Promise<void>;
     onChangeSize: (cartItemId: string, size: string) => void;
 }
 
@@ -34,6 +34,11 @@ function sortSizes(sizes: string[]) {
 function CartItem({ item, onRemove, onUpdateQuantity, onChangeSize }: CartItemProps) {
     const router = useRouter();
     const [changingSize, setChangingSize] = React.useState(false);
+    // Guards the stepper against double-taps: without it, two rapid presses each
+    // start their own async updateQuantity call against the same pre-tap
+    // quantity, and the optimistic updates race — the value flickers back and
+    // forth as they resolve out of order.
+    const [qtyPending, setQtyPending] = React.useState(false);
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(50)).current;
 
@@ -59,6 +64,16 @@ function CartItem({ item, onRemove, onUpdateQuantity, onChangeSize }: CartItemPr
     const brand = item.product?.brand || item.brand || 'ZPIN';
     const hasSizes = !!item.sizeQuantities && Object.keys(item.sizeQuantities).length > 0;
     const atStockLimit = typeof item.availableStock === 'number' && item.quantity >= item.availableStock;
+
+    const handleStep = async (nextQuantity: number) => {
+        if (qtyPending) return;
+        setQtyPending(true);
+        try {
+            await onUpdateQuantity(item.cartItemId, nextQuantity);
+        } finally {
+            setQtyPending(false);
+        }
+    };
 
     return (
         <Animated.View style={[styles.item, { opacity: fadeAnim, transform: [{ translateX: slideAnim }] }]}>
@@ -118,9 +133,9 @@ function CartItem({ item, onRemove, onUpdateQuantity, onChangeSize }: CartItemPr
                 <View style={styles.itemBottom}>
                     <Text style={styles.itemPrice}>₹{((item.product?.price || item.price) * item.quantity).toLocaleString('en-IN')}</Text>
                     <View style={styles.stepper}>
-                        <Pressable onPress={() => onUpdateQuantity(item.cartItemId, item.quantity - 1)} hitSlop={6}><Minus size={14} color={colors.textStrong} /></Pressable>
+                        <Pressable onPress={() => handleStep(item.quantity - 1)} disabled={qtyPending} hitSlop={6}><Minus size={14} color={colors.textStrong} /></Pressable>
                         <Text style={styles.qty}>{item.quantity}</Text>
-                        <Pressable onPress={() => onUpdateQuantity(item.cartItemId, item.quantity + 1)} hitSlop={6}>
+                        <Pressable onPress={() => handleStep(item.quantity + 1)} disabled={qtyPending || atStockLimit} hitSlop={6}>
                             <Plus size={14} color={atStockLimit ? colors.textFaint : colors.textStrong} />
                         </Pressable>
                     </View>
