@@ -8,6 +8,7 @@ import { consumeDealStock, liveDealPrices, releaseDealStock } from '../utils/fla
 import { generateId } from '../utils/id';
 import { recordOrderStatus } from '../utils/orderHistory';
 import { markupItems, withMarkup } from '../utils/pricing';
+import { notifyReturnTransition } from '../utils/returnNotify';
 import { cacheDel, cacheDelPattern } from '../utils/redis';
 import { sendPush } from '../utils/push';
 import { safeIdentifier } from '../utils/sql';
@@ -1111,6 +1112,10 @@ router.post('/:id/return', authenticate, async (req: AuthRequest, res: Response)
     );
     await recordOrderStatus(null, req.params.id, 'return_requested', `Return requested: ${reason}`);
 
+    // The seller learns a return is coming; the customer gets the inbox row.
+    // Not awaited: a notification must never delay or fail the request.
+    void notifyReturnTransition(req.params.id, 'requested', reason);
+
     res.json({
       success: true,
       data: {
@@ -1303,6 +1308,11 @@ router.patch('/:id/return-status', authenticate, async (req: AuthRequest, res: R
     }
 
     await client.query('COMMIT');
+
+    // AFTER COMMIT, deliberately: a rolled-back transition must not buzz a phone.
+    // Every surface that advances a return proxies to this handler, so this one
+    // call covers admin approvals/rejections/settlements and delivery pickups.
+    void notifyReturnTransition(req.params.id, nextStatus as any, note || undefined);
 
     res.json({
       success: true,
