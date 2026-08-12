@@ -69,9 +69,27 @@ export function stepIndex(status?: string, deliveryStatus?: string | null): numb
 export const RETURN_STEPS = [
     { key: 'return_requested', title: 'Requested', note: 'We have your return request', short: 'REQUESTED' },
     { key: 'approved', title: 'Approved', note: 'A delivery partner will collect the item', short: 'APPROVED' },
-    { key: 'picked_up', title: 'Picked up', note: 'Pending inspection', short: 'PICKED UP' },
+    { key: 'picked_up', title: 'Picked up — pending inspection', note: 'The seller still has to receive and check the item', short: 'PICKED UP' },
     { key: 'refunded', title: 'Refunded', note: 'The refund is on its way to you', short: 'REFUNDED' },
 ] as const;
+
+/**
+ * Badge/chip wording per return_requests.status. Never say "Returned" before the
+ * status is actually 'refunded' — a collected item is only in transit back to
+ * the seller, and the refund has not been settled yet.
+ */
+export const RETURN_STATUS_LABEL: Record<string, string> = {
+    requested: 'REQUESTED',
+    approved: 'APPROVED',
+    rejected: 'REJECTED',
+    picked_up: 'PICKED UP · PENDING INSPECTION',
+    refunded: 'REFUNDED',
+};
+
+export function returnStatusLabel(status?: string): string {
+    const s = (status || '').toLowerCase();
+    return RETURN_STATUS_LABEL[s] || statusLabel(s).toUpperCase();
+}
 
 export type ReturnStage = { active: number; rejected: boolean };
 

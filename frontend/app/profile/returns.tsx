@@ -8,6 +8,7 @@ import { AppHeader, ZText } from '../../components/ui';
 import { colors, fonts, palette, radius } from '../../constants/theme';
 import { useOrder } from '../../context/OrderContext';
 import { orderService } from '../../services/order';
+import { returnStatusLabel } from '../../utils/orderStatus';
 
 type ReturnStatusRecord = {
     returnStatus: string; reason: string; description?: string; requestedAt: string; updatedAt: string;
@@ -97,7 +98,7 @@ export default function ReturnsRefundsScreen() {
             const step = Math.max(0, REFUND_STEPS.indexOf(status));
             return {
                 order: o,
-                statusLabel: status.replace(/_/g, ' ').toUpperCase(),
+                statusLabel: returnStatusLabel(status),
                 step,
                 firstItem: o.items[0],
                 disclaimer: rd?.refundDisclaimer ?? REFUND_DISCLAIMER,
@@ -236,7 +237,9 @@ const styles = StyleSheet.create({
     itemName: { fontFamily: fonts.bodySemiBold, fontSize: 14, color: colors.textStrong },
     itemSub: { fontFamily: fonts.bodyRegular, fontSize: 12, color: colors.textFaint, marginTop: 2 },
     price: { fontFamily: fonts.displaySemiBold, fontSize: 16, color: colors.textStrong },
-    statusChip: { backgroundColor: palette.yellow100, paddingHorizontal: 8, paddingVertical: 4, borderRadius: radius.xs, alignSelf: 'flex-start' },
+    // maxWidth + wrapping: "PICKED UP · PENDING INSPECTION" is deliberately long
+    // (it must not read as "returned"), so it wraps instead of crushing the name.
+    statusChip: { backgroundColor: palette.yellow100, paddingHorizontal: 8, paddingVertical: 4, borderRadius: radius.xs, alignSelf: 'flex-start', maxWidth: 96 },
     statusChipText: { fontFamily: fonts.monoBold, fontSize: 9, letterSpacing: 0.4, color: palette.yellow800 },
 
     progress: { flexDirection: 'row', alignItems: 'center', marginTop: 15 },
