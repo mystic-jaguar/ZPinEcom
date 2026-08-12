@@ -61,6 +61,36 @@ export function stepIndex(status?: string, deliveryStatus?: string | null): numb
     return Math.max(a, b);
 }
 
+/**
+ * Return timeline. Once a return exists the fulfilment stages are over, so the
+ * track screen swaps TRACK_STEPS for these. Keys are the event `status` values
+ * GET /orders/:id/track puts in trackingHistory (backend buildTrackingHistory).
+ */
+export const RETURN_STEPS = [
+    { key: 'return_requested', title: 'Requested', note: 'We have your return request', short: 'REQUESTED' },
+    { key: 'approved', title: 'Approved', note: 'A delivery partner will collect the item', short: 'APPROVED' },
+    { key: 'picked_up', title: 'Picked up', note: 'Pending inspection', short: 'PICKED UP' },
+    { key: 'refunded', title: 'Refunded', note: 'The refund is on its way to you', short: 'REFUNDED' },
+] as const;
+
+export type ReturnStage = { active: number; rejected: boolean };
+
+/**
+ * Current return stage from the tracking history, or null when the order has no
+ * return. Only events after 'return_requested' are considered — the fulfilment
+ * events before it use a different vocabulary.
+ */
+export function returnStage(trackingHistory?: any[]): ReturnStage | null {
+    const history = Array.isArray(trackingHistory) ? trackingHistory : [];
+    const start = history.findIndex((e) => e?.status === 'return_requested');
+    if (start < 0) return null;
+    const seen = new Set(history.slice(start).map((e) => e?.status));
+    if (seen.has('rejected')) return { active: 1, rejected: true };
+    let active = 0;
+    RETURN_STEPS.forEach((step, i) => { if (seen.has(step.key)) active = i; });
+    return { active, rejected: false };
+}
+
 /** "out_for_delivery" → "Out For Delivery" */
 export function statusLabel(status?: string): string {
     return (status || 'pending').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());

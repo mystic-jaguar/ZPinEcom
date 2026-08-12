@@ -9,7 +9,7 @@ import { colors, fonts, palette, radius } from '../../constants/theme';
 import { DELIVERY_ETA } from '../../constants/delivery';
 import { useOrder } from '../../context/OrderContext';
 import { orderService } from '../../services/order';
-import { FAILURE_TEXT, stepIndex, TRACK_STEPS } from '../../utils/orderStatus';
+import { FAILURE_TEXT, RETURN_STEPS, returnStage, stepIndex, TRACK_STEPS } from '../../utils/orderStatus';
 
 const ELECTRIC_DELAY_MS = 5 * 60 * 1000; // 5 min after delivery before the surge kicks in
 
@@ -64,9 +64,16 @@ export default function TrackOrderScreen() {
     const deliveryFailure: { reason?: string } | null = trackingData?.deliveryFailure ?? null;
     const liveEta = trackingData?.estimatedDelivery || order?.estimatedDelivery;
     const canCancel = order && ['pending', 'confirmed'].includes(liveStatus);
-    const active = stepIndex(liveStatus, deliveryStatus);
+    // A return replaces the fulfilment timeline entirely — by the time one exists
+    // the order was already delivered, so the five delivery stages say nothing.
+    const ret = returnStage(trackingData?.trackingHistory);
+    // A rejected return is terminal — don't dangle "Picked up"/"Refunded" as if
+    // they're still coming.
+    const steps: readonly { key: string; title: string; note: string }[] =
+        ret ? (ret.rejected ? RETURN_STEPS.slice(0, 2) : RETURN_STEPS) : TRACK_STEPS;
+    const active = ret ? ret.active : stepIndex(liveStatus, deliveryStatus);
     // RouteTrack only draws three phases; collapse the five stages onto them.
-    const phase: RoutePhase = active >= 4 ? 'delivered' : active >= 2 ? 'shipped' : 'confirmed';
+    const phase: RoutePhase = ret || active >= 4 ? 'delivered' : active >= 2 ? 'shipped' : 'confirmed';
 
     // Instant-trial celebration: once delivered, wait a beat, then run the electric surge.
     const [electric, setElectric] = useState(false);
@@ -82,7 +89,9 @@ export default function TrackOrderScreen() {
 
     // Instant shows the live clock ETA once the server has one; everything else shows
     // the promised window — we never surface a raw multi-day delivery date.
-    const etaLabel = liveEta && isInstant
+    const etaLabel = ret
+        ? (ret.rejected ? 'Rejected' : RETURN_STEPS[ret.active].title)
+        : liveEta && isInstant
         ? new Date(liveEta).toLocaleString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true })
         : DELIVERY_ETA;
 
@@ -105,7 +114,9 @@ export default function TrackOrderScreen() {
                         <View>
                             <View style={styles.arrivingRow}>
                                 <View style={styles.pulse} />
-                                <Text style={styles.arriving}>ARRIVING · {TRACK_STEPS[active].short}</Text>
+                                <Text style={styles.arriving}>
+                                    {ret ? `RETURN · ${ret.rejected ? 'REJECTED' : RETURN_STEPS[ret.active].short}` : `ARRIVING · ${TRACK_STEPS[active].short}`}
+                                </Text>
                             </View>
                             <View style={styles.etaRow}>
                                 <Text style={styles.etaValue}>{etaLabel}</Text>
@@ -121,7 +132,7 @@ export default function TrackOrderScreen() {
                 </View>
 
                 <View style={{ paddingHorizontal: 20 }}>
-                    {isInstant && (
+                    {isInstant && !ret && (
                         <View style={styles.trialCard}>
                             <View style={styles.trialHead}>
                                 <View style={styles.trialLeft}>
@@ -165,11 +176,16 @@ export default function TrackOrderScreen() {
 
                     {/* Timeline */}
                     <View style={styles.card}>
-                        <ZText variant="eyebrow" style={{ marginBottom: 18 }}>Order status</ZText>
-                        {TRACK_STEPS.map((step, i) => {
+                        <ZText variant="eyebrow" style={{ marginBottom: 18 }}>{ret ? 'Return status' : 'Order status'}</ZText>
+                        {steps.map((step, i) => {
                             const done = i < active;
                             const current = i === active;
-                            const last = i === TRACK_STEPS.length - 1;
+                            const last = i === steps.length - 1;
+                            // A rejected return stops at stage 1 and that stage is
+                            // the rejection, not an approval.
+                            const rejectedHere = !!ret?.rejected && i === 1;
+                            const title = rejectedHere ? 'Rejected' : step.title;
+                            const note = rejectedHere ? 'Your return request was not accepted' : step.note;
                             return (
                                 <View key={step.key} style={styles.tlRow}>
                                     <View style={styles.tlLeft}>
@@ -179,8 +195,8 @@ export default function TrackOrderScreen() {
                                         {!last && <View style={[styles.tlLine, done ? { backgroundColor: palette.yellow500 } : { backgroundColor: colors.borderSubtle }]} />}
                                     </View>
                                     <View style={{ flex: 1, paddingBottom: last ? 0 : 18 }}>
-                                        <Text style={[styles.tlTitle, !done && !current && { color: colors.textFaint }]}>{step.title}</Text>
-                                        <Text style={styles.tlNote}>{step.note}</Text>
+                                        <Text style={[styles.tlTitle, !done && !current && { color: colors.textFaint }]}>{title}</Text>
+                                        <Text style={styles.tlNote}>{note}</Text>
                                     </View>
                                 </View>
                             );
