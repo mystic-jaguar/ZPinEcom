@@ -20,6 +20,10 @@ export default function CancelOrderScreen() {
     const orderId = Array.isArray(params.orderId) ? params.orderId[0] : params.orderId;
     const mode = Array.isArray(params.mode) ? params.mode[0] : (params.mode ?? 'cancel');
     const productId = Array.isArray(params.productId) ? params.productId[0] : params.productId;
+    // Multi-item return: returns.tsx passes a comma-separated list. Falls back to
+    // the single productId so the one-item path is unchanged.
+    const productIdsParam = Array.isArray(params.productIds) ? params.productIds[0] : params.productIds;
+    const productIds = (productIdsParam ? String(productIdsParam).split(',') : productId ? [productId] : []).filter(Boolean);
     const { getOrderById, cancelOrder } = useOrder();
 
     const isReturn = mode === 'return';
@@ -31,7 +35,9 @@ export default function CancelOrderScreen() {
     const [errorMessage, setErrorMessage] = useState('');
 
     const order = getOrderById(orderId as string);
-    const selectedOrderItemId = isReturn && productId ? order?.items.find(item => item.productId === productId)?.orderItemId : undefined;
+    const selectedOrderItemIds = isReturn
+        ? productIds.map(pid => order?.items.find(item => item.productId === pid)?.orderItemId).filter(Boolean) as string[]
+        : [];
 
     if (!order) {
         return (
@@ -61,7 +67,7 @@ export default function CancelOrderScreen() {
             let response: any;
             if (isReturn) {
                 response = await orderService.returnOrder(order.id, {
-                    orderItemIds: selectedOrderItemId ? [selectedOrderItemId] : [],
+                    orderItemIds: selectedOrderItemIds,
                     reason: selectedReason,
                     description: 'Return request via app',
                 });

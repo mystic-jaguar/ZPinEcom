@@ -47,6 +47,13 @@ export default function ReturnsRefundsScreen() {
     const [isLoading, setIsLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [returnStatusByOrder, setReturnStatusByOrder] = useState<Record<string, ReturnStatusRecord>>({});
+    // orderId -> productIds the customer ticked. Only used for multi-item orders.
+    const [selectedByOrder, setSelectedByOrder] = useState<Record<string, string[]>>({});
+
+    const toggleItem = (orderId: string, productId: string) => setSelectedByOrder(prev => {
+        const cur = prev[orderId] || [];
+        return { ...prev, [orderId]: cur.includes(productId) ? cur.filter(p => p !== productId) : [...cur, productId] };
+    });
 
     const onRefresh = async () => {
         setRefreshing(true);
@@ -73,11 +80,13 @@ export default function ReturnsRefundsScreen() {
         return () => { cancelled = true; };
     }, [orders]);
 
-    const returnableItems = orders.flatMap(order => {
+    // One card per ORDER, not per product — a multi-item order is returned in a
+    // single request with all the selected orderItemIds.
+    const returnableOrders = orders.filter(order => {
         const rd = returnStatusByOrder[order.id];
         const hasActive = Boolean(rd && ACTIVE_RETURN_STATUSES.has(rd.returnStatus));
-        if (!isWithinReturnWindow(order) || hasActive || order.status === 'returned' || order.paymentStatus === 'refunded') return [];
-        return (order.items || []).map(item => ({ ...item, orderId: order.id, orderNumber: order.orderNumber, updatedAt: order.updatedAt, createdAt: order.createdAt }));
+        if (!isWithinReturnWindow(order) || hasActive || order.status === 'returned' || order.paymentStatus === 'refunded') return false;
+        return (order.items || []).length > 0;
     });
 
     const activeReturns = orders
@@ -151,28 +160,53 @@ export default function ReturnsRefundsScreen() {
 
                 {isLoading ? (
                     <View style={styles.empty}><ActivityIndicator color={palette.yellow500} /><ZText variant="muted" style={{ marginTop: 12 }}>Checking eligibility…</ZText></View>
-                ) : returnableItems.length === 0 ? (
+                ) : returnableOrders.length === 0 ? (
                     <View style={styles.empty}><RotateCcw size={44} color={colors.borderStrong} /><ZText variant="muted" style={{ marginTop: 12 }}>No returnable items</ZText></View>
                 ) : (
-                    returnableItems.map((item, i) => (
-                        <View key={`${item.orderId}-${item.productId}-${i}`} style={styles.card}>
-                            <View style={[styles.itemRow, { marginBottom: 14 }]}>
-                                <Image source={item.image ? { uri: item.image as string } : require('../../assets/images/icon_backup.png')} style={styles.itemImg} contentFit="cover" />
-                                <View style={{ flex: 1 }}>
-                                    <Text style={styles.itemName} numberOfLines={1}>{item.productName}</Text>
-                                    <Text style={styles.itemSub}>{daysLeft(item)} days left</Text>
-                                </View>
-                                <Text style={styles.price}>₹{Number(item.price).toLocaleString('en-IN')}</Text>
+                    returnableOrders.map(order => {
+                        const items = order.items || [];
+                        const multi = items.length > 1;
+                        const selected = selectedByOrder[order.id] || [];
+                        const canSubmit = !multi || selected.length > 0;
+                        const productIds = multi ? selected : [items[0].productId];
+                        return (
+                            <View key={order.id} style={styles.card}>
+                                {multi && (
+                                    <View style={styles.orderHead}>
+                                        <Text style={styles.orderNo}>{order.orderNumber}</Text>
+                                        <Text style={styles.itemSub}>{daysLeft(order)} days left</Text>
+                                    </View>
+                                )}
+                                {items.map((item, i) => {
+                                    const on = selected.includes(item.productId);
+                                    const row = (
+                                        <View style={[styles.itemRow, { marginBottom: 14 }]}>
+                                            {multi && <View style={[styles.checkbox, on && styles.checkboxOn]}>{on && <Check size={13} color={colors.textOnYellow} />}</View>}
+                                            <Image source={item.image ? { uri: item.image as string } : require('../../assets/images/icon_backup.png')} style={styles.itemImg} contentFit="cover" />
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={styles.itemName} numberOfLines={1}>{item.productName}</Text>
+                                                <Text style={styles.itemSub}>{multi ? (item.variant || '') : `${daysLeft(order)} days left`}</Text>
+                                            </View>
+                                            <Text style={styles.price}>₹{Number(item.price).toLocaleString('en-IN')}</Text>
+                                        </View>
+                                    );
+                                    return multi
+                                        ? <Pressable key={`${item.productId}-${i}`} onPress={() => toggleItem(order.id, item.productId)}>{row}</Pressable>
+                                        : <React.Fragment key={`${item.productId}-${i}`}>{row}</React.Fragment>;
+                                })}
+                                <Pressable
+                                    style={[styles.returnBtn, !canSubmit && styles.returnBtnOff]}
+                                    disabled={!canSubmit}
+                                    onPress={() => router.push({ pathname: '/profile/cancel-order', params: { orderId: order.id, productIds: productIds.join(','), mode: 'return' } })}
+                                >
+                                    <RotateCcw size={16} color={canSubmit ? colors.textStrong : colors.textFaint} />
+                                    <Text style={[styles.returnText, !canSubmit && { color: colors.textFaint }]}>
+                                        {multi ? (selected.length > 0 ? `Return ${selected.length} item${selected.length > 1 ? 's' : ''}` : 'Select items to return') : 'Request return'}
+                                    </Text>
+                                </Pressable>
                             </View>
-                            <Pressable
-                                style={styles.returnBtn}
-                                onPress={() => router.push({ pathname: '/profile/cancel-order', params: { orderId: item.orderId, productId: item.productId, mode: 'return', name: item.productName, variant: item.variant, image: item.image } })}
-                            >
-                                <RotateCcw size={16} color={colors.textStrong} />
-                                <Text style={styles.returnText}>Request return</Text>
-                            </Pressable>
-                        </View>
-                    ))
+                        );
+                    })
                 )}
 
                 <Pressable style={styles.support} onPress={() => router.push('/profile/help-center')}>
@@ -214,7 +248,13 @@ const styles = StyleSheet.create({
     pLabel: { flex: 1, fontFamily: fonts.monoBold, fontSize: 9 },
     disclaimer: { marginTop: 12, fontFamily: fonts.bodyRegular, fontSize: 12, lineHeight: 17, color: colors.textFaint },
 
+    orderHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+    orderNo: { fontFamily: fonts.monoBold, fontSize: 10, color: colors.textFaint },
+    checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: colors.borderSubtle, alignItems: 'center', justifyContent: 'center' },
+    checkboxOn: { backgroundColor: palette.yellow500, borderWidth: 0 },
+
     returnBtn: { height: 44, borderRadius: 12, borderWidth: 2, borderColor: colors.borderInk, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
+    returnBtnOff: { borderColor: colors.borderSubtle },
     returnText: { fontFamily: fonts.bodyBold, fontSize: 13, color: colors.textStrong },
 
     empty: { alignItems: 'center', paddingVertical: 40 },
