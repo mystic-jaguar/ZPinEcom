@@ -19,6 +19,24 @@ const ORDER_ITEMS = safeIdentifier('order_items');
 const CART = safeIdentifier('cart_items');
 const ADDRESSES = safeIdentifier('addresses');
 const RETURN_REQUESTS = safeIdentifier('return_requests');
+
+// The return workflow, in order. Must stay identical to the CHECK constraint on
+// return_requests.status (migrations/2026-08-12-return-status-vocabulary.cjs) —
+// they drifted apart once and every status advance failed on prod as a result.
+export const RETURN_STATUSES = ['approved', 'rejected', 'picked_up', 'refunded'];
+
+// One canonical wording for the refund promise, served to every customer
+// surface (ecom app + customer website) so the app and the web never quote
+// different terms for the same money.
+export const RETURN_REFUND_DISCLAIMER =
+  'This amount will be refunded once the seller receives the product.';
+
+// Which status may follow which. 'rejected' and 'refunded' are terminal.
+const RETURN_TRANSITIONS: Record<string, string[]> = {
+  requested: ['approved', 'rejected'],
+  approved: ['picked_up'],
+  picked_up: ['refunded'],
+};
 const ORDER_CANCELLATIONS = safeIdentifier('order_cancellations');
 const COUPON_REDEMPTIONS = safeIdentifier('coupon_redemptions');
 
@@ -53,6 +71,15 @@ export async function ensureOrderSupportTables() {
       `ALTER TABLE ${RETURN_REQUESTS} ADD COLUMN IF NOT EXISTS picked_up_at TIMESTAMP`,
       `ALTER TABLE ${RETURN_REQUESTS} ADD COLUMN IF NOT EXISTS refunded_at TIMESTAMP`,
       `ALTER TABLE ${RETURN_REQUESTS} ADD COLUMN IF NOT EXISTS status_history JSONB DEFAULT '[]'::jsonb`,
+      // Keep the dev bootstrap's status vocabulary identical to prod's CHECK
+      // constraint. It drifted once already: prod allowed only
+      // requested/approved/rejected/completed while the code wrote picked_up
+      // and refunded, so the status-advance endpoint failed on prod alone.
+      // DROP-then-ADD is idempotent; both statements run in order.
+      // See migrations/2026-08-12-return-status-vocabulary.cjs.
+      `ALTER TABLE ${RETURN_REQUESTS} DROP CONSTRAINT IF EXISTS return_requests_status_check`,
+      `ALTER TABLE ${RETURN_REQUESTS} ADD CONSTRAINT return_requests_status_check
+         CHECK (status IN ('requested', 'approved', 'rejected', 'picked_up', 'refunded'))`,
       // Multi-seller split: one checkout = one group_id shared by every seller's
       // sub-order row (NULL for legacy pre-split orders = a group of one).
       `ALTER TABLE ${ORDERS} ADD COLUMN IF NOT EXISTS group_id VARCHAR(7)`,
@@ -168,27 +195,46 @@ function buildTrackingHistory(order: any, returnRequest?: any) {
       note: returnRequest.reason,
     });
 
-    const pickedUpEvent = history.find((event: any) => event.status === 'picked_up');
+    const eventFor = (status: string) => history.find((event: any) => event.status === status);
+
+    const rejectedEvent = eventFor('rejected');
+    if (rejectedEvent || returnRequest.status === 'rejected') {
+      steps.push({
+        status: 'rejected',
+        title: 'Return rejected',
+        timestamp: rejectedEvent?.at || returnRequest.updated_at,
+        note: rejectedEvent?.note || undefined,
+      });
+      return steps;
+    }
+
+    const approvedEvent = eventFor('approved');
+    if (approvedEvent || ['approved', 'picked_up', 'refunded'].includes(returnRequest.status)) {
+      steps.push({
+        status: 'approved',
+        title: 'Return approved',
+        timestamp: approvedEvent?.at || returnRequest.updated_at,
+        note: approvedEvent?.note || 'A delivery partner will collect the item.',
+      });
+    }
+
+    const pickedUpEvent = eventFor('picked_up');
     if (pickedUpEvent || returnRequest.picked_up_at) {
       steps.push({
         status: 'picked_up',
         title: 'Return picked up',
         timestamp: pickedUpEvent?.at || returnRequest.picked_up_at,
+        note: RETURN_REFUND_DISCLAIMER,
       });
     }
 
-    const refundedEvent = history.find((event: any) => event.status === 'refunded');
+    const refundedEvent = eventFor('refunded');
     if (refundedEvent || returnRequest.refunded_at) {
       steps.push({
         status: 'refunded',
         title: 'Refunded',
         timestamp: refundedEvent?.at || returnRequest.refunded_at,
-      });
-    } else {
-      steps.push({
-        status: returnRequest.status,
-        title: `Return ${String(returnRequest.status).replace(/_/g, ' ')}`,
-        timestamp: returnRequest.updated_at,
+        note: refundedEvent?.note || undefined,
       });
     }
   }
@@ -1018,7 +1064,7 @@ router.post('/:id/return', authenticate, async (req: AuthRequest, res: Response)
     const existingReturn = await pool.query(
       `SELECT id, status, created_at, updated_at
        FROM ${RETURN_REQUESTS}
-       WHERE order_id = $1 AND user_id = $2 AND status IN ('requested', 'picked_up')
+       WHERE order_id = $1 AND user_id = $2 AND status IN ('requested', 'approved', 'picked_up')
        ORDER BY created_at DESC
        LIMIT 1`,
       [req.params.id, req.userId]
@@ -1034,6 +1080,7 @@ router.post('/:id/return', authenticate, async (req: AuthRequest, res: Response)
           message: 'Return request is already active for this order',
           refundAmount: Number(order.final_amount),
           refundStatus: 'initiated',
+          refundDisclaimer: RETURN_REFUND_DISCLAIMER,
         },
       });
       return;
@@ -1072,6 +1119,7 @@ router.post('/:id/return', authenticate, async (req: AuthRequest, res: Response)
         message: 'Return request initiated successfully',
         refundAmount: Number(order.final_amount),
         refundStatus: 'initiated',
+        refundDisclaimer: RETURN_REFUND_DISCLAIMER,
       },
     });
   } catch (err) {
@@ -1083,13 +1131,30 @@ router.post('/:id/return', authenticate, async (req: AuthRequest, res: Response)
 // PATCH /api/v1/orders/:id/return-status
 router.patch('/:id/return-status', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
   const nextStatus = String(req.body?.status || '').trim();
+  // Free-text context for the customer: why a return was refused, which courier
+  // collected it, which payout reference settled it. Stored on the history entry.
+  const note = String(req.body?.note || '').trim().slice(0, 500);
 
-  if (!['picked_up', 'refunded'].includes(nextStatus)) {
-    res.status(400).json({ success: false, message: 'status must be picked_up or refunded' });
+  if (!RETURN_STATUSES.includes(nextStatus)) {
+    res.status(400).json({
+      success: false,
+      message: `status must be one of: ${RETURN_STATUSES.join(', ')}`,
+    });
     return;
   }
 
-  if (req.userRole === 'customer') {
+  // Rejecting a return and settling a refund are money/trust decisions, so they
+  // are admin-only. A delivery partner may only record the physical collection.
+  // Sellers are read-only on returns by product decision (2026-08-12) — they see
+  // the request but do not rule on it.
+  const allowedRolesFor: Record<string, string[]> = {
+    approved: ['admin'],
+    rejected: ['admin'],
+    picked_up: ['admin', 'delivery_partner'],
+    refunded: ['admin'],
+  };
+
+  if (!allowedRolesFor[nextStatus].includes(String(req.userRole))) {
     res.status(403).json({ success: false, message: 'Forbidden' });
     return;
   }
@@ -1099,27 +1164,12 @@ router.patch('/:id/return-status', authenticate, async (req: AuthRequest, res: R
     await ensureOrderSupportTables();
     await client.query('BEGIN');
 
-    // Verify the order exists and enforce seller ownership:
-    // sellers may only update return status for orders containing their products.
-    // Admins and delivery partners may update any order's return status.
-    let orderCheckQuery: string;
-    let orderCheckParams: any[];
-
-    if (req.userRole === 'seller') {
-      // Seller must own at least one product in this order
-      orderCheckQuery = `
-        SELECT DISTINCT o.id
-        FROM ${ORDERS} o
-        JOIN ${ORDER_ITEMS} oi ON oi.order_id = o.id
-        JOIN products p ON p.id = oi.product_id
-        WHERE o.id = $1 AND p.user_id = $2`;
-      orderCheckParams = [req.params.id, req.userId];
-    } else {
-      orderCheckQuery = `SELECT id FROM ${ORDERS} WHERE id = $1`;
-      orderCheckParams = [req.params.id];
-    }
-
-    const orderCheck = await client.query(orderCheckQuery, orderCheckParams);
+    // Only admins and delivery partners reach this far (see allowedRolesFor
+    // above), and both may act on any order, so there is no ownership filter.
+    const orderCheck = await client.query(
+      `SELECT id FROM ${ORDERS} WHERE id = $1`,
+      [req.params.id]
+    );
     if (orderCheck.rows.length === 0) {
       await client.query('ROLLBACK');
       res.status(404).json({ success: false, message: 'Order not found' });
@@ -1129,7 +1179,7 @@ router.patch('/:id/return-status', authenticate, async (req: AuthRequest, res: R
     // Lock the latest return-request row so concurrent status updates serialize
     // instead of racing on a read-modify-write of status_history.
     const returnResult = await client.query(
-      `SELECT id, order_id, status, status_history, picked_up_at, refunded_at
+      `SELECT id, order_id, status, status_history, picked_up_at, refunded_at, order_item_ids
        FROM ${RETURN_REQUESTS}
        WHERE order_id = $1
        ORDER BY created_at DESC
@@ -1145,12 +1195,8 @@ router.patch('/:id/return-status', authenticate, async (req: AuthRequest, res: R
     }
 
     const currentReturn = returnResult.rows[0];
-    const allowedNextStatuses: Record<string, string[]> = {
-      requested: ['picked_up'],
-      picked_up: ['refunded'],
-    };
 
-    if (!allowedNextStatuses[currentReturn.status]?.includes(nextStatus)) {
+    if (!RETURN_TRANSITIONS[currentReturn.status]?.includes(nextStatus)) {
       await client.query('ROLLBACK');
       res.status(400).json({ success: false, message: 'Invalid return status transition' });
       return;
@@ -1159,7 +1205,9 @@ router.patch('/:id/return-status', authenticate, async (req: AuthRequest, res: R
     const now = new Date().toISOString();
     // Append the new entry atomically in SQL (status_history || $3) instead of
     // rewriting the whole array we read — under the row lock nothing is lost.
-    const entry = JSON.stringify([{ status: nextStatus, at: now, by: req.userId, role: req.userRole }]);
+    const entry = JSON.stringify([
+      { status: nextStatus, at: now, by: req.userId, role: req.userRole, ...(note ? { note } : {}) },
+    ]);
 
     const updateFields: string[] = ['status = $2', 'status_history = status_history || $3::jsonb', 'updated_at = NOW()'];
     const values: any[] = [currentReturn.id, nextStatus, entry];
@@ -1180,6 +1228,39 @@ router.patch('/:id/return-status', authenticate, async (req: AuthRequest, res: R
       values
     );
 
+    if (nextStatus === 'approved') {
+      await recordOrderStatus(
+        client,
+        req.params.id,
+        'return_requested',
+        note ? `Return approved: ${note}` : 'Return approved — pickup will be scheduled'
+      );
+    }
+
+    if (nextStatus === 'rejected') {
+      // A refused return leaves the order exactly as it was: delivered and paid.
+      // Without this the customer is stranded on 'return_requested' forever.
+      await client.query(
+        `UPDATE ${ORDERS} SET status = 'delivered', updated_at = NOW() WHERE id = $1`,
+        [req.params.id]
+      );
+      await recordOrderStatus(
+        client,
+        req.params.id,
+        'delivered',
+        note ? `Return rejected: ${note}` : 'Return rejected'
+      );
+    }
+
+    if (nextStatus === 'picked_up') {
+      await recordOrderStatus(
+        client,
+        req.params.id,
+        'return_requested',
+        note ? `Return picked up: ${note}` : 'Return picked up from customer'
+      );
+    }
+
     if (nextStatus === 'refunded') {
       await client.query(
         `UPDATE ${ORDERS}
@@ -1187,7 +1268,38 @@ router.patch('/:id/return-status', authenticate, async (req: AuthRequest, res: R
          WHERE id = $1`,
         [req.params.id]
       );
-      await recordOrderStatus(client, req.params.id, 'returned', 'Return refunded');
+
+      // Put the goods back on the shelf. Cancellation has always restocked;
+      // returns never did, so every completed return silently shrank the
+      // seller's sellable inventory. Restocking happens here rather than at
+      // pickup because 'refunded' is the point at which the seller has actually
+      // received the item back — the same promise the customer is shown.
+      const returnedIds: string[] = Array.isArray(currentReturn.order_item_ids)
+        ? currentReturn.order_item_ids
+        : [];
+      // An empty order_item_ids means "the whole order" — that is what the
+      // customer-facing return screens send when no per-item choice was made.
+      const itemsToRestock = await client.query(
+        returnedIds.length > 0
+          ? `SELECT product_id, quantity FROM ${ORDER_ITEMS} WHERE order_id = $1 AND id = ANY($2)`
+          : `SELECT product_id, quantity FROM ${ORDER_ITEMS} WHERE order_id = $1`,
+        returnedIds.length > 0 ? [req.params.id, returnedIds] : [req.params.id]
+      );
+      for (const item of itemsToRestock.rows) {
+        await client.query(
+          `UPDATE products
+           SET quantity = quantity + $1, in_stock = true, updated_at = NOW()
+           WHERE id = $2`,
+          [item.quantity, item.product_id]
+        );
+      }
+
+      await recordOrderStatus(
+        client,
+        req.params.id,
+        'returned',
+        note ? `Refund settled: ${note}` : 'Refund settled'
+      );
     }
 
     await client.query('COMMIT');
@@ -1262,6 +1374,11 @@ router.get('/:id/return-status', authenticate, async (req: AuthRequest, res: Res
         pickedUpAt: rr.picked_up_at,
         refundedAt: rr.refunded_at,
         statusHistory: Array.isArray(rr.status_history) ? rr.status_history : [],
+        // Only promise a refund while one is still coming. A rejected return
+        // owes the customer nothing, and a refunded one is already settled.
+        refundDisclaimer: ['requested', 'approved', 'picked_up'].includes(rr.status)
+          ? RETURN_REFUND_DISCLAIMER
+          : null,
       },
     });
   } catch (err) {

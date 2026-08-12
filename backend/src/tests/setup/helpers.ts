@@ -21,6 +21,11 @@ export function makeSellerToken(userId = 'SLR0001'): string {
   return makeAccessToken(userId, 'seller');
 }
 
+/** Generate an access token for a delivery partner */
+export function makeDeliveryToken(userId = 'DLV0001'): string {
+  return makeAccessToken(userId, 'delivery_partner');
+}
+
 /** Generate a valid refresh token */
 export function makeRefreshToken(userId = 'USR0001'): string {
   return jwt.sign({ userId }, JWT_REFRESH_SECRET, { expiresIn: '30d' });

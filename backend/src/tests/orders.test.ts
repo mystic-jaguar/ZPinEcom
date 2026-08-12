@@ -5,7 +5,7 @@
  */
 import request from 'supertest';
 import app from './setup/app';
-import { bearerHeader, makeAccessToken, makeAdminToken } from './setup/helpers';
+import { bearerHeader, makeAccessToken, makeAdminToken, makeSellerToken, makeDeliveryToken } from './setup/helpers';
 
 const BASE = '/api/v1/orders';
 const custToken = makeAccessToken('USR0001');
@@ -452,5 +452,95 @@ describe('PATCH /orders/:id/return-status', () => {
       .send({ status: 'picked_up' }); // backward from refunded
     expect(res.status).toBe(400);
     expect(res.body.message).toMatch(/invalid.*transition/i);
+  });
+
+  // ── the 2026-08-12 workflow: requested → approved/rejected → picked_up → refunded
+
+  /** Mocks a return request sitting at `status`, with the order existing. */
+  const mockReturnAt = (status: string) => {
+    const db = require('../db');
+    db.__mockQuery.mockImplementation((sql: string) => {
+      if (sql.includes('WHERE id = $1') && sql.includes('"orders"') && !sql.includes('user_id')) {
+        return Promise.resolve({ rows: [{ id: orderId }] });
+      }
+      if (sql.includes('"return_requests"') && sql.includes('WHERE order_id = $1')) {
+        return Promise.resolve({
+          rows: [{
+            id: 'RET0001', order_id: orderId, status,
+            status_history: [], picked_up_at: null, refunded_at: null, order_item_ids: [],
+          }],
+        });
+      }
+      if (sql.includes('RETURNING status_history')) {
+        return Promise.resolve({ rows: [{ status_history: [{ status }] }] });
+      }
+      // The line items the refund step puts back into stock.
+      if (/SELECT product_id, quantity FROM\s+"order_items"/i.test(sql)) {
+        return Promise.resolve({ rows: [{ product_id: productUuid, quantity: 2 }] });
+      }
+      return Promise.resolve({ rows: [] });
+    });
+  };
+
+  it('lets an admin approve a requested return', async () => {
+    mockReturnAt('requested');
+    const res = await request(app)
+      .patch(`${BASE}/${orderId}/return-status`)
+      .set(bearerHeader(adminToken))
+      .send({ status: 'approved' });
+    expect(res.status).toBe(200);
+    expect(res.body.data.status).toBe('approved');
+  });
+
+  it('rejects a pickup before the return has been approved', async () => {
+    mockReturnAt('requested');
+    const res = await request(app)
+      .patch(`${BASE}/${orderId}/return-status`)
+      .set(bearerHeader(adminToken))
+      .send({ status: 'picked_up' });
+    expect(res.status).toBe(400);
+    expect(res.body.message).toMatch(/invalid.*transition/i);
+  });
+
+  it('forbids a seller from ruling on a return', async () => {
+    mockReturnAt('requested');
+    const res = await request(app)
+      .patch(`${BASE}/${orderId}/return-status`)
+      .set(bearerHeader(makeSellerToken()))
+      .send({ status: 'approved' });
+    expect(res.status).toBe(403);
+  });
+
+  it('forbids a delivery partner from settling the refund', async () => {
+    mockReturnAt('picked_up');
+    const res = await request(app)
+      .patch(`${BASE}/${orderId}/return-status`)
+      .set(bearerHeader(makeDeliveryToken()))
+      .send({ status: 'refunded' });
+    expect(res.status).toBe(403);
+  });
+
+  it('lets a delivery partner record the pickup of an approved return', async () => {
+    mockReturnAt('approved');
+    const res = await request(app)
+      .patch(`${BASE}/${orderId}/return-status`)
+      .set(bearerHeader(makeDeliveryToken()))
+      .send({ status: 'picked_up' });
+    expect(res.status).toBe(200);
+    expect(res.body.data.status).toBe('picked_up');
+  });
+
+  it('restocks the returned items when the refund is settled', async () => {
+    mockReturnAt('picked_up');
+    const db = require('../db');
+    const res = await request(app)
+      .patch(`${BASE}/${orderId}/return-status`)
+      .set(bearerHeader(adminToken))
+      .send({ status: 'refunded' });
+    expect(res.status).toBe(200);
+    const restocked = db.__mockQuery.mock.calls.some(
+      ([sql]: [string]) => /UPDATE products/i.test(sql) && /quantity \+ \$1/.test(sql)
+    );
+    expect(restocked).toBe(true);
   });
 });

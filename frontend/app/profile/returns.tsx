@@ -9,10 +9,20 @@ import { colors, fonts, palette, radius } from '../../constants/theme';
 import { useOrder } from '../../context/OrderContext';
 import { orderService } from '../../services/order';
 
-type ReturnStatusRecord = { returnStatus: string; reason: string; description?: string; requestedAt: string; updatedAt: string };
+type ReturnStatusRecord = {
+    returnStatus: string; reason: string; description?: string; requestedAt: string; updatedAt: string;
+    refundDisclaimer?: string | null;
+    statusHistory?: Array<{ status: string; at: string; note?: string }>;
+};
 
 const RETURN_WINDOW_DAYS = 7;
-const ACTIVE_RETURN_STATUSES = new Set(['requested', 'picked_up']);
+// A return in flight: still owed a decision, a pickup or the money.
+const ACTIVE_RETURN_STATUSES = new Set(['requested', 'approved', 'picked_up']);
+// Steps of the refund progress bar, in order. Mirrors the backend's
+// RETURN_TRANSITIONS chain (ZPinEcom/backend/src/routes/orders.ts).
+const REFUND_STEPS = ['requested', 'approved', 'picked_up', 'refunded'];
+// Fallback only — the server sends the authoritative wording as refundDisclaimer.
+const REFUND_DISCLAIMER = 'This amount will be refunded once the seller receives the product.';
 
 function isWithinReturnWindow(order: { status: string; updatedAt?: string; createdAt?: string }) {
     if (order.status !== 'delivered') return false;
@@ -74,25 +84,33 @@ export default function ReturnsRefundsScreen() {
         .filter(o => { const rd = returnStatusByOrder[o.id]; return Boolean(rd && ACTIVE_RETURN_STATUSES.has(rd.returnStatus)); })
         .map(o => {
             const rd = returnStatusByOrder[o.id];
-            const pickedUp = rd?.returnStatus === 'picked_up';
-            return { order: o, statusLabel: (rd?.returnStatus || 'requested').replace(/_/g, ' ').toUpperCase(), step: pickedUp ? 1 : 0, firstItem: o.items[0] };
+            const status = rd?.returnStatus || 'requested';
+            const step = Math.max(0, REFUND_STEPS.indexOf(status));
+            return {
+                order: o,
+                statusLabel: status.replace(/_/g, ' ').toUpperCase(),
+                step,
+                firstItem: o.items[0],
+                disclaimer: rd?.refundDisclaimer ?? REFUND_DISCLAIMER,
+            };
         });
 
     const RefundProgress = ({ step }: { step: number }) => {
-        // 0 requested, 1 picked up, 2 refunded
-        const labels = ['REQUESTED', 'PICKED UP', 'REFUNDED'];
+        // 0 requested, 1 approved, 2 picked up, 3 refunded — REFUND_STEPS order.
+        const labels = ['REQUESTED', 'APPROVED', 'PICKED UP', 'REFUNDED'];
+        const last = labels.length - 1;
         return (
             <>
                 <View style={styles.progress}>
-                    {[0, 1, 2].map((i) => (
-                        <React.Fragment key={i}>
+                    {labels.map((l, i) => (
+                        <React.Fragment key={l}>
                             <View style={[styles.pDot, i <= step ? styles.pDotOn : styles.pDotOff]}>{i <= step && <Check size={12} color={colors.textOnYellow} />}</View>
-                            {i < 2 && <View style={[styles.pLine, { backgroundColor: i < step ? palette.yellow500 : colors.borderSubtle }]} />}
+                            {i < last && <View style={[styles.pLine, { backgroundColor: i < step ? palette.yellow500 : colors.borderSubtle }]} />}
                         </React.Fragment>
                     ))}
                 </View>
                 <View style={styles.pLabels}>
-                    {labels.map((l, i) => <Text key={l} style={[styles.pLabel, { textAlign: i === 0 ? 'left' : i === 1 ? 'center' : 'right', color: i <= step ? colors.textStrong : colors.textFaint }]}>{l}</Text>)}
+                    {labels.map((l, i) => <Text key={l} style={[styles.pLabel, { textAlign: i === 0 ? 'left' : i === last ? 'right' : 'center', color: i <= step ? colors.textStrong : colors.textFaint }]}>{l}</Text>)}
                 </View>
             </>
         );
@@ -109,7 +127,7 @@ export default function ReturnsRefundsScreen() {
                 {activeReturns.length > 0 && (
                     <>
                         <ZText variant="eyebrow" style={styles.sectionLabel}>Active refund</ZText>
-                        {activeReturns.map(({ order, statusLabel, step, firstItem }) => (
+                        {activeReturns.map(({ order, statusLabel, step, firstItem, disclaimer }) => (
                             <View key={order.id} style={styles.card}>
                                 <View style={styles.itemRow}>
                                     <Image source={firstItem?.image ? { uri: firstItem.image as string } : require('../../assets/images/icon_backup.png')} style={styles.itemImg} contentFit="cover" />
@@ -120,6 +138,7 @@ export default function ReturnsRefundsScreen() {
                                     <View style={styles.statusChip}><Text style={styles.statusChipText}>{statusLabel}</Text></View>
                                 </View>
                                 <RefundProgress step={step} />
+                                {!!disclaimer && <Text style={styles.disclaimer}>{disclaimer}</Text>}
                             </View>
                         ))}
                     </>
@@ -193,6 +212,7 @@ const styles = StyleSheet.create({
     pLine: { flex: 1, height: 2 },
     pLabels: { flexDirection: 'row', marginTop: 8 },
     pLabel: { flex: 1, fontFamily: fonts.monoBold, fontSize: 9 },
+    disclaimer: { marginTop: 12, fontFamily: fonts.bodyRegular, fontSize: 12, lineHeight: 17, color: colors.textFaint },
 
     returnBtn: { height: 44, borderRadius: 12, borderWidth: 2, borderColor: colors.borderInk, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
     returnText: { fontFamily: fonts.bodyBold, fontSize: 13, color: colors.textStrong },

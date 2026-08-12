@@ -70,7 +70,11 @@ export default function CancelOrderScreen() {
             }
             let msg = response?.message || `${isReturn ? 'Return initiated' : 'Order cancelled'} successfully.`;
             if (response?.refundAmount && response.refundAmount > 0) {
-                msg += `\n\nRefund of ₹${response.refundAmount.toFixed(2)} credited to your original payment method.`;
+                // On a return the money has NOT moved yet — it is owed, not credited.
+                // The server sends the exact wording as refundDisclaimer.
+                msg += isReturn
+                    ? `\n\nRefund of ₹${response.refundAmount.toFixed(2)}. ${response.refundDisclaimer || 'This amount will be refunded once the seller receives the product.'}`
+                    : `\n\nRefund of ₹${response.refundAmount.toFixed(2)} credited to your original payment method.`;
             }
             setSuccessMessage(msg);
             setIsSubmitting(false);
@@ -111,7 +115,16 @@ export default function CancelOrderScreen() {
 
                 <View style={styles.infoBox}>
                     <Info size={17} color={palette.yellow700} />
-                    <Text style={styles.infoText}>Refund of <Text style={{ fontFamily: fonts.bodyBold }}>{money(order.finalAmount)}</Text> will hit your {order.paymentMethod === 'cod' ? 'account' : 'original payment method'} within 3–4 business days.</Text>
+                    {/* A return is not a cancellation: the money only moves after the
+                        item travels back and the seller has it. Promising "3–4 business
+                        days" here would be a commitment ZPIN cannot keep. */}
+                    {isReturn ? (
+                        <Text style={styles.infoText}>
+                            Refund of <Text style={{ fontFamily: fonts.bodyBold }}>{money(order.finalAmount)}</Text>. This amount will be refunded once the seller receives the product.
+                        </Text>
+                    ) : (
+                        <Text style={styles.infoText}>Refund of <Text style={{ fontFamily: fonts.bodyBold }}>{money(order.finalAmount)}</Text> will hit your {order.paymentMethod === 'cod' ? 'account' : 'original payment method'} within 3–4 business days.</Text>
+                    )}
                 </View>
             </ScrollView>
 
