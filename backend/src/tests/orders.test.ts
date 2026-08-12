@@ -456,8 +456,12 @@ describe('PATCH /orders/:id/return-status', () => {
 
   // ── the 2026-08-12 workflow: requested → approved/rejected → picked_up → refunded
 
-  /** Mocks a return request sitting at `status`, with the order existing. */
-  const mockReturnAt = (status: string) => {
+  /**
+   * Mocks a return request sitting at `status`, with the order existing.
+   * `itemCondition` left undefined mimics production TODAY: the column is
+   * proposed but not applied, so the row comes back without the key at all.
+   */
+  const mockReturnAt = (status: string, itemCondition?: string) => {
     const db = require('../db');
     db.__mockQuery.mockImplementation((sql: string) => {
       if (sql.includes('WHERE id = $1') && sql.includes('"orders"') && !sql.includes('user_id')) {
@@ -468,6 +472,7 @@ describe('PATCH /orders/:id/return-status', () => {
           rows: [{
             id: 'RET0001', order_id: orderId, status,
             status_history: [], picked_up_at: null, refunded_at: null, order_item_ids: [],
+            ...(itemCondition !== undefined ? { item_condition: itemCondition } : {}),
           }],
         });
       }
@@ -528,6 +533,66 @@ describe('PATCH /orders/:id/return-status', () => {
       .send({ status: 'picked_up' });
     expect(res.status).toBe(200);
     expect(res.body.data.status).toBe('picked_up');
+  });
+
+  // ── the refund gate (SCHEMA_CHANGES.md 2026-08-12, return_requests.item_condition)
+
+  it('refuses to refund a return the partner marked damaged', async () => {
+    mockReturnAt('picked_up', 'damaged');
+    const res = await request(app)
+      .patch(`${BASE}/${orderId}/return-status`)
+      .set(bearerHeader(adminToken))
+      .send({ status: 'refunded' });
+    expect(res.status).toBe(400);
+    expect(res.body.message).toMatch(/damaged/i);
+  });
+
+  it('refuses to refund before the item condition is confirmed', async () => {
+    mockReturnAt('picked_up', 'pending');
+    const res = await request(app)
+      .patch(`${BASE}/${orderId}/return-status`)
+      .set(bearerHeader(adminToken))
+      .send({ status: 'refunded' });
+    expect(res.status).toBe(400);
+    expect(res.body.data.itemCondition).toBe('pending');
+  });
+
+  it('allows the refund once the partner confirmed the item is ok', async () => {
+    mockReturnAt('picked_up', 'ok');
+    const res = await request(app)
+      .patch(`${BASE}/${orderId}/return-status`)
+      .set(bearerHeader(adminToken))
+      .send({ status: 'refunded' });
+    expect(res.status).toBe(200);
+  });
+
+  it('lets a damaged return be rejected instead of refunded', async () => {
+    mockReturnAt('picked_up', 'damaged');
+    const res = await request(app)
+      .patch(`${BASE}/${orderId}/return-status`)
+      .set(bearerHeader(adminToken))
+      .send({ status: 'rejected', note: 'item returned broken' });
+    expect(res.status).toBe(200);
+    expect(res.body.data.status).toBe('rejected');
+  });
+
+  it('rejects an unknown item_condition value', async () => {
+    mockReturnAt('approved', 'pending');
+    const res = await request(app)
+      .patch(`${BASE}/${orderId}/return-status`)
+      .set(bearerHeader(makeDeliveryToken()))
+      .send({ status: 'picked_up', item_condition: 'maybe' });
+    expect(res.status).toBe(400);
+    expect(res.body.message).toMatch(/item_condition/);
+  });
+
+  it('still allows the refund on a database without the column (pre-migration)', async () => {
+    mockReturnAt('picked_up'); // no item_condition key at all
+    const res = await request(app)
+      .patch(`${BASE}/${orderId}/return-status`)
+      .set(bearerHeader(adminToken))
+      .send({ status: 'refunded' });
+    expect(res.status).toBe(200);
   });
 
   it('restocks the returned items when the refund is settled', async () => {

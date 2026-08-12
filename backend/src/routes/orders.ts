@@ -33,11 +33,20 @@ export const RETURN_REFUND_DISCLAIMER =
   'This amount will be refunded once the seller receives the product.';
 
 // Which status may follow which. 'rejected' and 'refunded' are terminal.
+// picked_up -> rejected exists so a return the delivery partner marked
+// `item_condition = 'damaged'` has somewhere to go: it must NOT be refunded, and
+// without this it would be stuck at picked_up forever.
 const RETURN_TRANSITIONS: Record<string, string[]> = {
   requested: ['approved', 'rejected'],
   approved: ['picked_up'],
-  picked_up: ['refunded'],
+  picked_up: ['refunded', 'rejected'],
 };
+
+// Did the delivery partner inspect the returned goods, and were they acceptable?
+// Written at pickup; gates the refund (see the 'refunded' check below). Column
+// proposed in SCHEMA_CHANGES.md (2026-08-12) and NOT yet applied on prod — every
+// read here is defensive so this code is correct both before and after the DDL.
+export const ITEM_CONDITIONS = ['ok', 'damaged'];
 const ORDER_CANCELLATIONS = safeIdentifier('order_cancellations');
 const COUPON_REDEMPTIONS = safeIdentifier('coupon_redemptions');
 
@@ -1139,6 +1148,17 @@ router.patch('/:id/return-status', authenticate, async (req: AuthRequest, res: R
   // Free-text context for the customer: why a return was refused, which courier
   // collected it, which payout reference settled it. Stored on the history entry.
   const note = String(req.body?.note || '').trim().slice(0, 500);
+  // Sent with a 'picked_up' transition by whoever physically handled the goods.
+  // Ignored on every other transition.
+  const itemCondition = String(req.body?.item_condition || '').trim().toLowerCase();
+
+  if (itemCondition && !ITEM_CONDITIONS.includes(itemCondition)) {
+    res.status(400).json({
+      success: false,
+      message: `item_condition must be one of: ${ITEM_CONDITIONS.join(', ')}`,
+    });
+    return;
+  }
 
   if (!RETURN_STATUSES.includes(nextStatus)) {
     res.status(400).json({
@@ -1183,8 +1203,13 @@ router.patch('/:id/return-status', authenticate, async (req: AuthRequest, res: R
 
     // Lock the latest return-request row so concurrent status updates serialize
     // instead of racing on a read-modify-write of status_history.
+    // SELECT * rather than a column list on purpose: item_condition is not on
+    // prod yet (SCHEMA_CHANGES.md 2026-08-12), and `*` is the one form that
+    // works before AND after the DDL. Its presence in the returned row is also
+    // how the code below detects whether the column exists — no extra
+    // information_schema round-trip per request.
     const returnResult = await client.query(
-      `SELECT id, order_id, status, status_history, picked_up_at, refunded_at, order_item_ids
+      `SELECT *
        FROM ${RETURN_REQUESTS}
        WHERE order_id = $1
        ORDER BY created_at DESC
@@ -1207,11 +1232,43 @@ router.patch('/:id/return-status', authenticate, async (req: AuthRequest, res: R
       return;
     }
 
+    // Undefined = the column is not on this database yet; null/'' = present but
+    // never written. Only the first case may skip the gate.
+    const hasItemCondition = currentReturn.item_condition !== undefined;
+    const currentCondition = String(currentReturn.item_condition || 'pending');
+
+    // The refund gate. A refund is only allowed once someone physically
+    // inspected the goods and said they were acceptable. 'damaged' returns must
+    // be rejected instead (picked_up -> rejected, see RETURN_TRANSITIONS);
+    // 'pending' means nobody has looked yet. Enforced here rather than in the
+    // admin UI so no client — admin website, curl, a future surface — can settle
+    // a refund the delivery partner never cleared.
+    if (nextStatus === 'refunded' && hasItemCondition && currentCondition !== 'ok') {
+      await client.query('ROLLBACK');
+      res.status(400).json({
+        success: false,
+        message: currentCondition === 'damaged'
+          ? 'This return was collected damaged and cannot be refunded — reject it instead.'
+          : 'The delivery partner has not confirmed the item condition yet.',
+        data: { itemCondition: currentCondition },
+      });
+      return;
+    }
+
     const now = new Date().toISOString();
     // Append the new entry atomically in SQL (status_history || $3) instead of
     // rewriting the whole array we read — under the row lock nothing is lost.
     const entry = JSON.stringify([
-      { status: nextStatus, at: now, by: req.userId, role: req.userRole, ...(note ? { note } : {}) },
+      {
+        status: nextStatus,
+        at: now,
+        by: req.userId,
+        role: req.userRole,
+        ...(note ? { note } : {}),
+        // Recorded on the history entry even when the column is missing, so the
+        // partner's answer is never lost to a pending migration.
+        ...(nextStatus === 'picked_up' && itemCondition ? { itemCondition } : {}),
+      },
     ]);
 
     const updateFields: string[] = ['status = $2', 'status_history = status_history || $3::jsonb', 'updated_at = NOW()'];
@@ -1219,6 +1276,10 @@ router.patch('/:id/return-status', authenticate, async (req: AuthRequest, res: R
 
     if (nextStatus === 'picked_up') {
       updateFields.unshift('picked_up_at = NOW()');
+      if (itemCondition && hasItemCondition) {
+        values.push(itemCondition);
+        updateFields.push(`item_condition = $${values.length}`);
+      }
     }
 
     if (nextStatus === 'refunded') {
@@ -1320,6 +1381,10 @@ router.patch('/:id/return-status', authenticate, async (req: AuthRequest, res: R
         orderId: req.params.id,
         returnId: currentReturn.id,
         status: nextStatus,
+        // What the admin UI reads to decide whether to offer "Process Refund".
+        itemCondition: nextStatus === 'picked_up' && itemCondition
+          ? itemCondition
+          : currentCondition,
         pickedUpAt: nextStatus === 'picked_up' ? now : currentReturn.picked_up_at,
         refundedAt: nextStatus === 'refunded' ? now : currentReturn.refunded_at,
         statusHistory: updated.rows[0].status_history,
