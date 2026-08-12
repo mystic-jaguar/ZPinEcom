@@ -181,10 +181,10 @@ router.post('/verify', authenticate, async (req: AuthRequest, res: Response): Pr
       const isFull = charged >= Number(row.final_amount);
       await client.query(
         `UPDATE ${ORDERS}
-            SET payment_status = $1,
-                status         = CASE WHEN $1 = 'paid' THEN 'confirmed' ELSE status END,
+            SET payment_status = $1::varchar,
+                status         = CASE WHEN $1::varchar = 'paid' THEN 'confirmed' ELSE status END,
                 payment_id     = $2,
-                payment_method = CASE WHEN $1 = 'paid' THEN 'razorpay' ELSE payment_method END,
+                payment_method = CASE WHEN $1::varchar = 'paid' THEN 'razorpay' ELSE payment_method END,
                 prepaid_amount = $3,
                 updated_at     = NOW()
           WHERE id = $4`,
