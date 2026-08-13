@@ -48,12 +48,15 @@ export default function ReturnsRefundsScreen() {
     const [isLoading, setIsLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [returnStatusByOrder, setReturnStatusByOrder] = useState<Record<string, ReturnStatusRecord>>({});
-    // orderId -> productIds the customer ticked. Only used for multi-item orders.
+    // orderId -> orderItemIds the customer ticked. Keyed on the ORDER ITEM, not
+    // the product: the list payload carries no productId, so keying on it made
+    // every checkbox share the same undefined key (tick one, tick all) and sent
+    // an empty selection — which the backend reads as "the whole order".
     const [selectedByOrder, setSelectedByOrder] = useState<Record<string, string[]>>({});
 
-    const toggleItem = (orderId: string, productId: string) => setSelectedByOrder(prev => {
+    const toggleItem = (orderId: string, orderItemId: string) => setSelectedByOrder(prev => {
         const cur = prev[orderId] || [];
-        return { ...prev, [orderId]: cur.includes(productId) ? cur.filter(p => p !== productId) : [...cur, productId] };
+        return { ...prev, [orderId]: cur.includes(orderItemId) ? cur.filter(p => p !== orderItemId) : [...cur, orderItemId] };
     });
 
     const onRefresh = async () => {
@@ -87,7 +90,7 @@ export default function ReturnsRefundsScreen() {
         const rd = returnStatusByOrder[order.id];
         const hasActive = Boolean(rd && ACTIVE_RETURN_STATUSES.has(rd.returnStatus));
         if (!isWithinReturnWindow(order) || hasActive || order.status === 'returned' || order.paymentStatus === 'refunded') return false;
-        return (order.items || []).length > 0;
+        return (order.items || []).some(i => !i.isReturned);
     });
 
     const activeReturns = orders
@@ -165,11 +168,12 @@ export default function ReturnsRefundsScreen() {
                     <View style={styles.empty}><RotateCcw size={44} color={colors.borderStrong} /><ZText variant="muted" style={{ marginTop: 12 }}>No returnable items</ZText></View>
                 ) : (
                     returnableOrders.map(order => {
-                        const items = order.items || [];
+                        // Lines already sent back on an earlier partial return are gone.
+                        const items = (order.items || []).filter(i => !i.isReturned);
                         const multi = items.length > 1;
                         const selected = selectedByOrder[order.id] || [];
                         const canSubmit = !multi || selected.length > 0;
-                        const productIds = multi ? selected : [items[0].productId];
+                        const orderItemIds = (multi ? selected : [items[0]?.orderItemId]).filter(Boolean) as string[];
                         return (
                             <View key={order.id} style={styles.card}>
                                 {multi && (
@@ -179,7 +183,8 @@ export default function ReturnsRefundsScreen() {
                                     </View>
                                 )}
                                 {items.map((item, i) => {
-                                    const on = selected.includes(item.productId);
+                                    const itemId = String(item.orderItemId || '');
+                                    const on = selected.includes(itemId);
                                     const row = (
                                         <View style={[styles.itemRow, { marginBottom: 14 }]}>
                                             {multi && <View style={[styles.checkbox, on && styles.checkboxOn]}>{on && <Check size={13} color={colors.textOnYellow} />}</View>}
@@ -192,13 +197,13 @@ export default function ReturnsRefundsScreen() {
                                         </View>
                                     );
                                     return multi
-                                        ? <Pressable key={`${item.productId}-${i}`} onPress={() => toggleItem(order.id, item.productId)}>{row}</Pressable>
-                                        : <React.Fragment key={`${item.productId}-${i}`}>{row}</React.Fragment>;
+                                        ? <Pressable key={`${itemId}-${i}`} onPress={() => toggleItem(order.id, itemId)}>{row}</Pressable>
+                                        : <React.Fragment key={`${itemId}-${i}`}>{row}</React.Fragment>;
                                 })}
                                 <Pressable
                                     style={[styles.returnBtn, !canSubmit && styles.returnBtnOff]}
                                     disabled={!canSubmit}
-                                    onPress={() => router.push({ pathname: '/profile/cancel-order', params: { orderId: order.id, productIds: productIds.join(','), mode: 'return' } })}
+                                    onPress={() => router.push({ pathname: '/profile/cancel-order', params: { orderId: order.id, orderItemIds: orderItemIds.join(','), mode: 'return' } })}
                                 >
                                     <RotateCcw size={16} color={canSubmit ? colors.textStrong : colors.textFaint} />
                                     <Text style={[styles.returnText, !canSubmit && { color: colors.textFaint }]}>

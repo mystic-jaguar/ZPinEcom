@@ -19,11 +19,13 @@ export default function CancelOrderScreen() {
     const params = useLocalSearchParams();
     const orderId = Array.isArray(params.orderId) ? params.orderId[0] : params.orderId;
     const mode = Array.isArray(params.mode) ? params.mode[0] : (params.mode ?? 'cancel');
-    const productId = Array.isArray(params.productId) ? params.productId[0] : params.productId;
-    // Multi-item return: returns.tsx passes a comma-separated list. Falls back to
-    // the single productId so the one-item path is unchanged.
-    const productIdsParam = Array.isArray(params.productIds) ? params.productIds[0] : params.productIds;
-    const productIds = (productIdsParam ? String(productIdsParam).split(',') : productId ? [productId] : []).filter(Boolean);
+    // Multi-item return: returns.tsx passes a comma-separated list of ORDER ITEM
+    // ids — the only item id the orders payload actually carries. It used to pass
+    // productIds and look them up here, but the list endpoint returns no
+    // productId, so every lookup missed and the selection arrived empty — which
+    // the backend reads as "the whole order" and refunds in full.
+    const orderItemIdsParam = Array.isArray(params.orderItemIds) ? params.orderItemIds[0] : params.orderItemIds;
+    const orderItemIds = (orderItemIdsParam ? String(orderItemIdsParam).split(',') : []).filter(Boolean);
     const { getOrderById, cancelOrder } = useOrder();
 
     const isReturn = mode === 'return';
@@ -35,8 +37,10 @@ export default function CancelOrderScreen() {
     const [errorMessage, setErrorMessage] = useState('');
 
     const order = getOrderById(orderId as string);
+    // Only ids that really belong to this order — a stale param must not widen
+    // the return, and must not silently become the empty "whole order" list.
     const selectedOrderItemIds = isReturn
-        ? productIds.map(pid => order?.items.find(item => item.productId === pid)?.orderItemId).filter(Boolean) as string[]
+        ? orderItemIds.filter(id => order?.items.some(item => String(item.orderItemId) === id))
         : [];
 
     if (!order) {
@@ -59,6 +63,13 @@ export default function CancelOrderScreen() {
     const handleConfirmAction = async () => {
         if (!selectedReason) {
             setErrorMessage(`Please select a reason for ${isReturn ? 'return' : 'cancellation'}.`);
+            setShowErrorModal(true);
+            return;
+        }
+        // Never submit a return with nothing selected — the backend would treat it
+        // as the whole order and refund everything.
+        if (isReturn && selectedOrderItemIds.length === 0) {
+            setErrorMessage('Please select the item you want to return.');
             setShowErrorModal(true);
             return;
         }

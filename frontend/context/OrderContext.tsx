@@ -64,6 +64,7 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
                         price: Number(item.price || 0),
                         image: item.image || '',
                         variant: item.variant,
+                        isReturned: Boolean(item.isReturned),
                     })) : [],
                     estimatedDelivery: o.estimatedDelivery || '',
                     trackingNumber: o.trackingNumber,

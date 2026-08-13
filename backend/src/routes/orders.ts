@@ -1085,22 +1085,23 @@ router.post('/:id/return', authenticate, async (req: AuthRequest, res: Response)
     // 18% rate createOrder used); delivery_fee (the instant-delivery charge) is
     // never refunded, same policy as the trial keep/return flow below. No
     // selection (legacy single-item flow) falls back to the full order amount.
-    let refundAmount = Number(order.final_amount);
-    if (Array.isArray(orderItemIds) && orderItemIds.length > 0) {
+    const refundFor = async (ids: unknown): Promise<number> => {
+      if (!Array.isArray(ids) || ids.length === 0) return Number(order.final_amount);
       const itemsResult = await pool.query(
         `SELECT price, quantity FROM ${ORDER_ITEMS} WHERE order_id = $1 AND id = ANY($2::text[])`,
-        [req.params.id, orderItemIds]
+        [req.params.id, ids.map(String)]
       );
+      if (itemsResult.rows.length === 0) return Number(order.final_amount);
       const itemsSubtotal = itemsResult.rows.reduce(
         (sum, i) => sum + withMarkup(i.price) * Number(i.quantity),
         0
       );
-      const itemsTax = Math.round(itemsSubtotal * 0.18);
-      refundAmount = itemsSubtotal + itemsTax;
-    }
+      return itemsSubtotal + Math.round(itemsSubtotal * 0.18);
+    };
+    const refundAmount = await refundFor(orderItemIds);
 
     const existingReturn = await pool.query(
-      `SELECT id, status, created_at, updated_at
+      `SELECT id, status, order_item_ids, created_at, updated_at
        FROM ${RETURN_REQUESTS}
        WHERE order_id = $1 AND user_id = $2 AND status IN ('requested', 'approved', 'picked_up')
        ORDER BY created_at DESC
@@ -1116,7 +1117,10 @@ router.post('/:id/return', authenticate, async (req: AuthRequest, res: Response)
           returnId: activeReturn.id,
           status: activeReturn.status,
           message: 'Return request is already active for this order',
-          refundAmount: Number(order.final_amount),
+          // The amount owed on the return that already exists, not on this
+          // request's selection — quoting final_amount here showed the customer
+          // the whole order value for a single-item return.
+          refundAmount: await refundFor(activeReturn.order_item_ids),
           refundStatus: 'initiated',
           refundDisclaimer: RETURN_REFUND_DISCLAIMER,
         },
@@ -1356,10 +1360,37 @@ router.patch('/:id/return-status', authenticate, async (req: AuthRequest, res: R
     }
 
     if (nextStatus === 'refunded') {
+      const returnedLineIds: string[] = Array.isArray(currentReturn.order_item_ids)
+        ? currentReturn.order_item_ids.map(String)
+        : [];
+
+      // Mark exactly the lines that came back. Without this a partial return read
+      // as a whole-order return everywhere downstream, and the remaining items
+      // stayed listed as returnable.
+      if (returnedLineIds.length > 0) {
+        await client.query(
+          `UPDATE ${ORDER_ITEMS} SET is_returned = true WHERE order_id = $1 AND id = ANY($2)`,
+          [req.params.id, returnedLineIds]
+        );
+      } else {
+        await client.query(
+          `UPDATE ${ORDER_ITEMS} SET is_returned = true WHERE order_id = $1`,
+          [req.params.id]
+        );
+      }
+
+      // The order is only 'returned'/'refunded' once every line has come back. A
+      // partial return leaves it delivered so the customer can still return the
+      // rest and the order does not read as fully refunded.
+      const remaining = await client.query(
+        `SELECT 1 FROM ${ORDER_ITEMS} WHERE order_id = $1 AND is_returned = false LIMIT 1`,
+        [req.params.id]
+      );
+      const fullyReturned = remaining.rows.length === 0;
       await client.query(
-        `UPDATE ${ORDERS}
-         SET status = 'returned', payment_status = 'refunded', updated_at = NOW()
-         WHERE id = $1`,
+        fullyReturned
+          ? `UPDATE ${ORDERS} SET status = 'returned', payment_status = 'refunded', updated_at = NOW() WHERE id = $1`
+          : `UPDATE ${ORDERS} SET status = 'delivered', updated_at = NOW() WHERE id = $1`,
         [req.params.id]
       );
 
@@ -1368,16 +1399,13 @@ router.patch('/:id/return-status', authenticate, async (req: AuthRequest, res: R
       // seller's sellable inventory. Restocking happens here rather than at
       // pickup because 'refunded' is the point at which the seller has actually
       // received the item back — the same promise the customer is shown.
-      const returnedIds: string[] = Array.isArray(currentReturn.order_item_ids)
-        ? currentReturn.order_item_ids
-        : [];
       // An empty order_item_ids means "the whole order" — that is what the
       // customer-facing return screens send when no per-item choice was made.
       const itemsToRestock = await client.query(
-        returnedIds.length > 0
+        returnedLineIds.length > 0
           ? `SELECT product_id, quantity FROM ${ORDER_ITEMS} WHERE order_id = $1 AND id = ANY($2)`
           : `SELECT product_id, quantity FROM ${ORDER_ITEMS} WHERE order_id = $1`,
-        returnedIds.length > 0 ? [req.params.id, returnedIds] : [req.params.id]
+        returnedLineIds.length > 0 ? [req.params.id, returnedLineIds] : [req.params.id]
       );
       for (const item of itemsToRestock.rows) {
         await client.query(
@@ -1391,7 +1419,7 @@ router.patch('/:id/return-status', authenticate, async (req: AuthRequest, res: R
       await recordOrderStatus(
         client,
         req.params.id,
-        'returned',
+        fullyReturned ? 'returned' : 'delivered',
         note ? `Refund settled: ${note}` : 'Refund settled'
       );
     }
