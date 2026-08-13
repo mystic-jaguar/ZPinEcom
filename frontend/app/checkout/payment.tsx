@@ -28,9 +28,6 @@ export default function CheckoutPaymentScreen() {
     const [orderError, setOrderError] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [confirmedFinalAmount, setConfirmedFinalAmount] = useState<number | null>(null);
-    // Phase 9A — Instant Delivery only: pay just the delivery fee now, then pick
-    // which items to keep within 15 minutes of the courier collecting the order.
-    const [tryFirst, setTryFirst] = useState(false);
 
     React.useEffect(() => { setLastStep(3); }, []);
 
@@ -77,9 +74,10 @@ export default function CheckoutPaymentScreen() {
             : isRazorpayMethod ? 'razorpay'
             : 'cod';
 
-        // A trial order settles the goods at the door whatever method was picked,
-        // so it always prepays exactly the delivery fee online.
-        const isTrial = isInstant && tryFirst;
+        // Instant delivery IS Try-at-Door (see summary screen + FAQ) — every Instant
+        // order is a trial order, settling the goods at the door whatever method was
+        // picked, so it always prepays exactly the delivery fee online.
+        const isTrial = isInstant;
         const needsFeePrepay = isInstant && deliveryFee > 0 && (isTrial || backendMethod === 'cod');
 
         let createdOrderId: string | null = null;
@@ -208,24 +206,19 @@ export default function CheckoutPaymentScreen() {
                 </View>
 
                 {isInstant && (
-                    <Pressable
-                        style={[styles.tryCard, tryFirst && styles.tryCardOn]}
-                        onPress={() => setTryFirst(v => !v)}
-                        accessibilityRole="checkbox"
-                        accessibilityState={{ checked: tryFirst }}
-                    >
-                        <View style={[styles.checkbox, tryFirst && styles.checkboxOn]}>
-                            {tryFirst && <Check size={13} color={palette.yellow500} />}
+                    <View style={[styles.tryCard, styles.tryCardOn]}>
+                        <View style={[styles.checkbox, styles.checkboxOn]}>
+                            <Check size={13} color={palette.yellow500} />
                         </View>
                         <View style={{ flex: 1 }}>
                             <Text style={styles.optLabel}>Try items for 15 minutes before paying</Text>
                             <Text style={styles.optSub}>
-                                Pay only the {money(deliveryFee)} delivery charge now (non-refundable). When the
-                                courier picks up your order you get 15 minutes to choose which items to keep — you
-                                pay for those at your door and hand the rest back.
+                                Included with Try-at-Door. Pay only the {money(deliveryFee)} delivery charge now
+                                (non-refundable). When the courier picks up your order you get 15 minutes to choose
+                                which items to keep — you pay for those at your door and hand the rest back.
                             </Text>
                         </View>
-                    </Pressable>
+                    </View>
                 )}
 
                 <View style={styles.eyebrowRow}>
@@ -255,9 +248,9 @@ export default function CheckoutPaymentScreen() {
             <View style={[styles.footer, { paddingBottom: 14 + insets.bottom }]}>
                 <View>
                     <ZText variant="eyebrow" color={colors.textMuted} style={{ marginBottom: 2 }}>
-                        {isInstant && tryFirst ? 'Pay now' : 'Total to pay'}
+                        {isInstant ? 'Pay now' : 'Total to pay'}
                     </ZText>
-                    <Text style={styles.footerTotal}>{money(isInstant && tryFirst ? deliveryFee : finalTotal)}</Text>
+                    <Text style={styles.footerTotal}>{money(isInstant ? deliveryFee : finalTotal)}</Text>
                 </View>
                 <Pressable style={[styles.payBtn, isSubmitting && { opacity: 0.6 }]} onPress={handleConfirm} disabled={isSubmitting}>
                     {isSubmitting ? <ActivityIndicator color={colors.textOnYellow} /> : (
