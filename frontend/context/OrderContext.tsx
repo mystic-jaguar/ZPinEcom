@@ -6,6 +6,7 @@ import { useUser } from './UserContext';
 
 interface OrderContextType {
     orders: OrderObject[];
+    totalOrders: number;
     addOrder: (order: OrderObject) => void;
     getOrderById: (id: string) => OrderObject | undefined;
     cancelOrder: (id: string, data: CancelOrderData) => Promise<{ message: string; refundAmount: number; refundStatus: string }>;
@@ -18,6 +19,7 @@ const OrderContext = createContext<OrderContextType | undefined>(undefined);
 
 export const OrderProvider = ({ children }: { children: ReactNode }) => {
     const [orders, setOrders] = useState<OrderObject[]>([]);
+    const [totalOrders, setTotalOrders] = useState(0);
     const [isLoading, setIsLoading] = useState(true);
 
     const { isAuthenticated, isLoading: isUserLoading } = useUser();
@@ -25,6 +27,7 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
     const loadOrders = useCallback(async () => {
         if (!isAuthenticated) {
             setOrders([]);
+            setTotalOrders(0);
             setIsLoading(false);
             return;
         }
@@ -73,6 +76,8 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
                 // orders are legitimately pending/pending until the seller confirms them
                 // and must not be filtered out again here.
                 setOrders(normalized);
+                const total = (response as any).pagination?.totalItems;
+                setTotalOrders(typeof total === 'number' ? total : normalized.length);
             }
         } catch (error: any) {
             // Keep whatever we already have — a transient network/500 must not
@@ -131,6 +136,7 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
     return (
         <OrderContext.Provider value={{
             orders,
+            totalOrders,
             addOrder,
             getOrderById,
             cancelOrder,

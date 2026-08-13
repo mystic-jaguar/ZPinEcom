@@ -24,7 +24,7 @@ function initialsOf(name?: string) {
 export default function ProfileScreen() {
     const { user, resetUser } = useUser();
     const { clearCart, availableCoupons, refreshCoupons } = useCart();
-    const { orders, refreshOrders } = useOrder();
+    const { orders, totalOrders, refreshOrders } = useOrder();
     const { wishlistItems, clearWishlist, refreshWishlist } = useWishlist();
     const router = useRouter();
     const [refreshing, setRefreshing] = useState(false);
@@ -118,7 +118,7 @@ export default function ProfileScreen() {
                     </View>
                     <View style={styles.statsRow}>
                         <Pressable style={[styles.stat, styles.statDivider]} onPress={() => router.push('/profile/orders')}>
-                            <Text style={styles.statValue}>{orders.length}</Text>
+                            <Text style={styles.statValue}>{totalOrders}</Text>
                             <Text style={styles.statLabel}>ORDERS</Text>
                         </Pressable>
                         <Pressable style={[styles.stat, styles.statDivider]} onPress={() => router.push('/profile/wishlist')}>
