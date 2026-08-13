@@ -9,6 +9,12 @@ import { generateId } from '../utils/id';
 import { recordOrderStatus } from '../utils/orderHistory';
 import { markupItems, withMarkup } from '../utils/pricing';
 import { notifyReturnTransition } from '../utils/returnNotify';
+import {
+  parseReturnLines,
+  refundForLines,
+  resolveReturnLines,
+  tallyReturnedQuantities,
+} from '../utils/returnLines';
 import { cacheDel, cacheDelPattern } from '../utils/redis';
 import { sendPush } from '../utils/push';
 import { safeIdentifier } from '../utils/sql';
@@ -20,6 +26,34 @@ const ORDER_ITEMS = safeIdentifier('order_items');
 const CART = safeIdentifier('cart_items');
 const ADDRESSES = safeIdentifier('addresses');
 const RETURN_REQUESTS = safeIdentifier('return_requests');
+
+// How many units of an `oi` (order_items) row are already committed to a return.
+// Every state except 'rejected' still holds its units; a rejection releases them.
+//
+// The schema is frozen — there is no `order_items.returned_quantity` — so this
+// reads the counts back out of `return_requests.order_item_ids`, whose elements
+// are either a bare id string (the WHOLE line) or `{id, quantity}` (that many
+// units). See utils/returnLines.ts, which is the TypeScript twin of this SQL.
+// An empty/absent array still means "the whole order".
+const RETURNED_QTY = `(
+  SELECT COALESCE(SUM(
+    CASE
+      WHEN jsonb_typeof(rr.order_item_ids) <> 'array' OR jsonb_array_length(rr.order_item_ids) = 0
+        THEN oi.quantity
+      ELSE COALESCE((
+        SELECT SUM(
+          CASE WHEN jsonb_typeof(e) = 'object'
+               THEN LEAST(COALESCE(NULLIF(e ->> 'quantity', '')::int, oi.quantity), oi.quantity)
+               ELSE oi.quantity END
+        )
+        FROM jsonb_array_elements(rr.order_item_ids) e
+        WHERE COALESCE(e ->> 'id', trim(both '"' from e::text)) = oi.id::text
+      ), 0)
+    END
+  ), 0)
+  FROM ${RETURN_REQUESTS} rr
+  WHERE rr.order_id = oi.order_id AND rr.status <> 'rejected'
+)`;
 
 // The return workflow, in order. Must stay identical to the CHECK constraint on
 // return_requests.status (migrations/2026-08-12-return-status-vocabulary.cjs) —
@@ -348,7 +382,11 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response): Promise<v
           'price', oi.price,
           'image', oi.image,
           'variant', oi.variant,
-          'isReturned', oi.is_returned
+          -- The list payload used to omit productId while the detail payload had
+          -- it; the returns screen matched on it and silently matched nothing.
+          'productId', oi.product_id,
+          'isReturned', oi.is_returned,
+          'returnedQuantity', ${RETURNED_QTY}
         )) FILTER (WHERE oi.id IS NOT NULL), '[]') as items
        FROM ${ORDERS} o
        LEFT JOIN ${ORDER_ITEMS} oi ON oi.order_id = o.id
@@ -394,7 +432,8 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response): Promis
           'price', oi.price,
           'image', oi.image,
           'productId', oi.product_id,
-          'isReturned', oi.is_returned
+          'isReturned', oi.is_returned,
+          'returnedQuantity', ${RETURNED_QTY}
         )) FILTER (WHERE oi.id IS NOT NULL), '[]') as items
        FROM ${ORDERS} o
        LEFT JOIN ${ORDER_ITEMS} oi ON oi.order_id = o.id
@@ -1080,25 +1119,80 @@ router.post('/:id/return', authenticate, async (req: AuthRequest, res: Response)
       return;
     }
 
-    // Refund only what the customer actually selected — a partial-item return
-    // must not refund the whole order. GST is refunded (recomputed at the same
-    // 18% rate createOrder used); delivery_fee (the instant-delivery charge) is
-    // never refunded, same policy as the trial keep/return flow below. No
-    // selection (legacy single-item flow) falls back to the full order amount.
-    const refundFor = async (ids: unknown): Promise<number> => {
-      if (!Array.isArray(ids) || ids.length === 0) return Number(order.final_amount);
-      const itemsResult = await pool.query(
-        `SELECT price, quantity FROM ${ORDER_ITEMS} WHERE order_id = $1 AND id = ANY($2::text[])`,
-        [req.params.id, ids.map(String)]
-      );
-      if (itemsResult.rows.length === 0) return Number(order.final_amount);
-      const itemsSubtotal = itemsResult.rows.reduce(
-        (sum, i) => sum + withMarkup(i.price) * Number(i.quantity),
-        0
-      );
-      return itemsSubtotal + Math.round(itemsSubtotal * 0.18);
-    };
-    const refundAmount = await refundFor(orderItemIds);
+    const orderItems = (
+      await pool.query(
+        `SELECT id, price, quantity FROM ${ORDER_ITEMS} WHERE order_id = $1`,
+        [req.params.id]
+      )
+    ).rows;
+
+    // Units already spoken for by an earlier return on this order. A rejected
+    // return gives its units back; every other state (requested/approved/
+    // picked_up/refunded) is still holding them, so 2-of-5 followed by another
+    // 4-of-5 must be refused rather than silently over-refunding.
+    const priorReturns = await pool.query(
+      `SELECT order_item_ids FROM ${RETURN_REQUESTS}
+       WHERE order_id = $1 AND status <> 'rejected'`,
+      [req.params.id]
+    );
+    const alreadyReturned = tallyReturnedQuantities(priorReturns.rows, orderItems);
+
+    // What is still returnable, per line. The customer-facing screens filter on
+    // this too, but the check has to live here — the client is not the gate.
+    const remainingItems = orderItems
+      .map((i) => ({
+        ...i,
+        quantity: Math.max(0, Number(i.quantity) - (alreadyReturned.get(String(i.id)) || 0)),
+      }))
+      .filter((i) => i.quantity > 0);
+
+    if (remainingItems.length === 0) {
+      res.status(400).json({
+        success: false,
+        message: 'Every item on this order has already been returned',
+      });
+      return;
+    }
+
+    // No selection = "everything still returnable". Anything selected is checked
+    // against what's left, so a client cannot inflate a refund by asking for more
+    // units than it bought (resolveReturnLines also clamps).
+    const requested = Array.isArray(orderItemIds) ? orderItemIds : [];
+    if (requested.length > 0) {
+      const remainingById = new Map(remainingItems.map((i) => [String(i.id), i.quantity]));
+      for (const line of parseReturnLines(requested)) {
+        const left = remainingById.get(line.id);
+        if (left === undefined) {
+          res.status(400).json({
+            success: false,
+            message: 'One of the selected items is not on this order, or has already been returned',
+          });
+          return;
+        }
+        if (line.quantity !== null && line.quantity > left) {
+          res.status(400).json({
+            success: false,
+            message: `You can return at most ${left} of that item`,
+          });
+          return;
+        }
+      }
+    }
+
+    const resolvedLines = resolveReturnLines(requested, remainingItems);
+    if (resolvedLines.length === 0) {
+      res.status(400).json({ success: false, message: 'Select at least one item to return' });
+      return;
+    }
+
+    // Refund only the units actually coming back. GST is refunded (recomputed at
+    // the same 18% rate createOrder used); delivery_fee (the instant-delivery
+    // charge) is never refunded, same policy as the trial keep/return flow.
+    const refundAmount = refundForLines(resolvedLines, withMarkup).total;
+
+    // Persist the concrete lines, never the raw client payload — one canonical
+    // shape ({id, quantity}) for every downstream reader.
+    const storedLines = resolvedLines.map((l) => ({ id: l.id, quantity: l.quantity }));
 
     const existingReturn = await pool.query(
       `SELECT id, status, order_item_ids, created_at, updated_at
@@ -1120,7 +1214,10 @@ router.post('/:id/return', authenticate, async (req: AuthRequest, res: Response)
           // The amount owed on the return that already exists, not on this
           // request's selection — quoting final_amount here showed the customer
           // the whole order value for a single-item return.
-          refundAmount: await refundFor(activeReturn.order_item_ids),
+          refundAmount: refundForLines(
+            resolveReturnLines(activeReturn.order_item_ids, orderItems),
+            withMarkup
+          ).total,
           refundStatus: 'initiated',
           refundDisclaimer: RETURN_REFUND_DISCLAIMER,
         },
@@ -1137,7 +1234,7 @@ router.post('/:id/return', authenticate, async (req: AuthRequest, res: Response)
         returnId,
         req.params.id,
         req.userId,
-        JSON.stringify(orderItemIds || []),
+        JSON.stringify(storedLines),
         reason,
         description || '',
         JSON.stringify([
@@ -1360,33 +1457,42 @@ router.patch('/:id/return-status', authenticate, async (req: AuthRequest, res: R
     }
 
     if (nextStatus === 'refunded') {
-      const returnedLineIds: string[] = Array.isArray(currentReturn.order_item_ids)
-        ? currentReturn.order_item_ids.map(String)
-        : [];
+      const orderItems = (
+        await client.query(
+          `SELECT id, product_id, price, quantity FROM ${ORDER_ITEMS} WHERE order_id = $1`,
+          [req.params.id]
+        )
+      ).rows;
 
-      // Mark exactly the lines that came back. Without this a partial return read
-      // as a whole-order return everywhere downstream, and the remaining items
-      // stayed listed as returnable.
-      if (returnedLineIds.length > 0) {
+      // Exactly the units coming back on THIS return. An empty selection still
+      // means the whole order (legacy rows), which resolveReturnLines expands.
+      const settledLines = resolveReturnLines(currentReturn.order_item_ids, orderItems);
+
+      // Every unit returned across all settled returns on this order — a line is
+      // only 'is_returned' once its LAST unit is back, so a 2-of-5 return leaves
+      // the other 3 returnable.
+      const refundedRows = await client.query(
+        `SELECT order_item_ids FROM ${RETURN_REQUESTS}
+         WHERE order_id = $1 AND (status = 'refunded' OR id = $2)`,
+        [req.params.id, currentReturn.id]
+      );
+      const returnedByItem = tallyReturnedQuantities(refundedRows.rows, orderItems);
+
+      const fullyReturnedIds = orderItems
+        .filter((i: any) => (returnedByItem.get(String(i.id)) || 0) >= Number(i.quantity))
+        .map((i: any) => String(i.id));
+
+      if (fullyReturnedIds.length > 0) {
         await client.query(
           `UPDATE ${ORDER_ITEMS} SET is_returned = true WHERE order_id = $1 AND id = ANY($2)`,
-          [req.params.id, returnedLineIds]
-        );
-      } else {
-        await client.query(
-          `UPDATE ${ORDER_ITEMS} SET is_returned = true WHERE order_id = $1`,
-          [req.params.id]
+          [req.params.id, fullyReturnedIds]
         );
       }
 
-      // The order is only 'returned'/'refunded' once every line has come back. A
+      // The order is only 'returned'/'refunded' once every unit has come back. A
       // partial return leaves it delivered so the customer can still return the
       // rest and the order does not read as fully refunded.
-      const remaining = await client.query(
-        `SELECT 1 FROM ${ORDER_ITEMS} WHERE order_id = $1 AND is_returned = false LIMIT 1`,
-        [req.params.id]
-      );
-      const fullyReturned = remaining.rows.length === 0;
+      const fullyReturned = fullyReturnedIds.length === orderItems.length;
       await client.query(
         fullyReturned
           ? `UPDATE ${ORDERS} SET status = 'returned', payment_status = 'refunded', updated_at = NOW() WHERE id = $1`
@@ -1399,20 +1505,13 @@ router.patch('/:id/return-status', authenticate, async (req: AuthRequest, res: R
       // seller's sellable inventory. Restocking happens here rather than at
       // pickup because 'refunded' is the point at which the seller has actually
       // received the item back — the same promise the customer is shown.
-      // An empty order_item_ids means "the whole order" — that is what the
-      // customer-facing return screens send when no per-item choice was made.
-      const itemsToRestock = await client.query(
-        returnedLineIds.length > 0
-          ? `SELECT product_id, quantity FROM ${ORDER_ITEMS} WHERE order_id = $1 AND id = ANY($2)`
-          : `SELECT product_id, quantity FROM ${ORDER_ITEMS} WHERE order_id = $1`,
-        returnedLineIds.length > 0 ? [req.params.id, returnedLineIds] : [req.params.id]
-      );
-      for (const item of itemsToRestock.rows) {
+      // Restock the RETURNED unit count, not the whole line: 2 of 5 puts 2 back.
+      for (const line of settledLines) {
         await client.query(
           `UPDATE products
            SET quantity = quantity + $1, in_stock = true, updated_at = NOW()
            WHERE id = $2`,
-          [item.quantity, item.product_id]
+          [line.quantity, (line.item as any).product_id]
         );
       }
 
@@ -1489,6 +1588,15 @@ router.get('/:id/return-status', authenticate, async (req: AuthRequest, res: Res
     const rr = returnResult.rows[0];
     const order = orderResult.rows[0];
 
+    const orderItems = (
+      await pool.query(
+        `SELECT id, product_name, price, quantity FROM ${ORDER_ITEMS} WHERE order_id = $1`,
+        [req.params.id]
+      )
+    ).rows;
+    const lines = resolveReturnLines(rr.order_item_ids, orderItems);
+    const refund = refundForLines(lines, withMarkup);
+
     res.json({
       success: true,
       data: {
@@ -1499,7 +1607,18 @@ router.get('/:id/return-status', authenticate, async (req: AuthRequest, res: Res
         returnStatus: rr.status,
         reason: rr.reason,
         description: rr.description,
-        orderItemIds: Array.isArray(rr.order_item_ids) ? rr.order_item_ids : [],
+        // Which units are coming back, resolved — the raw column may hold bare
+        // id strings (whole line) or {id, quantity} objects.
+        returnItems: lines.map((l) => ({
+          orderItemId: l.id,
+          productName: (l.item as any).product_name,
+          quantity: l.quantity,
+          orderedQuantity: Number((l.item as any).quantity),
+          price: withMarkup((l.item as any).price),
+        })),
+        refundAmount: refund.total,
+        // Kept for older app builds that read the flat id list.
+        orderItemIds: lines.map((l) => l.id),
         requestedAt: rr.created_at,
         updatedAt: rr.updated_at,
         pickedUpAt: rr.picked_up_at,

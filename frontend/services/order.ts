@@ -156,7 +156,10 @@ export const orderService = {
      * Initiate return request
      */
     async returnOrder(id: string, data: {
-        orderItemIds: string[];
+        // Either bare order-item ids (the whole line) or {orderItemId, quantity}
+        // for a partial-quantity return — "2 of the 5 I bought". An EMPTY array
+        // means the whole order, so never send one by accident.
+        orderItemIds: Array<string | { orderItemId: string; quantity: number }>;
         reason: string;
         description?: string;
         images?: string[];
@@ -189,6 +192,14 @@ export const orderService = {
                 reason: string;
                 description?: string;
                 orderItemIds: string[];
+                returnItems?: Array<{
+                    orderItemId: string;
+                    productName: string;
+                    quantity: number;
+                    orderedQuantity: number;
+                    price: number;
+                }>;
+                refundAmount?: number;
                 requestedAt: string;
                 updatedAt: string;
             }>>(`orders/${id}/return-status`);

@@ -48,16 +48,29 @@ export default function ReturnsRefundsScreen() {
     const [isLoading, setIsLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [returnStatusByOrder, setReturnStatusByOrder] = useState<Record<string, ReturnStatusRecord>>({});
-    // orderId -> orderItemIds the customer ticked. Keyed on the ORDER ITEM, not
-    // the product: the list payload carries no productId, so keying on it made
-    // every checkbox share the same undefined key (tick one, tick all) and sent
-    // an empty selection — which the backend reads as "the whole order".
-    const [selectedByOrder, setSelectedByOrder] = useState<Record<string, string[]>>({});
+    // orderId -> { orderItemId: units the customer wants to send back }. Absent
+    // or 0 = not selected. Keyed on the ORDER ITEM, not the product: keying on
+    // productId made every checkbox share the same undefined key (tick one, tick
+    // all) and sent an empty selection — which the backend reads as "everything".
+    // NOTHING is ever pre-selected: the customer picks the items AND the units.
+    const [selectedByOrder, setSelectedByOrder] = useState<Record<string, Record<string, number>>>({});
 
     const toggleItem = (orderId: string, orderItemId: string) => setSelectedByOrder(prev => {
-        const cur = prev[orderId] || [];
-        return { ...prev, [orderId]: cur.includes(orderItemId) ? cur.filter(p => p !== orderItemId) : [...cur, orderItemId] };
+        const cur = { ...(prev[orderId] || {}) };
+        if (cur[orderItemId]) delete cur[orderItemId];
+        else cur[orderItemId] = 1;
+        return { ...prev, [orderId]: cur };
     });
+
+    // Nudge one line's unit count within [1, max]. Selecting is implicit: a
+    // customer who taps "+" on an unticked row means to return it.
+    const stepQty = (orderId: string, orderItemId: string, delta: number, max: number) =>
+        setSelectedByOrder(prev => {
+            const cur = { ...(prev[orderId] || {}) };
+            const next = Math.min(max, Math.max(1, (cur[orderItemId] || 0) + delta));
+            cur[orderItemId] = next;
+            return { ...prev, [orderId]: cur };
+        });
 
     const onRefresh = async () => {
         setRefreshing(true);
@@ -84,13 +97,18 @@ export default function ReturnsRefundsScreen() {
         return () => { cancelled = true; };
     }, [orders]);
 
+    // Units of a line the customer can still send back: what they bought, minus
+    // whatever an earlier return already claimed. 0 = the line is done.
+    const returnableQty = (item: { quantity: number; returnedQuantity?: number; isReturned?: boolean }) =>
+        item.isReturned ? 0 : Math.max(0, Number(item.quantity) - Number(item.returnedQuantity || 0));
+
     // One card per ORDER, not per product — a multi-item order is returned in a
-    // single request with all the selected orderItemIds.
+    // single request carrying every selected line and its unit count.
     const returnableOrders = orders.filter(order => {
         const rd = returnStatusByOrder[order.id];
         const hasActive = Boolean(rd && ACTIVE_RETURN_STATUSES.has(rd.returnStatus));
         if (!isWithinReturnWindow(order) || hasActive || order.status === 'returned' || order.paymentStatus === 'refunded') return false;
-        return (order.items || []).some(i => !i.isReturned);
+        return (order.items || []).some(i => returnableQty(i) > 0);
     });
 
     const activeReturns = orders
@@ -168,15 +186,23 @@ export default function ReturnsRefundsScreen() {
                     <View style={styles.empty}><RotateCcw size={44} color={colors.borderStrong} /><ZText variant="muted" style={{ marginTop: 12 }}>No returnable items</ZText></View>
                 ) : (
                     returnableOrders.map(order => {
-                        // Lines already sent back on an earlier partial return are gone.
-                        const items = (order.items || []).filter(i => !i.isReturned);
-                        const multi = items.length > 1;
-                        const selected = selectedByOrder[order.id] || [];
-                        const canSubmit = !multi || selected.length > 0;
-                        const orderItemIds = (multi ? selected : [items[0]?.orderItemId]).filter(Boolean) as string[];
+                        // Units already sent back on an earlier return are gone.
+                        const items = (order.items || []).filter(i => returnableQty(i) > 0);
+                        const selected = selectedByOrder[order.id] || {};
+                        // A single line with a single unit has nothing to choose, so it
+                        // skips the checkboxes. Anything else — several lines, or one
+                        // line bought more than once — must be picked explicitly.
+                        const soleUnit = items.length === 1 && returnableQty(items[0]) === 1;
+                        const chosen = soleUnit
+                            ? [{ id: String(items[0].orderItemId || ''), quantity: 1 }]
+                            : Object.entries(selected)
+                                .filter(([, q]) => q > 0)
+                                .map(([id, quantity]) => ({ id, quantity }));
+                        const unitCount = chosen.reduce((n, c) => n + c.quantity, 0);
+                        const canSubmit = chosen.length > 0;
                         return (
                             <View key={order.id} style={styles.card}>
-                                {multi && (
+                                {!soleUnit && (
                                     <View style={styles.orderHead}>
                                         <Text style={styles.orderNo}>{order.orderNumber}</Text>
                                         <Text style={styles.itemSub}>{daysLeft(order)} days left</Text>
@@ -184,30 +210,78 @@ export default function ReturnsRefundsScreen() {
                                 )}
                                 {items.map((item, i) => {
                                     const itemId = String(item.orderItemId || '');
-                                    const on = selected.includes(itemId);
+                                    const max = returnableQty(item);
+                                    const qty = selected[itemId] || 0;
+                                    const on = soleUnit || qty > 0;
+                                    // Only the units still returnable count toward the
+                                    // running total the customer sees.
+                                    const partOfLine = item.returnedQuantity
+                                        ? `${max} of ${item.quantity} left`
+                                        : (item.variant || '');
                                     const row = (
                                         <View style={[styles.itemRow, { marginBottom: 14 }]}>
-                                            {multi && <View style={[styles.checkbox, on && styles.checkboxOn]}>{on && <Check size={13} color={colors.textOnYellow} />}</View>}
+                                            {!soleUnit && <View style={[styles.checkbox, on && styles.checkboxOn]}>{on && <Check size={13} color={colors.textOnYellow} />}</View>}
                                             <Image source={item.image ? { uri: item.image as string } : require('../../assets/images/icon_backup.png')} style={styles.itemImg} contentFit="cover" />
                                             <View style={{ flex: 1 }}>
                                                 <Text style={styles.itemName} numberOfLines={1}>{item.productName}</Text>
-                                                <Text style={styles.itemSub}>{multi ? (item.variant || '') : `${daysLeft(order)} days left`}</Text>
+                                                <Text style={styles.itemSub}>{soleUnit ? `${daysLeft(order)} days left` : partOfLine}</Text>
+                                                {/* Bought more than one? Choose how many come back. */}
+                                                {max > 1 && (
+                                                    <View style={styles.stepper}>
+                                                        <Pressable
+                                                            hitSlop={8}
+                                                            style={[styles.stepBtn, (qty <= 1) && styles.stepBtnOff]}
+                                                            disabled={qty <= 1}
+                                                            onPress={() => stepQty(order.id, itemId, -1, max)}
+                                                        >
+                                                            <Text style={styles.stepGlyph}>−</Text>
+                                                        </Pressable>
+                                                        <Text style={styles.stepQty}>{qty || 0}</Text>
+                                                        <Pressable
+                                                            hitSlop={8}
+                                                            style={[styles.stepBtn, (qty >= max) && styles.stepBtnOff]}
+                                                            disabled={qty >= max}
+                                                            onPress={() => stepQty(order.id, itemId, 1, max)}
+                                                        >
+                                                            <Text style={styles.stepGlyph}>+</Text>
+                                                        </Pressable>
+                                                        <Text style={styles.stepMax}>of {max}</Text>
+                                                    </View>
+                                                )}
                                             </View>
-                                            <Text style={styles.price}>₹{Number(item.price).toLocaleString('en-IN')}</Text>
+                                            <Text style={styles.price}>
+                                                ₹{(Number(item.price) * Math.max(1, qty || 1)).toLocaleString('en-IN')}
+                                            </Text>
                                         </View>
                                     );
-                                    return multi
-                                        ? <Pressable key={`${itemId}-${i}`} onPress={() => toggleItem(order.id, itemId)}>{row}</Pressable>
-                                        : <React.Fragment key={`${itemId}-${i}`}>{row}</React.Fragment>;
+                                    // The whole row toggles the line. The stepper's own
+                                    // Pressables sit deeper, so RN's responder system gives
+                                    // them the touch and the row does not also untick.
+                                    return soleUnit
+                                        ? <React.Fragment key={`${itemId}-${i}`}>{row}</React.Fragment>
+                                        : <Pressable key={`${itemId}-${i}`} onPress={() => toggleItem(order.id, itemId)}>{row}</Pressable>;
                                 })}
                                 <Pressable
                                     style={[styles.returnBtn, !canSubmit && styles.returnBtnOff]}
                                     disabled={!canSubmit}
-                                    onPress={() => router.push({ pathname: '/profile/cancel-order', params: { orderId: order.id, orderItemIds: orderItemIds.join(','), mode: 'return' } })}
+                                    onPress={() => router.push({
+                                        pathname: '/profile/cancel-order',
+                                        params: {
+                                            orderId: order.id,
+                                            // "<orderItemId>:<units>" pairs — the router only
+                                            // carries strings, and the units must survive.
+                                            returnLines: chosen.map(c => `${c.id}:${c.quantity}`).join(','),
+                                            mode: 'return',
+                                        },
+                                    })}
                                 >
                                     <RotateCcw size={16} color={canSubmit ? colors.textStrong : colors.textFaint} />
                                     <Text style={[styles.returnText, !canSubmit && { color: colors.textFaint }]}>
-                                        {multi ? (selected.length > 0 ? `Return ${selected.length} item${selected.length > 1 ? 's' : ''}` : 'Select items to return') : 'Request return'}
+                                        {soleUnit
+                                            ? 'Request return'
+                                            : canSubmit
+                                                ? `Return ${unitCount} item${unitCount > 1 ? 's' : ''}`
+                                                : 'Select items to return'}
                                     </Text>
                                 </Pressable>
                             </View>
@@ -260,6 +334,14 @@ const styles = StyleSheet.create({
     orderNo: { fontFamily: fonts.monoBold, fontSize: 10, color: colors.textFaint },
     checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: colors.borderSubtle, alignItems: 'center', justifyContent: 'center' },
     checkboxOn: { backgroundColor: palette.yellow500, borderWidth: 0 },
+
+    // Per-line unit picker, shown only when the customer bought more than one.
+    stepper: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 7 },
+    stepBtn: { width: 26, height: 26, borderRadius: 8, borderWidth: 2, borderColor: colors.borderSubtle, alignItems: 'center', justifyContent: 'center' },
+    stepBtnOff: { opacity: 0.35 },
+    stepGlyph: { fontFamily: fonts.bodyBold, fontSize: 15, lineHeight: 18, color: colors.textStrong },
+    stepQty: { fontFamily: fonts.monoBold, fontSize: 13, color: colors.textStrong, minWidth: 14, textAlign: 'center' },
+    stepMax: { fontFamily: fonts.bodyRegular, fontSize: 11, color: colors.textFaint },
 
     returnBtn: { height: 44, borderRadius: 12, borderWidth: 2, borderColor: colors.borderInk, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
     returnBtnOff: { borderColor: colors.borderSubtle },

@@ -461,17 +461,24 @@ describe('PATCH /orders/:id/return-status', () => {
    * `itemCondition` left undefined mimics production TODAY: the column is
    * proposed but not applied, so the row comes back without the key at all.
    */
-  const mockReturnAt = (status: string, itemCondition?: string) => {
+  // `orderItemIds` is what return_requests.order_item_ids holds: [] = the whole
+  // order, or {id, quantity} elements for a partial-quantity return.
+  const mockReturnAt = (status: string, itemCondition?: string, orderItemIds: any[] = []) => {
     const db = require('../db');
     db.__mockQuery.mockImplementation((sql: string) => {
       if (sql.includes('WHERE id = $1') && sql.includes('"orders"') && !sql.includes('user_id')) {
         return Promise.resolve({ rows: [{ id: orderId }] });
       }
+      // The tally query the refund step runs over every settled return.
+      if (sql.includes('SELECT order_item_ids FROM') && sql.includes('"return_requests"')) {
+        return Promise.resolve({ rows: [{ order_item_ids: orderItemIds }] });
+      }
       if (sql.includes('"return_requests"') && sql.includes('WHERE order_id = $1')) {
         return Promise.resolve({
           rows: [{
             id: 'RET0001', order_id: orderId, status,
-            status_history: [], picked_up_at: null, refunded_at: null, order_item_ids: [],
+            status_history: [], picked_up_at: null, refunded_at: null,
+            order_item_ids: orderItemIds,
             ...(itemCondition !== undefined ? { item_condition: itemCondition } : {}),
           }],
         });
@@ -479,9 +486,11 @@ describe('PATCH /orders/:id/return-status', () => {
       if (sql.includes('RETURNING status_history')) {
         return Promise.resolve({ rows: [{ status_history: [{ status }] }] });
       }
-      // The line items the refund step puts back into stock.
-      if (/SELECT product_id, quantity FROM\s+"order_items"/i.test(sql)) {
-        return Promise.resolve({ rows: [{ product_id: productUuid, quantity: 2 }] });
+      // The line items the refund step prices and puts back into stock.
+      if (/SELECT id, product_id, price, quantity FROM\s+"order_items"/i.test(sql)) {
+        return Promise.resolve({
+          rows: [{ id: 'OI1', product_id: productUuid, price: '100.00', quantity: 2 }],
+        });
       }
       return Promise.resolve({ rows: [] });
     });
@@ -607,5 +616,45 @@ describe('PATCH /orders/:id/return-status', () => {
       ([sql]: [string]) => /UPDATE products/i.test(sql) && /quantity \+ \$1/.test(sql)
     );
     expect(restocked).toBe(true);
+  });
+
+  it('restocks only the returned UNITS on a partial-quantity return', async () => {
+    // The line holds 2 units and the customer sent 1 back — putting 2 back on
+    // the shelf would invent stock the seller never received.
+    mockReturnAt('picked_up', undefined, [{ id: 'OI1', quantity: 1 }]);
+    const db = require('../db');
+    const res = await request(app)
+      .patch(`${BASE}/${orderId}/return-status`)
+      .set(bearerHeader(adminToken))
+      .send({ status: 'refunded' });
+    expect(res.status).toBe(200);
+
+    const restock = db.__mockQuery.mock.calls.find(
+      ([sql]: [string]) => /UPDATE products/i.test(sql) && /quantity \+ \$1/.test(sql)
+    );
+    expect(restock).toBeDefined();
+    expect(restock[1][0]).toBe(1);
+
+    // 1 of 2 units back = the line is NOT finished, so the order stays delivered
+    // rather than flipping to 'returned' / payment_status 'refunded'.
+    const orderUpdate = db.__mockQuery.mock.calls.find(
+      ([sql]: [string]) => /UPDATE\s+"orders"/i.test(sql) && /SET status =/.test(sql)
+    );
+    expect(orderUpdate[0]).toMatch(/status = 'delivered'/);
+  });
+
+  it('marks the order returned once every unit has come back', async () => {
+    mockReturnAt('picked_up', undefined, [{ id: 'OI1', quantity: 2 }]);
+    const db = require('../db');
+    await request(app)
+      .patch(`${BASE}/${orderId}/return-status`)
+      .set(bearerHeader(adminToken))
+      .send({ status: 'refunded' });
+
+    const orderUpdate = db.__mockQuery.mock.calls.find(
+      ([sql]: [string]) => /UPDATE\s+"orders"/i.test(sql) && /SET status =/.test(sql)
+    );
+    expect(orderUpdate[0]).toMatch(/status = 'returned'/);
+    expect(orderUpdate[0]).toMatch(/payment_status = 'refunded'/);
   });
 });

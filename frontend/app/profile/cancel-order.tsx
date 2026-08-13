@@ -19,13 +19,20 @@ export default function CancelOrderScreen() {
     const params = useLocalSearchParams();
     const orderId = Array.isArray(params.orderId) ? params.orderId[0] : params.orderId;
     const mode = Array.isArray(params.mode) ? params.mode[0] : (params.mode ?? 'cancel');
-    // Multi-item return: returns.tsx passes a comma-separated list of ORDER ITEM
-    // ids — the only item id the orders payload actually carries. It used to pass
-    // productIds and look them up here, but the list endpoint returns no
-    // productId, so every lookup missed and the selection arrived empty — which
-    // the backend reads as "the whole order" and refunds in full.
-    const orderItemIdsParam = Array.isArray(params.orderItemIds) ? params.orderItemIds[0] : params.orderItemIds;
-    const orderItemIds = (orderItemIdsParam ? String(orderItemIdsParam).split(',') : []).filter(Boolean);
+    // Partial return: returns.tsx passes "<orderItemId>:<units>" pairs. Order ITEM
+    // ids, not product ids — the id the orders payload actually carries, and the
+    // one the backend keys the refund on. (It used to pass productIds and look
+    // them up here; the list endpoint returned none, so every lookup missed and
+    // the selection arrived empty — which the backend reads as "the whole order".)
+    const returnLinesParam = Array.isArray(params.returnLines) ? params.returnLines[0] : params.returnLines;
+    const requestedLines = String(returnLinesParam || '')
+        .split(',')
+        .filter(Boolean)
+        .map(pair => {
+            const [id, units] = pair.split(':');
+            return { id, quantity: Math.max(1, Number(units) || 1) };
+        })
+        .filter(l => l.id);
     const { getOrderById, cancelOrder } = useOrder();
 
     const isReturn = mode === 'return';
@@ -37,11 +44,19 @@ export default function CancelOrderScreen() {
     const [errorMessage, setErrorMessage] = useState('');
 
     const order = getOrderById(orderId as string);
-    // Only ids that really belong to this order — a stale param must not widen
-    // the return, and must not silently become the empty "whole order" list.
-    const selectedOrderItemIds = isReturn
-        ? orderItemIds.filter(id => order?.items.some(item => String(item.orderItemId) === id))
+    // Only lines that really belong to this order, capped at what is still
+    // returnable — a stale param must not widen the return, and must never
+    // collapse to the empty list the backend reads as "everything".
+    const returnLines = isReturn
+        ? requestedLines.flatMap(line => {
+            const item = order?.items.find(i => String(i.orderItemId) === line.id);
+            if (!item) return [];
+            const left = Math.max(0, Number(item.quantity) - Number(item.returnedQuantity || 0));
+            if (left <= 0) return [];
+            return [{ orderItemId: line.id, quantity: Math.min(left, line.quantity) }];
+        })
         : [];
+    const returnUnits = returnLines.reduce((n, l) => n + l.quantity, 0);
 
     if (!order) {
         return (
@@ -57,8 +72,20 @@ export default function CancelOrderScreen() {
 
     const money = (n: number) => `₹${Number(n).toLocaleString('en-IN')}`;
     const reasons = isReturn ? RETURN_REASONS : CANCELLATION_REASONS;
-    const firstItem = order.items[0];
-    const extra = order.items.length - 1;
+
+    // On a return the header must describe what is COMING BACK, not the order —
+    // showing the order total next to a one-item return is what made customers
+    // think the whole order was being refunded.
+    const returningItems = returnLines.map(l => ({
+        ...l,
+        item: order.items.find(i => String(i.orderItemId) === l.orderItemId),
+    }));
+    const firstItem = isReturn ? (returningItems[0]?.item ?? order.items[0]) : order.items[0];
+    const extra = (isReturn ? returningItems.length : order.items.length) - 1;
+    // Estimate only — the server recomputes it and returns the authoritative
+    // figure. Same formula: line subtotal + 18% GST, no delivery fee.
+    const returnSubtotal = returningItems.reduce((sum, l) => sum + Number(l.item?.price || 0) * l.quantity, 0);
+    const estimatedRefund = returnSubtotal + Math.round(returnSubtotal * 0.18);
 
     const handleConfirmAction = async () => {
         if (!selectedReason) {
@@ -68,7 +95,7 @@ export default function CancelOrderScreen() {
         }
         // Never submit a return with nothing selected — the backend would treat it
         // as the whole order and refund everything.
-        if (isReturn && selectedOrderItemIds.length === 0) {
+        if (isReturn && returnLines.length === 0) {
             setErrorMessage('Please select the item you want to return.');
             setShowErrorModal(true);
             return;
@@ -78,7 +105,9 @@ export default function CancelOrderScreen() {
             let response: any;
             if (isReturn) {
                 response = await orderService.returnOrder(order.id, {
-                    orderItemIds: selectedOrderItemIds,
+                    // {orderItemId, quantity} objects — the backend also still
+                    // accepts bare id strings from older builds.
+                    orderItemIds: returnLines,
                     reason: selectedReason,
                     description: 'Return request via app',
                 });
@@ -113,9 +142,28 @@ export default function CancelOrderScreen() {
                     <View style={{ flex: 1 }}>
                         <Text style={styles.orderNo}>{order.orderNumber}</Text>
                         <Text style={styles.orderName} numberOfLines={1}>{firstItem?.productName || 'Order'}{extra > 0 ? ` +${extra}` : ''}</Text>
+                        {isReturn && (
+                            <Text style={styles.orderSub}>
+                                Returning {returnUnits} item{returnUnits > 1 ? 's' : ''} · refund est.
+                            </Text>
+                        )}
                     </View>
-                    <Text style={styles.orderTotal}>{money(order.finalAmount)}</Text>
+                    <Text style={styles.orderTotal}>{money(isReturn ? estimatedRefund : order.finalAmount)}</Text>
                 </View>
+
+                {/* Line-by-line, so "2 of 5" is visible before confirming. */}
+                {isReturn && returningItems.length > 0 && (
+                    <View style={styles.returnLines}>
+                        {returningItems.map(l => (
+                            <View key={l.orderItemId} style={styles.returnLineRow}>
+                                <Text style={styles.returnLineName} numberOfLines={1}>{l.item?.productName}</Text>
+                                <Text style={styles.returnLineQty}>
+                                    {l.quantity} × {money(Number(l.item?.price || 0))}
+                                </Text>
+                            </View>
+                        ))}
+                    </View>
+                )}
 
                 <ZText variant="eyebrow" style={{ marginBottom: 12 }}>Why are you {isReturn ? 'returning' : 'cancelling'}?</ZText>
                 <View style={styles.reasons}>
@@ -180,7 +228,12 @@ const styles = StyleSheet.create({
     orderImg: { width: 48, height: 56, borderRadius: 10, backgroundColor: colors.surfaceSunken },
     orderNo: { fontFamily: fonts.monoBold, fontSize: 10, color: colors.textFaint },
     orderName: { fontFamily: fonts.bodySemiBold, fontSize: 14, color: colors.textStrong, marginTop: 2 },
+    orderSub: { fontFamily: fonts.bodyRegular, fontSize: 11, color: colors.textFaint, marginTop: 2 },
     orderTotal: { fontFamily: fonts.displayBold, fontSize: 16, color: colors.textStrong },
+    returnLines: { borderWidth: 1, borderColor: palette.neutral200, borderRadius: 14, paddingVertical: 4, paddingHorizontal: 14, marginTop: -8, marginBottom: 20 },
+    returnLineRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12, paddingVertical: 8 },
+    returnLineName: { flex: 1, fontFamily: fonts.bodyRegular, fontSize: 13, color: colors.textMuted },
+    returnLineQty: { fontFamily: fonts.monoBold, fontSize: 12, color: colors.textStrong },
     reasons: { gap: 11 },
     reason: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderRadius: radius.md, paddingVertical: 15, paddingHorizontal: 16 },
     reasonOn: { backgroundColor: colors.surfaceInverse },

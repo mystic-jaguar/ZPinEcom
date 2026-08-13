@@ -319,6 +319,9 @@ export interface OrderItemObject {
     // Phase 9A: the customer sent this line back during the 15-minute Instant
     // Delivery trial, so it is not part of the recalculated final amount.
     isReturned?: boolean;
+    // Units of this line already committed to a return (any state but rejected).
+    // `quantity - returnedQuantity` is what is still returnable.
+    returnedQuantity?: number;
 }
 
 /**
