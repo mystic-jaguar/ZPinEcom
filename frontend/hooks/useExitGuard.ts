@@ -1,6 +1,5 @@
 import { useNavigation } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
-import { BackHandler } from 'react-native';
 import ActionModal from '../components/common/ActionModal';
 
 interface ExitGuardOptions {
@@ -17,10 +16,10 @@ interface ExitGuardOptions {
 /**
  * Confirms before a multi-step form is abandoned.
  *
- * Covers all four ways out of a screen with one hook:
- *  - Android hardware back  → `BackHandler` (consumes the event, so the
- *    navigator's own pop never runs and `beforeRemove` cannot double-fire)
- *  - header back / `router.back()` → `beforeRemove`
+ * Covers every way out of a screen with one hook:
+ *  - Android hardware back, header back and `router.back()` all go through the
+ *    navigator, so `beforeRemove` alone catches them. (A separate BackHandler
+ *    would have to synthesise its own POP action, which is what used to crash.)
  *  - iOS swipe-back gesture → `beforeRemove` cannot reliably veto a native
  *    gesture mid-swipe, so the gesture is disabled while the guard is armed
  *
@@ -45,25 +44,21 @@ export function useExitGuard({
         navigation.setOptions?.({ gestureEnabled: !enabled });
     }, [enabled, navigation]);
 
+    // Set once the user has confirmed, so re-dispatching the very action we
+    // just blocked isn't blocked again (which would re-open the modal forever).
+    const allowRef = useRef(false);
+
     useEffect(() => {
         if (!enabled) return;
-
-        const confirm = (proceed: () => void) => setPendingProceed(() => proceed);
-
-        const back = BackHandler.addEventListener('hardwareBackPress', () => {
-            confirm(() => navigation.dispatch({ type: 'POP', payload: {} } as any));
-            return true;
-        });
-
         const beforeRemove = navigation.addListener('beforeRemove' as any, (e: any) => {
+            if (allowRef.current) return;
             e.preventDefault();
-            confirm(() => navigation.dispatch(e.data.action));
+            setPendingProceed(() => () => {
+                allowRef.current = true;
+                navigation.dispatch(e.data.action);
+            });
         });
-
-        return () => {
-            back.remove();
-            beforeRemove();
-        };
+        return beforeRemove;
     }, [enabled, navigation]);
 
     const ConfirmModal = React.createElement(ActionModal, {

@@ -248,9 +248,12 @@ export default function CheckoutPaymentScreen() {
             <View style={[styles.footer, { paddingBottom: 14 + insets.bottom }]}>
                 <View>
                     <ZText variant="eyebrow" color={colors.textMuted} style={{ marginBottom: 2 }}>
-                        {isInstant ? 'Pay now' : 'Total to pay'}
+                        {isInstant ? 'Order total' : 'Total to pay'}
                     </ZText>
-                    <Text style={styles.footerTotal}>{money(isInstant ? deliveryFee : finalTotal)}</Text>
+                    <Text style={styles.footerTotal}>{money(finalTotal)}</Text>
+                    {isInstant && (
+                        <Text style={styles.optSub}>{money(deliveryFee)} now · rest at your door</Text>
+                    )}
                 </View>
                 <Pressable style={[styles.payBtn, isSubmitting && { opacity: 0.6 }]} onPress={handleConfirm} disabled={isSubmitting}>
                     {isSubmitting ? <ActivityIndicator color={colors.textOnYellow} /> : (

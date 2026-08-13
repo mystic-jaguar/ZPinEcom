@@ -7,7 +7,6 @@ import { ArrowRight, Check, MapPin, Receipt, Ticket, Zap } from 'lucide-react-na
 import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useExitGuard } from '../../hooks/useExitGuard';
 import { AppHeader, CheckoutSteps, ZButton, ZText } from '../../components/ui';
 import { colors, fonts, palette, radius, shadow } from '../../constants/theme';
 
@@ -22,14 +21,8 @@ export default function CheckoutSummaryScreen() {
 
     const selectedAddress = addresses.find(a => a.id === selectedAddressId);
     const [couponCode, setCouponCode] = useState('');
-    // An applied coupon is the one thing on this screen a user would hate to
-    // silently re-enter, so only guard once there is something to lose.
-    const { ConfirmModal: ExitConfirmModal } = useExitGuard({
-        enabled: !!appliedCoupon,
-        title: 'Go back?',
-        message: 'Your applied coupon stays on the cart, but you will need to return here to place the order.',
-        discardLabel: 'Go back',
-    });
+    // No exit guard here: the applied coupon stays on the cart either way, and
+    // backing out of payment would otherwise prompt again on this step.
     const [modalVisible, setModalVisible] = useState(false);
     const [modalConfig, setModalConfig] = useState({ title: '', message: '', icon: 'check-circle' as any });
 
@@ -165,7 +158,6 @@ export default function CheckoutSummaryScreen() {
             </View>
 
             <ActionModal visible={modalVisible} title={modalConfig.title} message={modalConfig.message} icon={modalConfig.icon} primaryButtonText="OK" onPrimaryPress={() => setModalVisible(false)} onClose={() => setModalVisible(false)} />
-            {ExitConfirmModal}
         </SafeAreaView>
     );
 }

@@ -6,7 +6,6 @@ import { ArrowRight, Check, MapPin, Pencil, Plus, Trash2 } from 'lucide-react-na
 import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useExitGuard } from '../../hooks/useExitGuard';
 import { AppHeader, BottomBar, CheckoutSteps, ZButton, ZText } from '../../components/ui';
 import { DELIVERY_CITY, isPuneAddress } from '../../constants/delivery';
 import { colors, fonts, palette, radius } from '../../constants/theme';
@@ -22,14 +21,8 @@ export default function CheckoutAddressScreen() {
 
     React.useEffect(() => { setLastStep(1); }, []);
 
-    // Leaving step 1 abandons the whole checkout — worth a confirm, but the
-    // selections themselves survive in CheckoutContext either way.
-    const { ConfirmModal: ExitConfirmModal } = useExitGuard({
-        enabled: true,
-        title: 'Leave checkout?',
-        message: 'You can come back — your cart and address selection are saved.',
-        discardLabel: 'Leave',
-    });
+    // No exit guard here: nothing is lost (selections live in CheckoutContext),
+    // and backing out of payment would otherwise re-prompt on every step down.
 
     React.useEffect(() => {
         if (addresses.length === 0) return;
@@ -128,7 +121,6 @@ export default function CheckoutAddressScreen() {
                 onSecondaryPress={() => { setShowDeleteModal(false); setAddressToDelete(null); }}
                 onClose={() => { setShowDeleteModal(false); setAddressToDelete(null); }}
             />
-            {ExitConfirmModal}
         </SafeAreaView>
     );
 }
