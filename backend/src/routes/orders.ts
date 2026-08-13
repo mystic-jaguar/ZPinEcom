@@ -1072,18 +1072,22 @@ router.post('/:id/return', authenticate, async (req: AuthRequest, res: Response)
     }
 
     // Refund only what the customer actually selected — a partial-item return
-    // must not refund the whole order. No selection (legacy single-item flow)
-    // falls back to the full order amount.
+    // must not refund the whole order. GST is refunded (recomputed at the same
+    // 18% rate createOrder used); delivery_fee (the instant-delivery charge) is
+    // never refunded, same policy as the trial keep/return flow below. No
+    // selection (legacy single-item flow) falls back to the full order amount.
     let refundAmount = Number(order.final_amount);
     if (Array.isArray(orderItemIds) && orderItemIds.length > 0) {
       const itemsResult = await pool.query(
         `SELECT price, quantity FROM ${ORDER_ITEMS} WHERE order_id = $1 AND id = ANY($2::text[])`,
         [req.params.id, orderItemIds]
       );
-      refundAmount = itemsResult.rows.reduce(
+      const itemsSubtotal = itemsResult.rows.reduce(
         (sum, i) => sum + withMarkup(i.price) * Number(i.quantity),
         0
       );
+      const itemsTax = Math.round(itemsSubtotal * 0.18);
+      refundAmount = itemsSubtotal + itemsTax;
     }
 
     const existingReturn = await pool.query(
