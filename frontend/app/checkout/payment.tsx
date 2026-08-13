@@ -54,6 +54,10 @@ export default function CheckoutPaymentScreen() {
     );
 
     const isInstant = deliveryType === 'Instant';
+    // Try-at-Door only kicks in when settling at the door (COD or nothing picked
+    // yet); explicitly choosing UPI/Cards/Net Banking means paying the full
+    // amount now, so it isn't a trial.
+    const isTrialSelection = isInstant && (!selectedPaymentMethod || selectedPaymentMethod === 'cod');
     const deliveryFee = isInstant ? 50.0 : 0;
     const taxAmount = Math.round(totalPrice * 0.18);
     const shippingAmount = totalPrice > 999 ? 0 : 49; // free-delivery threshold — must match server (orders.ts) + cart bar
@@ -74,11 +78,12 @@ export default function CheckoutPaymentScreen() {
             : isRazorpayMethod ? 'razorpay'
             : 'cod';
 
-        // Instant delivery IS Try-at-Door (see summary screen + FAQ) — every Instant
-        // order is a trial order, settling the goods at the door whatever method was
-        // picked, so it always prepays exactly the delivery fee online.
-        const isTrial = isInstant;
-        const needsFeePrepay = isInstant && deliveryFee > 0 && (isTrial || backendMethod === 'cod');
+        // Instant delivery is Try-at-Door ONLY when settling at the door (COD): the
+        // customer prepays just the delivery fee now and pays for kept items at the
+        // door after the trial. Explicitly choosing UPI/Cards/Net Banking means they
+        // want to pay the full amount now, so it is NOT a trial order.
+        const isTrial = isInstant && backendMethod === 'cod';
+        const needsFeePrepay = isInstant && deliveryFee > 0 && isTrial;
 
         let createdOrderId: string | null = null;
         try {
@@ -205,7 +210,7 @@ export default function CheckoutPaymentScreen() {
                     ))}
                 </View>
 
-                {isInstant && (
+                {isInstant && isTrialSelection && (
                     <View style={[styles.tryCard, styles.tryCardOn]}>
                         <View style={[styles.checkbox, styles.checkboxOn]}>
                             <Check size={13} color={palette.yellow500} />
@@ -216,6 +221,18 @@ export default function CheckoutPaymentScreen() {
                                 Included with Try-at-Door. Pay only the {money(deliveryFee)} delivery charge now
                                 (non-refundable). When the courier picks up your order you get 15 minutes to choose
                                 which items to keep — you pay for those at your door and hand the rest back.
+                            </Text>
+                        </View>
+                    </View>
+                )}
+                {isInstant && !isTrialSelection && (
+                    <View style={[styles.tryCard, styles.tryCardOn]}>
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.optLabel}>Paying the full amount now</Text>
+                            <Text style={styles.optSub}>
+                                UPI/Cards/Net Banking pays the entire order total now — choose Cash on Delivery
+                                instead to pay only the {money(deliveryFee)} delivery charge now and try items for
+                                15 minutes before paying the rest at your door.
                             </Text>
                         </View>
                     </View>
@@ -251,7 +268,7 @@ export default function CheckoutPaymentScreen() {
                         {isInstant ? 'Order total' : 'Total to pay'}
                     </ZText>
                     <Text style={styles.footerTotal}>{money(finalTotal)}</Text>
-                    {isInstant && (
+                    {isInstant && isTrialSelection && (
                         <Text style={styles.optSub}>{money(deliveryFee)} now · rest at your door</Text>
                     )}
                 </View>
