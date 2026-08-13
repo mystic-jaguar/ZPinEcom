@@ -1071,6 +1071,21 @@ router.post('/:id/return', authenticate, async (req: AuthRequest, res: Response)
       return;
     }
 
+    // Refund only what the customer actually selected — a partial-item return
+    // must not refund the whole order. No selection (legacy single-item flow)
+    // falls back to the full order amount.
+    let refundAmount = Number(order.final_amount);
+    if (Array.isArray(orderItemIds) && orderItemIds.length > 0) {
+      const itemsResult = await pool.query(
+        `SELECT price, quantity FROM ${ORDER_ITEMS} WHERE order_id = $1 AND id = ANY($2::text[])`,
+        [req.params.id, orderItemIds]
+      );
+      refundAmount = itemsResult.rows.reduce(
+        (sum, i) => sum + withMarkup(i.price) * Number(i.quantity),
+        0
+      );
+    }
+
     const existingReturn = await pool.query(
       `SELECT id, status, created_at, updated_at
        FROM ${RETURN_REQUESTS}
@@ -1131,7 +1146,7 @@ router.post('/:id/return', authenticate, async (req: AuthRequest, res: Response)
         returnId,
         status: 'requested',
         message: 'Return request initiated successfully',
-        refundAmount: Number(order.final_amount),
+        refundAmount,
         refundStatus: 'initiated',
         refundDisclaimer: RETURN_REFUND_DISCLAIMER,
       },
