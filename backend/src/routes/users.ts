@@ -78,9 +78,16 @@ router.get('/orders', authenticate, async (req: AuthRequest, res: Response): Pro
   const offset = (page - 1) * limit;
 
   try {
-    // Exclude orders that are pending with unpaid status — these are failed/abandoned payments
+    // Exclude only genuinely abandoned/unpaid online checkouts — plain COD orders
+    // are born pending/pending and stay that way until the seller confirms them,
+    // so filtering on payment_status alone hid every new COD order here too.
+    // Mirrors the /abandon eligibility check in routes/orders.ts.
+    const abandonedCheckout = `(status = 'pending' AND payment_status = 'pending' AND (
+      LOWER(COALESCE(payment_method, '')) NOT IN ('cod', 'cash', 'cash_on_delivery')
+      OR (delivery_type = 'flash' AND COALESCE(delivery_fee, 0) > 0)
+    ))`;
     const countResult = await pool.query(
-      `SELECT COUNT(*) FROM ${ORDERS} WHERE user_id = $1 AND NOT (status = 'pending' AND payment_status = 'pending')`,
+      `SELECT COUNT(*) FROM ${ORDERS} WHERE user_id = $1 AND NOT ${abandonedCheckout}`,
       [req.userId]
     );
     const total = Number(countResult.rows[0].count);
@@ -96,7 +103,7 @@ router.get('/orders', authenticate, async (req: AuthRequest, res: Response): Pro
         )) FILTER (WHERE oi.id IS NOT NULL), '[]') as items
        FROM ${ORDERS} o
        LEFT JOIN ${ORDER_ITEMS} oi ON oi.order_id = o.id
-       WHERE o.user_id = $1 AND NOT (o.status = 'pending' AND o.payment_status = 'pending')
+       WHERE o.user_id = $1 AND NOT ${abandonedCheckout}
        GROUP BY o.id
        ORDER BY o.created_at DESC
        LIMIT $2 OFFSET $3`,

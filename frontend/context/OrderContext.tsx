@@ -69,8 +69,10 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
                     updatedAt: o.updatedAt,
                     date: o.createdAt,
                 }));
-                // Filter out pending+unpaid orders (failed/abandoned payments)
-                setOrders(normalized.filter(o => !(o.status === 'pending' && o.paymentStatus === 'pending')));
+                // Backend already excludes abandoned/unpaid online checkouts; plain COD
+                // orders are legitimately pending/pending until the seller confirms them
+                // and must not be filtered out again here.
+                setOrders(normalized);
             }
         } catch (error: any) {
             // Keep whatever we already have — a transient network/500 must not

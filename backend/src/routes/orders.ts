@@ -324,8 +324,17 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response): Promise<v
     // always reopens to the orders tab. Sweeping here clears their own ghost order
     // (and its held stock) without waiting for another shopper to hit checkout.
     await sweepStaleCheckouts();
+    // Hide only genuinely abandoned/unpaid online checkouts, not plain COD
+    // orders — COD is *born* pending/pending and stays that way until the
+    // seller confirms it, so filtering on payment_status alone hid every new
+    // COD order from the customer's own list/count. Mirrors the /abandon
+    // eligibility check below (payment_method + Instant-fee-prepay carve-out).
+    const abandonedCheckout = `(status = 'pending' AND payment_status = 'pending' AND (
+      LOWER(COALESCE(payment_method, '')) NOT IN ('cod', 'cash', 'cash_on_delivery')
+      OR (delivery_type = 'flash' AND COALESCE(delivery_fee, 0) > 0)
+    ))`;
     const countResult = await pool.query(
-      `SELECT COUNT(*) FROM ${ORDERS} WHERE user_id = $1 AND NOT (status = 'pending' AND payment_status = 'pending')`,
+      `SELECT COUNT(*) FROM ${ORDERS} WHERE user_id = $1 AND NOT ${abandonedCheckout}`,
       [req.userId]
     );
     const total = Number(countResult.rows[0].count);
@@ -343,7 +352,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response): Promise<v
         )) FILTER (WHERE oi.id IS NOT NULL), '[]') as items
        FROM ${ORDERS} o
        LEFT JOIN ${ORDER_ITEMS} oi ON oi.order_id = o.id
-       WHERE o.user_id = $1 AND NOT (o.status = 'pending' AND o.payment_status = 'pending')
+       WHERE o.user_id = $1 AND NOT ${abandonedCheckout}
        GROUP BY o.id
        ORDER BY o.created_at DESC
        LIMIT $2 OFFSET $3`,
