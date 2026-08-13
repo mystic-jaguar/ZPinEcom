@@ -287,7 +287,7 @@ export default function OrderDetailsScreen() {
 
     const delivered = order.status === 'delivered';
     const cancelled = order.status === 'cancelled';
-    const statusLabel = delivered ? 'Delivered' : cancelled ? 'Cancelled' : order.status.charAt(0).toUpperCase() + order.status.slice(1);
+    const bannerStatusLabel = delivered ? 'Delivered' : cancelled ? 'Cancelled' : statusLabel(order.status);
     const statusColor = delivered ? palette.green500 : cancelled ? palette.red500 : palette.yellow600;
     const addr = order.shippingAddress || ({} as any);
 
@@ -304,7 +304,7 @@ export default function OrderDetailsScreen() {
                         {delivered ? <Check size={24} color="#fff" /> : <Bike size={22} color="#fff" />}
                     </View>
                     <View>
-                        <Text style={styles.bannerTitle}>{statusLabel}</Text>
+                        <Text style={styles.bannerTitle}>{bannerStatusLabel}</Text>
                         <Text style={styles.bannerSub}>{isInstantDelivery ? 'Try-at-Door · Instant' : 'Standard delivery'}{delivered ? '' : ` · est. ${DELIVERY_ETA.toLowerCase()}`}</Text>
                     </View>
                 </View>
