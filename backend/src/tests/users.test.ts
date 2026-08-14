@@ -347,3 +347,50 @@ describe('DELETE /users/block/:userId', () => {
     expect(res.body.success).toBe(true);
   });
 });
+
+// GET /users/orders is the endpoint the CUSTOMER APP's order list actually
+// calls — not GET /orders. It shipped without `orderItemId`, which left the
+// returns screen with no per-item key: every checkbox shared one key, so
+// ticking one ticked all and the selection never reached the server. The SQL is
+// now shared (utils/orderItemsSql.ts); this locks the payload contract.
+describe('GET /users/orders', () => {
+  it('returns 401 without auth', async () => {
+    const res = await request(app).get(`${BASE}/orders`);
+    expect(res.status).toBe(401);
+  });
+
+  it('sends every field the returns screen keys on', async () => {
+    getDbMock()
+      // authenticate() checks token revocation first and eats one mock.
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ count: '1' }] })
+      .mockResolvedValueOnce({
+        rows: [{
+          id: 'ORD0001', order_number: 'ZP-1', group_id: 'GRP0001', user_id: 'USR0001',
+          status: 'delivered', payment_status: 'paid',
+          total_amount: 100, final_amount: 118, shipping_address: {},
+          items: [
+            { orderItemId: 'OI00001', productId: 'PRD0001', productName: 'A', quantity: 2, price: 100, isReturned: false, returnedQuantity: 1 },
+            { orderItemId: 'OI00002', productId: 'PRD0002', productName: 'B', quantity: 1, price: 50, isReturned: false, returnedQuantity: 0 },
+          ],
+          created_at: new Date(), updated_at: new Date(),
+        }],
+      });
+
+    const res = await request(app).get(`${BASE}/orders`).set(bearerHeader(token));
+    expect(res.status).toBe(200);
+    const items = res.body.data[0].items;
+    // Distinct, non-empty ids are the whole point: one shared key = one refund
+    // for the entire order.
+    const ids = items.map((i: any) => i.orderItemId);
+    expect(ids).toEqual(['OI00001', 'OI00002']);
+    expect(new Set(ids).size).toBe(items.length);
+    expect(items[0].returnedQuantity).toBe(1);
+    expect(res.body.data[0].groupId).toBe('GRP0001');
+
+    // ...and the SQL must really ask for them, not just pass a mocked row through.
+    const sql = String(getDbMock().mock.calls[2][0]);
+    expect(sql).toMatch(/'orderItemId', oi\.id/);
+    expect(sql).toMatch(/'returnedQuantity'/);
+  });
+});

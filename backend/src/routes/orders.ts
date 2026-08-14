@@ -17,6 +17,7 @@ import {
 } from '../utils/returnLines';
 import { cacheDel, cacheDelPattern } from '../utils/redis';
 import { sendPush } from '../utils/push';
+import { ORDER_ITEMS_JSON } from '../utils/orderItemsSql';
 import { safeIdentifier } from '../utils/sql';
 import { logger } from '../utils/logger';
 
@@ -27,33 +28,6 @@ const CART = safeIdentifier('cart_items');
 const ADDRESSES = safeIdentifier('addresses');
 const RETURN_REQUESTS = safeIdentifier('return_requests');
 
-// How many units of an `oi` (order_items) row are already committed to a return.
-// Every state except 'rejected' still holds its units; a rejection releases them.
-//
-// The schema is frozen — there is no `order_items.returned_quantity` — so this
-// reads the counts back out of `return_requests.order_item_ids`, whose elements
-// are either a bare id string (the WHOLE line) or `{id, quantity}` (that many
-// units). See utils/returnLines.ts, which is the TypeScript twin of this SQL.
-// An empty/absent array still means "the whole order".
-const RETURNED_QTY = `(
-  SELECT COALESCE(SUM(
-    CASE
-      WHEN jsonb_typeof(rr.order_item_ids) <> 'array' OR jsonb_array_length(rr.order_item_ids) = 0
-        THEN oi.quantity
-      ELSE COALESCE((
-        SELECT SUM(
-          CASE WHEN jsonb_typeof(e) = 'object'
-               THEN LEAST(COALESCE(NULLIF(e ->> 'quantity', '')::int, oi.quantity), oi.quantity)
-               ELSE oi.quantity END
-        )
-        FROM jsonb_array_elements(rr.order_item_ids) e
-        WHERE COALESCE(e ->> 'id', trim(both '"' from e::text)) = oi.id::text
-      ), 0)
-    END
-  ), 0)
-  FROM ${RETURN_REQUESTS} rr
-  WHERE rr.order_id = oi.order_id AND rr.status <> 'rejected'
-)`;
 
 // The return workflow, in order. Must stay identical to the CHECK constraint on
 // return_requests.status (migrations/2026-08-12-return-status-vocabulary.cjs) —
@@ -375,19 +349,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response): Promise<v
 
     const result = await pool.query(
       `SELECT o.*,
-        COALESCE(json_agg(json_build_object(
-              'orderItemId', oi.id,
-          'productName', oi.product_name,
-          'quantity', oi.quantity,
-          'price', oi.price,
-          'image', oi.image,
-          'variant', oi.variant,
-          -- The list payload used to omit productId while the detail payload had
-          -- it; the returns screen matched on it and silently matched nothing.
-          'productId', oi.product_id,
-          'isReturned', oi.is_returned,
-          'returnedQuantity', ${RETURNED_QTY}
-        )) FILTER (WHERE oi.id IS NOT NULL), '[]') as items
+        COALESCE(json_agg(${ORDER_ITEMS_JSON}) FILTER (WHERE oi.id IS NOT NULL), '[]') as items
        FROM ${ORDERS} o
        LEFT JOIN ${ORDER_ITEMS} oi ON oi.order_id = o.id
        WHERE o.user_id = $1 AND NOT ${abandonedCheckout}
@@ -425,16 +387,7 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response): Promis
         -- duration, not a timestamp, so the app never has to reconcile the
         -- device clock or the column's timezone with ours.
         EXTRACT(EPOCH FROM (o.trial_expires_at - NOW())) AS trial_seconds_left,
-        COALESCE(json_agg(json_build_object(
-              'orderItemId', oi.id,
-          'productName', oi.product_name,
-          'quantity', oi.quantity,
-          'price', oi.price,
-          'image', oi.image,
-          'productId', oi.product_id,
-          'isReturned', oi.is_returned,
-          'returnedQuantity', ${RETURNED_QTY}
-        )) FILTER (WHERE oi.id IS NOT NULL), '[]') as items
+        COALESCE(json_agg(${ORDER_ITEMS_JSON}) FILTER (WHERE oi.id IS NOT NULL), '[]') as items
        FROM ${ORDERS} o
        LEFT JOIN ${ORDER_ITEMS} oi ON oi.order_id = o.id
        WHERE o.id = $1 AND o.user_id = $2

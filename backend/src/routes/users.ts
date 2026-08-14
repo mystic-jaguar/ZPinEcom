@@ -6,6 +6,7 @@ import { isPuneAddress, OUT_OF_AREA_MESSAGE } from '../utils/delivery';
 import { decryptAddressPayload, encryptAddressPayload } from '../utils/encryption';
 import { generateId } from '../utils/id';
 import { ensureModerationSchema } from '../utils/moderationSchema';
+import { ORDER_ITEMS_JSON } from '../utils/orderItemsSql';
 import { markupItems } from '../utils/pricing';
 import { safeIdentifier } from '../utils/sql';
 import { logger } from '../utils/logger';
@@ -45,8 +46,19 @@ function normalizeOrder(row: any) {
   return {
     id: row.id,
     orderNumber: row.order_number,
+    // Same fields routes/orders.ts sends. This endpoint is the one the app's
+    // order list actually calls (services/order.ts -> GET users/orders), so
+    // anything missing here is missing everywhere the customer looks: group_id
+    // left the app unable to merge a multi-seller checkout, and the delivery /
+    // trial columns drove the Instant-Delivery screens off default values.
+    groupId: row.group_id ?? null,
     userId: row.user_id,
     status: row.status,
+    deliveryType: row.delivery_type ?? 'standard',
+    deliveryFee: Number(row.delivery_fee || 0),
+    prepaidAmount: Number(row.prepaid_amount || 0),
+    isTrial: !!row.is_trial,
+    trialExpiresAt: row.trial_expires_at ?? null,
     paymentStatus: row.payment_status,
     totalAmount: Number(row.total_amount || 0),
     shippingAmount: Number(row.shipping_amount || 0),
@@ -94,13 +106,7 @@ router.get('/orders', authenticate, async (req: AuthRequest, res: Response): Pro
 
     const result = await pool.query(
       `SELECT o.*,
-        COALESCE(json_agg(json_build_object(
-          'productId', oi.product_id,
-          'productName', oi.product_name,
-          'quantity', oi.quantity,
-          'price', oi.price,
-          'image', oi.image
-        )) FILTER (WHERE oi.id IS NOT NULL), '[]') as items
+        COALESCE(json_agg(${ORDER_ITEMS_JSON}) FILTER (WHERE oi.id IS NOT NULL), '[]') as items
        FROM ${ORDERS} o
        LEFT JOIN ${ORDER_ITEMS} oi ON oi.order_id = o.id
        WHERE o.user_id = $1 AND NOT ${abandonedCheckout}
