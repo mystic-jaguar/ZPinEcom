@@ -15,6 +15,13 @@ import {
   resolveReturnLines,
   tallyReturnedQuantities,
 } from '../utils/returnLines';
+import {
+  dropoffOtpFrom,
+  generateDropoffOtp,
+  hasDroppedOff,
+  otpMatches,
+  sanitizeReturnHistory,
+} from '../utils/returnDropoff';
 import { cacheDel, cacheDelPattern } from '../utils/redis';
 import { sendPush } from '../utils/push';
 import { ORDER_ITEMS_JSON } from '../utils/orderItemsSql';
@@ -1350,6 +1357,11 @@ router.patch('/:id/return-status', authenticate, async (req: AuthRequest, res: R
         // Recorded on the history entry even when the column is missing, so the
         // partner's answer is never lost to a pending migration.
         ...(nextStatus === 'picked_up' && itemCondition ? { itemCondition } : {}),
+        // The seller's confirmation code for the second leg (partner -> seller).
+        // Minted here because 'picked_up' is the moment the goods start moving
+        // towards the seller. Never served to the customer or the partner —
+        // see sanitizeReturnHistory in utils/returnDropoff.ts.
+        ...(nextStatus === 'picked_up' ? { dropoffOtp: generateDropoffOtp() } : {}),
       },
     ]);
 
@@ -1495,12 +1507,131 @@ router.patch('/:id/return-status', authenticate, async (req: AuthRequest, res: R
           : currentCondition,
         pickedUpAt: nextStatus === 'picked_up' ? now : currentReturn.picked_up_at,
         refundedAt: nextStatus === 'refunded' ? now : currentReturn.refunded_at,
-        statusHistory: updated.rows[0].status_history,
+        // Sanitised: the caller here is the admin website or the delivery
+        // backend, and the drop-off OTP belongs to the seller alone.
+        statusHistory: sanitizeReturnHistory(updated.rows[0].status_history),
       },
     });
   } catch (err) {
     try { await client.query('ROLLBACK'); } catch { /* ignore */ }
     logger.error('updatereturnstatus_error', { error: (err as any)?.message ?? String(err) });
+    res.status(500).json({ success: false, message: 'Server error' });
+  } finally {
+    client.release();
+  }
+});
+
+// PATCH /api/v1/orders/:id/return-dropoff
+//
+// The second leg of a return: the partner hands the collected goods back to the
+// seller, who reads out the OTP minted at pickup. Separate from the status
+// endpoint above because it does NOT move `return_requests.status` — it appends
+// a `dropped_off` entry to status_history (see utils/returnDropoff.ts for why a
+// sixth status is not an option here).
+router.patch('/:id/return-dropoff', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+  const otp = String(req.body?.otp ?? '').trim();
+  const note = String(req.body?.note || '').trim().slice(0, 500);
+
+  // Same gate as the pickup: the partner physically doing the handover, or an
+  // admin correcting the record. Sellers stay read-only on returns.
+  if (!['admin', 'delivery_partner'].includes(String(req.userRole))) {
+    res.status(403).json({ success: false, message: 'Forbidden' });
+    return;
+  }
+  if (!/^\d{6}$/.test(otp)) {
+    res.status(400).json({ success: false, message: 'Enter the 6-digit code from the seller' });
+    return;
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const returnResult = await client.query(
+      `SELECT id, status, status_history
+       FROM ${RETURN_REQUESTS}
+       WHERE order_id = $1
+       ORDER BY created_at DESC
+       LIMIT 1
+       FOR UPDATE`,
+      [req.params.id]
+    );
+    if (returnResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      res.status(404).json({ success: false, message: 'Return request not found' });
+      return;
+    }
+
+    const currentReturn = returnResult.rows[0];
+
+    // Only a collected return can be handed over. 'refunded'/'rejected' are
+    // already settled and 'approved' is still with the customer.
+    if (currentReturn.status !== 'picked_up') {
+      await client.query('ROLLBACK');
+      res.status(400).json({ success: false, message: 'This return has not been collected yet' });
+      return;
+    }
+    if (hasDroppedOff(currentReturn.status_history)) {
+      await client.query('ROLLBACK');
+      res.status(400).json({ success: false, message: 'This return was already handed to the seller' });
+      return;
+    }
+
+    const expected = dropoffOtpFrom(currentReturn.status_history);
+    if (!expected) {
+      // Collected before this feature shipped: there is no code for the seller
+      // to read out, and inventing one now would let anyone close the task.
+      await client.query('ROLLBACK');
+      res.status(409).json({
+        success: false,
+        message: 'No handover code exists for this return — contact ZPIN support to close it.',
+      });
+      return;
+    }
+    if (!otpMatches(expected, otp)) {
+      await client.query('ROLLBACK');
+      res.status(400).json({ success: false, message: 'Wrong code. Ask the seller to read it from their app again.' });
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const updated = await client.query(
+      `UPDATE ${RETURN_REQUESTS}
+       SET status_history = status_history || $2::jsonb, updated_at = NOW()
+       WHERE id = $1
+       RETURNING status_history`,
+      [
+        currentReturn.id,
+        JSON.stringify([
+          { status: 'dropped_off', at: now, by: req.userId, role: req.userRole, ...(note ? { note } : {}) },
+        ]),
+      ]
+    );
+
+    await recordOrderStatus(
+      client,
+      req.params.id,
+      'return_requested',
+      note ? `Return handed to seller: ${note}` : 'Return handed back to the seller'
+    );
+
+    await client.query('COMMIT');
+
+    void notifyReturnTransition(req.params.id, 'dropped_off', note || undefined);
+
+    res.json({
+      success: true,
+      data: {
+        orderId: req.params.id,
+        returnId: currentReturn.id,
+        status: currentReturn.status,
+        droppedOffAt: now,
+        statusHistory: sanitizeReturnHistory(updated.rows[0].status_history),
+      },
+    });
+  } catch (err) {
+    try { await client.query('ROLLBACK'); } catch { /* ignore */ }
+    logger.error('returndropoff_error', { error: (err as any)?.message ?? String(err) });
     res.status(500).json({ success: false, message: 'Server error' });
   } finally {
     client.release();
@@ -1576,7 +1707,9 @@ router.get('/:id/return-status', authenticate, async (req: AuthRequest, res: Res
         updatedAt: rr.updated_at,
         pickedUpAt: rr.picked_up_at,
         refundedAt: rr.refunded_at,
-        statusHistory: Array.isArray(rr.status_history) ? rr.status_history : [],
+        // Sanitised: this is the CUSTOMER's view of their own return, and the
+        // drop-off OTP on the 'picked_up' entry is the seller's secret.
+        statusHistory: sanitizeReturnHistory(rr.status_history),
         // Only promise a refund while one is still coming. A rejected return
         // owes the customer nothing, and a refunded one is already settled.
         refundDisclaimer: ['requested', 'approved', 'picked_up'].includes(rr.status)

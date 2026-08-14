@@ -35,7 +35,10 @@ import { logger } from './logger';
  * Call AFTER COMMIT — a rolled-back transaction must not buzz a phone.
  */
 
-type ReturnEvent = 'requested' | 'approved' | 'rejected' | 'picked_up' | 'refunded';
+// 'dropped_off' is not a `return_requests.status` value — it is a status_history
+// entry (see utils/returnDropoff.ts). It is an event here all the same: the
+// seller has physically got the goods back and both sides want to know.
+type ReturnEvent = 'requested' | 'approved' | 'rejected' | 'picked_up' | 'dropped_off' | 'refunded';
 
 // One row per audience per event. `null` copy = that audience is not told.
 // The customer is not pushed about their own 'requested' tap; they still get the
@@ -60,6 +63,10 @@ const COPY: Record<ReturnEvent, {
     customer: { title: 'Return collected', body: (n) => `Your return for order ${n} has been collected. This amount will be refunded once the seller receives the product.` },
     seller: { title: 'Return on its way back', body: (n) => `The return for order ${n} has been collected from the customer and is on its way to you.` },
   },
+  dropped_off: {
+    customer: { title: 'Return delivered to seller', body: (n) => `Your return for order ${n} has reached the seller. Your refund will be settled shortly.` },
+    seller: { title: 'Return received', body: (n) => `You confirmed the return for order ${n}. ZPIN will settle the refund.` },
+  },
   refunded: {
     customer: { title: 'Refund settled', body: (n) => `The refund for your return on order ${n} has been settled.` },
     seller: { title: 'Return refunded', body: (n) => `The return on order ${n} has been refunded and the stock put back.` },
@@ -71,6 +78,7 @@ const PUSH_CUSTOMER: Record<ReturnEvent, boolean> = {
   approved: true,
   rejected: true,
   picked_up: true,
+  dropped_off: true,
   refunded: true,
 };
 
