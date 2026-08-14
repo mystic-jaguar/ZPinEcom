@@ -25,6 +25,14 @@ const REFUND_STEPS = ['requested', 'approved', 'picked_up', 'refunded'];
 // Fallback only — the server sends the authoritative wording as refundDisclaimer.
 const REFUND_DISCLAIMER = 'This amount will be refunded once the seller receives the product.';
 
+// Every checkbox is keyed on the order ITEM id. If that id is ever missing from
+// the payload, falling back to a constant ('') silently gives every row the SAME
+// key — ticking one ticks all, and the selection the customer thought they made
+// never reaches the server. Fall back to something unique per row instead, and
+// refuse to submit it (see canSubmit below).
+const MISSING_ID = 'no-id-';
+const keyOf = (item: { orderItemId?: string }, i: number) => String(item.orderItemId || `${MISSING_ID}${i}`);
+
 function isWithinReturnWindow(order: { status: string; updatedAt?: string; createdAt?: string }) {
     if (order.status !== 'delivered') return false;
     const ref = order.updatedAt || order.createdAt;
@@ -194,12 +202,15 @@ export default function ReturnsRefundsScreen() {
                         // line bought more than once — must be picked explicitly.
                         const soleUnit = items.length === 1 && returnableQty(items[0]) === 1;
                         const chosen = soleUnit
-                            ? [{ id: String(items[0].orderItemId || ''), quantity: 1 }]
+                            ? [{ id: keyOf(items[0], 0), quantity: 1 }]
                             : Object.entries(selected)
                                 .filter(([, q]) => q > 0)
                                 .map(([id, quantity]) => ({ id, quantity }));
                         const unitCount = chosen.reduce((n, c) => n + c.quantity, 0);
-                        const canSubmit = chosen.length > 0;
+                        // A row whose orderItemId never arrived carries a placeholder
+                        // key. Never submit one: an id the backend cannot match is
+                        // how a one-item return turns back into a whole-order refund.
+                        const canSubmit = chosen.length > 0 && chosen.every(c => !c.id.startsWith(MISSING_ID));
                         return (
                             <View key={order.id} style={styles.card}>
                                 {!soleUnit && (
@@ -209,7 +220,7 @@ export default function ReturnsRefundsScreen() {
                                     </View>
                                 )}
                                 {items.map((item, i) => {
-                                    const itemId = String(item.orderItemId || '');
+                                    const itemId = keyOf(item, i);
                                     const max = returnableQty(item);
                                     const qty = selected[itemId] || 0;
                                     const on = soleUnit || qty > 0;
@@ -277,10 +288,10 @@ export default function ReturnsRefundsScreen() {
                                 >
                                     <RotateCcw size={16} color={canSubmit ? colors.textStrong : colors.textFaint} />
                                     <Text style={[styles.returnText, !canSubmit && { color: colors.textFaint }]}>
-                                        {soleUnit
-                                            ? 'Request return'
-                                            : canSubmit
-                                                ? `Return ${unitCount} item${unitCount > 1 ? 's' : ''}`
+                                        {canSubmit
+                                            ? (soleUnit ? 'Request return' : `Return ${unitCount} item${unitCount > 1 ? 's' : ''}`)
+                                            : chosen.length > 0
+                                                ? 'Pull to refresh and try again'
                                                 : 'Select items to return'}
                                     </Text>
                                 </Pressable>

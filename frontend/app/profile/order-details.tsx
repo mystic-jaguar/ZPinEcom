@@ -426,8 +426,10 @@ export default function OrderDetailsScreen() {
                             Tap an item to send it back. You pay only for what you keep, plus tax and the delivery charge.
                         </Text>
                         <ScrollView style={{ maxHeight: 300, marginVertical: 12 }}>
-                            {order.items.map((it) => {
-                                const id = String(it.orderItemId || '');
+                            {order.items.map((it, idx) => {
+                                // Unique per row even if the id is missing — a shared
+                                // key would mark every item "Return" on one tap.
+                                const id = String(it.orderItemId || `no-id-${idx}`);
                                 const returning = returnIds.includes(id);
                                 return (
                                     <Pressable key={id} style={[styles.itemRow, styles.itemRowBorder]} onPress={() => toggleReturn(id)}>
