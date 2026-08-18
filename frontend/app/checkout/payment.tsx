@@ -114,17 +114,26 @@ export default function CheckoutPaymentScreen() {
                 const rzpOrderResponse = await paymentService.createRazorpayOrder(appOrder.id);
                 if (!rzpOrderResponse.success || !rzpOrderResponse.data) throw new Error('Failed to initiate payment');
                 const { razorpayOrderId, amount, currency, keyId } = rzpOrderResponse.data;
+                const isNetBanking = selectedPaymentMethod === 'net_banking';
                 const options = {
                     description: `Payment for order ${appOrder.orderNumber || appOrder.id}`,
                     image: 'https://i.imgur.com/3g7nmJC.png',
                     currency, key: keyId, amount: String(amount), name: 'ZPIN', order_id: razorpayOrderId,
-                    prefill: { email: user?.email || '', contact: user?.mobile || '', name: user?.name || '' },
-                    // Net Banking maps straight to Razorpay's netbanking method so the
-                    // checkout opens on the bank list instead of the full method menu.
-                    ...(selectedPaymentMethod === 'net_banking' ? { method: { netbanking: true } } : {}),
+                    prefill: {
+                        email: user?.email || '', contact: user?.mobile || '', name: user?.name || '',
+                        // Opens Razorpay straight on the bank list. Every key in `method`
+                        // below defaults to true, so it can only DISABLE methods -- without
+                        // `prefill.method` the checkout still lands on the one-tap screen.
+                        ...(isNetBanking ? { method: 'netbanking' as const } : {}),
+                    },
+                    // Belt and braces: the customer already picked Net Banking on our screen,
+                    // so nothing else is offered inside the sheet.
+                    ...(isNetBanking
+                        ? { method: { netbanking: true, card: false, upi: false, wallet: false, emi: false, paylater: false } }
+                        : {}),
                     theme: { color: Colors.light.tint },
                 };
-                if (!RazorpayCheckout) throw new Error('Payment gateway is not available. Please ensure you are using a native build (not Expo Go).');
+                if (!RazorpayCheckout) throw new Error('Payment gateway is not available. Please try again after some time.');
                 const rzpData = await RazorpayCheckout.open(options);
                 await paymentService.verifyRazorpayPayment({
                     razorpayOrderId,

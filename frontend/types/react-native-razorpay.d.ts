@@ -12,12 +12,15 @@ declare module 'react-native-razorpay' {
             contact?: string;
             name?: string;
             vpa?: string; // UPI ID
+            method?: 'netbanking' | 'card' | 'upi' | 'wallet' | 'emi' | 'paylater';
         };
         method?: {
             upi?: boolean;
             card?: boolean;
             netbanking?: boolean;
             wallet?: boolean;
+            emi?: boolean;
+            paylater?: boolean;
         };
         theme?: {
             color?: string;
