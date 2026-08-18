@@ -7,6 +7,7 @@ import { amountToCharge } from '../utils/collect';
 import { generateId } from '../utils/id';
 import { recordOrderStatus } from '../utils/orderHistory';
 import { sendPush } from '../utils/push';
+import { sendOrderEmail } from '../utils/orderEmail';
 import { notifySellersOfPaidOrders, pushSellersOfPaidOrders } from '../utils/sellerOrderNotify';
 import { safeIdentifier } from '../utils/sql';
 import { logger } from '../utils/logger';
@@ -225,6 +226,9 @@ router.post('/verify', authenticate, async (req: AuthRequest, res: Response): Pr
     sendPush(req.userId, `Payment successful: ${order.order_number}`,
       `Your payment of ₹${groupTotal.toFixed(2)} for order ${order.order_number} was successful.`,
       { orderId: appOrderId, paymentId: razorpayPaymentId, type: 'payment_success' });
+
+    // Confirmation email for prepaid checkouts (COD ones were mailed at checkout).
+    sendOrderEmail(req.userId!, order.group_id ? `ZP-${order.group_id}` : order.order_number, paidOrderIds);
 
     res.json({
       success: true,

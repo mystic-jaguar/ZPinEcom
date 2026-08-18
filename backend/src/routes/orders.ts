@@ -24,6 +24,7 @@ import {
 } from '../utils/returnDropoff';
 import { cacheDel, cacheDelPattern } from '../utils/redis';
 import { sendPush } from '../utils/push';
+import { sendOrderEmail } from '../utils/orderEmail';
 import { ORDER_ITEMS_JSON } from '../utils/orderItemsSql';
 import { safeIdentifier } from '../utils/sql';
 import { logger } from '../utils/logger';
@@ -1017,6 +1018,11 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
         `You have a new order for ${sub.items.length} item(s).`,
         { orderId: sub.id, orderNumber: sub.orderNumber, type: 'new_order' });
     }
+
+    // Order confirmation email, same as the customer website. Prepaid orders are
+    // mailed by razorpay/verify instead — an unpaid checkout gets deleted, and the
+    // customer must not have been told it was confirmed in the meantime.
+    if (notifySellersNow) sendOrderEmail(req.userId!, groupOrderNumber, subOrders.map((o) => o.id));
 
     // Invalidate user's order list and cart caches
     await Promise.all([
