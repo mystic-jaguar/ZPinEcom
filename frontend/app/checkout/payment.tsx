@@ -119,6 +119,9 @@ export default function CheckoutPaymentScreen() {
                     image: 'https://i.imgur.com/3g7nmJC.png',
                     currency, key: keyId, amount: String(amount), name: 'ZPIN', order_id: razorpayOrderId,
                     prefill: { email: user?.email || '', contact: user?.mobile || '', name: user?.name || '' },
+                    // Net Banking maps straight to Razorpay's netbanking method so the
+                    // checkout opens on the bank list instead of the full method menu.
+                    ...(selectedPaymentMethod === 'net_banking' ? { method: { netbanking: true } } : {}),
                     theme: { color: Colors.light.tint },
                 };
                 if (!RazorpayCheckout) throw new Error('Payment gateway is not available. Please ensure you are using a native build (not Expo Go).');
@@ -265,11 +268,13 @@ export default function CheckoutPaymentScreen() {
             <View style={[styles.footer, { paddingBottom: 14 + insets.bottom }]}>
                 <View>
                     <ZText variant="eyebrow" color={colors.textMuted} style={{ marginBottom: 2 }}>
-                        {isInstant ? 'Order total' : 'Total to pay'}
+                        {isTrialSelection ? 'Pay now' : 'Total to pay'}
                     </ZText>
-                    <Text style={styles.footerTotal}>{money(finalTotal)}</Text>
-                    {isInstant && isTrialSelection && (
-                        <Text style={styles.optSub}>{money(deliveryFee)} now · rest at your door</Text>
+                    {/* Try-at-Door only charges the delivery fee up front, so the bold
+                        figure is what is actually about to be debited, not the order total. */}
+                    <Text style={styles.footerTotal}>{money(isTrialSelection ? deliveryFee : finalTotal)}</Text>
+                    {isTrialSelection && (
+                        <Text style={styles.optSub}>{money(finalTotal)} order total · rest at your door</Text>
                     )}
                 </View>
                 <Pressable style={[styles.payBtn, isSubmitting && { opacity: 0.6 }]} onPress={handleConfirm} disabled={isSubmitting}>

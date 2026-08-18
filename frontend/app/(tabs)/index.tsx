@@ -567,7 +567,7 @@ export default function HomeScreen() {
                 </View>
 
                 {/* Recommended */}
-                <SectionHeader eyebrow="Fresh today" title="New in your size" actionLabel="See all" onAction={() => router.push('/product-listing')} style={styles.section} />
+                <SectionHeader eyebrow="Fresh today" title="Recently viewed" actionLabel="See all" onAction={() => router.push('/product-listing')} style={styles.section} />
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hList}>
                     {recommended.map((item) => (
                         <ProductCard
