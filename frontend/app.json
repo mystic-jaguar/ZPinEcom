@@ -53,6 +53,12 @@
         }
       ],
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "ZPIN needs access to your photos so you can add pictures to a product review."
+        }
+      ],
+      [
         "expo-location",
         {
           "locationWhenInUsePermission": "ZPIN uses your location only while you're using the app to show product availability and delivery options near you.",

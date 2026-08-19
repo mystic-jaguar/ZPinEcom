@@ -2,12 +2,15 @@ import { Request, Response, Router } from 'express';
 import jwt from 'jsonwebtoken';
 import { pool } from '../db';
 import { authenticate, AuthRequest } from '../middleware/auth';
-import { productListLimiter, reviewLimiter } from '../middleware/rateLimits';
+import { productListLimiter, reviewLimiter, reviewUploadLimiter } from '../middleware/rateLimits';
 import { generateId } from '../utils/id';
 import { AUTO_HIDE_THRESHOLD, ensureModerationSchema } from '../utils/moderationSchema';
 import { withMarkup, withoutMarkup } from '../utils/pricing';
 import { cacheDel, cacheDelPattern, cacheGet, cacheSet } from '../utils/redis';
 import { logger } from '../utils/logger';
+import multer from 'multer';
+import { looksLikeImage } from '../utils/imageBytes';
+import { isConfigured as cloudinaryConfigured, uploadReviewImage } from '../utils/cloudinary';
 
 // TTLs (seconds)
 // Price/stock edits are made in OTHER backends (vendor app, vendor website) that
@@ -23,6 +26,15 @@ const TTL_FRESH_CAT = 7200;     // 2h — fresh categories
 const TTL_NEARBY = 3600;        // 1h — nearby categories
 
 const router = Router();
+
+// Review photos: one at a time, 5MB, same ceiling and byte-sniffing the vendor
+// backend uses for KYC/product uploads (mimetype is the client's own header).
+const reviewImageUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+  fileFilter: (_req, file, cb) =>
+    file.mimetype.startsWith('image/') ? cb(null, true) : cb(new Error('Only image files are allowed')),
+});
 
 /**
  * Phase 10 — typo-tolerant search.
@@ -784,6 +796,29 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
+// POST /api/v1/products/reviews/upload
+// Hosts one review photo and returns its URL; the URL is then sent in the
+// `images` array of the review POST/PUT. Declared before the /:id routes so the
+// literal path always wins.
+router.post('/reviews/upload', authenticate, reviewUploadLimiter, reviewImageUpload.single('image'), async (req: AuthRequest, res: Response): Promise<void> => {
+  if (!cloudinaryConfigured()) {
+    res.status(503).json({ success: false, message: 'Image uploads are not available right now' });
+    return;
+  }
+  if (!req.file?.buffer || !looksLikeImage(req.file.buffer)) {
+    res.status(400).json({ success: false, message: 'Please choose a valid image file' });
+    return;
+  }
+
+  try {
+    const url = await uploadReviewImage(req.file.buffer, req.userId as string);
+    res.status(201).json({ success: true, data: { url } });
+  } catch (err) {
+    logger.error('reviewimageupload_error', { error: (err as any)?.message ?? String(err) });
+    res.status(500).json({ success: false, message: 'Failed to upload image' });
+  }
+});
+
 // GET /api/v1/products/:id/reviews
 router.get('/:id/reviews', async (req: Request, res: Response): Promise<void> => {
   if (!isValidProductId(req.params.id)) {
@@ -897,9 +932,21 @@ router.get('/:id/reviews', async (req: Request, res: Response): Promise<void> =>
     );
     const total = Number(countResult.rows[0].count);
 
+    // Star distribution over ALL visible reviews, not just this page — the app
+    // draws the 5/4/3/2/1 bars from it and the page only ever holds 10 rows.
+    const distResult = await pool.query(
+      mineOnly
+        ? 'SELECT rating, COUNT(*)::int AS count FROM product_reviews WHERE product_id = $1 AND user_id::text = $2 GROUP BY rating'
+        : `SELECT pr.rating, COUNT(*)::int AS count FROM product_reviews pr WHERE pr.product_id = $1 AND pr.is_hidden = false${blockedFilter} GROUP BY pr.rating`,
+      mineOnly ? [productUUID, mineUserId] : requesterId ? [productUUID, requesterId] : [productUUID]
+    );
+    const ratingCounts: Record<string, number> = { '1': 0, '2': 0, '3': 0, '4': 0, '5': 0 };
+    for (const row of distResult.rows) ratingCounts[String(row.rating)] = Number(row.count);
+
     const response = {
       success: true,
       data: result.rows.map(mapReviewRow),
+      ratingCounts,
       pagination: {
         currentPage: page,
         totalPages: Math.ceil(total / limit),

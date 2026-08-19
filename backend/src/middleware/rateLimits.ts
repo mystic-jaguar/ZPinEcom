@@ -67,6 +67,17 @@ export const reviewLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// ── Review photo uploads ─────────────────────────────────────────────────────
+// Separate from reviewLimiter on purpose: a review can carry 4 photos, and
+// uploading them must not eat the budget the review submission itself needs.
+export const reviewUploadLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: isProd ? 40 : 10000,
+  message: json429('Too many image uploads. Please try again later.'),
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // ── Coupon validation — prevent brute-force coupon guessing ──────────────────
 // Production: 20/15min | Development: unlimited
 export const couponLimiter = rateLimit({

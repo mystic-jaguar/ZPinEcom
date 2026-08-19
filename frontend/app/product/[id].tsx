@@ -17,7 +17,8 @@ import { useUser } from '../../context/UserContext';
 import { useWishlist } from '../../context/WishlistContext';
 import apiClient, { tokenManager } from '../../services/api';
 import { productService } from '../../services/product';
-import { reviewService } from '../../services/review';
+import * as ImagePicker from 'expo-image-picker';
+import { MAX_REVIEW_IMAGES, reviewService } from '../../services/review';
 import { userService } from '../../services/user';
 import { colors, fonts, palette, radius } from '../../constants/theme';
 import { ProductObject, ReviewObject } from '../../types/types';
@@ -53,6 +54,10 @@ export default function ProductDetails() {
     const [reviews, setReviews] = useState<ReviewObject[]>([]);
     const [myReview, setMyReview] = useState<ReviewObject | null>(null);
     const [reviewTotal, setReviewTotal] = useState(0);
+    // Star distribution over ALL visible reviews (the list itself is only page 1).
+    const [ratingCounts, setRatingCounts] = useState<Record<string, number>>({});
+    const [reviewImages, setReviewImages] = useState<string[]>([]);
+    const [reviewImageUploading, setReviewImageUploading] = useState(false);
     const [activeCoupon, setActiveCoupon] = useState<{ code: string; description: string; discountType: string; discountValue: number } | null>(null);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -83,11 +88,13 @@ export default function ProductDetails() {
             ]);
             setReviews(reviewsRes.data || []);
             setReviewTotal(reviewsRes.pagination?.totalItems || 0);
+            setRatingCounts(reviewsRes.ratingCounts || {});
             setMyReview(mineRes?.data?.[0] || null);
         } catch {
             setReviews([]);
             setMyReview(null);
             setReviewTotal(0);
+            setRatingCounts({});
         }
     };
 
@@ -113,9 +120,11 @@ export default function ProductDetails() {
         if (ownReview) {
             setReviewRating(ownReview.rating);
             setReviewComment(ownReview.comment);
+            setReviewImages(ownReview.images || []);
         } else {
             setReviewRating(5);
             setReviewComment('');
+            setReviewImages([]);
         }
     }, [ownReview?.id]);
 
@@ -173,12 +182,14 @@ export default function ProductDetails() {
                 await reviewService.updateProductReview(product.productId, ownReview.id, {
                     rating: reviewRating,
                     comment: trimmedComment,
+                    images: reviewImages,
                 });
                 setReviewFeedback('Your review was updated.');
             } else {
                 await reviewService.addProductReview(product.productId, {
                     rating: reviewRating,
                     comment: trimmedComment,
+                    images: reviewImages,
                 });
                 setReviewFeedback('Thanks for reviewing this product.');
             }
@@ -188,6 +199,38 @@ export default function ProductDetails() {
             setReviewFeedback(err.message || 'Failed to submit review.');
         } finally {
             setReviewSubmitting(false);
+        }
+    };
+
+    // Pick one photo and host it straight away, so the review POST only ever
+    // carries URLs. Matches the vendor app's ImageUploadTile flow.
+    const handlePickReviewImage = async () => {
+        if (reviewImages.length >= MAX_REVIEW_IMAGES) return;
+
+        const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!perm.granted) {
+            setReviewFeedback('Allow photo access to add pictures to your review.');
+            return;
+        }
+
+        const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8 });
+        if (result.canceled) return;
+
+        const asset = result.assets[0];
+        if ((asset.fileSize ?? 0) > 5 * 1024 * 1024) {
+            setReviewFeedback('Pick an image under 5MB.');
+            return;
+        }
+
+        try {
+            setReviewImageUploading(true);
+            setReviewFeedback(null);
+            const url = await reviewService.uploadReviewImage(asset.uri);
+            setReviewImages(prev => [...prev, url]);
+        } catch (err: any) {
+            setReviewFeedback(err.message || 'Failed to upload image.');
+        } finally {
+            setReviewImageUploading(false);
         }
     };
 
@@ -202,6 +245,7 @@ export default function ProductDetails() {
             setShowDeleteReviewModal(false);
             setReviewComment('');
             setReviewRating(5);
+            setReviewImages([]);
             setReviewFeedback('Your review was deleted.');
             await loadReviews(product.productId);
         } catch (err: any) {
@@ -369,27 +413,6 @@ export default function ProductDetails() {
                     {/* One-line product detail, directly under the title */}
                     {oneLiner && <Text style={styles.subtitle} numberOfLines={1}>{oneLiner}</Text>}
 
-                    {/* Rating summary row */}
-                    {reviewTotal > 0 && (
-                        <View style={styles.ratingSummaryRow}>
-                            {[5,4,3,2,1].map(star => {
-                                const count = reviews.filter(r => r.rating === star).length;
-                                const pct = reviews.length > 0 ? (count / reviews.length) * 100 : 0;
-                                return (
-                                    <View key={star} style={styles.ratingBarRow}>
-                                        <Text style={styles.ratingBarLabel}>{star}</Text>
-                                        <Ionicons name="star" size={10} color="#FBBF24" />
-                                        <View style={styles.ratingBarTrack}>
-                                            <View style={[styles.ratingBarFill, { width: `${pct}%` }]} />
-                                        </View>
-                                        <Text style={styles.ratingBarCount}>{count}</Text>
-                                    </View>
-                                );
-                            })}
-                            <Text style={styles.ratingTotalText}>{reviewTotal} rating{reviewTotal !== 1 ? 's' : ''}</Text>
-                        </View>
-                    )}
-
                     {/* Seller name inline; the address stays behind the accordion below */}
                     {product.sellerName && (
                         <Text style={styles.sellerLine}>Sold by {product.sellerName}</Text>
@@ -553,6 +576,28 @@ export default function ProductDetails() {
                     )}
 
                     <AccordionItem title={`Reviews${reviewTotal > 0 ? ` (${reviewTotal})` : ''}`}>
+                        {/* Star distribution — counts come from the API so they cover
+                            every review, not just the first page loaded below. */}
+                        {reviewTotal > 0 && (
+                            <View style={styles.ratingSummaryRow}>
+                                {[5, 4, 3, 2, 1].map(star => {
+                                    const count = ratingCounts[String(star)] ?? 0;
+                                    const pct = reviewTotal > 0 ? (count / reviewTotal) * 100 : 0;
+                                    return (
+                                        <View key={star} style={styles.ratingBarRow}>
+                                            <Text style={styles.ratingBarLabel}>{star}</Text>
+                                            <Ionicons name="star" size={10} color="#FBBF24" />
+                                            <View style={styles.ratingBarTrack}>
+                                                <View style={[styles.ratingBarFill, { width: `${pct}%` }]} />
+                                            </View>
+                                            <Text style={styles.ratingBarCount}>{count}</Text>
+                                        </View>
+                                    );
+                                })}
+                                <Text style={styles.ratingTotalText}>{reviewTotal} rating{reviewTotal !== 1 ? 's' : ''}</Text>
+                            </View>
+                        )}
+
                         {showReviewForm ? (
                             <View style={styles.reviewComposer}>
                                 <View style={styles.reviewComposerHeader}>
@@ -589,6 +634,36 @@ export default function ProductDetails() {
                                     numberOfLines={4}
                                     style={styles.reviewInput}
                                 />
+
+                                {/* Photos — uploaded on pick, so `reviewImages` is URLs */}
+                                <View style={styles.reviewPhotoRow}>
+                                    {reviewImages.map((uri, i) => (
+                                        <View key={uri} style={styles.reviewPhotoWrap}>
+                                            <Image source={{ uri }} style={styles.reviewPhoto} />
+                                            <TouchableOpacity
+                                                style={styles.reviewPhotoRemove}
+                                                accessibilityLabel={`Remove photo ${i + 1}`}
+                                                onPress={() => setReviewImages(prev => prev.filter(u => u !== uri))}
+                                            >
+                                                <Ionicons name="close" size={12} color="#fff" />
+                                            </TouchableOpacity>
+                                        </View>
+                                    ))}
+                                    {reviewImages.length < MAX_REVIEW_IMAGES && (
+                                        <TouchableOpacity
+                                            style={styles.reviewPhotoAdd}
+                                            onPress={handlePickReviewImage}
+                                            disabled={reviewImageUploading}
+                                            accessibilityRole="button"
+                                            accessibilityLabel="Add a photo to your review"
+                                        >
+                                            {reviewImageUploading
+                                                ? <ActivityIndicator size="small" color={palette.yellow600} />
+                                                : <><Feather name="camera" size={16} color={palette.yellow600} />
+                                                    <Text style={styles.reviewPhotoAddText}>Add photo</Text></>}
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
 
                                 {reviewFeedback ? <Text style={styles.reviewFeedback}>{reviewFeedback}</Text> : null}
 
@@ -643,6 +718,13 @@ export default function ProductDetails() {
                                             </Text>
                                         </View>
                                         <Text style={styles.reviewComment}>{r.comment}</Text>
+                                        {!!r.images?.length && (
+                                            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.reviewPhotoStrip}>
+                                                {r.images.map(uri => (
+                                                    <Image key={uri} source={{ uri }} style={styles.reviewPhoto} />
+                                                ))}
+                                            </ScrollView>
+                                        )}
                                         {r.userId !== user.id && (
                                             <View style={styles.reviewModerationRow}>
                                                 <TouchableOpacity style={styles.reviewModerationBtn} onPress={() => setReviewToReport(r)}>
@@ -1079,6 +1161,52 @@ const styles = StyleSheet.create({
         backgroundColor: '#F9FAFB',
         borderRadius: 10,
         padding: 12,
+    },
+    reviewPhotoRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+        marginTop: 10,
+    },
+    reviewPhotoStrip: {
+        marginTop: 8,
+    },
+    reviewPhotoWrap: {
+        position: 'relative',
+    },
+    reviewPhoto: {
+        width: 64,
+        height: 64,
+        borderRadius: 8,
+        backgroundColor: '#f0f0f0',
+        marginRight: 8,
+    },
+    reviewPhotoRemove: {
+        position: 'absolute',
+        top: -6,
+        right: 2,
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        backgroundColor: 'rgba(0,0,0,0.65)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    reviewPhotoAdd: {
+        width: 64,
+        height: 64,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderStyle: 'dashed',
+        borderColor: palette.yellow600,
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 2,
+    },
+    reviewPhotoAddText: {
+        fontSize: 9,
+        color: palette.yellow600,
+        fontWeight: '600',
     },
     ratingBarRow: {
         flexDirection: 'row',
