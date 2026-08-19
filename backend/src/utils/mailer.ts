@@ -60,6 +60,12 @@ export async function sendOrderConfirmationEmail(
     deliveryFee = 0, discount = 0, total, items = [], shippingAddress,
   } = order;
 
+  // Deep link to THIS order, not the order list. `/orders` is not a route on the
+  // customer site at all, so a button pointing at it does nothing when tapped —
+  // `/order-tracking/:orderNumber` is the route Profile.jsx itself navigates to.
+  // encodeURIComponent because the number lands in the path.
+  const trackUrl = `${(process.env.WEB_BASE_URL || 'https://zpinservices.com').replace(/\/+$/, '')}/order-tracking/${encodeURIComponent(orderNumber)}`;
+
   const fmt = (n: number) => `Rs. ${Number(n || 0).toFixed(2)}`;
   const esc = (s: any) => String(s ?? '').replace(/[<>&"]/g, (c) =>
     ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c] as string));
@@ -109,6 +115,9 @@ export async function sendOrderConfirmationEmail(
           <p style="font-size:14px;color:#64748b;margin:0 0 20px;line-height:1.6">
             We're getting your order ready. ${deliveryLabel}.
           </p>
+          <a href="${esc(trackUrl)}" style="display:inline-block;background:#1a1a1a;color:#fff;text-decoration:none;font-size:14px;font-weight:600;padding:12px 24px;border-radius:8px">
+            View your order
+          </a>
         </div>
 
         <div style="padding:24px 32px 8px">

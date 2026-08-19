@@ -19,8 +19,11 @@ const money = (n: number) => `₹${Number(n).toLocaleString('en-IN', { minimumFr
 function parcelStatusMeta(status: string) {
     if (status === 'delivered') return { label: 'Delivered', color: palette.green500 };
     if (status === 'cancelled') return { label: 'Cancelled', color: palette.red500 };
-    if (status === 'out_for_delivery') return { label: 'Out for delivery', color: palette.yellow600 };
-    if (status === 'shipped' || status === 'in_transit') return { label: 'In transit', color: palette.yellow600 };
+    // No 'In transit' stage exists any more (see utils/orderStatus.ts): a
+    // picked-up parcel is already on its way to the door, so shipped/in_transit
+    // read as 'Out for delivery' here too — a badge must never contradict the
+    // tracker the customer opens from it.
+    if (['out_for_delivery', 'shipped', 'in_transit'].includes(status)) return { label: 'Out for delivery', color: palette.yellow600 };
     if (status === 'returned' || status === 'return_requested') return { label: 'Return', color: palette.yellow600 };
     return { label: statusLabel(status), color: palette.yellow600 };
 }

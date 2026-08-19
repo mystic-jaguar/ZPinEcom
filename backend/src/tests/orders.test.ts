@@ -409,6 +409,83 @@ describe('POST /orders/:id/return', () => {
     expect(res.status).toBe(400);
     expect(res.body.message).toMatch(/delivered/i);
   });
+
+  /**
+   * The 2026-08-19 "Return Failed" report. The customer had a return already
+   * open (raised a moment earlier), tapped Confirm, and got a red "Return
+   * Failed — Every item on this order has already been returned". Their return
+   * was fine; the open-return lookup simply ran AFTER the already-returned
+   * guard, so the guard answered first. The open return must win.
+   */
+  it('answers with the OPEN return instead of failing the request', async () => {
+    const db = require('../db');
+    const itemId = 'eadb59c3-4343-4100-b16d-575da69f306e';
+    db.__mockQuery.mockImplementation((sql: string) => {
+      if (sql.includes('WHERE id = $1 AND user_id = $2') && sql.includes('"orders"')) {
+        return Promise.resolve({ rows: [{ id: orderId, status: 'return_requested', final_amount: '11' }] });
+      }
+      if (sql.includes('"order_items"') && sql.includes('WHERE order_id = $1')) {
+        return Promise.resolve({ rows: [{ id: itemId, price: '9', quantity: 1 }] });
+      }
+      // The whole line is already spoken for, so the already-returned guard
+      // WOULD reject this if it ran first.
+      if (sql.includes('"return_requests"')) {
+        return Promise.resolve({
+          rows: [{
+            id: 'RET0001', status: 'requested', order_item_ids: [{ id: itemId, quantity: 1 }],
+            created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+          }],
+        });
+      }
+      return Promise.resolve({ rows: [] });
+    });
+
+    const res = await request(app)
+      .post(`${BASE}/${orderId}/return`)
+      .set(bearerHeader(custToken))
+      .send({ orderItemIds: [{ orderItemId: itemId, quantity: 1 }], reason: 'Size issue' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.returnId).toBe('RET0001');
+    expect(res.body.data.status).toBe('requested');
+    expect(res.body.data.message).toMatch(/already in progress/i);
+    // And it must NOT be the scary failure the customer saw.
+    expect(JSON.stringify(res.body)).not.toMatch(/already been returned/i);
+  });
+
+  /**
+   * A free-text "Other" reason must survive to the stored row — the seller and
+   * the admin queue have nothing else to read.
+   */
+  it('stores an "Other: ..." free-text reason verbatim', async () => {
+    const db = require('../db');
+    const itemId = 'aaaaaaaa-9c0b-4ef8-bb6d-6bb9bd380a11';
+    const inserts: any[][] = [];
+    db.__mockQuery.mockImplementation((sql: string, params?: any[]) => {
+      if (sql.includes('INSERT INTO "return_requests"')) {
+        inserts.push(params || []);
+        return Promise.resolve({ rows: [] });
+      }
+      if (sql.includes('WHERE id = $1 AND user_id = $2') && sql.includes('"orders"')) {
+        return Promise.resolve({ rows: [{ id: orderId, status: 'delivered', final_amount: '11' }] });
+      }
+      if (sql.includes('"order_items"') && sql.includes('WHERE order_id = $1')) {
+        return Promise.resolve({ rows: [{ id: itemId, price: '9', quantity: 1 }] });
+      }
+      return Promise.resolve({ rows: [] });
+    });
+
+    const reason = 'Other: the cap was cracked in two places';
+    const res = await request(app)
+      .post(`${BASE}/${orderId}/return`)
+      .set(bearerHeader(custToken))
+      .send({ orderItemIds: [{ orderItemId: itemId, quantity: 1 }], reason, description: 'the cap was cracked in two places' });
+
+    expect(res.status).toBe(200);
+    expect(inserts.length).toBe(1);
+    expect(inserts[0]).toContain(reason);
+  });
 });
 
 // ─── PATCH /orders/:id/return-status ─────────────────────────────────────────

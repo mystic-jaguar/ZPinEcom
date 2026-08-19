@@ -2,7 +2,7 @@ import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Check, Info } from 'lucide-react-native';
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
 import { AppHeader, ZButton, ZText } from '../../components/ui';
@@ -11,7 +11,12 @@ import { useOrder } from '../../context/OrderContext';
 import { orderService } from '../../services/order';
 
 const CANCELLATION_REASONS = ['Ordered by mistake', 'Found a better price', 'Delivery taking too long', 'Changed my mind', 'Item not needed anymore', 'Other'];
-const RETURN_REASONS = ['Defective product', 'Product not working', 'Different from description', 'Wrong item received', 'Size issue', 'Quality not as expected'];
+const RETURN_REASONS = ['Defective product', 'Product not working', 'Different from description', 'Wrong item received', 'Size issue', 'Quality not as expected', 'Other'];
+// The one reason that carries the customer's own words. Picking it reveals a
+// text box, and the typed text is what the seller and the admin queue read —
+// a bare "Other" tells nobody why the item came back.
+const OTHER_REASON = 'Other';
+const OTHER_MAX = 300;
 
 export default function CancelOrderScreen() {
     const router = useRouter();
@@ -37,6 +42,7 @@ export default function CancelOrderScreen() {
 
     const isReturn = mode === 'return';
     const [selectedReason, setSelectedReason] = useState('');
+    const [otherReason, setOtherReason] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [showErrorModal, setShowErrorModal] = useState(false);
@@ -93,6 +99,13 @@ export default function CancelOrderScreen() {
             setShowErrorModal(true);
             return;
         }
+        // "Other" without the words is the same as no reason at all.
+        const customReason = otherReason.trim();
+        if (selectedReason === OTHER_REASON && !customReason) {
+            setErrorMessage(`Please tell us why you are ${isReturn ? 'returning' : 'cancelling'}.`);
+            setShowErrorModal(true);
+            return;
+        }
         // Never submit a return with nothing selected — the backend would treat it
         // as the whole order and refund everything.
         if (isReturn && returnLines.length === 0) {
@@ -108,11 +121,13 @@ export default function CancelOrderScreen() {
                     // {orderItemId, quantity} objects — the backend also still
                     // accepts bare id strings from older builds.
                     orderItemIds: returnLines,
-                    reason: selectedReason,
-                    description: 'Return request via app',
+                    reason: selectedReason === OTHER_REASON ? `Other: ${customReason}` : selectedReason,
+                    // The seller/admin queue shows `description`; keep the typed
+                    // words there too so neither surface has to parse `reason`.
+                    description: selectedReason === OTHER_REASON ? customReason : 'Return request via app',
                 });
             } else {
-                response = await cancelOrder(order.id, { reason: selectedReason, refundMethod: 'original' });
+                response = await cancelOrder(order.id, { reason: selectedReason === OTHER_REASON ? `Other: ${customReason}` : selectedReason, refundMethod: 'original' });
             }
             let msg = response?.message || `${isReturn ? 'Return initiated' : 'Order cancelled'} successfully.`;
             if (response?.refundAmount && response.refundAmount > 0) {
@@ -178,6 +193,19 @@ export default function CancelOrderScreen() {
                     })}
                 </View>
 
+                {selectedReason === OTHER_REASON && (
+                    <TextInput
+                        style={styles.otherInput}
+                        value={otherReason}
+                        onChangeText={setOtherReason}
+                        placeholder={`Tell us why you are ${isReturn ? 'returning' : 'cancelling'} this item`}
+                        placeholderTextColor={colors.textFaint}
+                        multiline
+                        maxLength={OTHER_MAX}
+                        textAlignVertical="top"
+                    />
+                )}
+
                 <View style={styles.infoBox}>
                     <Info size={17} color={palette.yellow700} />
                     {/* A return is not a cancellation: the money only moves after the
@@ -239,6 +267,7 @@ const styles = StyleSheet.create({
     reasonOn: { backgroundColor: colors.surfaceInverse },
     reasonOff: { backgroundColor: colors.surfaceCard, borderWidth: 1.5, borderColor: colors.borderSubtle },
     reasonText: { fontFamily: fonts.bodySemiBold, fontSize: 14, color: colors.textBody },
+    otherInput: { marginTop: 12, minHeight: 92, borderWidth: 1.5, borderColor: colors.borderSubtle, borderRadius: radius.md, backgroundColor: colors.surfaceCard, padding: 14, fontFamily: fonts.bodyRegular, fontSize: 14, color: colors.textBody },
     radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: colors.borderSubtle, alignItems: 'center', justifyContent: 'center' },
     radioOn: { backgroundColor: palette.yellow500, borderWidth: 0 },
     infoBox: { flexDirection: 'row', gap: 10, alignItems: 'flex-start', backgroundColor: palette.yellow100, borderRadius: radius.md, padding: 14, marginTop: 18 },

@@ -1092,6 +1092,43 @@ router.post('/:id/return', authenticate, async (req: AuthRequest, res: Response)
       )
     ).rows;
 
+    // A return that is ALREADY OPEN wins over every guard below. This lookup used
+    // to sit after them, so a customer whose return already existed — a double
+    // tap, a retry after a dropped response, or a return raised on the website a
+    // moment earlier — got "Every item on this order has already been returned"
+    // under a red "Return Failed" heading. Their return was fine; only the order
+    // of the checks was wrong. Answer with the open return instead.
+    const existingReturn = await pool.query(
+      `SELECT id, status, order_item_ids, created_at, updated_at
+       FROM ${RETURN_REQUESTS}
+       WHERE order_id = $1 AND user_id = $2 AND status IN ('requested', 'approved', 'picked_up')
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [req.params.id, req.userId]
+    );
+
+    if (existingReturn.rows.length > 0) {
+      const activeReturn = existingReturn.rows[0];
+      res.json({
+        success: true,
+        data: {
+          returnId: activeReturn.id,
+          status: activeReturn.status,
+          message: 'A return is already in progress for this order.',
+          // The amount owed on the return that already exists, not on this
+          // request's selection — quoting final_amount here showed the customer
+          // the whole order value for a single-item return.
+          refundAmount: refundForLines(
+            resolveReturnLines(activeReturn.order_item_ids, orderItems),
+            withMarkup
+          ).total,
+          refundStatus: 'initiated',
+          refundDisclaimer: RETURN_REFUND_DISCLAIMER,
+        },
+      });
+      return;
+    }
+
     // Units already spoken for by an earlier return on this order. A rejected
     // return gives its units back; every other state (requested/approved/
     // picked_up/refunded) is still holding them, so 2-of-5 followed by another
@@ -1112,10 +1149,12 @@ router.post('/:id/return', authenticate, async (req: AuthRequest, res: Response)
       }))
       .filter((i) => i.quantity > 0);
 
+    // Only reachable when every prior return is SETTLED (refunded) — an open one
+    // was answered above — so this really is a finished order.
     if (remainingItems.length === 0) {
       res.status(400).json({
         success: false,
-        message: 'Every item on this order has already been returned',
+        message: 'Every item on this order has already been returned and refunded.',
       });
       return;
     }
@@ -1159,37 +1198,6 @@ router.post('/:id/return', authenticate, async (req: AuthRequest, res: Response)
     // Persist the concrete lines, never the raw client payload — one canonical
     // shape ({id, quantity}) for every downstream reader.
     const storedLines = resolvedLines.map((l) => ({ id: l.id, quantity: l.quantity }));
-
-    const existingReturn = await pool.query(
-      `SELECT id, status, order_item_ids, created_at, updated_at
-       FROM ${RETURN_REQUESTS}
-       WHERE order_id = $1 AND user_id = $2 AND status IN ('requested', 'approved', 'picked_up')
-       ORDER BY created_at DESC
-       LIMIT 1`,
-      [req.params.id, req.userId]
-    );
-
-    if (existingReturn.rows.length > 0) {
-      const activeReturn = existingReturn.rows[0];
-      res.json({
-        success: true,
-        data: {
-          returnId: activeReturn.id,
-          status: activeReturn.status,
-          message: 'Return request is already active for this order',
-          // The amount owed on the return that already exists, not on this
-          // request's selection — quoting final_amount here showed the customer
-          // the whole order value for a single-item return.
-          refundAmount: refundForLines(
-            resolveReturnLines(activeReturn.order_item_ids, orderItems),
-            withMarkup
-          ).total,
-          refundStatus: 'initiated',
-          refundDisclaimer: RETURN_REFUND_DISCLAIMER,
-        },
-      });
-      return;
-    }
 
     // Insert into return_requests table
     const returnId = generateId();

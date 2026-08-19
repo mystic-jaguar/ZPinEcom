@@ -2,38 +2,47 @@
  * ONE order-status vocabulary, shared with the customer website
  * (zpin-customer-main/src/Pages/OrderTracking/OrderTracking.jsx).
  *
- * The website has always shown five tracking stages and understood the finer
- * `in_transit` / `out_for_delivery` values; the app only had three. Both
- * surfaces now read the same table so a customer sees the same stage whichever
- * one they open. Keep STEPS / STEP_INDEX in sync with the website's copy.
+ * The website has always shown the finer `in_transit` / `out_for_delivery`
+ * values; the app only had three stages. Both surfaces now read the same table
+ * so a customer sees the same stage whichever one they open. Keep STEPS /
+ * STEP_INDEX in sync with the website's copy.
+ *
+ * "In transit" was dropped: ZPIN delivers within 12 hours inside Pune with one
+ * partner carrying the parcel door to door, so there is no courier-network leg
+ * between pickup and the doorstep. The stage never lasted long enough to mean
+ * anything and only made the tracker look stalled. A picked-up parcel now reads
+ * as 'Out for delivery', which is what it actually is.
  */
 
 export const TRACK_STEPS = [
     { key: 'order_placed', title: 'Order placed', note: 'We have your order', short: 'PLACED' },
     { key: 'processing', title: 'Processing', note: 'Accepted by the vendor', short: 'CONFIRMED' },
-    { key: 'in_transit', title: 'In transit', note: 'Picked up by the courier', short: 'IN TRANSIT' },
     { key: 'out_for_delivery', title: 'Out for delivery', note: 'On the way to you', short: 'ON THE WAY' },
     { key: 'delivered', title: 'Delivered', note: 'Have your size ready', short: 'DELIVERED' },
 ] as const;
 
-/** Every backend order status → one of the five stage indexes above. */
+/**
+ * Every backend order status → one of the four stage indexes above. The
+ * `shipped`/`in_transit`/`picked_up` family still ARRIVES from the backend (the
+ * statuses are not going away) — it just maps onto 'Out for delivery' now.
+ */
 const STEP_INDEX: Record<string, number> = {
     order_placed: 0, pending: 0, placed: 0, trial_pending: 0,
     confirmed: 1, processing: 1, accepted: 1,
     shipped: 2, in_transit: 2, picked_up: 2, dispatched: 2,
-    out_for_delivery: 3, out_delivery: 3, awaiting_collection: 3,
+    out_for_delivery: 2, out_delivery: 2, awaiting_collection: 2,
     // Phase 9: a failed attempt does not move the order backwards — it is still
     // out with the courier, who either retries or returns it.
-    delivery_failed: 3,
-    delivered: 4, completed: 4,
+    delivery_failed: 2,
+    delivered: 3, completed: 3,
 };
 
-/** delivery_status (written by the delivery app) → the same five stages. */
+/** delivery_status (written by the delivery app) → the same four stages. */
 const DELIVERY_STEP_INDEX: Record<string, number> = {
     assigned: 1, accepted: 1,
     picked_up: 2, in_transit: 2,
-    out_for_delivery: 3, failed: 3,
-    delivered: 4,
+    out_for_delivery: 2, failed: 2,
+    delivered: 3,
 };
 
 /** A delivery was attempted and could not be completed (Phase 9). */
@@ -52,7 +61,7 @@ export const FAILURE_TEXT: Record<string, string> = {
 export const TERMINATED = new Set(['cancelled', 'canceled', 'returned', 'refunded', 'return_requested']);
 
 /**
- * Current stage, 0-4. delivery_status is finer-grained than order.status, so
+ * Current stage, 0-3. delivery_status is finer-grained than order.status, so
  * take whichever is further along.
  */
 export function stepIndex(status?: string, deliveryStatus?: string | null): number {

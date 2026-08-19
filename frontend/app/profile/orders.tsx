@@ -16,8 +16,9 @@ const FILTERS = ['All', 'In Progress', 'Completed', 'Cancelled'];
 function statusMeta(status: string) {
     if (status === 'delivered') return { label: 'DELIVERED', bg: palette.green50, fg: palette.green500, dot: null };
     if (status === 'cancelled') return { label: 'CANCELLED', bg: '#F7E3E2', fg: palette.red500, dot: null };
-    if (status === 'out_for_delivery') return { label: 'OUT FOR DELIVERY', bg: palette.yellow100, fg: palette.yellow800, dot: palette.yellow600 };
-    if (status === 'shipped' || status === 'in_transit') return { label: 'IN TRANSIT', bg: palette.yellow100, fg: palette.yellow800, dot: palette.yellow600 };
+    // shipped/in_transit collapse into 'Out for delivery' — the tracker no
+    // longer has an In transit stage (utils/orderStatus.ts).
+    if (['out_for_delivery', 'shipped', 'in_transit'].includes(status)) return { label: 'OUT FOR DELIVERY', bg: palette.yellow100, fg: palette.yellow800, dot: palette.yellow600 };
     if (TERMINATED.has(status)) return { label: statusLabel(status).toUpperCase(), bg: '#F7E3E2', fg: palette.red500, dot: null };
     return { label: 'IN PROGRESS', bg: palette.yellow100, fg: palette.yellow800, dot: palette.yellow600 };
 }
