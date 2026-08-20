@@ -205,6 +205,14 @@ export interface ProductObject {
     sellerAddress?: string;                // detail endpoint only, revealed on tap
     sellerIsLive?: boolean;                // users.is_live — false blocks buying
     variants?: ProductVariant[];           // detail endpoint only, sibling colors/designs
+    specifications?: ProductSpecification[]; // detail endpoint only, EAV attributes (same shape as the website)
+}
+
+export interface ProductSpecification {
+    code: string;
+    name: string;
+    unit?: string | null;
+    values: string[];
 }
 
 export interface ProductVariant {

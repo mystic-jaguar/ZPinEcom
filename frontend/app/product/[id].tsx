@@ -9,6 +9,7 @@ import AccordionItem from '../../components/common/AccordionItem';
 import ActionModal from '../../components/common/ActionModal';
 import DeliveryOptionSelector from '../../components/product/DeliveryOptionSelector';
 import ProductImageCarousel from '../../components/product/ProductImageCarousel';
+import ProductSpecifications from '../../components/product/ProductSpecifications';
 import VariantSelector from '../../components/product/VariantSelector';
 import { useCart } from '../../context/CartContext';
 import { useCheckout } from '../../context/CheckoutContext';
@@ -562,6 +563,7 @@ export default function ProductDetails() {
                         <Text style={styles.bodyText}>
                             {product.details || product.description}
                         </Text>
+                        <ProductSpecifications specs={product.specifications || []} />
                     </AccordionItem>
 
                     {(product.sellerName || product.sellerAddress) && (

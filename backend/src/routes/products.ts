@@ -108,6 +108,38 @@ function normalizeProduct(row: any) {
   };
 }
 
+/**
+ * A product's category-driven EAV attributes, shaped exactly like the customer
+ * website's Specifications card ({ code, name, unit, values[] }) so both surfaces
+ * render the same list. Best-effort: never break the product page over it.
+ */
+async function getProductSpecifications(productId: string) {
+  try {
+    const { rows } = await pool.query(
+      `SELECT a.code, a.name, a.unit,
+              o.value AS option_value, pav.value_text, pav.value_number, pav.value_bool
+       FROM product_attribute_values pav
+       JOIN attributes a ON a.id = pav.attribute_id
+       LEFT JOIN attribute_options o ON o.id = pav.option_id
+       WHERE pav.product_id = $1::uuid
+       ORDER BY a.name`,
+      [productId]
+    );
+    const byCode = new Map<string, { code: string; name: string; unit: string | null; values: string[] }>();
+    for (const r of rows) {
+      const display = r.option_value ??
+        (r.value_number != null ? String(r.value_number) :
+        (r.value_bool != null ? (r.value_bool ? 'Yes' : 'No') : r.value_text));
+      if (display == null) continue;
+      if (!byCode.has(r.code)) byCode.set(r.code, { code: r.code, name: r.name, unit: r.unit, values: [] });
+      byCode.get(r.code)!.values.push(display);
+    }
+    return Array.from(byCode.values());
+  } catch {
+    return [];
+  }
+}
+
 const PRODUCT_ID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SHORT_ID_REGEX = /^[A-Z0-9]{7}$/;
 
@@ -773,6 +805,8 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
       }));
     }
 
+    const specifications = await getProductSpecifications(result.rows[0].id);
+
     // Seller name is inline; the address is detail-only and the app keeps it
     // behind a "More information" reveal (never in listings or search).
     const response = {
@@ -786,6 +820,7 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
         // server-side at checkout.
         sellerIsLive: result.rows[0].seller_is_live !== false,
         variants: variants.length > 1 ? variants : undefined,
+        specifications: specifications.length > 0 ? specifications : undefined,
       },
     };
     if (freshStamp) await cacheSet(cacheKey, { stamp: freshStamp, response }, TTL_PRODUCT);
