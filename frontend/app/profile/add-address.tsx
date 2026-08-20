@@ -86,6 +86,7 @@ export default function AddAddressScreen() {
     const onPincodeChange = (t: string) => {
         const pincode = t.replace(/[^0-9]/g, '');
         setForm(f => ({ ...f, pincode }));
+        if (isPunePincode(pincode)) setErrors(e => ({ ...e, pincode: '' }));
         if (pincode.length !== 6) return;
         lookupPincode(pincode).then(loc => {
             if (!loc) return;
