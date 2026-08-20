@@ -4,6 +4,7 @@ import React, { useEffect } from 'react';
 import { LayoutAnimation, Platform, Pressable, StyleSheet, Text, UIManager, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, fonts, palette, shadow } from '../constants/theme';
+import { useCart } from '../context/CartContext';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -19,6 +20,8 @@ const TABS: Record<string, { icon: LucideIcon; label: string }> = {
 /** Floating dark pill tab bar with an expanding active item (ZPIN v2 design). */
 export default function TabBar({ state, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
+  const { cartItems } = useCart();
+  const cartProductCount = new Set(cartItems.map(i => i.productId)).size;
 
   useEffect(() => {
     LayoutAnimation.configureNext(LayoutAnimation.create(320, 'easeInEaseOut', 'opacity'));
@@ -50,7 +53,14 @@ export default function TabBar({ state, navigation }: BottomTabBarProps) {
                 pressed && { transform: [{ scale: 0.9 }] },
               ]}
             >
-              <Icon size={20} color={focused ? colors.textOnYellow : '#8A877E'} />
+              <View>
+                <Icon size={20} color={focused ? colors.textOnYellow : '#8A877E'} />
+                {route.name === 'cart' && cartProductCount > 0 && (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>{cartProductCount > 9 ? '9+' : cartProductCount}</Text>
+                  </View>
+                )}
+              </View>
               {focused ? <Text style={styles.label}>{meta.label}</Text> : null}
             </Pressable>
           );
@@ -95,5 +105,23 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyBold,
     fontSize: 12,
     color: colors.textOnYellow,
+  },
+  badge: {
+    position: 'absolute',
+    top: -6,
+    right: -8,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    paddingHorizontal: 3,
+    backgroundColor: palette.red500,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 9,
+    lineHeight: 11,
+    color: '#fff',
   },
 });

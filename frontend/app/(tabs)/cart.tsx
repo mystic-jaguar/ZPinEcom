@@ -103,7 +103,6 @@ function CartItem({ item, onRemove, onUpdateQuantity, onChangeSize }: CartItemPr
                             ) : null}
                             {item.selectedColor ? (
                                 <View style={styles.chip}>
-                                    <View style={[styles.swatch, { backgroundColor: item.selectedColor }]} />
                                     <Text style={styles.chipText}>{String(item.selectedColor).toUpperCase()}</Text>
                                 </View>
                             ) : null}
@@ -305,7 +304,6 @@ const styles = StyleSheet.create({
     chips: { flexDirection: 'row', gap: 7 },
     chip: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.surfaceSunken, borderRadius: radius.xs, paddingHorizontal: 8, paddingVertical: 3 },
     chipText: { fontFamily: fonts.monoBold, fontSize: 10, color: colors.textBody },
-    swatch: { width: 9, height: 9, borderRadius: 5 },
     sizeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 7 },
     sizeBtn: { minWidth: 32, alignItems: 'center', borderWidth: 1.5, borderColor: colors.borderSubtle, borderRadius: radius.xs, paddingHorizontal: 8, paddingVertical: 4 },
     sizeBtnActive: { borderColor: palette.yellow500, backgroundColor: colors.surfaceSunken },
