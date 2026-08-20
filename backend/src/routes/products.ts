@@ -73,7 +73,7 @@ async function ensureTrigram(): Promise<boolean> {
 // default: below it "shirt" starts matching "shorts".
 const TRIGRAM_THRESHOLD = 0.3;
 
-function normalizeProduct(row: any) {
+export function normalizeProduct(row: any) {
   // Extract sizes from size_quantities keys (e.g. {S:10, M:15} → ['S','M']).
   // Include out-of-stock sizes too so the UI can mark them as unavailable
   // instead of hiding them; availability is driven by sizeQuantities below.
@@ -84,6 +84,13 @@ function normalizeProduct(row: any) {
   const attrs = row.extracted_attributes || {};
   const colors: string[] = attrs.colors || [];
 
+  // Customer-facing price = vendor price + 20% ZPIN platform fee (see `price`
+  // below). The vendor-entered MRP gets the SAME markup so the struck-through
+  // price and the discount % the customer sees stay the vendor's real ones.
+  const price = withMarkup(row.price);
+  const originalPrice = withMarkup(row.mrp);
+  const hasMrp = originalPrice > price;
+
   return {
     productId: row.id,
     userId: row.user_id,
@@ -92,9 +99,9 @@ function normalizeProduct(row: any) {
     categoryId: row.category_id,
     deepestCategoryName: row.deepest_category_name,
     categoryPath: row.category_path || 'All',
-    // Customer-facing price = vendor price + 20% ZPIN platform fee. The DB keeps
-    // the raw vendor price; the markup is applied here, on read.
-    price: withMarkup(row.price),
+    price,
+    originalPrice: hasMrp ? originalPrice : undefined,
+    discount: hasMrp ? Math.round(((originalPrice - price) / originalPrice) * 100) : undefined,
     quantity: row.quantity,
     inStock: row.in_stock,
     images: row.images || [],
