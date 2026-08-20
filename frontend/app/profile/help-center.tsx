@@ -5,7 +5,7 @@ import { useCart } from '@/context/CartContext';
 import { useWishlist } from '@/context/WishlistContext';
 import { authService } from '@/services/auth';
 import { useRouter } from 'expo-router';
-import { Bike, ChevronDown, ChevronRight, ChevronUp, CreditCard, FileText, Mail, MessageCircle, Phone, RotateCcw, Search, Shield, Shirt, Trash2 } from 'lucide-react-native';
+import { ChevronDown, ChevronRight, ChevronUp, CreditCard, FileText, Mail, MessageCircle, Phone, RotateCcw, Search, Shield, Trash2 } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -16,8 +16,6 @@ import { useUser } from '../../context/UserContext';
 type FAQ = { id: string; category: string; question: string; answer: string };
 
 const TOPICS = [
-    { id: 'track', icon: Bike, label: "Where's my order?", route: '/profile/orders' },
-    { id: 'trial', icon: Shirt, label: 'How does Try-at-Door work?', route: '/profile/orders' },
     { id: 'returns', icon: RotateCcw, label: 'Returns & refunds', route: '/profile/returns' },
     { id: 'payments', icon: CreditCard, label: 'Payments & coupons', route: '/profile/coupons' },
 ];
@@ -25,7 +23,6 @@ const TOPICS = [
 const ALL_FAQS: FAQ[] = [
     { id: '1', category: 'Orders', question: 'How do I track my order?', answer: 'Go to "My Orders" and open the order to see real-time tracking and estimated delivery time.' },
     { id: '3', category: 'Orders', question: 'How long does delivery take?', answer: 'Estimated delivery is within 12 hours for both Standard and Instant Try-at-Door orders in serviceable areas.' },
-    { id: '5', category: 'Returns', question: 'What is Try-at-Door?', answer: 'Try products at your door for 15 minutes. Keep what fits, hand the rest back to the courier — no box, no label.' },
     { id: '6', category: 'Returns', question: 'How do I return a product?', answer: 'Open the order and tap "Return items". Choose a reason and refund method. Returns are accepted within 7 days of delivery.' },
     { id: '7', category: 'Returns', question: 'When will I get my refund?', answer: 'Refunds are processed within 5–7 business days after we receive the returned product.' },
     { id: '8', category: 'Orders', question: 'Can I cancel an order?', answer: 'Yes, until it is dispatched. Open the order from My Orders and tap Cancel. If the option is gone the order is already on its way — contact support and we will help.' },
