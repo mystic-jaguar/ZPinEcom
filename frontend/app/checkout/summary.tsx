@@ -49,7 +49,7 @@ export default function CheckoutSummaryScreen() {
     };
 
     const handleConfirmOrder = () => {
-        if (!selectedAddressId) {
+        if (!selectedAddress) {
             setModalConfig({ title: 'No Address', message: 'Please select a delivery address first.', icon: 'alert-circle' });
             setModalVisible(true);
             return;

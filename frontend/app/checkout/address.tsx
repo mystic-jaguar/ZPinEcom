@@ -36,9 +36,9 @@ export default function CheckoutAddressScreen() {
     }, [addresses, selectedAddressId]);
 
     const handleConfirm = () => {
-        if (!selectedAddressId) { setShowModal(true); return; }
         const selected = addresses.find((a: any) => a.id === selectedAddressId);
-        if (selected && !isPuneAddress(selected.city, selected.pincode)) { setShowAreaModal(true); return; }
+        if (!selected) { setShowModal(true); return; }
+        if (!isPuneAddress(selected.city, selected.pincode)) { setShowAreaModal(true); return; }
         router.push('/checkout/summary');
     };
 
