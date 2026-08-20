@@ -61,6 +61,7 @@ export default function AddAddressScreen() {
         if (!form.pincode) e.pincode = 'Pincode is required';
         else if (!isPunePincode(form.pincode)) e.pincode = `We currently deliver only in ${DELIVERY_CITY}`;
         if (!form.addressLine1) e.addressLine1 = 'Address is required';
+        if (!form.addressLine2) e.addressLine2 = 'Locality is required';
         if (!form.city) e.city = 'City is required';
         else if (!isPuneCity(form.city)) e.city = `We currently deliver only in ${DELIVERY_CITY}`;
         if (!form.state) e.state = 'State is required';
@@ -152,6 +153,9 @@ export default function AddAddressScreen() {
                         multiline
                     />
                     {err('addressLine1')}
+
+                    <ZInput label="Locality / Area" placeholder="e.g. Bandra West" value={form.addressLine2} onChangeText={(t) => setForm({ ...form, addressLine2: t })} containerStyle={{ marginTop: 16, marginBottom: errors.addressLine2 ? 4 : 0 }} />
+                    {err('addressLine2')}
 
                     <ZInput label="Landmark (optional)" placeholder="Nearby landmark" value={form.landmark} onChangeText={(t) => setForm({ ...form, landmark: t })} containerStyle={{ marginTop: 16 }} />
 
