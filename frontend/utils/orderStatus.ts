@@ -27,8 +27,12 @@ export const TRACK_STEPS = [
  * statuses are not going away) — it just maps onto 'Out for delivery' now.
  */
 const STEP_INDEX: Record<string, number> = {
-    order_placed: 0, pending: 0, placed: 0, trial_pending: 0,
-    confirmed: 1, processing: 1, accepted: 1,
+    // 'confirmed' only means the PAYMENT went through (razorpay verify sets it);
+    // the vendor has not touched the order yet, so it must not read as
+    // "Processing — accepted by the vendor". Only 'processing' (written by the
+    // vendor's Mark as Ready) advances to stage 1.
+    order_placed: 0, pending: 0, placed: 0, trial_pending: 0, confirmed: 0,
+    processing: 1, accepted: 1,
     shipped: 2, in_transit: 2, picked_up: 2, dispatched: 2,
     out_for_delivery: 2, out_delivery: 2, awaiting_collection: 2,
     // Phase 9: a failed attempt does not move the order backwards — it is still
