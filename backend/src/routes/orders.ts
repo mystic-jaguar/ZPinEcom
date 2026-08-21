@@ -1652,6 +1652,162 @@ router.patch('/:id/return-dropoff', authenticate, async (req: AuthRequest, res: 
   }
 });
 
+// PATCH /api/v1/orders/:id/delivery-return
+//
+// A failed delivery has run out of attempts (or was an instant order, which gets
+// none) and the partner is bringing the goods back to the seller. This is NOT
+// the customer-initiated return flow: no `return_requests` row exists, nothing
+// was ever handed over, and the customer asked for nothing.
+//
+// It lives HERE rather than in the delivery backend for one reason: restocking is
+// the single authoritative write that decides what a seller can sell. There are
+// already five drifting copies of the return-line parser in this codebase; a
+// sixth copy of the restock rules — on the one path that moves inventory without
+// a human ever confirming it — is how sellers quietly lose stock. The delivery
+// backend calls this with a service token (see Z-PinApp/backend/lib/ecomService.js).
+//
+// The refund is deliberately NOT issued here. `payment_status` is left untouched
+// so a prepaid failed delivery lands in the admin queue as an explicit decision —
+// the customer may have refused delivery in bad faith, and the delivery fee is
+// not refundable on an instant order.
+router.patch('/:id/delivery-return', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+  const note = String(req.body?.note || '').trim().slice(0, 500);
+
+  // Same gate as the return legs: the partner physically holding the parcel, or
+  // an admin correcting the record. A seller cannot declare their own restock.
+  if (!['admin', 'delivery_partner'].includes(String(req.userRole))) {
+    res.status(403).json({ success: false, message: 'Forbidden' });
+    return;
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // FOR UPDATE: two partners racing the same order, or a retry landing at the
+    // same moment, must not both restock. The status guard below then rejects
+    // whichever one arrives second.
+    const orderResult = await client.query(
+      `SELECT id, order_number, status, user_id, seller_id, delivery_type
+       FROM ${ORDERS}
+       WHERE id = $1
+       FOR UPDATE`,
+      [req.params.id]
+    );
+    if (orderResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      res.status(404).json({ success: false, message: 'Order not found' });
+      return;
+    }
+    const order = orderResult.rows[0];
+
+    // Only a failed delivery turns around this way. Guarding on the status also
+    // makes the call idempotent-safe: a retried HTTP request finds 'returned'
+    // and cannot restock the same goods twice.
+    if (order.status !== 'delivery_failed') {
+      await client.query('ROLLBACK');
+      res.status(409).json({
+        success: false,
+        message: order.status === 'returned'
+          ? 'This order has already been returned to the seller'
+          : 'Only a failed delivery can be returned to the seller',
+      });
+      return;
+    }
+
+    const itemsResult = await client.query(
+      `SELECT id, product_id, quantity FROM ${ORDER_ITEMS} WHERE order_id = $1`,
+      [req.params.id]
+    );
+
+    // Nothing was ever delivered, so the WHOLE order comes back — unlike a
+    // customer return, there are no kept lines and no partial quantities.
+    for (const item of itemsResult.rows) {
+      if (!item.product_id) continue;
+      await client.query(
+        `UPDATE products
+         SET quantity = quantity + $1, in_stock = true, updated_at = NOW()
+         WHERE id = $2`,
+        [Math.max(1, Number(item.quantity) || 1), item.product_id]
+      );
+    }
+
+    await client.query(
+      `UPDATE ${ORDERS} SET status = 'returned', updated_at = NOW() WHERE id = $1`,
+      [req.params.id]
+    );
+
+    await recordOrderStatus(
+      client,
+      req.params.id,
+      'returned',
+      note ? `Returned to seller after a failed delivery: ${note}` : 'Returned to seller after a failed delivery'
+    );
+
+    const isFlash = String(order.delivery_type || '').toLowerCase() === 'flash';
+    const customerMessage = isFlash
+      ? `Order ${order.order_number} has been returned to the seller. Instant delivery orders are not re-attempted, and the delivery charge is not refundable. Any remaining refund will be reviewed by our team.`
+      : `Order ${order.order_number} could not be delivered after a second attempt and has been returned to the seller. Any refund due will be reviewed by our team.`;
+
+    if (order.user_id) {
+      await client.query(
+        `INSERT INTO notifications (id, user_id, type, title, message, data, created_at)
+         VALUES ($1,$2,'order_update',$3,$4,$5, NOW())`,
+        [
+          generateId(),
+          order.user_id,
+          `Order returned: ${order.order_number}`,
+          customerMessage,
+          JSON.stringify({ orderId: order.id, orderNumber: order.order_number, status: 'returned' }),
+        ]
+      );
+    }
+    // The seller's stock has just moved without them touching anything — they
+    // need to know why the count changed and that the parcel is on its way back.
+    if (order.seller_id) {
+      await client.query(
+        `INSERT INTO notifications (id, user_id, type, title, message, data, created_at)
+         VALUES ($1,$2,'order_update',$3,$4,$5, NOW())`,
+        [
+          generateId(),
+          order.seller_id,
+          `Order returned to you: ${order.order_number}`,
+          `Order ${order.order_number} could not be delivered and is coming back to you. The items have been added back to your stock automatically.`,
+          JSON.stringify({ orderId: order.id, orderNumber: order.order_number, status: 'returned' }),
+        ]
+      );
+    }
+
+    await client.query('COMMIT');
+
+    // After commit: a rolled-back turnaround must not buzz anyone's phone.
+    sendPush(order.user_id, `Order returned: ${order.order_number}`, customerMessage,
+      { orderId: order.id, orderNumber: order.order_number, status: 'returned' });
+    sendPush(order.seller_id, `Order returned to you: ${order.order_number}`,
+      `Order ${order.order_number} is coming back to you. Stock has been restored.`,
+      { orderId: order.id, orderNumber: order.order_number, status: 'returned' });
+
+    await cacheDel(`order:${req.params.id}`);
+
+    res.json({
+      success: true,
+      data: {
+        orderId: order.id,
+        orderNumber: order.order_number,
+        status: 'returned',
+        restockedItems: itemsResult.rows.length,
+        refundPending: true,
+      },
+    });
+  } catch (err) {
+    try { await client.query('ROLLBACK'); } catch { /* ignore */ }
+    logger.error('deliveryreturn_error', { error: (err as any)?.message ?? String(err) });
+    res.status(500).json({ success: false, message: 'Server error' });
+  } finally {
+    client.release();
+  }
+});
+
 // GET /api/v1/orders/:id/return-status
 router.get('/:id/return-status', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
