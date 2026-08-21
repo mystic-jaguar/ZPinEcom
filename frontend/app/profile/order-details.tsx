@@ -5,6 +5,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Linking, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
+import InvoicePreviewModal from '../../components/common/InvoicePreviewModal';
 import { AppHeader, ZButton, ZText } from '../../components/ui';
 import { colors, fonts, palette, radius } from '../../constants/theme';
 import { DELIVERY_ETA } from '../../constants/delivery';
@@ -13,6 +14,8 @@ import { orderService } from '../../services/order';
 import { OrderObject } from '../../types/types';
 import { groupOrders } from '../../utils/orderGroups';
 import { statusLabel } from '../../utils/orderStatus';
+import { buildInvoiceHtml, InvoiceData } from '../../utils/invoiceHtml';
+import { useUser } from '../../context/UserContext';
 
 const money = (n: number) => `₹${Number(n).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 
@@ -35,13 +38,21 @@ export default function OrderDetailsScreen() {
     const legacyOrderId = (Array.isArray(params.orderId) ? params.orderId[0] : params.orderId) as string | undefined;
     const key = groupKey || legacyOrderId || '';
     const { getOrderById, orders, refreshOrders } = useOrder();
+    const { user } = useUser();
+
+    // Same document the customer website produces — see utils/invoiceHtml.ts.
+    const openInvoice = useCallback((data: InvoiceData) => {
+        setInvoiceNumber(data.orderNumber);
+        setInvoiceHtml(buildInvoiceHtml(data, user?.email));
+    }, [user?.email]);
 
     const group = useMemo(() => groupOrders(orders).find(g => g.key === key), [orders, key]);
     const isMultiGroup = !!group && group.orders.length > 1;
     // For a single-parcel group the key may be a group_id (not an order id) — resolve the real order id to fetch.
     const singleId = group && !isMultiGroup ? group.orders[0].id : key;
 
-    const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+    const [invoiceHtml, setInvoiceHtml] = useState<string | null>(null);
+    const [invoiceNumber, setInvoiceNumber] = useState('');
     const [fetchedOrder, setFetchedOrder] = useState<OrderObject | null>(null);
     const [isFetching, setIsFetching] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -219,14 +230,23 @@ export default function OrderDetailsScreen() {
                     </View>
 
                     <View style={styles.actions}>
-                        <Pressable style={styles.yellowBtn} onPress={() => setShowInvoiceModal(true)}>
+                        <Pressable style={styles.yellowBtn} onPress={() => openInvoice({
+                            orderNumber: group.groupNumber,
+                            createdAt: group.createdAt,
+                            paymentMethod,
+                            shippingAddress: addr,
+                            items: group.orders.flatMap(o => o.items),
+                            deliveryFee: shipping,
+                            taxAmount: tax,
+                            totalAmount: group.total,
+                        })}>
                             <Download size={17} color={colors.textOnYellow} />
                             <Text style={styles.yellowText}>Invoice</Text>
                         </Pressable>
                     </View>
                     <View style={{ height: 30 }} />
                 </ScrollView>
-                <ActionModal visible={showInvoiceModal} title="Invoice Download" message="Invoice will be downloaded to your device." icon="file-text" primaryButtonText="OK" onPrimaryPress={() => setShowInvoiceModal(false)} onClose={() => setShowInvoiceModal(false)} />
+                <InvoicePreviewModal visible={!!invoiceHtml} html={invoiceHtml || ''} orderNumber={invoiceNumber} onClose={() => setInvoiceHtml(null)} />
             </SafeAreaView>
         );
     }
@@ -400,7 +420,16 @@ export default function OrderDetailsScreen() {
                             <Text style={styles.outlineText}>Return items</Text>
                         </Pressable>
                     )}
-                    <Pressable style={styles.yellowBtn} onPress={() => setShowInvoiceModal(true)}>
+                    <Pressable style={styles.yellowBtn} onPress={() => openInvoice({
+                        orderNumber: order.orderNumber,
+                        createdAt: order.createdAt,
+                        paymentMethod: order.paymentMethod,
+                        shippingAddress: addr,
+                        items: order.items,
+                        deliveryFee: shippingFee,
+                        taxAmount: gstAmount,
+                        totalAmount: Number(order.finalAmount || 0),
+                    })}>
                         <Download size={17} color={colors.textOnYellow} />
                         <Text style={styles.yellowText}>Invoice</Text>
                     </Pressable>
@@ -418,7 +447,7 @@ export default function OrderDetailsScreen() {
                 <View style={{ height: 30 }} />
             </ScrollView>
 
-            <ActionModal visible={showInvoiceModal} title="Invoice Download" message="Invoice will be downloaded to your device." icon="file-text" primaryButtonText="OK" onPrimaryPress={() => setShowInvoiceModal(false)} onClose={() => setShowInvoiceModal(false)} />
+            <InvoicePreviewModal visible={!!invoiceHtml} html={invoiceHtml || ''} orderNumber={invoiceNumber} onClose={() => setInvoiceHtml(null)} />
 
             {/* Phase 9A — per-item Keep / Return. Everything defaults to Keep. */}
             <Modal visible={showTrialModal} transparent animationType="slide" onRequestClose={() => setShowTrialModal(false)}>

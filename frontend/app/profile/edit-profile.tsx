@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { BadgeCheck, Calendar, Camera, Check, ChevronDown } from 'lucide-react-native';
+import { BadgeCheck, Calendar, Check, ChevronDown } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -106,7 +106,6 @@ export default function EditProfileScreen() {
             <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                 <View style={styles.avatarWrap}>
                     <View style={styles.avatar}><Text style={styles.avatarText}>{initialsOf(form.name || user.name)}</Text></View>
-                    <View style={styles.cameraBadge}><Camera size={15} color={colors.textOnYellow} /></View>
                 </View>
 
                 <ZInput label="Full name" value={form.name} onChangeText={(t) => setForm({ ...form, name: t })} />
@@ -124,10 +123,11 @@ export default function EditProfileScreen() {
                 {user.mobile ? (
                     <>
                         <ZText variant="eyebrow" color={colors.textBody} style={styles.label}>Mobile</ZText>
-                        <View style={styles.mobileField}>
+                        <View style={styles.readonlyField}>
                             <Text style={styles.countryCode}>+91</Text>
                             <View style={styles.divider} />
-                            <Text style={styles.mobileText}>{user.mobile}</Text>
+                            <Text style={styles.readonlyText} numberOfLines={1}>{user.mobile}</Text>
+                            <BadgeCheck size={18} color={palette.green500} />
                         </View>
                     </>
                 ) : null}
@@ -198,15 +198,12 @@ const styles = StyleSheet.create({
     avatarWrap: { alignSelf: 'center', marginBottom: 26 },
     avatar: { width: 88, height: 88, borderRadius: 44, backgroundColor: colors.surfaceInverse, borderWidth: 3, borderColor: palette.yellow500, alignItems: 'center', justifyContent: 'center' },
     avatarText: { fontFamily: fonts.displayBold, fontSize: 32, color: palette.yellow500 },
-    cameraBadge: { position: 'absolute', bottom: 0, right: 0, width: 30, height: 30, borderRadius: 15, backgroundColor: palette.yellow500, borderWidth: 3, borderColor: palette.paperWarm, alignItems: 'center', justifyContent: 'center' },
 
     label: { marginBottom: 7 },
     readonlyField: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#F5F4F0', borderWidth: 1.5, borderColor: '#EFEDE6', borderRadius: radius.md, paddingHorizontal: 15, height: 52, marginBottom: 16 },
     readonlyText: { flex: 1, fontFamily: fonts.bodyMedium, fontSize: 15, color: colors.textMuted },
-    mobileField: { flexDirection: 'row', alignItems: 'center', gap: 11, backgroundColor: colors.surfaceCard, borderWidth: 1.5, borderColor: colors.borderSubtle, borderRadius: radius.md, paddingHorizontal: 15, height: 52, marginBottom: 16 },
-    countryCode: { fontFamily: fonts.monoBold, fontSize: 13, color: colors.textStrong },
+    countryCode: { fontFamily: fonts.monoBold, fontSize: 13, color: colors.textMuted },
     divider: { width: 1, height: 22, backgroundColor: colors.borderSubtle },
-    mobileText: { flex: 1, fontFamily: fonts.bodyMedium, fontSize: 15, color: colors.textStrong },
 
     row: { flexDirection: 'row', gap: 14 },
     field: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.surfaceCard, borderWidth: 1.5, borderColor: colors.borderSubtle, borderRadius: radius.md, paddingHorizontal: 15, height: 52 },

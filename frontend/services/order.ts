@@ -209,11 +209,4 @@ export const orderService = {
         }
     },
 
-    /**
-     * Download order invoice — not yet implemented on the backend.
-     * Throws a clear error rather than hitting a 404.
-     */
-    async downloadInvoice(_id: string): Promise<never> {
-        throw new Error('Invoice download is not yet available.');
-    },
 };

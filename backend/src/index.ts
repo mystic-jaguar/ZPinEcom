@@ -12,6 +12,7 @@ import authRoutes, { ensureAppleColumn } from './routes/auth';
 import cartRoutes from './routes/cart';
 import couponRoutes from './routes/coupons';
 import flashDealRoutes from './routes/flashDeals';
+import bannerRoutes from './routes/banners';
 import notificationRoutes from './routes/notifications';
 import orderRoutes, { ensureOrderSupportTables } from './routes/orders';
 import productRoutes from './routes/products';
@@ -102,6 +103,7 @@ app.use('/api/v1/wishlist', wishlistRoutes);
 app.use('/api/v1/orders', orderRoutes);
 app.use('/api/v1/coupons', couponRoutes);
 app.use('/api/v1/flash-deals', flashDealRoutes);
+app.use('/api/v1/banners', bannerRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
 app.use('/api/v1/razorpay', razorpayRoutes);
 

@@ -9,6 +9,7 @@ import SkeletonCard from '../components/product/SkeletonCard';
 import { ProductCard, ZButton, ZText } from '../components/ui';
 import { CATEGORY_DATA, CategoryNode } from '../constants/categories';
 import { colors, fonts, palette, radius } from '../constants/theme';
+import { useSearch } from '../context/SearchContext';
 import { useWishlist } from '../context/WishlistContext';
 import { productService, ProductListParams } from '../services/product';
 import { ProductObject } from '../types/types';
@@ -29,6 +30,10 @@ export default function ProductListing() {
     const router = useRouter();
     const params = useLocalSearchParams();
     const { categoryName, subCategoryName } = params;
+    // `recommend=1` renders the home page's "Recently viewed" strip in full — the
+    // same getRecommended() set, not the whole catalogue.
+    const recommendMode = params.recommend === '1';
+    const { recentSearches } = useSearch();
     const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
 
     const [products, setProducts] = useState<ProductObject[]>([]);
@@ -78,22 +83,24 @@ export default function ProductListing() {
         try {
             if (append) setLoadingMore(true);
             else { setLoading(true); setError(null); }
-            const response = isAllMode
-                ? await productService.getProducts(buildParams(pageNum))
-                : await productService.getProductsByCategory(effectiveCategory, buildParams(pageNum));
+            const response = recommendMode
+                ? { products: await productService.getRecommended(recentSearches, 50) }
+                : isAllMode
+                    ? await productService.getProducts(buildParams(pageNum))
+                    : await productService.getProductsByCategory(effectiveCategory, buildParams(pageNum));
             if (reqId !== requestIdRef.current) return;
 
-            const items = response.products || [];
+            const items: ProductObject[] = (response as any).products || [];
             setProducts(prev => {
                 if (!append) return items;
                 const seen = new Set(prev.map(p => p.productId));
                 return [...prev, ...items.filter(p => !seen.has(p.productId))];
             });
             pageRef.current = pageNum;
-            hasNextRef.current = !!response.pagination?.hasNextPage;
+            hasNextRef.current = !!(response as any).pagination?.hasNextPage;
             setPage(pageNum);
             setHasNextPage(hasNextRef.current);
-            setTotalItems(response.pagination?.totalItems ?? items.length);
+            setTotalItems((response as any).pagination?.totalItems ?? items.length);
             if (!append) {
                 const brands = (response as { brands?: string[] }).brands || [];
                 setAvailableBrands(brands.map(b => b.toUpperCase()));
@@ -108,7 +115,7 @@ export default function ProductListing() {
                 fetchingRef.current = false;
             }
         }
-    }, [effectiveCategory, isAllMode, buildParams]);
+    }, [effectiveCategory, isAllMode, buildParams, recommendMode, recentSearches]);
 
     useEffect(() => { loadProducts(1, false); }, [loadProducts]);
 
@@ -155,7 +162,9 @@ export default function ProductListing() {
         return findNode(CATEGORY_DATA, rootTarget);
     }, [rootTarget]);
 
-    const screenTitle = isAllMode
+    const screenTitle = recommendMode
+        ? 'Recently viewed'
+        : isAllMode
         ? 'Latest arrivals'
         : (currentCategoryNode?.name || (subCategoryName as string) || (categoryName as string) || 'Products');
 

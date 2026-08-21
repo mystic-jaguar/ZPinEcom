@@ -12,6 +12,7 @@ import { DELIVERY_CITY, isPuneLocation } from '../../constants/delivery';
 import { colors, fonts, palette, radius, shadow } from '../../constants/theme';
 import { useSearch } from '../../context/SearchContext';
 import { FlashDeal, flashDealService } from '../../services/flashDeals';
+import { PromoBanner, bannerService } from '../../services/banners';
 import { productService } from '../../services/product';
 import { productOneLiner } from '../../utils/productDetail';
 
@@ -79,6 +80,8 @@ export default function HomeScreen() {
     const [freshArrivals, setFreshArrivals] = useState<any[]>(FRESH_ARRIVALS);
     // Admin-managed flash deals. The strip only exists while a deal is live.
     const [flashDeals, setFlashDeals] = useState<FlashDeal[]>([]);
+    // Admin-managed promo banners (promo_banners). Empty list hides the carousel.
+    const [promoBanners, setPromoBanners] = useState<PromoBanner[]>([]);
     const [recommended, setRecommended] = useState<any[]>(RECOMMENDED);
     const [nearby, setNearby] = useState<any[]>(NEARBY_FALLBACK);
     const [locationLabel, setLocationLabel] = useState<string>('Your Area');
@@ -163,6 +166,7 @@ export default function HomeScreen() {
     // hides the strip.
     useEffect(() => {
         flashDealService.getFlashDeals().then(setFlashDeals).catch(() => setFlashDeals([]));
+        bannerService.getBanners().then(setPromoBanners).catch(() => setPromoBanners([]));
     }, []);
 
     useEffect(() => {
@@ -497,7 +501,7 @@ export default function HomeScreen() {
                     ) : (
                         <Text style={styles.addressPlace}>{locationGranted ? locationLabel : 'set location'}</Text>
                     )}
-                    <ChevronDown size={14} color={colors.textMuted} />
+                    {!locationGranted && <ChevronDown size={14} color={colors.textMuted} />}
                 </Pressable>
             </View>
 
@@ -567,7 +571,7 @@ export default function HomeScreen() {
                 </View>
 
                 {/* Recommended */}
-                <SectionHeader eyebrow="Fresh today" title="Recently viewed" actionLabel="See all" onAction={() => router.push('/product-listing')} style={styles.section} />
+                <SectionHeader eyebrow="Fresh today" title="Recently viewed" actionLabel="See all" onAction={() => router.push({ pathname: '/product-listing', params: { recommend: '1' } })} style={styles.section} />
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hList}>
                     {recommended.map((item) => (
                         <ProductCard
@@ -583,6 +587,36 @@ export default function HomeScreen() {
                         />
                     ))}
                 </ScrollView>
+
+                {/* Promo banners — authored in the admin panel (promo_banners).
+                    Hidden entirely when nothing is active, same as the website. */}
+                {promoBanners.length > 0 && (
+                    <ScrollView
+                        horizontal
+                        pagingEnabled
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.promoList}
+                        style={styles.promoScroll}
+                    >
+                        {promoBanners.map((b) => (
+                            <Pressable
+                                key={b.id}
+                                style={[styles.promoCard, b.bgColor ? { backgroundColor: b.bgColor } : null]}
+                                disabled={!b.actionUrl}
+                                onPress={() => { if (!b.actionUrl) return; try { router.push(b.actionUrl as any); } catch { /* admin-authored URL may not be an app route */ } }}
+                            >
+                                {b.imageUrl ? (
+                                    <Image source={{ uri: b.imageUrl }} style={styles.promoImage} contentFit="cover" />
+                                ) : (
+                                    <View style={styles.promoTextWrap}>
+                                        <Text style={styles.promoTitle} numberOfLines={2}>{b.title}</Text>
+                                        {!!b.subtitle && <Text style={styles.promoSub} numberOfLines={2}>{b.subtitle}</Text>}
+                                    </View>
+                                )}
+                            </Pressable>
+                        ))}
+                    </ScrollView>
+                )}
 
                 {/* Flash Deals — admin-managed, hidden when nothing is running */}
                 {flashDeals.length > 0 && (
@@ -767,6 +801,14 @@ const styles = StyleSheet.create({
     hero: { marginHorizontal: 20, marginTop: 16, backgroundColor: palette.yellow500, borderRadius: 28, padding: 22, position: 'relative', overflow: 'hidden' },
     heroImageWrap: { position: 'absolute', right: -30, bottom: -40, width: 200, height: 230, borderRadius: 24, overflow: 'hidden', transform: [{ rotate: '6deg' }] },
     heroImage: { width: '100%', height: '100%' },
+
+    promoScroll: { marginTop: 18 },
+    promoList: { paddingHorizontal: 20, gap: 12 },
+    promoCard: { width: 300, height: 150, borderRadius: 22, overflow: 'hidden', backgroundColor: palette.neutral200, justifyContent: 'center' },
+    promoImage: { width: '100%', height: '100%' },
+    promoTextWrap: { padding: 20 },
+    promoTitle: { fontFamily: fonts.displayBold, fontSize: 20, color: palette.ink },
+    promoSub: { fontFamily: fonts.bodyRegular, fontSize: 13, color: palette.neutral700, marginTop: 6 },
     heroContent: { maxWidth: '64%' },
     tryBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', backgroundColor: colors.surfaceInverse, paddingVertical: 6, paddingHorizontal: 11, borderRadius: 100, marginBottom: 14 },
     tryBadgeText: { fontFamily: fonts.monoBold, fontSize: 9, letterSpacing: 1.1, color: colors.textInvert },
