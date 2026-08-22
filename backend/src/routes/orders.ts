@@ -1697,9 +1697,22 @@ router.patch('/:id/return-dropoff', authenticate, async (req: AuthRequest, res: 
 router.patch('/:id/delivery-return', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
   const note = String(req.body?.note || '').trim().slice(0, 500);
 
-  // Same gate as the return legs: the partner physically holding the parcel, or
-  // an admin correcting the record. A seller cannot declare their own restock.
-  if (!['admin', 'delivery_partner'].includes(String(req.userRole))) {
+  // WHO may turn a failed delivery around:
+  //   delivery_partner — the partner returning the parcel (legacy direct path)
+  //   admin            — correcting the record
+  //   seller           — confirming the parcel physically arrived back
+  //
+  // The seller case is the normal path now. Restock used to fire the moment the
+  // partner pressed "Return to seller", which credited stock the seller did not
+  // yet have in their hands and left the partner blocked whenever this backend was
+  // unreachable. The parcel now travels first and the seller confirms receipt, so
+  // the stock count follows the goods instead of leading them.
+  //
+  // A seller may only confirm THEIR OWN order — checked below against seller_id,
+  // once the row is loaded. Without that check this would be a self-serve restock
+  // of anybody's order.
+  const actorRole = String(req.userRole);
+  if (!['admin', 'delivery_partner', 'seller'].includes(actorRole)) {
     res.status(403).json({ success: false, message: 'Forbidden' });
     return;
   }
@@ -1725,6 +1738,13 @@ router.patch('/:id/delivery-return', authenticate, async (req: AuthRequest, res:
       return;
     }
     const order = orderResult.rows[0];
+
+    // A seller confirms receipt of their own goods and nobody else's.
+    if (actorRole === 'seller' && String(order.seller_id || '') !== String(req.userId || '')) {
+      await client.query('ROLLBACK');
+      res.status(403).json({ success: false, message: 'This is not your order' });
+      return;
+    }
 
     // Only a failed delivery turns around this way. Guarding on the status also
     // makes the call idempotent-safe: a retried HTTP request finds 'returned'
