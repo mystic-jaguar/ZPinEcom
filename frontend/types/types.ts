@@ -365,6 +365,8 @@ export interface OrderObject {
     prepaidAmount?: number;
     // Phase 9A "try first". trialExpiresAt is null until the partner picks the
     // order up — that is when the 15-minute selection window opens.
+    /** Seller's reason, shown as a disclaimer when the seller rejected the order. */
+    cancellationReason?: string | null;
     isTrial?: boolean;
     trialExpiresAt?: string | null;
     partnerEarning?: number;

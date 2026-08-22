@@ -314,6 +314,10 @@ function normalizeOrder(row: any) {
     // Phase 9A "try first": the 15-minute keep/return window opens at the
     // partner's pickup, so trialExpiresAt is null until then. The app runs the
     // countdown (and its 1-min-before / 1-min-after warnings) off this timestamp.
+    // Set only when a seller rejected the order: the reason they typed, taken
+    // from the order_status_history note the vendor backend writes. The app
+    // shows it verbatim as a disclaimer on the cancelled order.
+    cancellationReason: row.cancellation_reason ?? null,
     isTrial: !!row.is_trial,
     trialExpiresAt: row.trial_expires_at ?? null,
     trialSecondsLeft: row.trial_seconds_left != null ? Math.round(Number(row.trial_seconds_left)) : null,
@@ -395,6 +399,13 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response): Promis
         -- duration, not a timestamp, so the app never has to reconcile the
         -- device clock or the column's timezone with ours.
         EXTRACT(EPOCH FROM (o.trial_expires_at - NOW())) AS trial_seconds_left,
+        -- Seller's rejection reason. The vendor backend stores it as the note on
+        -- the 'cancelled' history row, prefixed with who wrote it.
+        (SELECT REPLACE(h.note, 'Rejected by seller: ', '')
+           FROM order_status_history h
+          WHERE h.order_id = o.id AND h.status = 'cancelled'
+            AND h.note LIKE 'Rejected by seller:%'
+          ORDER BY h.created_at DESC LIMIT 1) AS cancellation_reason,
         COALESCE(json_agg(${ORDER_ITEMS_JSON}) FILTER (WHERE oi.id IS NOT NULL), '[]') as items
        FROM ${ORDERS} o
        LEFT JOIN ${ORDER_ITEMS} oi ON oi.order_id = o.id

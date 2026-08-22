@@ -86,6 +86,7 @@ export default function OrderDetailsScreen() {
                     deliveryType: o.deliveryType, deliveryFee: Number(o.deliveryFee || 0),
                     prepaidAmount: Number(o.prepaidAmount || 0),
                     isTrial: !!o.isTrial, trialExpiresAt: o.trialExpiresAt ?? null,
+                    cancellationReason: o.cancellationReason ?? null,
                     createdAt: o.createdAt, updatedAt: o.updatedAt,
                 } as OrderObject);
             }
@@ -331,6 +332,16 @@ export default function OrderDetailsScreen() {
                         <Text style={styles.bannerSub}>{isInstantDelivery ? 'Try-at-Door · Instant' : 'Standard delivery'}{delivered ? '' : ` · est. ${DELIVERY_ETA.toLowerCase()}`}</Text>
                     </View>
                 </View>
+
+                {/* Why the seller turned this order down — their own words, verbatim. */}
+                {cancelled && !!order.cancellationReason && (
+                    <View style={[styles.trialCard, styles.trialCardRed]}>
+                        <Text style={styles.trialTitle}>Why this order was cancelled</Text>
+                        <Text style={styles.trialBody}>
+                            The seller could not fulfil this order. Reason: {order.cancellationReason}
+                        </Text>
+                    </View>
+                )}
 
                 {/* Phase 9A — the 15-minute keep/return window */}
                 {(trialActive || showExpiredNotice) && (
