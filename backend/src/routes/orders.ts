@@ -1686,6 +1686,14 @@ router.patch('/:id/return-dropoff', authenticate, async (req: AuthRequest, res: 
 // so a prepaid failed delivery lands in the admin queue as an explicit decision —
 // the customer may have refused delivery in bad faith, and the delivery fee is
 // not refundable on an instant order.
+//
+// What this DOES do is raise the flag: a prepaid order that turns around gets an
+// explicit `refund_due` row in the shared history naming the amount at stake.
+// Before this, a returned prepaid order was indistinguishable from a returned COD
+// one and money sat unclaimed with nothing marking it. The row is a marker, NOT a
+// payment: no gateway call, and `payment_status` is deliberately untouched (it has
+// no CHECK constraint, so writing an invented value there would be accepted
+// silently while every other surface tests for 'paid'/'refunded').
 router.patch('/:id/delivery-return', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
   const note = String(req.body?.note || '').trim().slice(0, 500);
 
@@ -1704,7 +1712,8 @@ router.patch('/:id/delivery-return', authenticate, async (req: AuthRequest, res:
     // same moment, must not both restock. The status guard below then rejects
     // whichever one arrives second.
     const orderResult = await client.query(
-      `SELECT id, order_number, status, user_id, seller_id, delivery_type
+      `SELECT id, order_number, status, user_id, seller_id, delivery_type,
+              payment_status, payment_method, final_amount, total_amount
        FROM ${ORDERS}
        WHERE id = $1
        FOR UPDATE`,
@@ -1759,6 +1768,23 @@ router.patch('/:id/delivery-return', authenticate, async (req: AuthRequest, res:
       'returned',
       note ? `Returned to seller after a failed delivery: ${note}` : 'Returned to seller after a failed delivery'
     );
+
+    // Prepaid: the customer's money is with us and the goods are going back to
+    // the seller. Flag it for the admin decision — deliberately not paid out here
+    // (see the header comment): a refusal at the door can be bad faith, and on an
+    // instant order the delivery fee is not refundable, so the amount owed is a
+    // judgement call rather than arithmetic.
+    const isPrepaid = String(order.payment_status || '').toLowerCase() === 'paid'
+      && String(order.payment_method || '').toLowerCase() !== 'cod';
+    if (isPrepaid) {
+      const paid = Number(order.final_amount ?? order.total_amount ?? 0);
+      await recordOrderStatus(
+        client,
+        req.params.id,
+        'refund_due',
+        `Prepaid order returned to the seller after a failed delivery. ₹${paid.toFixed(2)} was collected and is awaiting a refund decision. No money has been moved.`
+      );
+    }
 
     const isFlash = String(order.delivery_type || '').toLowerCase() === 'flash';
     const customerMessage = isFlash
