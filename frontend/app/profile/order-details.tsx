@@ -87,6 +87,7 @@ export default function OrderDetailsScreen() {
                     prepaidAmount: Number(o.prepaidAmount || 0),
                     isTrial: !!o.isTrial, trialExpiresAt: o.trialExpiresAt ?? null,
                     cancellationReason: o.cancellationReason ?? null,
+                    courier: o.courier ?? null,
                     createdAt: o.createdAt, updatedAt: o.updatedAt,
                 } as OrderObject);
             }
@@ -452,8 +453,8 @@ export default function OrderDetailsScreen() {
                 {canCancel && (
                     <ZButton label="Cancel order" variant="outline" style={{ marginTop: 12 }} onPress={() => router.push({ pathname: '/profile/cancel-order', params: { orderId: order.id } })} />
                 )}
-                {['processing', 'shipped', 'in_transit', 'out_for_delivery'].includes(order.status) && (
-                    <ZButton label="Contact delivery partner" variant="light" style={{ marginTop: 12 }} onPress={() => Linking.openURL('tel:+919876543210')} />
+                {order.courier?.phone && (
+                    <ZButton label="Contact delivery partner" variant="light" style={{ marginTop: 12 }} onPress={() => Linking.openURL(`tel:${order.courier!.phone}`)} />
                 )}
                 <View style={{ height: 30 }} />
             </ScrollView>

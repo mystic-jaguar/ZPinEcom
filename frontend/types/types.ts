@@ -369,6 +369,8 @@ export interface OrderObject {
     cancellationReason?: string | null;
     isTrial?: boolean;
     trialExpiresAt?: string | null;
+    // Present only once a delivery partner has accepted (delivery_boy_id set).
+    courier?: { name: string | null; phone: string | null } | null;
     partnerEarning?: number;
     distance?: number;                     // km
     estimatedTime?: number;                // minutes

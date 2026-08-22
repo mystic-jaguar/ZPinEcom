@@ -321,6 +321,9 @@ function normalizeOrder(row: any) {
     isTrial: !!row.is_trial,
     trialExpiresAt: row.trial_expires_at ?? null,
     trialSecondsLeft: row.trial_seconds_left != null ? Math.round(Number(row.trial_seconds_left)) : null,
+    // Same gate as the /track endpoint: only present once a delivery partner
+    // has actually accepted (delivery_boy_id set), never a placeholder.
+    courier: row.delivery_boy_id ? { name: row.courier_name || null, phone: row.courier_phone || null } : null,
     // order_items.price is the raw VENDOR price (that's what the seller is paid
     // and what the seller dashboard reports). The customer is shown — and was
     // charged — that price plus the 20% ZPIN platform fee, which is why these
@@ -406,11 +409,13 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response): Promis
           WHERE h.order_id = o.id AND h.status = 'cancelled'
             AND h.note LIKE 'Rejected by seller:%'
           ORDER BY h.created_at DESC LIMIT 1) AS cancellation_reason,
+        dp.name AS courier_name, dp.mobile AS courier_phone,
         COALESCE(json_agg(${ORDER_ITEMS_JSON}) FILTER (WHERE oi.id IS NOT NULL), '[]') as items
        FROM ${ORDERS} o
        LEFT JOIN ${ORDER_ITEMS} oi ON oi.order_id = o.id
+       LEFT JOIN delivery_partner_profiles dp ON dp.id::text = o.delivery_boy_id::text
        WHERE o.id = $1 AND o.user_id = $2
-       GROUP BY o.id`,
+       GROUP BY o.id, dp.name, dp.mobile`,
       [req.params.id, req.userId]
     );
 
