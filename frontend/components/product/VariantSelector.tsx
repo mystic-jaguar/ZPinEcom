@@ -1,16 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-// Map common color names to hex for display
-const COLOR_MAP: Record<string, string> = {
-    red: '#EF4444', blue: '#3B82F6', green: '#22C55E', yellow: '#FBBF24',
-    black: '#1a1a1a', white: '#F9FAFB', grey: '#9CA3AF', gray: '#9CA3AF',
-    pink: '#EC4899', purple: '#A855F7', orange: '#F97316', brown: '#92400E',
-    navy: '#1E3A5F', maroon: '#7F1D1D', beige: '#D4B896', cream: '#FFF8E7',
-    teal: '#14B8A6', indigo: '#6366F1', violet: '#7C3AED', gold: '#D97706',
-    silver: '#94A3B8', coral: '#F87171', mint: '#6EE7B7', lavender: '#C4B5FD',
-};
-
 interface VariantSelectorProps {
     colors?: string[];
     sizes?: string[];
@@ -45,22 +35,18 @@ export default function VariantSelector({
                     <View style={styles.row}>
                         {colors.map((color) => {
                             const isSelected = selectedColor === color;
-                            const hex = COLOR_MAP[color.toLowerCase()] || '#E5E7EB';
-                            const isDark = ['black', 'navy', 'maroon', 'indigo', 'violet'].includes(color.toLowerCase());
                             return (
                                 <TouchableOpacity
                                     key={color}
                                     onPress={() => onSelectColor?.(color)}
                                     style={[
                                         styles.colorChip,
-                                        { backgroundColor: hex },
                                         isSelected && styles.colorChipSelected,
-                                        color.toLowerCase() === 'white' && styles.colorChipWhite,
                                     ]}
                                 >
                                     <Text style={[
                                         styles.colorChipText,
-                                        { color: isDark ? '#fff' : '#1a1a1a' },
+                                        isSelected && styles.colorChipTextSelected,
                                     ]}>
                                         {color.charAt(0).toUpperCase() + color.slice(1)}
                                     </Text>
@@ -151,18 +137,22 @@ const styles = StyleSheet.create({
         paddingHorizontal: 14,
         paddingVertical: 8,
         borderRadius: 20,
-        borderWidth: 2,
-        borderColor: 'transparent',
+        borderWidth: 1.5,
+        borderColor: '#E5E7EB',
+        backgroundColor: '#fff',
     },
     colorChipSelected: {
-        borderColor: '#1a1a1a',
-    },
-    colorChipWhite: {
-        borderColor: '#E5E7EB',
+        borderColor: '#FBBF24',
+        backgroundColor: '#FFFBE6',
     },
     colorChipText: {
         fontSize: 13,
         fontWeight: '600',
+        color: '#555',
+    },
+    colorChipTextSelected: {
+        color: '#1a1a1a',
+        fontWeight: '700',
     },
     // Size boxes
     sizeBox: {
