@@ -88,8 +88,10 @@ export default function AllOrdersScreen() {
                 </View>
 
                 {/* A seller rejection carries a reason; say so on the card so the
-                    customer doesn't have to open the order to find out why. */}
-                {cancelled && group.orders.some((o: any) => o.cancellationReason) && (
+                    customer doesn't have to open the order to find out why. Checked
+                    independent of the group's aggregate status: in a multi-seller
+                    group, one seller can reject while the others still ship. */}
+                {group.orders.some((o: any) => o.cancellationReason) && (
                     <Text style={styles.sellerCancelNote}>The seller could not fulfil this order.</Text>
                 )}
 
