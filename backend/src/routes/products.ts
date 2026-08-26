@@ -754,12 +754,33 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
   // stamp taken when it was cached. A vendor price edit (any backend, plus the
   // `update_products_updated_at` trigger) bumps that column, so the next request
   // rebuilds instead of serving the old price for up to 2h.
+  //
+  // The stamp also covers the product's colour-variant siblings, because the
+  // `variants` list below is part of this cached payload. Adding a Blue jacket
+  // does not touch the Red row's updated_at, so on its own stamp the Red page
+  // would keep serving a cached variants list with no Blue in it for up to 2h —
+  // Blue showed Red and Green, but never the other way round.
   const cacheKey = `product:${id}`;
   const cached = await cacheGet<{ stamp: string; response: unknown }>(cacheKey);
   let freshStamp: string | null = null;
   try {
-    const stampRow = await pool.query('SELECT updated_at FROM products WHERE id = $1::uuid', [id]);
-    freshStamp = stampRow.rows[0] ? String(stampRow.rows[0].updated_at?.valueOf?.() ?? stampRow.rows[0].updated_at) : null;
+    const stampRow = await pool.query(
+      `SELECT p.updated_at,
+              (SELECT MAX(s.updated_at) FROM products s
+                WHERE s.variant_group_id = p.variant_group_id AND s.is_approved = true) AS group_updated_at,
+              (SELECT COUNT(*) FROM products s
+                WHERE s.variant_group_id = p.variant_group_id AND s.is_approved = true) AS group_size
+         FROM products p WHERE p.id = $1::uuid`,
+      [id]
+    );
+    const r = stampRow.rows[0];
+    // COUNT as well as MAX: removing or unapproving a sibling lowers the count
+    // while leaving the group's newest updated_at untouched.
+    freshStamp = r
+      ? [r.updated_at, r.group_updated_at, r.group_size]
+          .map((v: any) => String(v?.valueOf?.() ?? v))
+          .join('|')
+      : null;
   } catch { /* fall through to a full rebuild */ }
   if (cached?.response && freshStamp && cached.stamp === freshStamp) {
     res.json(cached.response);
