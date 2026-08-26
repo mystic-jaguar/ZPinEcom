@@ -48,6 +48,10 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
                     orderNumber: o.orderNumber,
                     groupId: o.groupId ?? null,
                     status: o.status,
+                    // Set only when a seller rejected the order. This normalizer is an
+                    // allow-list, so a field missing here is dropped no matter what the
+                    // backend sends — that is why the list card showed no reason note.
+                    cancellationReason: o.cancellationReason ?? null,
                     paymentStatus: o.paymentStatus,
                     totalAmount: Number(o.totalAmount || 0),
                     shippingAmount: Number(o.shippingAmount || 0),
