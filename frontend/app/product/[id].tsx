@@ -507,12 +507,9 @@ export default function ProductDetails() {
 
                     {/* Variants */}
                     <VariantSelector
-                        colors={product.colors}
                         sizes={product.sizes}
                         sizeQuantities={(product as any).sizeQuantities}
-                        selectedColor={selectedColor}
                         selectedSize={selectedSize}
-                        onSelectColor={setSelectedColor}
                         onSelectSize={setSelectedSize}
                     />
 

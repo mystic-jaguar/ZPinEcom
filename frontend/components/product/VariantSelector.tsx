@@ -1,68 +1,45 @@
-import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useState } from 'react';
+import { Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 interface VariantSelectorProps {
-    colors?: string[];
     sizes?: string[];
     sizeQuantities?: Record<string, number>;
-    selectedColor?: string;
     selectedSize?: string;
-    onSelectColor?: (color: string) => void;
     onSelectSize?: (size: string) => void;
 }
 
+// Same chart the customer website shows (ProductDetail.jsx)
+const SIZE_CHART_ROWS = [
+    ['XS', '36', '26', '16.5'],
+    ['S', '38', '27', '17'],
+    ['M', '40', '28', '17.5'],
+    ['L', '42', '29', '18'],
+    ['XL', '44', '30', '18.5'],
+    ['XXL', '46', '31', '19'],
+];
+
 export default function VariantSelector({
-    colors,
     sizes,
     sizeQuantities,
-    selectedColor,
     selectedSize,
-    onSelectColor,
     onSelectSize,
 }: VariantSelectorProps) {
-    if ((!colors || colors.length === 0) && (!sizes || sizes.length === 0)) {
+    const [sizeChartOpen, setSizeChartOpen] = useState(false);
+
+    if (!sizes || sizes.length === 0) {
         return null;
     }
 
     return (
         <View style={styles.container}>
-            {/* Color Selector */}
-            {colors && colors.length > 0 && (
-                <View style={styles.section}>
-                    <Text style={styles.label}>
-                        COLOR{selectedColor ? `: ${selectedColor.charAt(0).toUpperCase() + selectedColor.slice(1)}` : ''}
-                    </Text>
-                    <View style={styles.row}>
-                        {colors.map((color) => {
-                            const isSelected = selectedColor === color;
-                            return (
-                                <TouchableOpacity
-                                    key={color}
-                                    onPress={() => onSelectColor?.(color)}
-                                    style={[
-                                        styles.colorChip,
-                                        isSelected && styles.colorChipSelected,
-                                    ]}
-                                >
-                                    <Text style={[
-                                        styles.colorChipText,
-                                        isSelected && styles.colorChipTextSelected,
-                                    ]}>
-                                        {color.charAt(0).toUpperCase() + color.slice(1)}
-                                    </Text>
-                                </TouchableOpacity>
-                            );
-                        })}
-                    </View>
-                </View>
-            )}
-
             {/* Size Selector */}
             {sizes && sizes.length > 0 && (
                 <View style={styles.section}>
                     <View style={styles.sizeHeaderRow}>
                         <Text style={styles.label}>SIZE</Text>
-                        <Text style={styles.sizeChartLink}>Size Chart</Text>
+                        <TouchableOpacity onPress={() => setSizeChartOpen(true)}>
+                            <Text style={styles.sizeChartLink}>Size Chart</Text>
+                        </TouchableOpacity>
                     </View>
                     <View style={styles.row}>
                         {sizes.map((size) => {
@@ -104,6 +81,32 @@ export default function VariantSelector({
                     )}
                 </View>
             )}
+
+            <Modal visible={sizeChartOpen} transparent animationType="fade" onRequestClose={() => setSizeChartOpen(false)}>
+                <Pressable style={styles.modalOverlay} onPress={() => setSizeChartOpen(false)}>
+                    <Pressable style={styles.modalCard} onPress={() => {}}>
+                        <Text style={styles.modalTitle}>Size Chart</Text>
+                        <View style={styles.chartTable}>
+                            <View style={[styles.chartRow, styles.chartHeadRow]}>
+                                {['Size', 'Chest (in)', 'Length (in)', 'Shoulder (in)'].map((h) => (
+                                    <Text key={h} style={[styles.chartCell, styles.chartHeadCell]}>{h}</Text>
+                                ))}
+                            </View>
+                            {SIZE_CHART_ROWS.map((row) => (
+                                <View key={row[0]} style={styles.chartRow}>
+                                    {row.map((cell, i) => (
+                                        <Text key={i} style={[styles.chartCell, i === 0 && styles.chartCellFirst]}>{cell}</Text>
+                                    ))}
+                                </View>
+                            ))}
+                        </View>
+                        <Text style={styles.chartNote}>Measurements are approximate — actual fit may vary slightly by style.</Text>
+                        <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setSizeChartOpen(false)}>
+                            <Text style={styles.modalCloseText}>Close</Text>
+                        </TouchableOpacity>
+                    </Pressable>
+                </Pressable>
+            </Modal>
         </View>
     );
 }
@@ -131,28 +134,6 @@ const styles = StyleSheet.create({
         color: '#FBBF24',
         fontWeight: '600',
         textDecorationLine: 'underline',
-    },
-    // Color chips
-    colorChip: {
-        paddingHorizontal: 14,
-        paddingVertical: 8,
-        borderRadius: 20,
-        borderWidth: 1.5,
-        borderColor: '#E5E7EB',
-        backgroundColor: '#fff',
-    },
-    colorChipSelected: {
-        borderColor: '#FBBF24',
-        backgroundColor: '#FFFBE6',
-    },
-    colorChipText: {
-        fontSize: 13,
-        fontWeight: '600',
-        color: '#555',
-    },
-    colorChipTextSelected: {
-        color: '#1a1a1a',
-        fontWeight: '700',
     },
     // Size boxes
     sizeBox: {
@@ -206,4 +187,35 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         marginTop: 8,
     },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 24,
+    },
+    modalCard: {
+        width: '100%',
+        backgroundColor: '#fff',
+        borderRadius: 14,
+        padding: 20,
+    },
+    modalTitle: { fontSize: 17, fontWeight: '700', color: '#1a1a1a', marginBottom: 14 },
+    chartTable: { borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, overflow: 'hidden' },
+    chartRow: { flexDirection: 'row', borderTopWidth: 1, borderTopColor: '#E5E7EB' },
+    chartHeadRow: { borderTopWidth: 0, backgroundColor: '#F9FAFB' },
+    chartCell: { flex: 1, paddingVertical: 8, paddingHorizontal: 6, fontSize: 12, color: '#555', textAlign: 'center' },
+    chartHeadCell: { fontWeight: '700', color: '#1a1a1a' },
+    chartCellFirst: { fontWeight: '700', color: '#1a1a1a' },
+    chartNote: { fontSize: 11, color: '#888', marginTop: 10 },
+    modalCloseBtn: {
+        marginTop: 16,
+        alignSelf: 'flex-end',
+        paddingVertical: 10,
+        paddingHorizontal: 20,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+    },
+    modalCloseText: { fontSize: 14, fontWeight: '600', color: '#333' },
 });
