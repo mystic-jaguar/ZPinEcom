@@ -221,6 +221,10 @@ export default function OrderDetailsScreen() {
 
                     <View style={styles.card}>
                         <ZText variant="eyebrow" style={{ marginBottom: 14 }}>Bill details</ZText>
+                        {group.orders.flatMap(o => o.items).map((it, i) => (
+                            <BillRow key={i} label={`${it.productName}${it.quantity > 1 ? ` × ${it.quantity}` : ''}`} value={money(Number(it.price) * Number(it.quantity))} sub />
+                        ))}
+                        <View style={styles.billDivider} />
                         <BillRow label="Subtotal" value={money(subtotal)} />
                         <BillRow label="Delivery" value={shipping === 0 ? 'FREE' : money(shipping)} mono={shipping === 0} />
                         {tax > 0 && <BillRow label="Tax (GST)" value={money(tax)} />}
@@ -398,6 +402,10 @@ export default function OrderDetailsScreen() {
                 {/* Bill */}
                 <View style={styles.card}>
                     <ZText variant="eyebrow" style={{ marginBottom: 14 }}>Bill details</ZText>
+                    {order.items.map((it, i) => (
+                        <BillRow key={i} label={`${it.productName}${it.quantity > 1 ? ` × ${it.quantity}` : ''}`} value={money(Number(it.price) * Number(it.quantity))} sub />
+                    ))}
+                    <View style={styles.billDivider} />
                     <BillRow label="Subtotal" value={money(itemsTotal || order.finalAmount)} />
                     {instantTrialFee > 0 && <BillRow label="Instant trial fee" value={money(instantTrialFee)} />}
                     <BillRow label="Delivery" value={shippingFee === 0 ? 'FREE' : money(shippingFee)} mono={shippingFee === 0} />
@@ -512,11 +520,11 @@ export default function OrderDetailsScreen() {
     );
 }
 
-function BillRow({ label, value, mono, red }: { label: string; value: string; mono?: boolean; red?: boolean }) {
+function BillRow({ label, value, mono, red, sub }: { label: string; value: string; mono?: boolean; red?: boolean; sub?: boolean }) {
     return (
         <View style={styles.billRow}>
-            <Text style={[styles.billLabel, red && { color: palette.red500 }]}>{label}</Text>
-            <Text style={[mono ? styles.billMono : styles.billValue, red && { color: palette.red500 }]}>{value}</Text>
+            <Text style={[styles.billLabel, sub && styles.billLabelSub, red && { color: palette.red500 }]} numberOfLines={1}>{label}</Text>
+            <Text style={[mono ? styles.billMono : styles.billValue, sub && styles.billValueSub, red && { color: palette.red500 }]}>{value}</Text>
         </View>
     );
 }
@@ -567,7 +575,10 @@ const styles = StyleSheet.create({
     addrLine: { fontFamily: fonts.bodyRegular, fontSize: 12, lineHeight: 18, color: colors.textFaint },
 
     billRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
-    billLabel: { fontFamily: fonts.bodyRegular, fontSize: 14, color: colors.textBody },
+    billLabel: { fontFamily: fonts.bodyRegular, fontSize: 14, color: colors.textBody, flex: 1, marginRight: 12 },
+    billLabelSub: { fontSize: 13, color: colors.textMuted },
+    billDivider: { height: 1, backgroundColor: colors.borderSubtle, marginBottom: 10, marginTop: 2 },
+    billValueSub: { fontFamily: fonts.bodyRegular, fontSize: 13, color: colors.textBody },
     billValue: { fontFamily: fonts.displaySemiBold, fontSize: 14, color: colors.textStrong },
     billMono: { fontFamily: fonts.monoBold, fontSize: 12, color: palette.green500 },
     billTotal: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', borderTopWidth: 1, borderTopColor: colors.borderSubtle, borderStyle: 'dashed', paddingTop: 12, marginTop: 2 },
