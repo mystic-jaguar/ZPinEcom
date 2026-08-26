@@ -25,6 +25,17 @@ const TTL_REVIEWS = 1800;       // 30m — reviews
 const TTL_FRESH_CAT = 7200;     // 2h — fresh categories
 const TTL_NEARBY = 3600;        // 1h — nearby categories
 
+// Colour/design variants are separate product rows sharing a variant_group_id
+// (2026-08-03 decision). Listings must show ONE card per group, or a jacket in
+// three colours reads as three unrelated products with its reviews split three
+// ways. Representative = the group's oldest still-listed row; the detail page's
+// swatch strip cross-links the rest. Ungrouped products (most of them) pass through.
+const VARIANT_PRIMARY = `(p.variant_group_id IS NULL OR p.id = (
+        SELECT s.id FROM products s
+        WHERE s.variant_group_id = p.variant_group_id
+          AND s.in_stock = true AND s.is_approved = true
+        ORDER BY s.created_at ASC, s.id ASC LIMIT 1))`;
+
 const router = Router();
 
 // Review photos: one at a time, 5MB, same ceiling and byte-sniffing the vendor
@@ -291,7 +302,7 @@ router.get('/recommended', authenticate, async (req: AuthRequest, res: Response)
          FROM products p
          LEFT JOIN product_images pi ON pi.product_id = p.id
          LEFT JOIN product_reviews pr ON pr.product_id = p.id
-         WHERE p.in_stock = true AND p.is_approved = true
+         WHERE p.in_stock = true AND p.is_approved = true AND ${VARIANT_PRIMARY}
          GROUP BY p.id
          ORDER BY p.created_at DESC
          LIMIT $1`,
@@ -315,7 +326,7 @@ router.get('/recommended', authenticate, async (req: AuthRequest, res: Response)
        FROM products p
        LEFT JOIN product_images pi ON pi.product_id = p.id
        LEFT JOIN product_reviews pr ON pr.product_id = p.id
-       WHERE p.in_stock = true AND p.is_approved = true
+       WHERE p.in_stock = true AND p.is_approved = true AND ${VARIANT_PRIMARY}
          AND p.deepest_category_name = ANY($1)
          AND p.id != ALL($2)
        GROUP BY p.id
@@ -353,7 +364,7 @@ router.get('/search', productListLimiter, async (req: Request, res: Response): P
        FROM products p
        LEFT JOIN product_images pi ON pi.product_id = p.id
        LEFT JOIN product_reviews pr ON pr.product_id = p.id
-       WHERE p.in_stock = true AND p.is_approved = true
+       WHERE p.in_stock = true AND p.is_approved = true AND ${VARIANT_PRIMARY}
          AND (
            LOWER(REPLACE(p.product_name, ' ', '')) LIKE $1
            OR LOWER(p.product_name) LIKE $2
@@ -379,7 +390,7 @@ router.get('/search', productListLimiter, async (req: Request, res: Response): P
          FROM products p
          LEFT JOIN product_images pi ON pi.product_id = p.id
          LEFT JOIN product_reviews pr ON pr.product_id = p.id
-         WHERE p.in_stock = true AND p.is_approved = true
+         WHERE p.in_stock = true AND p.is_approved = true AND ${VARIANT_PRIMARY}
            AND GREATEST(
                  similarity(LOWER(p.product_name), $1),
                  similarity(LOWER(COALESCE(p.deepest_category_name, '')), $1)
@@ -407,7 +418,7 @@ router.get('/search', productListLimiter, async (req: Request, res: Response): P
          FROM products p
          LEFT JOIN product_images pi ON pi.product_id = p.id
          LEFT JOIN product_reviews pr ON pr.product_id = p.id
-         WHERE p.in_stock = true AND p.is_approved = true
+         WHERE p.in_stock = true AND p.is_approved = true AND ${VARIANT_PRIMARY}
            AND p.deepest_category_name = ANY($1)
            AND p.id != ALL($2)
          GROUP BY p.id
@@ -450,7 +461,7 @@ router.get('/nearby', async (req: Request, res: Response): Promise<void> => {
         const params = cat.keywords.map(k => `%${k}%`);
 
         const countResult = await pool.query(
-          `SELECT COUNT(*) FROM products p WHERE p.in_stock = true AND p.is_approved = true AND (${likeConditions})`,
+          `SELECT COUNT(*) FROM products p WHERE p.in_stock = true AND p.is_approved = true AND ${VARIANT_PRIMARY} AND (${likeConditions})`,
           params
         );
 
@@ -458,7 +469,7 @@ router.get('/nearby', async (req: Request, res: Response): Promise<void> => {
         const imgResult = await pool.query(
           `SELECT pi.image_url FROM products p
            JOIN product_images pi ON pi.product_id = p.id
-           WHERE p.in_stock = true AND p.is_approved = true AND (${likeConditions})
+           WHERE p.in_stock = true AND p.is_approved = true AND ${VARIANT_PRIMARY} AND (${likeConditions})
            LIMIT 1`,
           params
         );
@@ -496,7 +507,7 @@ router.get('/fresh-categories', async (req: Request, res: Response): Promise<voi
         MAX(created_at) OVER (PARTITION BY deepest_category_name) AS latest_at,
         (SELECT image_url FROM product_images WHERE product_id = p.id LIMIT 1) AS image_url
       FROM products p
-      WHERE in_stock = true AND is_approved = true
+      WHERE p.in_stock = true AND p.is_approved = true AND ${VARIANT_PRIMARY}
         AND deepest_category_name IS NOT NULL
         AND deepest_category_name != ''
       ORDER BY deepest_category_name, created_at DESC
@@ -582,7 +593,7 @@ router.get('/category/:categoryName', productListLimiter, async (req: Request, r
   try {
     // $1 is always the category name. Subsequent filter params are appended dynamically.
     const params: any[] = [categoryName];
-    let where = `p.in_stock = true AND p.is_approved = true
+    let where = `p.in_stock = true AND p.is_approved = true AND ${VARIANT_PRIMARY}
       AND (
         LOWER(p.deepest_category_name) = LOWER($1)
         OR EXISTS (
@@ -637,7 +648,7 @@ router.get('/category/:categoryName', productListLimiter, async (req: Request, r
     const brandsResult = await pool.query(
       `SELECT DISTINCT p.deepest_category_name AS name
        FROM products p
-       WHERE p.in_stock = true AND p.is_approved = true
+       WHERE p.in_stock = true AND p.is_approved = true AND ${VARIANT_PRIMARY}
          AND p.deepest_category_name IS NOT NULL
          AND p.deepest_category_name <> ''
          AND (
@@ -704,7 +715,7 @@ router.get('/', productListLimiter, async (req: Request, res: Response): Promise
   if (cached) { res.json(cached); return; }
 
   try {
-    const countResult = await pool.query(`SELECT COUNT(*) FROM products WHERE in_stock = true AND is_approved = true`);
+    const countResult = await pool.query(`SELECT COUNT(*) FROM products p WHERE p.in_stock = true AND p.is_approved = true AND ${VARIANT_PRIMARY}`);
     const total = Number(countResult.rows[0].count);
 
     const result = await pool.query(
@@ -714,7 +725,7 @@ router.get('/', productListLimiter, async (req: Request, res: Response): Promise
        FROM products p
        LEFT JOIN product_images pi ON pi.product_id = p.id
        LEFT JOIN product_reviews pr ON pr.product_id = p.id
-       WHERE p.in_stock = true AND p.is_approved = true
+       WHERE p.in_stock = true AND p.is_approved = true AND ${VARIANT_PRIMARY}
        GROUP BY p.id
        ORDER BY p.created_at DESC, p.id ASC
        LIMIT $1 OFFSET $2`,
