@@ -59,6 +59,9 @@ function normalizeOrder(row: any) {
     prepaidAmount: Number(row.prepaid_amount || 0),
     isTrial: !!row.is_trial,
     trialExpiresAt: row.trial_expires_at ?? null,
+    // Present only when a seller rejected the order (see routes/orders.ts) —
+    // the order list uses it to show the "could not fulfil" note on the card.
+    cancellationReason: row.cancellation_reason ?? null,
     paymentStatus: row.payment_status,
     totalAmount: Number(row.total_amount || 0),
     shippingAmount: Number(row.shipping_amount || 0),
@@ -106,6 +109,11 @@ router.get('/orders', authenticate, async (req: AuthRequest, res: Response): Pro
 
     const result = await pool.query(
       `SELECT o.*,
+        (SELECT REPLACE(h.note, 'Rejected by seller: ', '')
+           FROM order_status_history h
+          WHERE h.order_id = o.id AND h.status = 'cancelled'
+            AND h.note LIKE 'Rejected by seller:%'
+          ORDER BY h.created_at DESC LIMIT 1) AS cancellation_reason,
         COALESCE(json_agg(${ORDER_ITEMS_JSON}) FILTER (WHERE oi.id IS NOT NULL), '[]') as items
        FROM ${ORDERS} o
        LEFT JOIN ${ORDER_ITEMS} oi ON oi.order_id = o.id

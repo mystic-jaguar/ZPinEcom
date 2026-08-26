@@ -338,9 +338,8 @@ export default function OrderDetailsScreen() {
                 {cancelled && !!order.cancellationReason && (
                     <View style={[styles.trialCard, styles.trialCardRed]}>
                         <Text style={styles.trialTitle}>Why this order was cancelled</Text>
-                        <Text style={styles.trialBody}>
-                            The seller could not fulfil this order. Reason: {order.cancellationReason}
-                        </Text>
+                        <Text style={styles.trialBody}>The seller could not fulfil this order.</Text>
+                        <Text style={styles.trialBody}>Reason: {order.cancellationReason}</Text>
                     </View>
                 )}
 

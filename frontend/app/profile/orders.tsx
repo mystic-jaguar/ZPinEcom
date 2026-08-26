@@ -87,6 +87,12 @@ export default function AllOrdersScreen() {
                     </View>
                 </View>
 
+                {/* A seller rejection carries a reason; say so on the card so the
+                    customer doesn't have to open the order to find out why. */}
+                {cancelled && group.orders.some((o: any) => o.cancellationReason) && (
+                    <Text style={styles.sellerCancelNote}>The seller could not fulfil this order.</Text>
+                )}
+
                 {/* Multi-shipment groups are opened from the card for per-parcel status/tracking.
                     Single-shipment groups keep the original inline actions. */}
                 {!single ? (
@@ -169,6 +175,7 @@ const styles = StyleSheet.create({
     cardHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
     orderNo: { fontFamily: fonts.monoBold, fontSize: 10, letterSpacing: 0.4, color: colors.textFaint },
     placed: { fontFamily: fonts.bodySemiBold, fontSize: 12, color: colors.textMuted, marginTop: 1 },
+    sellerCancelNote: { fontFamily: fonts.bodySemiBold, fontSize: 12, color: palette.red500, marginTop: 10 },
     statusPill: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 100 },
     dot: { width: 6, height: 6, borderRadius: 3 },
     statusText: { fontFamily: fonts.monoBold, fontSize: 9, letterSpacing: 0.4 },
