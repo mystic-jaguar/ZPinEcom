@@ -1,13 +1,15 @@
 import { Image } from 'expo-image';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import { Bike, Headphones, HelpCircle, Repeat, RotateCcw } from 'lucide-react-native';
+import { Bike, Headphones, HelpCircle, Repeat, RotateCcw, XCircle } from 'lucide-react-native';
 import React, { useCallback, useMemo, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import ActionModal from '../../components/common/ActionModal';
 import { AppHeader, ZText } from '../../components/ui';
 import { colors, fonts, palette, radius } from '../../constants/theme';
 import { useOrder } from '../../context/OrderContext';
+import { orderService } from '../../services/order';
 import { groupOrders, groupStatus, OrderGroup } from '../../utils/orderGroups';
 import { isInProgress, statusLabel, TERMINATED } from '../../utils/orderStatus';
 
@@ -28,6 +30,9 @@ export default function AllOrdersScreen() {
     const { orders, refreshOrders } = useOrder();
     const [activeFilter, setActiveFilter] = useState('All');
     const [refreshing, setRefreshing] = useState(false);
+    // Order id awaiting a "yes, call off my return" confirmation.
+    const [cancelReturnId, setCancelReturnId] = useState<string | null>(null);
+    const [returnError, setReturnError] = useState<string | null>(null);
 
     useFocusEffect(useCallback(() => { refreshOrders(); }, []));
 
@@ -35,6 +40,18 @@ export default function AllOrdersScreen() {
         setRefreshing(true);
         await refreshOrders();
         setRefreshing(false);
+    };
+
+    const confirmCancelReturn = async () => {
+        const id = cancelReturnId;
+        setCancelReturnId(null);
+        if (!id) return;
+        try {
+            await orderService.cancelReturn(id);
+        } catch (e: any) {
+            setReturnError(e?.message || 'Could not cancel the return. Please try again.');
+        }
+        await refreshOrders();
     };
 
     const groups = useMemo(() => groupOrders(orders), [orders]);
@@ -58,6 +75,10 @@ export default function AllOrdersScreen() {
         const inProgress = isInProgress(status);
         const delivered = status === 'delivered';
         const cancelled = status === 'cancelled';
+        // A return the customer can still call off: raised, but not yet collected
+        // by a delivery partner. 'picked_up' onwards is out of their hands.
+        const cancellableReturn = single && ['requested', 'approved'].includes(String((single as any).returnStatus || ''))
+            ? single : null;
         const dateLabel = new Date(group.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 
         return (
@@ -122,10 +143,17 @@ export default function AllOrdersScreen() {
                                     <RotateCcw size={16} color={colors.textStrong} />
                                     <Text style={styles.outlineText}>Return</Text>
                                 </Pressable>
-                                <Pressable style={styles.inkBtn} onPress={() => items[0] && router.push(`/product/${items[0].productId}`)}>
-                                    <Repeat size={16} color="#fff" />
-                                    <Text style={styles.inkText}>Buy again</Text>
-                                </Pressable>
+                                {cancellableReturn ? (
+                                    <Pressable style={styles.inkBtn} onPress={() => setCancelReturnId(cancellableReturn.id)}>
+                                        <XCircle size={16} color="#fff" />
+                                        <Text style={styles.inkText}>Cancel return</Text>
+                                    </Pressable>
+                                ) : (
+                                    <Pressable style={styles.inkBtn} onPress={() => items[0] && router.push(`/product/${items[0].productId}`)}>
+                                        <Repeat size={16} color="#fff" />
+                                        <Text style={styles.inkText}>Buy again</Text>
+                                    </Pressable>
+                                )}
                             </>
                         )}
                     </View>
@@ -158,6 +186,27 @@ export default function AllOrdersScreen() {
                 contentContainerStyle={styles.list}
                 showsVerticalScrollIndicator={false}
                 ListEmptyComponent={<View style={styles.empty}><ZText variant="muted">No orders found</ZText></View>}
+            />
+
+            <ActionModal
+                visible={!!cancelReturnId}
+                title="Cancel this return?"
+                message="Your return request will be withdrawn and no pickup will be scheduled. You can raise a new return later if you change your mind."
+                icon="alert-triangle"
+                primaryButtonText="Yes, cancel return"
+                onPrimaryPress={confirmCancelReturn}
+                secondaryButtonText="Keep return"
+                onSecondaryPress={() => setCancelReturnId(null)}
+                onClose={() => setCancelReturnId(null)}
+            />
+            <ActionModal
+                visible={!!returnError}
+                title="Could not cancel"
+                message={returnError || ''}
+                icon="alert-circle"
+                primaryButtonText="OK"
+                onPrimaryPress={() => setReturnError(null)}
+                onClose={() => setReturnError(null)}
             />
         </SafeAreaView>
     );

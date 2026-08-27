@@ -367,6 +367,8 @@ export interface OrderObject {
     // order up — that is when the 15-minute selection window opens.
     /** Seller's reason, shown as a disclaimer when the seller rejected the order. */
     cancellationReason?: string | null;
+    /** Open return on this order: 'requested' | 'approved' | 'picked_up', else null. */
+    returnStatus?: string | null;
     isTrial?: boolean;
     trialExpiresAt?: string | null;
     // Present only once a delivery partner has accepted (delivery_boy_id set).

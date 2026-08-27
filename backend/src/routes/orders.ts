@@ -1960,6 +1960,85 @@ router.get('/:id/return-status', authenticate, async (req: AuthRequest, res: Res
 });
 
 // PATCH /api/v1/orders/:id/cancel
+// PATCH /api/v1/orders/:id/cancel-return
+//
+// The customer changes their mind about a return, before a delivery partner has
+// collected the parcel. Recorded as 'rejected' rather than a sixth status: that
+// is the one terminal value every reader already understands — it releases the
+// units back to the returnable pool, takes the request out of the delivery
+// pickup pool (which keys on 'approved'), and puts the order back to delivered.
+router.patch('/:id/cancel-return', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+  const client = await pool.connect();
+  try {
+    await ensureOrderSupportTables();
+    await client.query('BEGIN');
+
+    const returnResult = await client.query(
+      `SELECT id, status FROM ${RETURN_REQUESTS}
+       WHERE order_id = $1 AND user_id = $2
+       ORDER BY created_at DESC LIMIT 1
+       FOR UPDATE`,
+      [req.params.id, req.userId]
+    );
+
+    if (returnResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      res.status(404).json({ success: false, message: 'Return request not found' });
+      return;
+    }
+
+    const current = returnResult.rows[0];
+    // Once the goods have left the customer's hands the return is no longer
+    // theirs to call off.
+    if (!['requested', 'approved'].includes(current.status)) {
+      await client.query('ROLLBACK');
+      res.status(400).json({
+        success: false,
+        message: current.status === 'picked_up'
+          ? 'This return has already been picked up and can no longer be cancelled.'
+          : 'This return can no longer be cancelled.',
+      });
+      return;
+    }
+
+    await client.query(
+      `UPDATE ${RETURN_REQUESTS}
+       SET status = 'rejected',
+           status_history = status_history || $2::jsonb,
+           updated_at = NOW()
+       WHERE id = $1`,
+      [
+        current.id,
+        JSON.stringify([{
+          status: 'rejected',
+          at: new Date().toISOString(),
+          by: req.userId,
+          role: 'customer',
+          note: 'Cancelled by the customer',
+        }]),
+      ]
+    );
+
+    await client.query(
+      `UPDATE ${ORDERS} SET status = 'delivered', updated_at = NOW() WHERE id = $1`,
+      [req.params.id]
+    );
+    await recordOrderStatus(client, req.params.id, 'delivered', 'Return cancelled by the customer');
+
+    await client.query('COMMIT');
+
+    void notifyReturnTransition(req.params.id, 'rejected', 'Cancelled by the customer');
+
+    res.json({ success: true, data: { orderId: req.params.id, returnId: current.id, status: 'rejected' } });
+  } catch (err) {
+    try { await client.query('ROLLBACK'); } catch { /* ignore */ }
+    logger.error('cancelreturn_error', { error: (err as any)?.message ?? String(err) });
+    res.status(500).json({ success: false, message: 'Server error' });
+  } finally {
+    client.release();
+  }
+});
+
 router.patch('/:id/cancel', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
   const { reason } = req.body;
 

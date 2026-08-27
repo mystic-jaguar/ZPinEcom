@@ -62,6 +62,9 @@ function normalizeOrder(row: any) {
     // Present only when a seller rejected the order (see routes/orders.ts) —
     // the order list uses it to show the "could not fulfil" note on the card.
     cancellationReason: row.cancellation_reason ?? null,
+    // Open return on this order, if any ('requested' | 'approved' | 'picked_up').
+    // The card offers "Cancel return" only before a partner has collected it.
+    returnStatus: row.return_status ?? null,
     paymentStatus: row.payment_status,
     totalAmount: Number(row.total_amount || 0),
     shippingAmount: Number(row.shipping_amount || 0),
@@ -114,6 +117,9 @@ router.get('/orders', authenticate, async (req: AuthRequest, res: Response): Pro
           WHERE h.order_id = o.id AND h.status = 'cancelled'
             AND h.note LIKE 'Rejected by seller:%'
           ORDER BY h.created_at DESC LIMIT 1) AS cancellation_reason,
+        (SELECT r.status FROM return_requests r
+          WHERE r.order_id = o.id AND r.status IN ('requested', 'approved', 'picked_up')
+          ORDER BY r.created_at DESC LIMIT 1) AS return_status,
         COALESCE(json_agg(${ORDER_ITEMS_JSON}) FILTER (WHERE oi.id IS NOT NULL), '[]') as items
        FROM ${ORDERS} o
        LEFT JOIN ${ORDER_ITEMS} oi ON oi.order_id = o.id

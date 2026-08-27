@@ -52,6 +52,9 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
                     // allow-list, so a field missing here is dropped no matter what the
                     // backend sends — that is why the list card showed no reason note.
                     cancellationReason: o.cancellationReason ?? null,
+                    // Allow-list normalizer: without this line the card can never
+                    // know a return is open on the order.
+                    returnStatus: o.returnStatus ?? null,
                     paymentStatus: o.paymentStatus,
                     totalAmount: Number(o.totalAmount || 0),
                     shippingAmount: Number(o.shippingAmount || 0),

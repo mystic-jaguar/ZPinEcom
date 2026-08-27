@@ -178,6 +178,24 @@ export const orderService = {
     },
 
     /**
+     * Call off a return the customer no longer wants — only valid until a
+     * delivery partner has picked the parcel up.
+     */
+    async cancelReturn(id: string) {
+        try {
+            // PATCH :- /api/v1/orders/:id/cancel-return
+            const response = await apiClient.patch<ApiSuccessResponse<{
+                orderId: string;
+                returnId: string;
+                status: string;
+            }>>(`orders/${id}/cancel-return`, {});
+            return response.data;
+        } catch (error) {
+            throw new Error(handleApiError(error));
+        }
+    },
+
+    /**
      * Get return request status for an order
      */
     async getReturnStatus(id: string) {
