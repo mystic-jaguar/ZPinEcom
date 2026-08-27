@@ -13,6 +13,9 @@ import { returnStatusLabel } from '../../utils/orderStatus';
 type ReturnStatusRecord = {
     returnStatus: string; reason: string; description?: string; requestedAt: string; updatedAt: string;
     refundDisclaimer?: string | null;
+    // What the OPEN return is actually worth — the units coming back plus GST,
+    // not the order total. A 1-of-5 return must never quote the whole order.
+    refundAmount?: number | null;
     statusHistory?: Array<{ status: string; at: string; note?: string }>;
 };
 
@@ -131,6 +134,7 @@ export default function ReturnsRefundsScreen() {
                 step,
                 firstItem: o.items[0],
                 disclaimer: rd?.refundDisclaimer ?? REFUND_DISCLAIMER,
+                refundAmount: Number(rd?.refundAmount) || 0,
             };
         });
 
@@ -166,13 +170,14 @@ export default function ReturnsRefundsScreen() {
                 {activeReturns.length > 0 && (
                     <>
                         <ZText variant="eyebrow" style={styles.sectionLabel}>Active refund</ZText>
-                        {activeReturns.map(({ order, statusLabel, step, firstItem, disclaimer }) => (
+                        {activeReturns.map(({ order, statusLabel, step, firstItem, disclaimer, refundAmount }) => (
                             <View key={order.id} style={styles.card}>
                                 <View style={styles.itemRow}>
                                     <Image source={firstItem?.image ? { uri: firstItem.image as string } : require('../../assets/images/icon_backup.png')} style={styles.itemImg} contentFit="cover" />
                                     <View style={{ flex: 1 }}>
                                         <Text style={styles.itemName} numberOfLines={1}>{firstItem?.productName || order.orderNumber}</Text>
-                                        <Text style={styles.itemSub}>Refund ₹{Number(order.finalAmount).toLocaleString('en-IN')}</Text>
+                                        {/* The return's own value, not order.finalAmount. */}
+                                        <Text style={styles.itemSub}>Refund ₹{(refundAmount || Number(order.finalAmount)).toLocaleString('en-IN')}</Text>
                                     </View>
                                     <View style={styles.statusChip}><Text style={styles.statusChipText}>{statusLabel}</Text></View>
                                 </View>

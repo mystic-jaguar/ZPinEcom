@@ -213,7 +213,7 @@ export default function CancelOrderScreen() {
                         days" here would be a commitment ZPIN cannot keep. */}
                     {isReturn ? (
                         <Text style={styles.infoText}>
-                            Refund of <Text style={{ fontFamily: fonts.bodyBold }}>{money(order.finalAmount)}</Text>. This amount will be refunded once the seller receives the product.
+                            Refund of <Text style={{ fontFamily: fonts.bodyBold }}>{money(estimatedRefund)}</Text> for the {returnUnits} item{returnUnits > 1 ? 's' : ''} you are sending back. This amount will be refunded once the seller receives the product. The delivery charge is not refunded.
                         </Text>
                     ) : (
                         <Text style={styles.infoText}>Refund of <Text style={{ fontFamily: fonts.bodyBold }}>{money(order.finalAmount)}</Text> will hit your {order.paymentMethod === 'cod' ? 'account' : 'original payment method'} within 3–4 business days.</Text>

@@ -2,6 +2,8 @@ import { pool } from '../db';
 import { generateId } from './id';
 import { sendPush } from './push';
 import { logger } from './logger';
+import { resolveReturnLines, refundForLines } from './returnLines';
+import { withMarkup } from './pricing';
 
 /**
  * Every notification the return workflow emits, for every audience.
@@ -43,8 +45,11 @@ type ReturnEvent = 'requested' | 'approved' | 'rejected' | 'picked_up' | 'droppe
 // One row per audience per event. `null` copy = that audience is not told.
 // The customer is not pushed about their own 'requested' tap; they still get the
 // inbox row so the history is complete.
+// `amt` is the refund the OPEN return is worth ("₹1,234"), or '' when there is
+// no open return to price. Only the customer copy that promises money uses it —
+// "This amount will be refunded" used to name no amount at all.
 const COPY: Record<ReturnEvent, {
-  customer: { title: string; body: (n: string) => string } | null;
+  customer: { title: string; body: (n: string, amt: string) => string } | null;
   seller: { title: string; body: (n: string) => string } | null;
 }> = {
   requested: {
@@ -60,15 +65,15 @@ const COPY: Record<ReturnEvent, {
     seller: { title: 'Return rejected', body: (n) => `The return on order ${n} was rejected. Nothing is coming back.` },
   },
   picked_up: {
-    customer: { title: 'Return collected', body: (n) => `Your return for order ${n} has been collected. This amount will be refunded once the seller receives the product.` },
+    customer: { title: 'Return collected', body: (n, amt) => `Your return for order ${n} has been collected. ${amt ? `${amt} ` : 'This amount '}will be refunded once the seller receives the product.` },
     seller: { title: 'Return on its way back', body: (n) => `The return for order ${n} has been collected from the customer and is on its way to you.` },
   },
   dropped_off: {
-    customer: { title: 'Return delivered to seller', body: (n) => `Your return for order ${n} has reached the seller. Your refund will be settled shortly.` },
+    customer: { title: 'Return delivered to seller', body: (n, amt) => `Your return for order ${n} has reached the seller. Your refund${amt ? ` of ${amt}` : ''} will be settled shortly.` },
     seller: { title: 'Return received', body: (n) => `You confirmed the return for order ${n}. ZPIN will settle the refund.` },
   },
   refunded: {
-    customer: { title: 'Refund settled', body: (n) => `The refund for your return on order ${n} has been settled.` },
+    customer: { title: 'Refund settled', body: (n, amt) => `The refund${amt ? ` of ${amt}` : ''} for your return on order ${n} has been settled.` },
     seller: { title: 'Return refunded', body: (n) => `The return on order ${n} has been refunded and the stock put back.` },
   },
 };
@@ -81,6 +86,31 @@ const PUSH_CUSTOMER: Record<ReturnEvent, boolean> = {
   dropped_off: true,
   refunded: true,
 };
+
+/**
+ * What the live return on this order is worth, formatted — the units actually
+ * coming back plus 18% GST, never the order total. Empty string when there is no
+ * return to price, so the copy falls back to its amount-less wording rather than
+ * promising "₹0".
+ */
+async function refundText(orderId: string): Promise<string> {
+  try {
+    const { rows } = await pool.query(
+      `SELECT order_item_ids FROM return_requests
+        WHERE order_id = $1 AND status <> 'rejected'
+        ORDER BY created_at DESC LIMIT 1`,
+      [orderId]
+    );
+    if (rows.length === 0) return '';
+    const items = (
+      await pool.query(`SELECT id, price, quantity FROM order_items WHERE order_id = $1`, [orderId])
+    ).rows;
+    const total = refundForLines(resolveReturnLines(rows[0].order_item_ids, items), withMarkup).total;
+    return total > 0 ? `₹${total.toLocaleString('en-IN')}` : '';
+  } catch {
+    return '';
+  }
+}
 
 export async function notifyReturnTransition(
   orderId: string,
@@ -120,7 +150,7 @@ export async function notifyReturnTransition(
         userId: customerId,
         title: copy.customer.title,
         // The reason a return was refused is the whole point of the message.
-        body: copy.customer.body(orderNumber) + (event === 'rejected' && note ? ` Reason: ${note}` : ''),
+        body: copy.customer.body(orderNumber, await refundText(orderId)) + (event === 'rejected' && note ? ` Reason: ${note}` : ''),
         push: PUSH_CUSTOMER[event],
       });
     }
