@@ -1219,7 +1219,7 @@ router.post('/:id/return', authenticate, async (req: AuthRequest, res: Response)
     const returnId = generateId();
     await pool.query(
       `INSERT INTO ${RETURN_REQUESTS} (id, order_id, user_id, order_item_ids, reason, description, status, picked_up_at, refunded_at, status_history, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, 'requested', NULL, NULL, $7, NOW(), NOW())`,
+       VALUES ($1, $2, $3, $4, $5, $6, 'approved', NULL, NULL, $7, NOW(), NOW())`,
       [
         returnId,
         req.params.id,
@@ -1227,8 +1227,11 @@ router.post('/:id/return', authenticate, async (req: AuthRequest, res: Response)
         JSON.stringify(storedLines),
         reason,
         description || '',
+        // Auto-approved on creation (2026-08-27): admin no longer rules on
+        // returns, so the request lands straight in the delivery pickup pool.
         JSON.stringify([
-          { status: 'requested', at: new Date().toISOString() }
+          { status: 'requested', at: new Date().toISOString() },
+          { status: 'approved', at: new Date().toISOString(), note: 'Auto-approved' },
         ]),
       ]
     );
@@ -1239,6 +1242,7 @@ router.post('/:id/return', authenticate, async (req: AuthRequest, res: Response)
       [req.params.id]
     );
     await recordOrderStatus(null, req.params.id, 'return_requested', `Return requested: ${reason}`);
+    await recordOrderStatus(null, req.params.id, 'return_requested', 'Return approved — pickup will be scheduled');
 
     // The seller learns a return is coming; the customer gets the inbox row.
     // Not awaited: a notification must never delay or fail the request.
@@ -1248,7 +1252,7 @@ router.post('/:id/return', authenticate, async (req: AuthRequest, res: Response)
       success: true,
       data: {
         returnId,
-        status: 'requested',
+        status: 'approved',
         message: 'Return request initiated successfully',
         refundAmount,
         refundStatus: 'initiated',
