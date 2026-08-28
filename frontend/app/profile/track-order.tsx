@@ -15,7 +15,7 @@ const ELECTRIC_DELAY_MS = 5 * 60 * 1000; // 5 min after delivery before the surg
 
 const POLL_MS = 15 * 1000; // refresh the track screen every 15s while it's focused
 
-// The five stages and their status mapping live in utils/orderStatus — the same
+// The four stages and their status mapping live in utils/orderStatus — the same
 // vocabulary the customer website's OrderTracking page uses.
 
 export default function TrackOrderScreen() {
@@ -65,15 +65,21 @@ export default function TrackOrderScreen() {
     const liveEta = trackingData?.estimatedDelivery || order?.estimatedDelivery;
     const canCancel = order && ['pending', 'confirmed'].includes(liveStatus);
     // A return replaces the fulfilment timeline entirely — by the time one exists
-    // the order was already delivered, so the five delivery stages say nothing.
+    // the order was already delivered, so the four delivery stages say nothing.
     const ret = returnStage(trackingData?.trackingHistory);
     // A rejected return is terminal — don't dangle "Picked up"/"Refunded" as if
     // they're still coming.
     const steps: readonly { key: string; title: string; note: string }[] =
         ret ? (ret.rejected ? RETURN_STEPS.slice(0, 2) : RETURN_STEPS) : TRACK_STEPS;
     const active = ret ? ret.active : stepIndex(liveStatus, deliveryStatus);
-    // RouteTrack only draws three phases; collapse the five stages onto them.
-    const phase: RoutePhase = ret || active >= 4 ? 'delivered' : active >= 2 ? 'shipped' : 'confirmed';
+    // RouteTrack only draws three phases; collapse the four stages onto them.
+    // TRACK_STEPS ends at index 3 ('delivered') — anything less leaves the route
+    // short of the home node forever.
+    const phase: RoutePhase = ret
+        // A return runs the other way: requested/approved sit at the customer's
+        // door, 'picked up' is the leg back, 'refunded' is it landing at the seller.
+        ? (ret.rejected ? 'confirmed' : ret.active >= 3 ? 'delivered' : ret.active >= 2 ? 'shipped' : 'confirmed')
+        : active >= 3 ? 'delivered' : active >= 2 ? 'shipped' : 'confirmed';
 
     // Instant-trial celebration: once delivered, wait a beat, then run the electric surge.
     const [electric, setElectric] = useState(false);
@@ -128,7 +134,7 @@ export default function TrackOrderScreen() {
                             <Text style={styles.fastText}>{isInstant ? 'FAST' : 'STD'}</Text>
                         </View>
                     </View>
-                    <RouteTrack phase={phase} electric={electric} />
+                    <RouteTrack phase={phase} electric={electric} reverse={!!ret} />
                 </View>
 
                 <View style={{ paddingHorizontal: 20 }}>

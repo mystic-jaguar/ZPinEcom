@@ -217,19 +217,23 @@ function Electric() {
     );
 }
 
-export default function RouteTrack({ phase, electric }: { phase: RoutePhase; electric: boolean }) {
+// `reverse` flips the endpoints for a return: the parcel starts at the customer's
+// door and travels back to the seller's store.
+export default function RouteTrack({ phase, electric, reverse }: { phase: RoutePhase; electric: boolean; reverse?: boolean }) {
     const reachedBike = phase === 'shipped' || phase === 'delivered';
     const reachedHome = phase === 'delivered';
+    const Start = reverse ? Home : Store;
+    const End = reverse ? Store : Home;
     return (
         <View style={styles.route}>
-            <View style={styles.nodeSmall}><Store size={14} color={colors.textOnYellow} /></View>
+            <View style={styles.nodeSmall}><Start size={14} color={colors.textOnYellow} /></View>
             <Segment filled={reachedBike} hidden={electric} />
             <View style={[styles.nodeBig, reachedBike && styles.nodeBigOn]}>
                 <Bike size={18} color={colors.textStrong} />
             </View>
             <Segment filled={reachedHome} hidden={electric} />
             <View style={[styles.nodeDim, reachedHome && styles.nodeHomeOn]}>
-                <Home size={14} color={reachedHome ? colors.textOnYellow : '#fff'} />
+                <End size={14} color={reachedHome ? colors.textOnYellow : '#fff'} />
             </View>
             {electric && <Electric />}
         </View>
