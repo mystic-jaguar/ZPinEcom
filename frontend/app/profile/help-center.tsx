@@ -10,9 +10,12 @@ import React, { useState } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader, ZText } from '../../components/ui';
+import { SUPPORT_EMAIL, SUPPORT_FAQS, SUPPORT_PHONE } from '../../constants/supportContent';
 import { colors, fonts, palette, radius } from '../../constants/theme';
 import { useUser } from '../../context/UserContext';
 
+// FAQs come from constants/supportContent.ts — the same list the ZPIN
+// Assistant answers from, so the two can't drift apart.
 type FAQ = { id: string; category: string; question: string; answer: string };
 
 const TOPICS = [
@@ -20,17 +23,12 @@ const TOPICS = [
     { id: 'payments', icon: CreditCard, label: 'Payments & coupons', route: '/profile/coupons' },
 ];
 
-const ALL_FAQS: FAQ[] = [
-    { id: '1', category: 'Orders', question: 'How do I track my order?', answer: 'Go to "My Orders" and open the order to see real-time tracking and estimated delivery time.' },
-    { id: '3', category: 'Orders', question: 'How long does delivery take?', answer: 'Estimated delivery is within 12 hours for both Standard and Instant Try-at-Door orders in serviceable areas.' },
-    { id: '6', category: 'Returns', question: 'How do I return a product?', answer: 'Open the order and tap "Return items". Choose a reason and refund method. Returns are accepted within 7 days of delivery.' },
-    { id: '7', category: 'Returns', question: 'When will I get my refund?', answer: 'Refunds are processed within 5–7 business days after we receive the returned product.' },
-    { id: '8', category: 'Orders', question: 'Can I cancel an order?', answer: 'Yes, until it is dispatched. Open the order from My Orders and tap Cancel. If the option is gone the order is already on its way — contact support and we will help.' },
-    { id: '10', category: 'Payment', question: 'What payment methods do you accept?', answer: 'UPI, Credit/Debit cards, Net Banking and Cash on Delivery via Razorpay.' },
-    { id: '11', category: 'Payment', question: 'How does Cash on Delivery work for Instant Delivery?', answer: 'For Instant Delivery orders paid by COD, the ₹50 delivery fee is prepaid online at checkout and only the product amount is collected at your door. Standard COD orders are paid in full on delivery.' },
-    { id: '12', category: 'Payment', question: 'How do I use a coupon?', answer: 'Tap "Apply coupon" on the payment step at checkout, or browse the coupons you can use from Profile → Coupons.' },
-    { id: '14', category: 'Account', question: 'How do I change my delivery address?', answer: 'Go to Profile → Saved addresses to add, edit or set a default address. On an order already placed, an address change is only possible shortly after checkout — contact support right away.' },
-];
+const ALL_FAQS: FAQ[] = SUPPORT_FAQS.map((f, i) => ({
+    id: String(i + 1),
+    category: f.category,
+    question: f.q,
+    answer: f.a,
+}));
 
 export default function HelpCenterScreen() {
     const router = useRouter();
@@ -78,8 +76,8 @@ export default function HelpCenterScreen() {
     const contact = (fn: () => Promise<any>, errTitle: string, errMsg: string) => {
         fn().catch(() => { setInfoModalConfig({ title: errTitle, message: errMsg, icon: 'x-circle' }); setInfoModalVisible(true); });
     };
-    const callSupport = () => contact(() => Linking.openURL('tel:+911234567890'), 'Error', 'Unable to make a call. Please dial +91-1234-567890 manually.');
-    const emailSupport = () => contact(() => Linking.openURL('mailto:support@zpin.com?subject=Support Request'), 'Error', 'Unable to open email. Please email support@zpin.com');
+    const callSupport = () => contact(() => Linking.openURL(`tel:${SUPPORT_PHONE}`), 'Error', `Unable to make a call. Please dial ${SUPPORT_PHONE} manually.`);
+    const emailSupport = () => contact(() => Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=Support Request`), 'Error', `Unable to open email. Please email ${SUPPORT_EMAIL}`);
 
     const QUICK = [
         { icon: MessageCircle, title: 'Live chat', sub: 'Replies instantly', onPress: () => setChatOpen(true) },
