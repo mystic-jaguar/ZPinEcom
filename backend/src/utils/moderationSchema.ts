@@ -6,6 +6,10 @@ import { pool } from '../db';
  * Adds the moderation flag + report/block tables used to filter objectionable
  * product reviews and let users report abuse / block authors. Runs once,
  * idempotently, so it also upgrades databases created before this feature.
+ *
+ * Column types must match production exactly (product_reviews.id is uuid,
+ * users.id is varchar(36)) - the local id column stays VARCHAR(7) because these
+ * two tables are keyed by generateId().
  */
 let ready = false;
 
@@ -21,8 +25,8 @@ export async function ensureModerationSchema(): Promise<void> {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS review_reports (
       id               VARCHAR(7) PRIMARY KEY,
-      review_id        VARCHAR(7) NOT NULL REFERENCES product_reviews(id) ON DELETE CASCADE,
-      reporter_user_id VARCHAR(7) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      review_id        UUID NOT NULL REFERENCES product_reviews(id) ON DELETE CASCADE,
+      reporter_user_id VARCHAR(36) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       reason           TEXT,
       created_at       TIMESTAMP  NOT NULL DEFAULT NOW(),
       UNIQUE(review_id, reporter_user_id)
@@ -34,8 +38,8 @@ export async function ensureModerationSchema(): Promise<void> {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS user_blocks (
       id              VARCHAR(7) PRIMARY KEY,
-      blocker_user_id VARCHAR(7) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      blocked_user_id VARCHAR(7) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      blocker_user_id VARCHAR(36) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      blocked_user_id VARCHAR(36) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       created_at      TIMESTAMP  NOT NULL DEFAULT NOW(),
       UNIQUE(blocker_user_id, blocked_user_id)
     )
