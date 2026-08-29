@@ -1097,9 +1097,10 @@ router.post('/:id/reviews', authenticate, reviewLimiter, async (req: AuthRequest
     }
 
     await pool.query(
-      `INSERT INTO product_reviews (id, product_id, user_id, rating, comment, images, is_verified_purchase, created_at, updated_at)
-       VALUES ($1,$2,$3::uuid,$4,$5,$6,false,NOW(),NOW())`,
-      [generateId(), productUUID, req.userId, parsedRating, parsedComment, JSON.stringify(normalizedImages)]
+      // id is a uuid with a DB default - never pass the 7-char generateId() here
+      `INSERT INTO product_reviews (product_id, user_id, rating, comment, images, is_verified_purchase, created_at, updated_at)
+       VALUES ($1,$2,$3,$4,$5,false,NOW(),NOW())`,
+      [productUUID, req.userId, parsedRating, parsedComment, JSON.stringify(normalizedImages)]
     );
     // Invalidate product cache (rating changed) and all review pages
     await Promise.all([
