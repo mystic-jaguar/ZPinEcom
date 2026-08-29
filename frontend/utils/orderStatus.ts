@@ -132,3 +132,14 @@ export function isInProgress(status: string): boolean {
     const s = (status || '').toLowerCase();
     return !TERMINATED.has(s) && s !== 'delivered';
 }
+
+/**
+ * A return that is still running: raised, but neither settled nor rejected.
+ * While one is open the order is tracked on the RETURN timeline above, so the
+ * customer gets "Track order" rather than another "Return" entry point.
+ */
+export const ACTIVE_RETURN_STATUSES = new Set(['requested', 'approved', 'picked_up']);
+
+export function isReturnInProgress(returnStatus?: string | null): boolean {
+    return ACTIVE_RETURN_STATUSES.has(String(returnStatus || '').toLowerCase());
+}

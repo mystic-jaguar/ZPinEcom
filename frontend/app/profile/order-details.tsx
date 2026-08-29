@@ -13,7 +13,7 @@ import { useOrder } from '../../context/OrderContext';
 import { orderService } from '../../services/order';
 import { OrderObject } from '../../types/types';
 import { groupOrders } from '../../utils/orderGroups';
-import { statusLabel } from '../../utils/orderStatus';
+import { isReturnInProgress, statusLabel } from '../../utils/orderStatus';
 import { buildInvoiceHtml, InvoiceData } from '../../utils/invoiceHtml';
 import { useUser } from '../../context/UserContext';
 
@@ -167,8 +167,11 @@ export default function OrderDetailsScreen() {
                     {group.orders.map((parcel, idx) => {
                         const meta = parcelStatusMeta(parcel.status);
                         const canCancel = ['pending', 'confirmed'].includes(parcel.status);
-                        const canReturn = parcel.status === 'delivered';
-                        const canTrack = !['cancelled', 'returned', 'delivered'].includes(parcel.status);
+                        // Same rule as the single-order screen: a parcel going back
+                        // is tracked, not returned again.
+                        const parcelReturning = isReturnInProgress((parcel as any).returnStatus);
+                        const canReturn = parcel.status === 'delivered' && !parcelReturning;
+                        const canTrack = parcelReturning || !['cancelled', 'returned', 'delivered'].includes(parcel.status);
                         return (
                             <View key={parcel.id} style={styles.card}>
                                 <View style={styles.parcelHead}>
@@ -295,7 +298,14 @@ export default function OrderDetailsScreen() {
     })();
 
     const canCancel = order && ['pending', 'confirmed'].includes(order.status);
-    const canReturn = order && order.status === 'delivered';
+    // While a return is in flight the order is tracked on the return timeline, so
+    // Track order stays available and the Return entry point steps aside.
+    // GET /orders/:id does not carry the return state — the list endpoint
+    // (users/orders) does, so read it off the cached list order.
+    const returning = isReturnInProgress(
+        (order as any)?.returnStatus ?? (getOrderById(singleId) as any)?.returnStatus
+    );
+    const canReturn = order && order.status === 'delivered' && !returning;
 
     if (isFetching && !order) {
         return (
@@ -454,7 +464,7 @@ export default function OrderDetailsScreen() {
                     </Pressable>
                 </View>
 
-                {!cancelled && !delivered && order.status !== 'returned' && (
+                {(returning || (!cancelled && !delivered && order.status !== 'returned')) && (
                     <ZButton label="Track order" style={{ marginTop: 12 }} onPress={() => router.push({ pathname: '/profile/track-order', params: { orderId: order.id } })} />
                 )}
                 {canCancel && (

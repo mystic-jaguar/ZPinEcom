@@ -8,7 +8,7 @@ import { AppHeader, ZText } from '../../components/ui';
 import { colors, fonts, palette, radius } from '../../constants/theme';
 import { useOrder } from '../../context/OrderContext';
 import { orderService } from '../../services/order';
-import { returnStatusLabel } from '../../utils/orderStatus';
+import { ACTIVE_RETURN_STATUSES, returnStatusLabel } from '../../utils/orderStatus';
 
 type ReturnStatusRecord = {
     returnStatus: string; reason: string; description?: string; requestedAt: string; updatedAt: string;
@@ -21,7 +21,6 @@ type ReturnStatusRecord = {
 
 const RETURN_WINDOW_DAYS = 7;
 // A return in flight: still owed a decision, a pickup or the money.
-const ACTIVE_RETURN_STATUSES = new Set(['requested', 'approved', 'picked_up']);
 // Steps of the refund progress bar, in order. Mirrors the backend's
 // RETURN_TRANSITIONS chain (ZPinEcom/backend/src/routes/orders.ts).
 const REFUND_STEPS = ['requested', 'approved', 'picked_up', 'refunded'];

@@ -11,7 +11,7 @@ import { colors, fonts, palette, radius } from '../../constants/theme';
 import { useOrder } from '../../context/OrderContext';
 import { orderService } from '../../services/order';
 import { groupOrders, groupStatus, OrderGroup } from '../../utils/orderGroups';
-import { isInProgress, statusLabel, TERMINATED } from '../../utils/orderStatus';
+import { isInProgress, isReturnInProgress, statusLabel, TERMINATED } from '../../utils/orderStatus';
 
 const FILTERS = ['All', 'In Progress', 'Completed', 'Cancelled'];
 
@@ -79,6 +79,10 @@ export default function AllOrdersScreen() {
         // by a delivery partner. 'picked_up' onwards is out of their hands.
         const cancellableReturn = single && ['requested', 'approved'].includes(String((single as any).returnStatus || ''))
             ? single : null;
+        // A return already in flight has its own timeline on the track screen
+        // (RETURN_STEPS), so the card offers to follow it rather than offering a
+        // second return on an order that is already going back.
+        const returning = !!single && isReturnInProgress((single as any).returnStatus);
         const dateLabel = new Date(group.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 
         return (
@@ -139,10 +143,17 @@ export default function AllOrdersScreen() {
                             </>
                         ) : (
                             <>
-                                <Pressable style={styles.outlineBtn} onPress={() => router.push('/profile/returns')}>
-                                    <RotateCcw size={16} color={colors.textStrong} />
-                                    <Text style={styles.outlineText}>Return</Text>
-                                </Pressable>
+                                {returning ? (
+                                    <Pressable style={styles.primaryBtn} onPress={() => router.push({ pathname: '/profile/track-order', params: { orderId: single!.id } })}>
+                                        <Bike size={16} color={colors.textOnYellow} />
+                                        <Text style={styles.primaryText}>Track order</Text>
+                                    </Pressable>
+                                ) : (
+                                    <Pressable style={styles.outlineBtn} onPress={() => router.push('/profile/returns')}>
+                                        <RotateCcw size={16} color={colors.textStrong} />
+                                        <Text style={styles.outlineText}>Return</Text>
+                                    </Pressable>
+                                )}
                                 {cancellableReturn ? (
                                     <Pressable style={styles.inkBtn} onPress={() => setCancelReturnId(cancellableReturn.id)}>
                                         <XCircle size={16} color="#fff" />
