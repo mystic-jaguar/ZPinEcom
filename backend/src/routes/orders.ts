@@ -870,12 +870,18 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
         // the same low-stock item can't oversell. No row updated → not enough stock.
         const dec = await client.query(
           `UPDATE products
-           SET quantity = quantity - $1,
+           SET size_quantities = CASE
+                 WHEN $3::text IS NOT NULL AND size_quantities ? $3 THEN
+                   jsonb_set(size_quantities, ARRAY[$3::text],
+                     to_jsonb(GREATEST(COALESCE((size_quantities->>$3)::int, 0) - $1, 0)))
+                 ELSE size_quantities
+               END,
+               quantity = quantity - $1,
                in_stock = CASE WHEN quantity - $1 <= 0 THEN false ELSE in_stock END,
                updated_at = NOW()
            WHERE id = $2 AND quantity >= $1
            RETURNING id`,
-          [item.quantity, item.product_id]
+          [item.quantity, item.product_id, item.variant || null]
         );
         if (dec.rows.length === 0) {
           // Roll back the whole checkout; the finally block releases the client.
@@ -1072,6 +1078,11 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
   }
 });
 
+// Standard delivery allows returns within this many days of placement. Must
+// match STANDARD_RETURN_DAYS on the customer website — the two surfaces must not
+// disagree about whether an order is still returnable.
+const STANDARD_RETURN_DAYS = 7;
+
 // POST /api/v1/orders/:id/return
 router.post('/:id/return', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
   const { orderItemIds, reason, description } = req.body;
@@ -1086,7 +1097,8 @@ router.post('/:id/return', authenticate, async (req: AuthRequest, res: Response)
 
     // Verify the order belongs to this user and is delivered
     const orderResult = await pool.query(
-      `SELECT id, status, final_amount FROM ${ORDERS} WHERE id = $1 AND user_id = $2`,
+      `SELECT id, status, final_amount, delivery_type, created_at
+         FROM ${ORDERS} WHERE id = $1 AND user_id = $2`,
       [req.params.id, req.userId]
     );
 
@@ -1096,8 +1108,33 @@ router.post('/:id/return', authenticate, async (req: AuthRequest, res: Response)
     }
 
     const order = orderResult.rows[0];
+
+    // Instant Delivery is returned AT THE DOOR to the delivery agent (the trial
+    // keep/return flow, POST /orders/:id/trial-selection). Letting a flash order
+    // also reach this endpoint gave the customer a second bite: hand items back
+    // at the door, then raise a pickup return on the same order. The customer
+    // website has always refused this; the app must too.
+    if (String(order.delivery_type || 'standard').toLowerCase() === 'flash') {
+      res.status(400).json({
+        success: false,
+        message: 'Instant Delivery orders are returned at the door to the delivery agent.',
+      });
+      return;
+    }
+
     if (!['delivered', 'return_requested'].includes(order.status)) {
       res.status(400).json({ success: false, message: 'Only delivered orders can be returned' });
+      return;
+    }
+
+    // The 7-day return window, counted from order placement — the same rule and
+    // the same wording the customer website enforces (STANDARD_RETURN_DAYS in
+    // website-customer/backend/controllers/orderController.js). Without it the
+    // app auto-approved returns on orders of any age and dispatched a partner
+    // to collect them.
+    const placedAt = new Date(order.created_at).getTime();
+    if (Date.now() > placedAt + STANDARD_RETURN_DAYS * 24 * 60 * 60 * 1000) {
+      res.status(400).json({ success: false, message: 'The 7-day return window has closed.' });
       return;
     }
 
@@ -2086,17 +2123,26 @@ router.patch('/:id/cancel', authenticate, async (req: AuthRequest, res: Response
 
     // Restore inventory for each cancelled order item
     const cancelledItems = await client.query(
-      `SELECT product_id, quantity FROM ${ORDER_ITEMS} WHERE order_id = $1`,
+      `SELECT product_id, quantity, variant FROM ${ORDER_ITEMS} WHERE order_id = $1`,
       [req.params.id]
     );
     for (const item of cancelledItems.rows) {
+      // Put the units back in the SAME place checkout took them from: the total
+      // and, where the line carried a size, that size's own count. Restoring
+      // only `quantity` left size_quantities drained by every cancelled order.
       await client.query(
         `UPDATE products
-         SET quantity = quantity + $1,
+         SET size_quantities = CASE
+               WHEN $3::text IS NOT NULL AND size_quantities ? $3 THEN
+                 jsonb_set(size_quantities, ARRAY[$3::text],
+                   to_jsonb(COALESCE((size_quantities->>$3)::int, 0) + $1))
+               ELSE size_quantities
+             END,
+             quantity = quantity + $1,
              in_stock = true,
              updated_at = NOW()
          WHERE id = $2`,
-        [item.quantity, item.product_id]
+        [item.quantity, item.product_id, item.variant || null]
       );
     }
 

@@ -17,6 +17,25 @@ import { isReturnInProgress, statusLabel } from '../../utils/orderStatus';
 import { buildInvoiceHtml, InvoiceData } from '../../utils/invoiceHtml';
 import { useUser } from '../../context/UserContext';
 
+/**
+ * Is this order still returnable at all?
+ *
+ * Two rules, both enforced server-side by POST /orders/:id/return and by the
+ * customer website's own copy — mirrored here only so the button is not offered
+ * on an order the backend will refuse:
+ *  - Instant Delivery ('flash') is returned AT THE DOOR to the delivery agent
+ *    (the trial keep/return flow), never by pickup afterwards.
+ *  - Standard delivery allows returns for 7 days from when the order was placed.
+ */
+const RETURN_WINDOW_DAYS = 7;
+const withinReturnWindow = (o: any): boolean => {
+    if (String(o?.deliveryType || 'standard').toLowerCase() === 'flash') return false;
+    const placed = new Date(o?.createdAt ?? 0).getTime();
+    if (!Number.isFinite(placed) || placed <= 0) return true; // no date -> don't hide it
+    return Date.now() <= placed + RETURN_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+};
+
+
 const money = (n: number) => `₹${Number(n).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 
 function parcelStatusMeta(status: string) {
@@ -170,7 +189,8 @@ export default function OrderDetailsScreen() {
                         // Same rule as the single-order screen: a parcel going back
                         // is tracked, not returned again.
                         const parcelReturning = isReturnInProgress((parcel as any).returnStatus);
-                        const canReturn = parcel.status === 'delivered' && !parcelReturning;
+                        const canReturn = parcel.status === 'delivered' && !parcelReturning
+                            && withinReturnWindow(parcel);
                         const canTrack = parcelReturning || !['cancelled', 'returned', 'delivered'].includes(parcel.status);
                         return (
                             <View key={parcel.id} style={styles.card}>
@@ -305,7 +325,8 @@ export default function OrderDetailsScreen() {
     const returning = isReturnInProgress(
         (order as any)?.returnStatus ?? (getOrderById(singleId) as any)?.returnStatus
     );
-    const canReturn = order && order.status === 'delivered' && !returning;
+    const canReturn = order && order.status === 'delivered' && !returning
+        && withinReturnWindow(order);
 
     if (isFetching && !order) {
         return (
