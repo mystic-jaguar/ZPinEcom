@@ -98,7 +98,7 @@ export default function TrackOrderScreen() {
     const etaLabel = ret
         ? (ret.rejected ? 'Rejected' : RETURN_STEPS[ret.active].title)
         : liveEta && isInstant
-        ? new Date(liveEta).toLocaleString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true })
+        ? new Date(liveEta).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', hour: 'numeric', minute: '2-digit', hour12: true })
         : DELIVERY_ETA;
 
     return (

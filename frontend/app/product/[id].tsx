@@ -713,7 +713,7 @@ export default function ProductDetails() {
                                             <Text style={styles.reviewerName}>{r.user?.name || 'User'}</Text>
                                             {r.isVerifiedPurchase && <Text style={styles.reviewVerifiedText}>Verified purchase</Text>}
                                             <Text style={styles.reviewDate}>
-                                                {new Date(r.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                                {new Date(r.createdAt).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', year: 'numeric' })}
                                             </Text>
                                         </View>
                                         <Text style={styles.reviewComment}>{r.comment}</Text>

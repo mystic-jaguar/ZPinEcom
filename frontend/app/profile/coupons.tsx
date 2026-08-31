@@ -53,7 +53,7 @@ export default function CouponsScreen() {
                 {!expired && (
                     <View style={styles.couponFoot}>
                         <Text style={[styles.expiry, featured && { color: palette.yellow300 }]}>
-                            {item.expiryDate ? `EXPIRES ${new Date(item.expiryDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }).toUpperCase()}` : 'LIMITED TIME'}
+                            {item.expiryDate ? `EXPIRES ${new Date(item.expiryDate).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short' }).toUpperCase()}` : 'LIMITED TIME'}
                         </Text>
                         <Pressable style={[styles.copyBtn, featured && styles.copyBtnDark]} onPress={() => copyCode(item.code)}>
                             <Text style={[styles.copyText, featured && { color: '#fff' }]}>{copied === item.code ? 'Copied!' : 'Copy code'}</Text>

@@ -83,7 +83,7 @@ export default function AllOrdersScreen() {
         // (RETURN_STEPS), so the card offers to follow it rather than offering a
         // second return on an order that is already going back.
         const returning = !!single && isReturnInProgress((single as any).returnStatus);
-        const dateLabel = new Date(group.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+        const dateLabel = new Date(group.createdAt).toLocaleDateString('en-GB', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short' });
 
         return (
             <Pressable style={styles.card} onPress={() => router.push({ pathname: '/profile/order-details', params: { groupId: group.key } })}>

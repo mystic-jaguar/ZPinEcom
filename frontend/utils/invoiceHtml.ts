@@ -23,7 +23,7 @@ export interface InvoiceData {
 const fmt = (n: number) =>
     `Rs. ${Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-const day = (d: Date) => d.toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' });
+const day = (d: Date) => d.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', year: 'numeric', month: 'short', day: 'numeric' });
 
 // Invoices are built from server data, but the address and product names are
 // user-authored — escape everything that reaches the document.
