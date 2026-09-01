@@ -7,6 +7,21 @@ import { unregisterPushNotifications } from './push';
 // would call requireNativeModule('ExpoCrypto') at module load, crashing any build
 // whose native binary predates the dependency — and on Android, which never uses it.
 
+/**
+ * Account-deletion errors carry a `blockers` list (open orders, etc.) that the
+ * screen shows all at once. handleApiError only keeps the top-level message, so
+ * the list is flattened onto the thrown Error instead of being lost.
+ */
+export type DeletionBlocker = { code: string; message: string };
+
+const toDeletionError = (error: any): Error & { blockers?: DeletionBlocker[]; code?: string } => {
+    const err = new Error(handleApiError(error)) as Error & { blockers?: DeletionBlocker[]; code?: string };
+    const data = error?.response?.data;
+    if (Array.isArray(data?.blockers)) err.blockers = data.blockers;
+    if (data?.code) err.code = data.code;
+    return err;
+};
+
 const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID?.trim() || '';
 const GOOGLE_ANDROID_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID?.trim();
 const GOOGLE_IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID?.trim();
@@ -192,21 +207,49 @@ export const authService = {
     },
 
     /**
-     * Permanently delete the current user's account (App Store 5.1.1(v)).
-     * Server anonymizes the account and removes personal data; on success we
-     * clear all local session + cached data so the app returns to a logged-out
-     * state. Throws (without clearing anything) if the server call fails.
+     * Step 1 of account deletion (App Store 5.1.1(v)) — mails a 6-digit code to
+     * the registered address. Same flow as the customer website: nothing is
+     * deleted until the code is confirmed. The server refuses while an order is
+     * still in progress and returns those reasons as `blockers`.
      */
-    async deleteAccount() {
+    async startAccountDeletion(): Promise<{ maskedEmail: string; recoveryDays: number }> {
         try {
-            await apiClient.delete('users/me');
+            const { data } = await apiClient.post('users/me/delete/start');
+            return { maskedEmail: data?.maskedEmail || '', recoveryDays: data?.recoveryDays ?? 30 };
         } catch (error) {
-            throw new Error(handleApiError(error));
+            throw toDeletionError(error);
+        }
+    },
+
+    /** Re-send the code. Server enforces a 30s cooldown and returns `retryAfter`. */
+    async resendAccountDeletionOtp(): Promise<void> {
+        try {
+            await apiClient.post('users/me/delete/resend');
+        } catch (error) {
+            throw toDeletionError(error);
+        }
+    },
+
+    /**
+     * Step 2 — confirm with the emailed code. The account is closed server-side
+     * and stays recoverable for 30 days; on success we clear all local session +
+     * cached data so the app returns to a logged-out state. Throws (without
+     * clearing anything) if the server call fails.
+     */
+    async confirmAccountDeletion(code: string, reason?: string): Promise<{ purgeAfter: string | null; recoveryDays: number }> {
+        let purgeAfter: string | null = null;
+        let recoveryDays = 30;
+        try {
+            const { data } = await apiClient.post('users/me/delete/confirm', { code, reason });
+            purgeAfter = data?.purgeAfter ?? null;
+            recoveryDays = data?.recoveryDays ?? 30;
+        } catch (error) {
+            throw toDeletionError(error);
         }
 
-        // Account is gone server-side — tear down the local session. Mirror the
-        // local-clear steps from logout() (but skip the auth/logout call, which
-        // would now fail).
+        // Account is closed server-side — tear down the local session. Mirror the
+        // local-clear steps from logout() (but skip the auth/logout call, whose
+        // token the server has already revoked).
         try {
             await googleAuthService.signOut();
         } catch {
@@ -228,6 +271,8 @@ export const authService = {
         } catch (storageError) {
             console.error('Error clearing AsyncStorage:', storageError);
         }
+
+        return { purgeAfter, recoveryDays };
     },
 
     /**

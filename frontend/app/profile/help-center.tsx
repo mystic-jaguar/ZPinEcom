@@ -1,9 +1,6 @@
 import ActionModal from '@/components/common/ActionModal';
 import LegalDocModal, { LegalDocType } from '@/components/common/LegalDocModal';
 import SupportChatBot from '@/components/common/SupportChatBot';
-import { useCart } from '@/context/CartContext';
-import { useWishlist } from '@/context/WishlistContext';
-import { authService } from '@/services/auth';
 import { useRouter } from 'expo-router';
 import { ChevronDown, ChevronRight, ChevronUp, CreditCard, FileText, Mail, MessageCircle, Phone, RotateCcw, Search, Shield, Trash2 } from 'lucide-react-native';
 import React, { useState } from 'react';
@@ -12,7 +9,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader, ZText } from '../../components/ui';
 import { SUPPORT_EMAIL, SUPPORT_FAQS, SUPPORT_PHONE } from '../../constants/supportContent';
 import { colors, fonts, palette, radius } from '../../constants/theme';
-import { useUser } from '../../context/UserContext';
 
 // FAQs come from constants/supportContent.ts — the same list the ZPIN
 // Assistant answers from, so the two can't drift apart.
@@ -32,9 +28,6 @@ const ALL_FAQS: FAQ[] = SUPPORT_FAQS.map((f, i) => ({
 
 export default function HelpCenterScreen() {
     const router = useRouter();
-    const { resetUser } = useUser();
-    const { clearCart } = useCart();
-    const { clearWishlist } = useWishlist();
     const [searchQuery, setSearchQuery] = useState('');
     const [expandedFaq, setExpandedFaq] = useState<string | null>(null);
     const [infoModalVisible, setInfoModalVisible] = useState(false);
@@ -43,31 +36,6 @@ export default function HelpCenterScreen() {
     const [legalModalVisible, setLegalModalVisible] = useState(false);
     const [legalDocType, setLegalDocType] = useState<LegalDocType>('privacy');
     const openLegal = (docType: LegalDocType) => { setLegalDocType(docType); setLegalModalVisible(true); };
-
-    const [deleteModalVisible, setDeleteModalVisible] = useState(false);
-    const [deleting, setDeleting] = useState(false);
-    const [deleteErrorVisible, setDeleteErrorVisible] = useState(false);
-    const [deleteErrorMessage, setDeleteErrorMessage] = useState('');
-
-    const handleDeleteAccount = async () => {
-        if (deleting) return;
-        setDeleting(true);
-        try {
-            await authService.deleteAccount();
-            resetUser();
-            clearCart();
-            clearWishlist();
-            setDeleteModalVisible(false);
-            router.replace('/auth/login');
-        } catch (error: any) {
-            console.error('Delete account error:', error);
-            setDeleteModalVisible(false);
-            setDeleteErrorMessage(error?.message || 'Something went wrong. Please try again later.');
-            setDeleteErrorVisible(true);
-        } finally {
-            setDeleting(false);
-        }
-    };
 
     const filteredFaqs = searchQuery.trim()
         ? ALL_FAQS.filter(f => f.question.toLowerCase().includes(searchQuery.toLowerCase()) || f.answer.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -178,7 +146,7 @@ export default function HelpCenterScreen() {
                         </View>
 
                         <ZText variant="eyebrow" style={{ marginTop: 24, marginBottom: 12 }}>Account</ZText>
-                        <Pressable style={styles.deleteRow} onPress={() => setDeleteModalVisible(true)}>
+                        <Pressable style={styles.deleteRow} onPress={() => router.push('/profile/delete-account')}>
                             <Trash2 size={16} color={palette.red500} />
                             <Text style={styles.deleteRowText}>Delete account</Text>
                         </Pressable>
@@ -192,26 +160,6 @@ export default function HelpCenterScreen() {
 
             <ActionModal visible={infoModalVisible} title={infoModalConfig.title} message={infoModalConfig.message} icon={infoModalConfig.icon} primaryButtonText="OK" onPrimaryPress={() => setInfoModalVisible(false)} onClose={() => setInfoModalVisible(false)} />
 
-            <ActionModal
-                visible={deleteModalVisible}
-                title="Delete Account"
-                message="This permanently deletes your account and personal data — profile, addresses, cart, wishlist and reviews. Order/invoice records are kept in anonymized form as required by law. This cannot be undone."
-                icon="trash-2"
-                primaryButtonText={deleting ? 'DELETING…' : 'DELETE ACCOUNT'}
-                onPrimaryPress={handleDeleteAccount}
-                secondaryButtonText="CANCEL"
-                onSecondaryPress={() => { if (!deleting) setDeleteModalVisible(false); }}
-                onClose={() => { if (!deleting) setDeleteModalVisible(false); }}
-            />
-            <ActionModal
-                visible={deleteErrorVisible}
-                title="Could not delete account"
-                message={deleteErrorMessage}
-                icon="alert-circle"
-                primaryButtonText="OK"
-                onPrimaryPress={() => setDeleteErrorVisible(false)}
-                onClose={() => setDeleteErrorVisible(false)}
-            />
         </SafeAreaView>
     );
 }

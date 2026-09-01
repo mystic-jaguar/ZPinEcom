@@ -38,6 +38,12 @@ jest.mock('../utils/encryption', () => ({
 }));
 
 // No-op the moderation schema bootstrap so it doesn't consume mocked DB calls.
+jest.mock('../utils/mailer', () => ({
+  sendOTPEmail: jest.fn().mockResolvedValue(undefined),
+  sendDeletionConfirmedEmail: jest.fn().mockResolvedValue(undefined),
+  sendOrderConfirmationEmail: jest.fn().mockResolvedValue(undefined),
+}));
+
 jest.mock('../utils/moderationSchema', () => ({
   ensureModerationSchema: jest.fn().mockResolvedValue(undefined),
   AUTO_HIDE_THRESHOLD: 3,
@@ -45,6 +51,7 @@ jest.mock('../utils/moderationSchema', () => ({
 
 const getDbMock = () => require('../db').__mockQuery as jest.Mock;
 const getClientMock = () => require('../db').__mockClientQuery as jest.Mock;
+const sendOTPEmailMock = require('../utils/mailer').sendOTPEmail as jest.Mock;
 
 const mockUserRow = {
   id: 'USR0001', user_name: 'tester', name: 'Test User',
@@ -58,6 +65,7 @@ const mockUserRow = {
 beforeEach(() => {
   getDbMock().mockReset();
   getClientMock().mockReset();
+  sendOTPEmailMock.mockClear();
 });
 
 // ─── GET /users/:id ───────────────────────────────────────────────────────────
@@ -254,49 +262,109 @@ describe('POST /users/shipping-address', () => {
   });
 });
 
-// ─── DELETE /users/me (account deletion) ─────────────────────────────────────
+// ─── Account deletion (OTP + 30-day recovery) ────────────────────────────────
+// The website twin's shape: /start mails a code, /confirm soft-deletes.
+// Nothing is anonymised here — that is the website backend's purge sweep, and a
+// test asserting immediate erasure would be asserting the old bug.
 
-describe('DELETE /users/me', () => {
+describe('account deletion', () => {
   const sqlsRun = () => getClientMock().mock.calls.map((c: any[]) => String(c[0]));
+  const poolSqls = () => getDbMock().mock.calls.map((c: any[]) => String(c[0]));
+  const liveUser = { id: 'USR0001', name: 'Test User', email: 'test@example.com', deleted_at: null };
+
+  // pool.query is used for the OTP table bootstrap, the user lookup, the blocker
+  // count and the OTP rows — route by SQL rather than by call order.
+  const routePool = (over: (sql: string) => any = () => null) => {
+    getDbMock().mockImplementation((sql: string) => {
+      const custom = over(sql);
+      if (custom) return Promise.resolve(custom);
+      if (/FROM "?users"?/i.test(sql)) return Promise.resolve({ rows: [liveUser] });
+      if (/COUNT\(\*\)/i.test(sql)) return Promise.resolve({ rows: [{ n: 0 }] });
+      if (/INSERT INTO email_otp_verifications/i.test(sql)) return Promise.resolve({ rows: [] });
+      return Promise.resolve({ rows: [] });
+    });
+  };
 
   it('returns 401 without auth', async () => {
-    const res = await request(app).delete(`${BASE}/me`);
+    const res = await request(app).post(`${BASE}/me/delete/start`);
     expect(res.status).toBe(401);
   });
 
-  it('returns 404 and rolls back when the account no longer exists', async () => {
-    // SELECT ... FOR UPDATE returns no rows
-    getClientMock().mockResolvedValue({ rows: [] });
-
-    const res = await request(app).delete(`${BASE}/me`).set(bearerHeader(token));
-    expect(res.status).toBe(404);
-    expect(sqlsRun().some(s => /ROLLBACK/i.test(s))).toBe(true);
-    expect(sqlsRun().some(s => /COMMIT/i.test(s))).toBe(false);
+  it('start mails a code and never returns it', async () => {
+    routePool();
+    const res = await request(app).post(`${BASE}/me/delete/start`).set(bearerHeader(token));
+    expect(res.status).toBe(200);
+    expect(res.body.recoveryDays).toBe(30);
+    expect(res.body.maskedEmail).toContain('@example.com');
+    expect(JSON.stringify(res.body)).not.toMatch(/\b\d{6}\b/);
+    expect(sendOTPEmailMock).toHaveBeenCalledWith('test@example.com', expect.stringMatching(/^\d{6}$/), 'account_deletion');
   });
 
-  it('anonymizes the user, deletes PII/UGC, retains orders, and commits', async () => {
-    getClientMock().mockImplementation((sql: string) => {
-      if (/^\s*SELECT/i.test(sql)) return Promise.resolve({ rows: [{ id: 'USR0001' }] });
-      return Promise.resolve({ rows: [] });
-    });
+  it('start refuses while an order is still in progress', async () => {
+    routePool(sql => (/COUNT\(\*\)/i.test(sql) ? { rows: [{ n: 2 }] } : null));
+    const res = await request(app).post(`${BASE}/me/delete/start`).set(bearerHeader(token));
+    expect(res.status).toBe(409);
+    expect(res.body.blockers[0].code).toBe('OPEN_ORDERS');
+    expect(sendOTPEmailMock).not.toHaveBeenCalled();
+  });
 
-    const res = await request(app).delete(`${BASE}/me`).set(bearerHeader(token));
+  it('confirm rejects a wrong code without touching the users row', async () => {
+    routePool(sql =>
+      /SELECT id, otp, attempts/i.test(sql)
+        ? { rows: [{ id: 1, otp: '111111', attempts: 0, expires_at: new Date(Date.now() + 60000) }] }
+        : /UPDATE email_otp_verifications SET attempts/i.test(sql)
+          ? { rows: [{ attempts: 1 }] }
+          : null
+    );
+    const res = await request(app).post(`${BASE}/me/delete/confirm`).set(bearerHeader(token)).send({ code: '999999' });
+    expect(res.status).toBe(400);
+    expect(sqlsRun().some(s => /UPDATE "?users"?/i.test(s))).toBe(false);
+  });
+
+  it('confirm soft-deletes with a 30-day window, writes the audit row and signs out', async () => {
+    routePool(sql =>
+      /SELECT id, otp, attempts/i.test(sql)
+        ? { rows: [{ id: 1, otp: '123456', attempts: 0, expires_at: new Date(Date.now() + 60000) }] }
+        : null
+    );
+    getClientMock().mockImplementation((sql: string) =>
+      Promise.resolve({ rows: /UPDATE "?users"?/i.test(sql) ? [{ id: 'USR0001' }] : [] })
+    );
+
+    const res = await request(app).post(`${BASE}/me/delete/confirm`).set(bearerHeader(token)).send({ code: '123456' });
     expect(res.status).toBe(200);
-    expect(res.body.success).toBe(true);
+    expect(res.body.recoveryDays).toBe(30);
+    expect(new Date(res.body.purgeAfter).getTime()).toBeGreaterThan(Date.now());
 
     const sqls = sqlsRun();
-    // transaction committed
     expect(sqls.some(s => /COMMIT/i.test(s))).toBe(true);
-    // personal data + UGC removed
-    expect(sqls.some(s => /DELETE FROM "?addresses"?/i.test(s))).toBe(true);
-    expect(sqls.some(s => /DELETE FROM refresh_tokens/i.test(s))).toBe(true);
-    expect(sqls.some(s => /DELETE FROM product_reviews/i.test(s))).toBe(true);
-    expect(sqls.some(s => /DELETE FROM wallets/i.test(s))).toBe(true);
-    // user row anonymized + deactivated
-    expect(sqls.some(s => /UPDATE "?users"? SET/i.test(s) && /is_active = false/i.test(s))).toBe(true);
-    // financial records are RETAINED, not deleted
+    // soft delete, not anonymisation — the purge sweep owns the erasure
+    expect(sqls.some(s => /UPDATE "?users"?/i.test(s) && /deleted_at = NOW\(\)/i.test(s) && /purge_after/i.test(s))).toBe(true);
+    expect(sqls.some(s => /'Deleted User'/i.test(s))).toBe(false);
+    expect(sqls.some(s => /INSERT INTO account_deletion_requests/i.test(s))).toBe(true);
+    // the live session dies immediately — this was the old flow's bug
+    expect(poolSqls().some(s => /customer_token_revocations/i.test(s))).toBe(true);
+    expect(poolSqls().some(s => /DELETE FROM "?refresh_tokens"?/i.test(s))).toBe(true);
+    // financial records are RETAINED
     expect(sqls.some(s => /DELETE FROM "?orders"?/i.test(s))).toBe(false);
     expect(sqls.some(s => /DELETE FROM order_items/i.test(s))).toBe(false);
+  });
+
+  it('legacy DELETE /me soft-deletes too (old installed builds)', async () => {
+    routePool();
+    getClientMock().mockImplementation((sql: string) =>
+      Promise.resolve({ rows: /UPDATE "?users"?/i.test(sql) ? [{ id: 'USR0001' }] : [] })
+    );
+    const res = await request(app).delete(`${BASE}/me`).set(bearerHeader(token));
+    expect(res.status).toBe(200);
+    expect(sqlsRun().some(s => /deleted_at = NOW\(\)/i.test(s))).toBe(true);
+  });
+
+  it('refuses an account that is already scheduled for deletion', async () => {
+    routePool(sql => (/FROM "?users"?/i.test(sql) ? { rows: [{ ...liveUser, deleted_at: new Date() }] } : null));
+    const res = await request(app).post(`${BASE}/me/delete/start`).set(bearerHeader(token));
+    expect(res.status).toBe(409);
+    expect(res.body.code).toBe('ALREADY_DELETED');
   });
 });
 

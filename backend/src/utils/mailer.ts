@@ -10,15 +10,33 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-export async function sendOTPEmail(to: string, otp: string, purpose: 'verification' | 'password_reset') {
+export async function sendOTPEmail(
+  to: string,
+  otp: string,
+  purpose: 'verification' | 'password_reset' | 'account_deletion'
+) {
   const subject =
-    purpose === 'password_reset' ? 'Your Password Reset OTP' : 'Verify Your Email';
+    purpose === 'password_reset'
+      ? 'Your Password Reset OTP'
+      : purpose === 'account_deletion'
+        ? 'Confirm your ZPIN account deletion'
+        : 'Verify Your Email';
+
+  const heading =
+    purpose === 'password_reset'
+      ? 'Reset Your Password'
+      : purpose === 'account_deletion'
+        ? 'Confirm Account Deletion'
+        : 'Email Verification';
 
   const html = `
     <div style="font-family:sans-serif;max-width:480px;margin:auto">
-      <h2>${purpose === 'password_reset' ? 'Reset Your Password' : 'Email Verification'}</h2>
+      <h2>${heading}</h2>
       <p>Use the OTP below. It expires in ${purpose === 'password_reset' ? '15' : '10'} minutes.</p>
       <div style="font-size:32px;font-weight:bold;letter-spacing:8px;padding:16px 0">${otp}</div>
+      ${purpose === 'account_deletion'
+        ? `<p style="color:#b91c1c;font-size:13px">Entering this code closes your ZPIN account. If this wasn't you, ignore this email and change your password.</p>`
+        : ''}
       <p style="color:#888;font-size:12px">If you didn't request this, ignore this email.</p>
     </div>
   `;
@@ -150,6 +168,36 @@ export async function sendOrderConfirmationEmail(
         <div style="padding:20px 32px;border-top:1px solid #f1f5f9;text-align:center">
           <p style="font-size:12px;color:#94a3b8;margin:0">Questions about your order? Contact us at support@zpin.in</p>
         </div>
+      </div>
+    `,
+  });
+}
+
+/**
+ * Sent once a deletion is confirmed. Twin of the website's
+ * sendDeletionConfirmedEmail (website-customer/backend/utils/mailer.js) —
+ * the recovery deadline is the only thing that matters here, so it is spelled
+ * out as an IST calendar date rather than "in 30 days".
+ */
+export async function sendDeletionConfirmedEmail(toEmail: string, purgeAfter: Date | string) {
+  const when = new Date(purgeAfter).toLocaleDateString('en-IN', {
+    day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Kolkata',
+  });
+  await transporter.sendMail({
+    from: process.env.SMTP_FROM || process.env.SMTP_USER,
+    to: toEmail,
+    subject: 'Your ZPIN account has been deleted',
+    html: `
+      <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#fff;border-radius:12px;border:1px solid #e2e8f0">
+        <div style="text-align:center;margin-bottom:24px">
+          <h1 style="color:#FF9800;font-size:28px;margin:0">ZPIN</h1>
+        </div>
+        <h2 style="color:#1a1a1a;font-size:20px;margin-bottom:8px">Account deleted</h2>
+        <p style="color:#64748b">Your ZPIN account has been closed and you have been signed out everywhere.</p>
+        <p style="color:#64748b"><strong style="color:#1a1a1a">You have until ${when}</strong> to change your mind.
+           Contact support before that date and we can restore the account exactly as it was.</p>
+        <p style="color:#64748b">After ${when} your personal details are permanently erased and the account cannot be
+           recovered. Order and tax records are retained in anonymised form as Indian law requires.</p>
       </div>
     `,
   });

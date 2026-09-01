@@ -3,11 +3,15 @@ import { pool } from '../db';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { addressLimiter } from '../middleware/rateLimits';
 import { isPuneAddress, OUT_OF_AREA_MESSAGE } from '../utils/delivery';
+import { revokeTokensFor } from '../middleware/auth';
+import { createEmailOtp, EMAIL_RE, maskEmail, normalizeEmail } from '../utils/emailOtp';
+import { sendDeletionConfirmedEmail, sendOTPEmail } from '../utils/mailer';
 import { decryptAddressPayload, encryptAddressPayload } from '../utils/encryption';
 import { generateId } from '../utils/id';
 import { ensureModerationSchema } from '../utils/moderationSchema';
 import { ORDER_ITEMS_JSON } from '../utils/orderItemsSql';
 import { markupItems } from '../utils/pricing';
+import { PUSH_APP } from '../utils/push';
 import { safeIdentifier } from '../utils/sql';
 import { logger } from '../utils/logger';
 
@@ -17,6 +21,7 @@ const USERS = safeIdentifier('users');
 const ORDERS = safeIdentifier('orders');
 const ORDER_ITEMS = safeIdentifier('order_items');
 const ADDRESSES = safeIdentifier('addresses');
+const REFRESH_TOKENS = safeIdentifier('refresh_tokens');
 
 function normalizeUser(row: any) {
   const rawDob = row.dob;
@@ -221,115 +226,279 @@ router.put('/profileDetails', authenticate, async (req: AuthRequest, res: Respon
   }
 });
 
-// ── DELETE /api/v1/users/me ───────────────────────────────────────────────────
-// In-app account deletion (App Store guideline 5.1.1(v)).
-// Anonymizes the user row in place and removes all personal data + UGC, while
-// RETAINING order/invoice records (now tied to an anonymized user) as required
-// for tax/accounting compliance. Runs in a single transaction.
+// ── Account deletion ──────────────────────────────────────────────────────────
+// Mirrors the customer website's flow (website-customer/backend/controllers/
+// accountDeletionController.js): email-OTP confirmation, then a SOFT delete with
+// a 30-day recovery window. Nothing is destroyed here.
+//
+// The permanent erasure is the website backend's purge sweep
+// (website-customer/backend/utils/accountPurge.js), which sweeps `users` for the
+// whole platform on `purge_after` — it is not per-surface, so this backend must
+// not run a second one. What this endpoint must do is write the SAME columns the
+// sweep looks at, or an account closed in the app would never be purged.
+//
+// Why the old behaviour was wrong: the previous DELETE /me anonymised the row
+// immediately (no OTP, no recovery) and never set `deleted_at`, so
+// (a) a mis-tap was unrecoverable, (b) the still-valid access token kept working
+// until it expired — routes/auth.ts's isDeletedAccount() gates login/refresh on
+// `deleted_at`, which nothing here ever set — and (c) the same person closed on
+// the website and in the app left two different shapes of dead row.
 
-router.delete('/me', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
-  const userId = req.userId!;
+const RECOVERY_DAYS = 30;
+
+// Namespaced identically to the website so the two surfaces share one flow.
+const deletionOtp = createEmailOtp('account_deletion', { ttlMs: 10 * 60 * 1000, maxAttempts: 3 });
+
+// Orders in these states are finished — anything else is still owed to someone.
+const SETTLED_STATUSES = ['delivered', 'cancelled', 'returned'];
+
+/** The signed-in account, or null when the row is gone. */
+async function loadDeletableUser(userId: string) {
+  const { rows } = await pool.query(
+    `SELECT id, name, email, deleted_at FROM ${USERS} WHERE id = $1`,
+    [userId]
+  );
+  return rows[0] || null;
+}
+
+/**
+ * Reasons this account cannot be closed yet, as a list so the UI can show all of
+ * them at once instead of drip-feeding one blocker per attempt.
+ */
+async function findBlockers(userId: string): Promise<{ code: string; message: string }[]> {
+  const { rows } = await pool.query(
+    `SELECT COUNT(*)::int AS n FROM ${ORDERS}
+      WHERE user_id = $1 AND LOWER(status) <> ALL($2::text[])`,
+    [userId, SETTLED_STATUSES]
+  );
+  const n = rows[0].n;
+  if (!n) return [];
+  return [{
+    code: 'OPEN_ORDERS',
+    message: `You have ${n} order${n === 1 ? '' : 's'} in progress. Wait until they are delivered or cancelled.`,
+  }];
+}
+
+/**
+ * Soft-delete + audit row + sign-out everywhere. Idempotent: the UPDATE is
+ * guarded on `deleted_at IS NULL`, so a retried request can't shorten the
+ * recovery window or write a second audit row. Returns null when the account was
+ * already scheduled.
+ */
+async function softDeleteAccount(user: any, reason: unknown, ip: string): Promise<Date | null> {
+  const purgeAfter = new Date(Date.now() + RECOVERY_DAYS * 24 * 60 * 60 * 1000);
+  const trimmedReason = reason ? String(reason).slice(0, 1000) : null;
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-
-    // Lock the row and confirm the account still exists.
-    const existing = await client.query(
-      `SELECT id FROM ${USERS} WHERE id = $1 FOR UPDATE`,
-      [userId]
+    const { rows } = await client.query(
+      `UPDATE ${USERS}
+          SET deleted_at = NOW(), purge_after = $2, deletion_reason = $3, updated_at = NOW()
+        WHERE id = $1 AND deleted_at IS NULL
+        RETURNING id`,
+      [user.id, purgeAfter, trimmedReason]
     );
-    if (existing.rows.length === 0) {
+    if (!rows.length) {
       await client.query('ROLLBACK');
+      return null;
+    }
+    await client.query(
+      `INSERT INTO account_deletion_requests (user_id, role, email, status, reason, requested_ip, purge_after)
+       VALUES ($1, 'customer', $2, 'pending_recovery', $3, $4, $5)`,
+      [user.id, user.email, trimmedReason, ip.slice(0, 64), purgeAfter]
+    );
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
+
+  // Outside the transaction: a revoke failure must not roll back a deletion the
+  // user has already confirmed. Both are needed — the revocation cut-off kills
+  // the live access token, the row delete kills the refresh token behind it.
+  await revokeTokensFor(user.id).catch((e: any) =>
+    logger.error('deleteaccount_revoke_failed', { error: e?.message }));
+  await pool
+    .query(`DELETE FROM ${REFRESH_TOKENS} WHERE user_id = $1`, [user.id])
+    .catch((e: any) => logger.error('deleteaccount_refresh_purge_failed', { error: e?.message }));
+
+  // The phone must stop buzzing for an account that no longer exists — logout
+  // unregisters the token, deletion never did. Swallowed: `push_tokens` is still
+  // pending in SCHEMA_CHANGES.md on some environments, and a missing table must
+  // not fail a deletion the user has already confirmed.
+  await pool
+    .query('DELETE FROM push_tokens WHERE user_id = $1 AND app = $2', [user.id, PUSH_APP])
+    .catch(() => {});
+
+  return purgeAfter;
+}
+
+// ── POST /api/v1/users/me/delete/start ────────────────────────────────────────
+// Checks the blockers, then emails a 6-digit confirmation code. The code is never
+// returned over HTTP, and is only persisted once the mail actually went out.
+
+const startDeletionHandler = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const user = await loadDeletableUser(req.userId!);
+    if (!user) {
       res.status(404).json({ success: false, message: 'User not found' });
       return;
     }
-
-    // Remove personal data + user-generated content. Orders, order_items,
-    // return_requests and order_cancellations are intentionally retained as
-    // financial records, kept valid by the anonymized user row below.
-    //
-    // The prod DB is a legacy schema that diverges from migrate.sql — some of
-    // these tables may not exist there, and some legacy tables type user_id as
-    // uuid rather than VARCHAR(7). A DELETE against a missing table, a missing
-    // user_id column, or a uuid column (which tries to parse our short id as a
-    // uuid → 22P02) aborts the whole transaction (→ 500). So we only delete
-    // from tables that actually have a user_id column, and compare against
-    // user_id::text so a uuid-typed column simply yields no match instead of
-    // throwing. Order matters for FK children: wallet_transactions before wallets.
-    const cleanupTables = [
-      'refresh_tokens',
-      'auth_tokens',
-      'addresses',
-      'cart_items',
-      'wishlists',
-      'product_reviews',
-      'notifications',
-      'wallet_transactions',
-      'wallets',
-    ];
-    const cleanupColsResult = await client.query(
-      `SELECT table_name FROM information_schema.columns
-        WHERE table_schema = 'public' AND column_name = 'user_id'
-          AND table_name = ANY($1)`,
-      [cleanupTables]
-    );
-    const deletableTables = new Set<string>(cleanupColsResult.rows.map((r: any) => r.table_name));
-    for (const table of cleanupTables) {
-      if (!deletableTables.has(table)) continue;
-      await client.query(`DELETE FROM ${safeIdentifier(table)} WHERE user_id::text = $1`, [userId]);
+    if (user.deleted_at) {
+      res.status(409).json({ success: false, code: 'ALREADY_DELETED', message: 'This account is already scheduled for deletion.' });
+      return;
+    }
+    if (!EMAIL_RE.test(normalizeEmail(user.email))) {
+      res.status(400).json({ success: false, message: 'This account has no valid email address. Contact support to close it.' });
+      return;
     }
 
-    // Anonymize the user row in place: scrub every personal identifier, give the
-    // UNIQUE columns id-derived placeholders to avoid collisions, and set
-    // is_active=false so the account can never be logged into again.
-    //
-    // Build the SET clause from columns that actually exist — the legacy prod
-    // users table may be missing some of the newer profile/notification columns,
-    // and referencing a non-existent column would abort the transaction.
-    const colsResult = await client.query(
-      `SELECT column_name FROM information_schema.columns
-        WHERE table_schema = 'public' AND table_name = 'users'`
-    );
-    const userColumns = new Set<string>(colsResult.rows.map((r: any) => r.column_name));
-
-    const anonValues: Record<string, any> = {
-      name: 'Deleted User',
-      user_name: `deleted_${userId}`,
-      email: `deleted_${userId}@deleted.zpin.invalid`,
-      mobile: null,
-      password_hash: null,
-      dob: null,
-      gender: null,
-      profile_image: null,
-      is_active: false,
-      is_verified: false,
-      receive_push_notifications: false,
-      receive_email_updates: false,
-      receive_order_updates: false,
-      updated_at: new Date(),
-    };
-
-    const setClauses: string[] = [];
-    const setParams: any[] = [userId];
-    for (const [col, val] of Object.entries(anonValues)) {
-      if (!userColumns.has(col)) continue;
-      setParams.push(val);
-      setClauses.push(`${safeIdentifier(col)} = $${setParams.length}`);
+    const blockers = await findBlockers(user.id);
+    if (blockers.length) {
+      res.status(409).json({ success: false, message: 'This account cannot be deleted yet.', blockers });
+      return;
     }
 
-    await client.query(
-      `UPDATE ${USERS} SET ${setClauses.join(', ')} WHERE id = $1`,
-      setParams
-    );
+    if (await deletionOtp.isRateLimited(user.email)) {
+      res.status(429).json({ success: false, message: 'Too many codes requested. Try again in 10 minutes.' });
+      return;
+    }
 
-    await client.query('COMMIT');
+    const code = await deletionOtp.issue(user.email);
+    try {
+      await sendOTPEmail(normalizeEmail(user.email), code, 'account_deletion');
+    } catch (mailErr: any) {
+      logger.error('deleteaccount_otp_email_failed', { error: mailErr?.message });
+      await deletionOtp.invalidateAll(user.email).catch(() => {});
+      res.status(503).json({ success: false, message: 'Email service unavailable. Please try again later.' });
+      return;
+    }
+
+    res.json({
+      success: true,
+      message: 'Confirmation code sent.',
+      maskedEmail: maskEmail(user.email),
+      expiresIn: deletionOtp.ttlMs / 1000,
+      recoveryDays: RECOVERY_DAYS,
+    });
+  } catch (err) {
+    logger.error('deleteaccount_start_error', { error: (err as any)?.message ?? String(err) });
+    res.status(500).json({ success: false, message: 'Could not start account deletion.' });
+  }
+};
+
+router.post('/me/delete/start', authenticate, startDeletionHandler);
+
+// ── POST /api/v1/users/me/delete/resend ───────────────────────────────────────
+// A 30s cooldown on top of /start's checks — never a cheaper path than /start.
+
+router.post('/me/delete/resend', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+  let wait: number;
+  try {
+    const user = await loadDeletableUser(req.userId!);
+    if (!user) {
+      res.status(404).json({ success: false, message: 'User not found' });
+      return;
+    }
+    wait = await deletionOtp.cooldownRemaining(user.email);
+  } catch (err) {
+    logger.error('deleteaccount_resend_error', { error: (err as any)?.message ?? String(err) });
+    res.status(500).json({ success: false, message: 'Could not resend the code.' });
+    return;
+  }
+  if (wait > 0) {
+    res.status(429).json({ success: false, message: 'Please wait before requesting another code.', retryAfter: wait });
+    return;
+  }
+  await startDeletionHandler(req, res);
+});
+
+// ── POST /api/v1/users/me/delete/confirm ──────────────────────────────────────
+// Verifies the code, re-checks the blockers (an order can arrive between the two
+// calls), then soft-deletes.
+
+router.post('/me/delete/confirm', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { code, reason } = req.body || {};
+    if (!code) {
+      res.status(400).json({ success: false, message: 'The emailed code is required.' });
+      return;
+    }
+
+    const user = await loadDeletableUser(req.userId!);
+    if (!user) {
+      res.status(404).json({ success: false, message: 'User not found' });
+      return;
+    }
+    if (user.deleted_at) {
+      res.status(409).json({ success: false, code: 'ALREADY_DELETED', message: 'This account is already scheduled for deletion.' });
+      return;
+    }
+
+    const check = await deletionOtp.verify(user.email, String(code));
+    if (check.ok === false) {
+      res.status(400).json({ success: false, message: check.error });
+      return;
+    }
+
+    const blockers = await findBlockers(user.id);
+    if (blockers.length) {
+      res.status(409).json({ success: false, message: 'This account cannot be deleted yet.', blockers });
+      return;
+    }
+
+    const purgeAfter = await softDeleteAccount(user, reason, String(req.ip || ''));
+    if (!purgeAfter) {
+      res.status(409).json({ success: false, code: 'ALREADY_DELETED', message: 'This account is already scheduled for deletion.' });
+      return;
+    }
+
+    await deletionOtp.invalidateAll(user.email).catch(() => {});
+    await sendDeletionConfirmedEmail(normalizeEmail(user.email), purgeAfter).catch((e: any) =>
+      logger.error('deleteaccount_confirm_email_failed', { error: e?.message }));
+
+    res.json({
+      success: true,
+      message: 'Your account has been deleted.',
+      purgeAfter,
+      recoveryDays: RECOVERY_DAYS,
+    });
+  } catch (err) {
+    logger.error('deleteaccount_confirm_error', { error: (err as any)?.message ?? String(err) });
+    res.status(500).json({ success: false, message: 'Could not complete account deletion.' });
+  }
+});
+
+// ── DELETE /api/v1/users/me ───────────────────────────────────────────────────
+// Legacy, kept only for already-installed builds that call it with no OTP step.
+// It now performs the SAME soft delete as /me/delete/confirm rather than the old
+// immediate anonymisation, so an old client can no longer destroy an account
+// outright — the 30-day window applies to it too.
+
+router.delete('/me', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const user = await loadDeletableUser(req.userId!);
+    if (!user) {
+      res.status(404).json({ success: false, message: 'User not found' });
+      return;
+    }
+    if (user.deleted_at) {
+      // Already scheduled — an old client has no recovery UI, so report success.
+      res.json({ success: true, message: 'Account deleted' });
+      return;
+    }
+
+    const purgeAfter = await softDeleteAccount(user, req.body?.reason, String(req.ip || ''));
+    if (purgeAfter) {
+      await sendDeletionConfirmedEmail(normalizeEmail(user.email), purgeAfter).catch((e: any) =>
+        logger.error('deleteaccount_confirm_email_failed', { error: e?.message }));
+    }
     res.json({ success: true, message: 'Account deleted' });
   } catch (err) {
-    await client.query('ROLLBACK').catch(() => {});
     logger.error('deleteaccount_error', { error: (err as any)?.message ?? String(err) });
     res.status(500).json({ success: false, message: 'Server error' });
-  } finally {
-    client.release();
   }
 });
 

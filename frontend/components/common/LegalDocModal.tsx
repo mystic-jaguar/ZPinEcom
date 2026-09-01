@@ -122,7 +122,7 @@ ZPIN stores and processes User information on secure servers and infrastructure 
 
 ZPIN retains personal and transactional information only for as long as is necessary to fulfil the purposes for which such data was collected. Upon expiry of the applicable retention period, ZPIN shall take reasonable steps to securely delete, anonymize, or irreversibly de-identify such information.
 
-Users may delete their account at any time directly within the app (Profile > Help Centre > Delete Account). This immediately anonymizes your profile information (name, email, username) and permanently erases associated personal data, including saved addresses, cart items, wishlist, notifications, and saved payment/login credentials. Order and transaction records are retained in de-identified form as required for financial, tax, and legal compliance purposes. This action cannot be undone. Users may alternatively request deletion by contacting ZPIN through the designated communication channels at zpinpvtltd@gmail.com.
+Users may delete their account at any time directly within the app (Profile > Help Centre > Delete Account). Deletion is confirmed by a code emailed to your registered address. Once confirmed, your account is closed immediately and you are signed out everywhere, and it remains recoverable for 30 days — contact ZPIN before that date and it is restored exactly as it was. After 30 days your profile information (name, email, username) is permanently anonymized and associated personal data, including saved addresses, cart items, wishlist, reviews, notifications, wallet and saved login credentials, is permanently erased. Order and transaction records are retained in de-identified form as required for financial, tax, and legal compliance purposes. After the 30-day window this action cannot be undone. Users may alternatively request deletion by contacting ZPIN through the designated communication channels at zpinpvtltd@gmail.com.
 
 7. DATA SECURITY AND PROTECTION MEASURES
 
@@ -144,7 +144,7 @@ ZPIN recognizes and respects the rights of Users in relation to their personal d
 
 - Access personal information maintained by ZPIN
 - Request correction or updating of inaccurate information
-- Request deletion or erasure of personal data (self-service in-app via Profile > Help Centre > Delete Account, immediate and irreversible)
+- Request deletion or erasure of personal data (self-service in-app via Profile > Help Centre > Delete Account, email-confirmed, recoverable for 30 days, then irreversible)
 - Withdraw consent for marketing communications
 - Request restriction of processing or object to certain types of processing
 - Request portability of data in a structured format
