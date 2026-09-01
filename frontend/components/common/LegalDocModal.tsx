@@ -13,7 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { PRIVACY_POLICY_URL, TERMS_URL } from '../../constants/legal';
 
 const PRIVACY_POLICY = `PRIVACY POLICY - ZPIN
-Last Updated: April 2025
+Last Updated: September 2026
 
 This Privacy Policy ("Policy") constitutes an electronic record in accordance with the provisions of the Information Technology Act, 2000, and the rules made thereunder, including any amendments relating to data protection and privacy. This Policy does not require any physical, electronic, or digital signature and shall be deemed a legally binding document between you ("User", "you", "your") and ZPIN Pvt. Ltd. ("ZPIN", "Company", "we", "our", "us").
 
@@ -122,7 +122,7 @@ ZPIN stores and processes User information on secure servers and infrastructure 
 
 ZPIN retains personal and transactional information only for as long as is necessary to fulfil the purposes for which such data was collected. Upon expiry of the applicable retention period, ZPIN shall take reasonable steps to securely delete, anonymize, or irreversibly de-identify such information.
 
-Users may request deletion of their personal data by contacting ZPIN through the designated communication channels at zpinpvtltd@gmail.com.
+Users may delete their account at any time directly within the app (Profile > Help Centre > Delete Account). This immediately anonymizes your profile information (name, email, username) and permanently erases associated personal data, including saved addresses, cart items, wishlist, notifications, and saved payment/login credentials. Order and transaction records are retained in de-identified form as required for financial, tax, and legal compliance purposes. This action cannot be undone. Users may alternatively request deletion by contacting ZPIN through the designated communication channels at zpinpvtltd@gmail.com.
 
 7. DATA SECURITY AND PROTECTION MEASURES
 
@@ -144,7 +144,7 @@ ZPIN recognizes and respects the rights of Users in relation to their personal d
 
 - Access personal information maintained by ZPIN
 - Request correction or updating of inaccurate information
-- Request deletion or erasure of personal data
+- Request deletion or erasure of personal data (self-service in-app via Profile > Help Centre > Delete Account, immediate and irreversible)
 - Withdraw consent for marketing communications
 - Request restriction of processing or object to certain types of processing
 - Request portability of data in a structured format
