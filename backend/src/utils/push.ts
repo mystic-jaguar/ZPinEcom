@@ -123,6 +123,20 @@ export async function sendPush(
     if (dead.length) {
       await pool.query('DELETE FROM push_tokens WHERE token = ANY($1)', [dead]);
     }
+
+    // Any other error ticket means Expo accepted the request but delivered
+    // nothing — most often InvalidCredentials, i.e. no FCM V1 key on the Expo
+    // project. Nothing throws, so without this line the failure is invisible:
+    // every ecom push failed this way for weeks and looked like silence.
+    const failed = tickets.filter(
+      (t) => t?.status === 'error' && t?.details?.error !== 'DeviceNotRegistered'
+    );
+    if (failed.length) {
+      logger.warn('push.ticket_error', {
+        count: failed.length,
+        errors: [...new Set(failed.map((t) => t?.details?.error || t?.message))],
+      });
+    }
   } catch (err: any) {
     logger.warn('push.send_failed', { error: err?.message });
   }
