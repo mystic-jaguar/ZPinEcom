@@ -9,6 +9,11 @@ expo-env.d.ts
 .env
 .env.*
 
+# Firebase service-account key (FCM V1 push credential) — a real secret, unlike
+# google-services.json. Uploaded to EAS with `eas credentials`, never committed.
+*service-account*.json
+fcm-*.json
+
 # Native directories - managed by Expo Prebuild (CNG)
 /android
 /ios
