@@ -4,6 +4,7 @@ import { pool } from '../db';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { productListLimiter, reviewLimiter, reviewUploadLimiter } from '../middleware/rateLimits';
 import { generateId } from '../utils/id';
+import { expandSearchTerms } from '../utils/searchSynonyms';
 import { AUTO_HIDE_THRESHOLD, ensureModerationSchema } from '../utils/moderationSchema';
 import { withMarkup, withoutMarkup } from '../utils/pricing';
 import { cacheDel, cacheDelPattern, cacheGet, cacheSet } from '../utils/redis';
@@ -357,6 +358,17 @@ router.get('/search', productListLimiter, async (req: Request, res: Response): P
     const normalized = q.replace(/\s+/g, '').toLowerCase();
     const spaced = q.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase();
 
+    // Same synonym/typo expansion the customer website uses, so "sari", "jaket"
+    // or "chappal" find the same products on both surfaces.
+    const terms = expandSearchTerms(q);
+    const params: any[] = [`%${normalized}%`, `%${spaced}%`];
+    const termClauses = terms.map((t) => {
+      params.push(`%${t}%`);
+      const i = params.length;
+      return `(p.product_name ILIKE $${i} OR p.description ILIKE $${i} OR p.deepest_category_name ILIKE $${i})`;
+    });
+    params.push(limit);
+
     const result = await pool.query(
       `SELECT p.*,
         COALESCE(json_agg(DISTINCT pi.image_url) FILTER (WHERE pi.image_url IS NOT NULL), '[]') as images,
@@ -368,11 +380,12 @@ router.get('/search', productListLimiter, async (req: Request, res: Response): P
          AND (
            LOWER(REPLACE(p.product_name, ' ', '')) LIKE $1
            OR LOWER(p.product_name) LIKE $2
+           OR ${termClauses.join(' OR ')}
          )
        GROUP BY p.id
        ORDER BY p.created_at DESC
-       LIMIT $3`,
-      [`%${normalized}%`, `%${spaced}%`, limit]
+       LIMIT $${params.length}`,
+      params
     );
 
     // Nothing matched literally — try again allowing typos. Only on a miss, so
