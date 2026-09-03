@@ -1,9 +1,12 @@
+import { useEffect } from 'react';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
+import { router } from 'expo-router';
 
 import apiClient from './api';
+import { routeForNotification } from './notification';
 
 /**
  * Device push notifications for the customer app.
@@ -99,4 +102,41 @@ export async function unregisterPushNotifications(): Promise<void> {
     // `push_tokens`, so the next login on this device re-points it anyway.
   }
   currentToken = null;
+}
+
+/** Cold start hands back the launching tap forever; only act on it once. */
+let coldStartHandled = false;
+
+/**
+ * Tapping an order notification opens that order. Without this the push just
+ * resumes whatever screen the app was left on — for "out for delivery", the one
+ * screen the customer doesn't want.
+ *
+ * `enabled` should stay false until the session is resolved: the root layout
+ * redirects an authenticated user to /(tabs) once loading finishes, and that
+ * replace() would clobber a navigation issued before it.
+ */
+export function useNotificationTaps(enabled: boolean): void {
+  useEffect(() => {
+    if (!enabled) return;
+
+    const open = (response: any) => {
+      const route = routeForNotification(response?.notification?.request?.content?.data ?? {});
+      if (!route) return;
+      router.push({ pathname: route.pathname as any, params: route.params });
+    };
+
+    Notifications.getLastNotificationResponseAsync()
+      .then((r) => {
+        if (!r || coldStartHandled) return;
+        coldStartHandled = true;
+        // Defer past the root layout's auth redirect, which runs in an effect of
+        // its own in the same pass and would otherwise replace() us away.
+        setTimeout(() => open(r), 0);
+      })
+      .catch(() => undefined);
+
+    const sub = Notifications.addNotificationResponseReceivedListener(open);
+    return () => sub.remove();
+  }, [enabled]);
 }

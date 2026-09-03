@@ -8,12 +8,14 @@ import OfflineBanner from "../components/common/OfflineBanner";
 import { AddressProvider } from "../context/AddressContext";
 import { CartProvider } from "../context/CartContext";
 import { CheckoutProvider } from "../context/CheckoutContext";
+import { NotificationsProvider } from "../context/NotificationsContext";
 import { OrderProvider } from "../context/OrderContext";
 import { SearchProvider } from "../context/SearchContext";
 import { UserProvider, useUser } from "../context/UserContext";
 import { NetworkProvider } from "../context/NetworkContext";
 import { WishlistProvider } from "../context/WishlistContext";
 import { startKeepAlive } from "../services/keepAlive";
+import { useNotificationTaps } from "../services/push";
 import { installRejectionHandler } from "../utils/rejectionHandler";
 
 installRejectionHandler();
@@ -41,6 +43,10 @@ function RootLayoutNav() {
   const { isAuthenticated, isLoading } = useUser();
   const segments = useSegments();
   const router = useRouter();
+
+  // Tapping an order push opens that order. Held back until the session is
+  // resolved so the auth redirect below doesn't replace() the tap away.
+  useNotificationTaps(isAuthenticated && !isLoading);
 
   useEffect(() => {
     // Start keep-alive only once the user is authenticated
@@ -93,6 +99,8 @@ export default function RootLayout() {
           <NetworkProvider>
           <SearchProvider>
             <UserProvider>
+              {/* Reads isAuthenticated, so it sits inside UserProvider. */}
+              <NotificationsProvider>
               {/* Wishlist wraps Cart: adding to the cart removes the item from the
                   wishlist, so the cart needs to read the wishlist, not the reverse. */}
               <WishlistProvider>
@@ -106,6 +114,7 @@ export default function RootLayout() {
                   </CheckoutProvider>
                 </CartProvider>
               </WishlistProvider>
+              </NotificationsProvider>
             </UserProvider>
           </SearchProvider>
           <OfflineBanner />

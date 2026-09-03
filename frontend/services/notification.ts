@@ -11,6 +11,29 @@ export interface NotificationItem {
     createdAt: string;
 }
 
+/**
+ * Where a notification should land the customer.
+ *
+ * Shared by the inbox screen (tapping a row) and the push tap handler
+ * (`useNotificationTaps` in ./push) so a notification opens the same screen
+ * whether it was tapped in the app or on the lock screen.
+ *
+ * Returns null when there is nothing to open — a notification with no orderId.
+ */
+export function routeForNotification(
+    data: NotificationItem['data'] | undefined
+): { pathname: string; params: Record<string, string> } | null {
+    const orderId = data?.orderId;
+    if (!orderId) return null;
+    // An order still moving has a live tracking screen; anything settled
+    // (delivered, cancelled, refunded) reads better on the order details page.
+    const live = ['shipped', 'out_for_delivery', 'processing'].includes(data?.status || '');
+    // order-details keys on groupId when the order was split across sellers
+    const params: Record<string, string> = { orderId: String(orderId) };
+    if (!live && data?.groupId) params.groupId = String(data.groupId);
+    return { pathname: live ? '/profile/track-order' : '/profile/order-details', params };
+}
+
 export const notificationService = {
     /**
      * Get the customer inbox with pagination

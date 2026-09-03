@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 import { tokenManager } from '../services/api';
-import { registerForPushNotifications } from '../services/push';
+import { registerForPushNotifications, unregisterPushNotifications } from '../services/push';
 import { userService } from '../services/user';
 import { CompleteUserProfile, UserDetailsObject, UserObject } from '../types/types';
 
@@ -238,6 +238,9 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     };
 
     const resetUser = async () => {
+        // Before the token is cleared — the unregister call needs it, and without
+        // it this device keeps buzzing with the previous customer's order updates.
+        await unregisterPushNotifications();
         setUserState(INITIAL_USER);
         setUserDetailsState(undefined);
         setIsAuthenticated(false);

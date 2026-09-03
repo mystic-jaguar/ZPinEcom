@@ -1,8 +1,8 @@
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback } from 'react';
 import { Dimensions, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { notificationService } from '../services/notification';
+import { useNotificationsBadge } from '../context/NotificationsContext';
 
 const { width } = Dimensions.get('window');
 
@@ -12,15 +12,11 @@ interface HeaderProps {
 
 export default function Header({ }: HeaderProps) {
     const router = useRouter();
-    const [unread, setUnread] = useState(0);
+    // Shared with the inbox screen and the push listener, so the badge moves the
+    // moment a notification arrives — focus is now just a backstop resync.
+    const { unread, refresh } = useNotificationsBadge();
 
-    useFocusEffect(useCallback(() => {
-        let cancelled = false;
-        notificationService.getUnreadCount()
-            .then(r => { if (!cancelled) setUnread(r.count ?? 0); })
-            .catch(() => { });
-        return () => { cancelled = true; };
-    }, []));
+    useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
 
     return (
         <View style={styles.header}>

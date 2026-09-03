@@ -5,7 +5,8 @@ import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, T
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader, ZText } from '../../components/ui';
 import { colors, fonts, palette, radius } from '../../constants/theme';
-import { NotificationItem, notificationService } from '../../services/notification';
+import { useNotificationsBadge } from '../../context/NotificationsContext';
+import { NotificationItem, notificationService, routeForNotification } from '../../services/notification';
 
 function iconFor(n: NotificationItem) {
     const status = n.data?.status;
@@ -26,6 +27,7 @@ function timeAgo(iso: string) {
 
 export default function NotificationsScreen() {
     const router = useRouter();
+    const { refresh } = useNotificationsBadge();
     const [items, setItems] = useState<NotificationItem[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -52,19 +54,18 @@ export default function NotificationsScreen() {
     const open = async (n: NotificationItem) => {
         if (!n.isRead) {
             setItems(prev => prev.map(i => (i.id === n.id ? { ...i, isRead: true } : i)));
-            notificationService.markRead(n.id).catch(() => { });
+            notificationService.markRead(n.id).then(refresh).catch(() => { });
         }
-        const orderId = n.data?.orderId;
-        if (!orderId) return;
-        const live = ['shipped', 'out_for_delivery', 'processing'].includes(n.data?.status || '');
-        // order-details keys on groupId when the order was split across sellers
-        const params = live || !n.data?.groupId ? { orderId } : { groupId: n.data.groupId, orderId };
-        router.push({ pathname: live ? '/profile/track-order' : '/profile/order-details', params });
+        // Same helper the push tap handler uses — one definition of where a
+        // notification leads, in the app or from the lock screen.
+        const route = routeForNotification(n.data);
+        if (!route) return;
+        router.push({ pathname: route.pathname as any, params: route.params });
     };
 
     const markAll = async () => {
         setItems(prev => prev.map(i => ({ ...i, isRead: true })));
-        notificationService.markAllRead().catch(() => { });
+        notificationService.markAllRead().then(refresh).catch(() => { });
     };
 
     const hasUnread = items.some(i => !i.isRead);
