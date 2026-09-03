@@ -100,9 +100,9 @@ export default function AddAddressScreen() {
 
     return (
         <SafeAreaView style={styles.container} edges={['top']}>
-            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
                 <AppHeader title={params.id ? 'Edit address' : 'Add address'} onBack={() => router.back()} />
-                <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+                <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" automaticallyAdjustKeyboardInsets showsVerticalScrollIndicator={false}>
                     <ZInput label="Full name" placeholder="Enter full name" value={form.name} onChangeText={(t) => setForm({ ...form, name: t })} containerStyle={{ marginBottom: errors.name ? 4 : 16 }} />
                     {err('name')}
 
@@ -193,7 +193,7 @@ export default function AddAddressScreen() {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: palette.paperWarm },
-    content: { padding: 26, paddingTop: 8, paddingBottom: 20 },
+    content: { padding: 26, paddingTop: 8, paddingBottom: 40 },
     label: { marginTop: 16, marginBottom: 7 },
     error: { fontFamily: fonts.bodyMedium, fontSize: 12, color: palette.red500, marginBottom: 12, marginTop: 4 },
     mobileField: { flexDirection: 'row', alignItems: 'center', gap: 11, backgroundColor: colors.surfaceCard, borderWidth: 1.5, borderColor: colors.borderSubtle, borderRadius: radius.md, paddingHorizontal: 15, height: 52 },
