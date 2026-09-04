@@ -3,7 +3,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { Bike, Headphones, HelpCircle, Repeat, RotateCcw, XCircle } from 'lucide-react-native';
 import React, { useCallback, useMemo, useState } from 'react';
-import { FlatList, Pressable, RefreshControl, View } from 'react-native';
+import { FlatList, Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
 import { AppHeader, ZText } from '../../components/ui';
@@ -182,13 +182,13 @@ export default function AllOrdersScreen() {
                 right={<Pressable style={styles.helpBtn} onPress={() => router.push('/profile/help-center')}><HelpCircle size={20} color={colors.textStrong} /></Pressable>}
             />
 
-            <View style={styles.filters}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>
                 {FILTERS.map((f) => (
                     <Pressable key={f} style={[styles.filter, activeFilter === f && styles.filterOn]} onPress={() => setActiveFilter(f)}>
                         <Text style={[styles.filterText, activeFilter === f && styles.filterTextOn]}>{f}</Text>
                     </Pressable>
                 ))}
-            </View>
+            </ScrollView>
 
             <FlatList
                 data={filteredGroups}
@@ -227,7 +227,7 @@ export default function AllOrdersScreen() {
 const styles = createStyles({
     container: { flex: 1, backgroundColor: palette.paperWarm },
     helpBtn: { width: 40, height: 40, borderRadius: 20, borderWidth: 2, borderColor: colors.borderInk, alignItems: 'center', justifyContent: 'center' },
-    filters: { flexDirection: 'row', flexWrap: 'wrap', gap: 9, paddingHorizontal: 20, paddingBottom: 14 },
+    filters: { flexDirection: 'row', gap: 9, paddingHorizontal: 20, paddingBottom: 14 },
     filter: { paddingHorizontal: 15, paddingVertical: 8, borderRadius: 100, borderWidth: 2, borderColor: colors.borderSubtle, backgroundColor: colors.surfaceCard },
     filterOn: { backgroundColor: colors.surfaceInverse, borderColor: colors.surfaceInverse },
     filterText: { fontFamily: fonts.bodyBold, fontSize: 12, color: colors.textBody },
