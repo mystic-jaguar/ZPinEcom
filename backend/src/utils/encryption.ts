@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { Pool } from 'pg';
+import { logger } from './logger';
 
 const ENCRYPTION_PREFIX = 'enc:v1:';
 const IV_LENGTH = 12;
@@ -89,7 +90,13 @@ export function encryptText(value: unknown): string {
   return `${ENCRYPTION_PREFIX}${Buffer.concat([iv, authTag, encrypted]).toString('base64')}`;
 }
 
-export function decryptText(value: unknown): string {
+/**
+ * Fails closed: a row that cannot be decrypted (truncated ciphertext, wrong key,
+ * bad auth tag) yields `null` for that field instead of throwing. One corrupt
+ * address must not 500 the whole orders list, and the plaintext must never be
+ * guessed at. Logged without the value.
+ */
+export function decryptText(value: unknown): string | null {
   if (value === null || value === undefined) {
     return '';
   }
@@ -99,16 +106,21 @@ export function decryptText(value: unknown): string {
     return normalized;
   }
 
-  const payload = Buffer.from(normalized.slice(ENCRYPTION_PREFIX.length), 'base64');
-  const iv = payload.subarray(0, IV_LENGTH);
-  const authTag = payload.subarray(IV_LENGTH, IV_LENGTH + AUTH_TAG_LENGTH);
-  const encrypted = payload.subarray(IV_LENGTH + AUTH_TAG_LENGTH);
+  try {
+    const payload = Buffer.from(normalized.slice(ENCRYPTION_PREFIX.length), 'base64');
+    const iv = payload.subarray(0, IV_LENGTH);
+    const authTag = payload.subarray(IV_LENGTH, IV_LENGTH + AUTH_TAG_LENGTH);
+    const encrypted = payload.subarray(IV_LENGTH + AUTH_TAG_LENGTH);
 
-  const decipher = crypto.createDecipheriv('aes-256-gcm', getKey(), iv);
-  decipher.setAuthTag(authTag);
+    const decipher = crypto.createDecipheriv('aes-256-gcm', getKey(), iv);
+    decipher.setAuthTag(authTag);
 
-  const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
-  return decrypted.toString('utf8');
+    const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
+    return decrypted.toString('utf8');
+  } catch (err) {
+    logger.warn('encryption.decrypt_failed', { length: normalized.length, error: (err as any)?.message ?? String(err) });
+    return null;
+  }
 }
 
 export function encryptAddressPayload<T>(payload: T): T {
@@ -187,17 +199,10 @@ export async function prepareSensitiveDataEncryption(pool: Pool): Promise<void> 
   const client = await pool.connect();
   await client.query('BEGIN');
   try {
+    // Data backfill only — no DDL. The TEXT column types this relies on are part
+    // of the frozen shared schema (verified live on prod 2026-09-04; see
+    // SCHEMA_CHANGES.md).
     if (await tableExists(client, 'addresses')) {
-      await client.query(`
-        ALTER TABLE addresses
-        ALTER COLUMN name TYPE TEXT,
-        ALTER COLUMN phone TYPE TEXT,
-        ALTER COLUMN city TYPE TEXT,
-        ALTER COLUMN state TYPE TEXT,
-        ALTER COLUMN pincode TYPE TEXT,
-        ALTER COLUMN country TYPE TEXT
-      `);
-
       // Bounded: let Postgres find the rows that still hold plaintext instead of
       // pulling every address into Node on every boot. Steady state = 0 rows.
       const addressRows = await client.query(
@@ -235,11 +240,6 @@ export async function prepareSensitiveDataEncryption(pool: Pool): Promise<void> 
     }
 
     if (await tableExists(client, 'wallets')) {
-      await client.query(`
-        ALTER TABLE wallets
-        ALTER COLUMN balance TYPE TEXT USING balance::text
-      `);
-
       const walletRows = await client.query('SELECT id, balance FROM wallets');
       for (const row of walletRows.rows) {
         if (!isEncrypted(row.balance)) {

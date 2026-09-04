@@ -1,7 +1,7 @@
 import { Request, Response, Router } from 'express';
 import { pool } from '../db';
 import { withMarkup } from '../utils/pricing';
-import { LIVE_DEAL_PREDICATE, ensureFlashDealsSchema } from '../utils/flashDeals';
+import { LIVE_DEAL_PREDICATE } from '../utils/flashDeals';
 
 const router = Router();
 
@@ -9,7 +9,6 @@ const router = Router();
 // same payload shape as the customer website's /api/flash-deals.
 router.get('/', async (_req: Request, res: Response) => {
   try {
-    await ensureFlashDealsSchema();
     const { rows } = await pool.query(
       `SELECT fd.*, p.product_name, p.price AS original_price, p.description, p.in_stock,
         COALESCE(json_agg(DISTINCT pi.image_url) FILTER (WHERE pi.image_url IS NOT NULL), '[]') AS images,

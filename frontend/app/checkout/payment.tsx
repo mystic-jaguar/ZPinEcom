@@ -87,6 +87,7 @@ export default function CheckoutPaymentScreen() {
         const needsFeePrepay = isInstant && deliveryFee > 0 && isTrial;
 
         let createdOrderId: string | null = null;
+        let sheetResolved = false;
         try {
             const cartPayload = cartItems.map(item => ({
                 productId: item.productId,
@@ -136,12 +137,29 @@ export default function CheckoutPaymentScreen() {
                 };
                 if (!RazorpayCheckout) throw new Error('Payment gateway is not available. Please try again after some time.');
                 const rzpData = await RazorpayCheckout.open(options);
-                await paymentService.verifyRazorpayPayment({
+                // From here the customer HAS been charged. Nothing below may
+                // discard the order — see the catch.
+                sheetResolved = true;
+                const verifyPayload = {
                     razorpayOrderId,
                     razorpayPaymentId: rzpData.razorpay_payment_id,
                     razorpaySignature: rzpData.razorpay_signature,
                     appOrderId: appOrder.id,
-                });
+                };
+                // A flaky network right after the app-switch back from the UPI app
+                // is the common failure here, so retry before giving up.
+                let lastErr: any;
+                for (let attempt = 0; attempt < 3; attempt++) {
+                    try {
+                        await paymentService.verifyRazorpayPayment(verifyPayload);
+                        lastErr = null;
+                        break;
+                    } catch (e) {
+                        lastErr = e;
+                        await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+                    }
+                }
+                if (lastErr) throw lastErr;
                 await refreshOrders();
             } else {
                 addOrder(appOrder as any);
@@ -154,17 +172,27 @@ export default function CheckoutPaymentScreen() {
             const isCancelled =
                 error?.code === 2 || error?.code === 'PAYMENT_CANCELLED' ||
                 rzpText.includes('cancel') || rzpText.includes('dismiss');
-            if (createdOrderId) {
-                // Never paid for, so it is discarded outright rather than cancelled:
-                // a cancelled row still surfaces in the seller's app as a real order.
-                // The server falls back to refusing anything that IS paid.
-                //
-                // Awaited, not fire-and-forget: the user is one tap from leaving this
-                // screen, and an unawaited request can be torn down mid-flight, which
-                // leaves the order sitting pending forever.
-                await orderService.abandonOrder(createdOrderId).catch(() => { });
+            if (sheetResolved) {
+                // The Razorpay sheet succeeded, so the money left the customer's
+                // account; only OUR verify call failed. The server cannot tell a
+                // paid-but-unverified order from an abandoned one (payment_status
+                // is still 'pending'), so abandoning here would DELETE a paid
+                // order. Keep it — verify can be re-run, and the order is visible.
+                await refreshOrders().catch(() => { });
+                setOrderError('Payment received, but we could not confirm it yet. Your order is saved — check My Orders in a minute or contact support. Do not pay again.');
+            } else {
+                if (createdOrderId) {
+                    // Never paid for, so it is discarded outright rather than cancelled:
+                    // a cancelled row still surfaces in the seller's app as a real order.
+                    // The server falls back to refusing anything that IS paid.
+                    //
+                    // Awaited, not fire-and-forget: the user is one tap from leaving this
+                    // screen, and an unawaited request can be torn down mid-flight, which
+                    // leaves the order sitting pending forever.
+                    await orderService.abandonOrder(createdOrderId).catch(() => { });
+                }
+                setOrderError(isCancelled ? 'Payment was cancelled. Please try again.' : (error.message || 'Payment failed. Please try again.'));
             }
-            setOrderError(isCancelled ? 'Payment was cancelled. Please try again.' : (error.message || 'Payment failed. Please try again.'));
         } finally {
             setIsSubmitting(false);
         }

@@ -129,10 +129,12 @@ router.post('/verify', authenticate, async (req: AuthRequest, res: Response): Pr
   try {
     await client.query('BEGIN');
 
-    // Verify order ownership and current status
+    // Verify order ownership and current status. FOR UPDATE: a concurrent cancel
+    // (or a second verify) must queue behind this transaction and then see the
+    // row this one wrote, not race it.
     const orderResult = await client.query(
-      `SELECT id, group_id, final_amount, payment_status, order_number, payment_method, delivery_type, delivery_fee, is_trial
-         FROM ${ORDERS} WHERE id = $1 AND user_id = $2`,
+      `SELECT id, group_id, final_amount, payment_status, status, order_number, payment_method, delivery_type, delivery_fee, is_trial
+         FROM ${ORDERS} WHERE id = $1 AND user_id = $2 FOR UPDATE`,
       [appOrderId, req.userId]
     );
 
@@ -148,8 +150,8 @@ router.post('/verify', authenticate, async (req: AuthRequest, res: Response): Pr
     // legacy NULL-group orders) so a single payment confirms the whole group.
     const groupRows = order.group_id
       ? (await client.query(
-          `SELECT id, final_amount, payment_status, payment_method, delivery_type, delivery_fee, is_trial
-             FROM ${ORDERS} WHERE group_id = $1 AND user_id = $2`,
+          `SELECT id, final_amount, payment_status, status, payment_method, delivery_type, delivery_fee, is_trial
+             FROM ${ORDERS} WHERE group_id = $1 AND user_id = $2 ORDER BY id FOR UPDATE`,
           [order.group_id, req.userId]
         )).rows
       : [order];
@@ -157,6 +159,19 @@ router.post('/verify', authenticate, async (req: AuthRequest, res: Response): Pr
     if (groupRows.every((r: any) => r.payment_status === 'paid' || r.payment_status === 'partial')) {
       await client.query('ROLLBACK');
       res.json({ success: true, message: 'Payment already recorded', data: { orderId: appOrderId } });
+      return;
+    }
+
+    // Only a still-pending checkout can be paid into 'confirmed'. A cancelled
+    // (or otherwise advanced) order must never be resurrected by a late verify —
+    // the money is real, so log it loudly for a manual refund.
+    const notPayable = groupRows.filter((r: any) => r.status !== 'pending');
+    if (notPayable.length > 0) {
+      await client.query('ROLLBACK');
+      logger.warn('razorpay.verify_order_not_pending', {
+        appOrderId, razorpayPaymentId, statuses: notPayable.map((r: any) => `${r.id}:${r.status}`),
+      });
+      res.status(409).json({ success: false, message: 'This order can no longer be paid. If you were charged, the amount will be refunded.' });
       return;
     }
 

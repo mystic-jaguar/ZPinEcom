@@ -8,7 +8,6 @@ import { createEmailOtp, EMAIL_RE, maskEmail, normalizeEmail } from '../utils/em
 import { sendDeletionConfirmedEmail, sendOTPEmail } from '../utils/mailer';
 import { decryptAddressPayload, encryptAddressPayload } from '../utils/encryption';
 import { generateId } from '../utils/id';
-import { ensureModerationSchema } from '../utils/moderationSchema';
 import { ORDER_ITEMS_JSON } from '../utils/orderItemsSql';
 import { markupItems } from '../utils/pricing';
 import { PUSH_APP } from '../utils/push';
@@ -721,7 +720,6 @@ router.post('/block', authenticate, async (req: AuthRequest, res: Response): Pro
   }
 
   try {
-    await ensureModerationSchema();
 
     const target = await pool.query(`SELECT id FROM ${USERS} WHERE id = $1`, [blockedUserId]);
     if (target.rows.length === 0) {
@@ -748,7 +746,6 @@ router.post('/block', authenticate, async (req: AuthRequest, res: Response): Pro
 
 router.delete('/block/:userId', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    await ensureModerationSchema();
     await pool.query(
       'DELETE FROM user_blocks WHERE blocker_user_id = $1 AND blocked_user_id = $2',
       [req.userId, req.params.userId]

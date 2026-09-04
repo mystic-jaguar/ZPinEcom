@@ -292,6 +292,20 @@ describe('POST /auth/refresh-token', () => {
     expect(res.status).toBe(401);
   });
 
+  it('returns 403 and mints nothing for an admin-suspended account (is_active=false)', async () => {
+    const token = makeRefreshToken('USR0001');
+    getDbMock().mockResolvedValueOnce({ rows: [{ user_id: 'USR0001', token }] });
+    getDbMock().mockResolvedValueOnce({ rows: [{ id: 'USR0001', user_role: 'customer', is_active: false }] });
+    const res = await request(app)
+      .post(`${BASE}/refresh-token`)
+      .send({ refreshToken: token });
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe('ACCOUNT_DEACTIVATED');
+    expect(res.body.accessToken).toBeUndefined();
+    // Only the two SELECTs ran — no DELETE/INSERT of refresh tokens.
+    expect(getDbMock()).toHaveBeenCalledTimes(2);
+  });
+
   it('returns new tokens on valid refresh token (token rotation)', async () => {
     const token = makeRefreshToken('USR0001');
     getDbMock().mockResolvedValueOnce({ rows: [{ user_id: 'USR0001', token }] });

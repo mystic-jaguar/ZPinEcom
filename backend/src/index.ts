@@ -8,21 +8,19 @@ import { httpsRedirect } from './middleware/httpsRedirect';
 import { inputSanitizer } from './middleware/inputSanitizer';
 import { globalLimiter } from './middleware/rateLimits';
 import { requestLogger } from './middleware/requestLogger';
-import authRoutes, { ensureAppleColumn } from './routes/auth';
+import authRoutes from './routes/auth';
 import cartRoutes from './routes/cart';
 import couponRoutes from './routes/coupons';
 import flashDealRoutes from './routes/flashDeals';
 import bannerRoutes from './routes/banners';
 import notificationRoutes from './routes/notifications';
-import orderRoutes, { ensureOrderSupportTables } from './routes/orders';
+import orderRoutes from './routes/orders';
 import productRoutes from './routes/products';
 import razorpayRoutes from './routes/razorpay';
 import userRoutes from './routes/users';
 import wishlistRoutes from './routes/wishlist';
 import { prepareSensitiveDataEncryption } from './utils/encryption';
 import { logger } from './utils/logger';
-import { ensureFlashDealsSchema } from './utils/flashDeals';
-import { ensureModerationSchema } from './utils/moderationSchema';
 import redis from './utils/redis';
 
 dotenv.config();
@@ -131,17 +129,9 @@ async function startServer() {
     logger.warn('startup.encryption_migration_failed', { message: err.message });
   }
 
-  // Ensure auxiliary schema exists at startup (idempotent) so DDL never runs on a
-  // user request path — removes first-request latency and keeps schema management
-  // out of request handlers. The per-route ensure* calls remain as a safety net
-  // but become no-ops once these have run.
-  for (const ensure of [ensureOrderSupportTables, ensureModerationSchema, ensureAppleColumn, ensureFlashDealsSchema]) {
-    try {
-      await ensure();
-    } catch (err: any) {
-      logger.warn('startup.schema_ensure_failed', { fn: ensure.name, message: err.message });
-    }
-  }
+  // No DDL at boot: the shared schema is frozen (CLAUDE.md rule 1). Every object
+  // the old ensure*() bootstraps created is recorded in SCHEMA_CHANGES.md
+  // (2026-09-04 entry) and verified live on prod.
 
   // Connect Redis (non-fatal — app works without cache)
   try {

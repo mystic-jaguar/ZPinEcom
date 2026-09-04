@@ -10,28 +10,6 @@ import { pool } from '../db';
  * Prices in `flash_deals.deal_price` are RAW VENDOR prices, exactly like
  * `products.price` — the 20% ZPIN markup is applied on read (utils/pricing).
  */
-let ready = false;
-
-export async function ensureFlashDealsSchema(): Promise<void> {
-  if (ready) return;
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS flash_deals (
-      id              VARCHAR(36) PRIMARY KEY,
-      product_id      UUID        NOT NULL REFERENCES products(id) ON DELETE CASCADE,
-      deal_price      NUMERIC(10,2) NOT NULL,
-      total_stock     INTEGER     NOT NULL DEFAULT 50,
-      stock_remaining INTEGER     NOT NULL DEFAULT 50,
-      label           VARCHAR(100) NOT NULL DEFAULT 'Flash Deal',
-      starts_at       TIMESTAMP   NOT NULL DEFAULT NOW(),
-      ends_at         TIMESTAMP   NOT NULL,
-      is_active       BOOLEAN     NOT NULL DEFAULT true,
-      created_at      TIMESTAMP   NOT NULL DEFAULT NOW()
-    )
-  `);
-  await pool.query(`CREATE INDEX IF NOT EXISTS idx_flash_deals_active ON flash_deals(is_active, ends_at)`);
-  await pool.query(`CREATE INDEX IF NOT EXISTS idx_flash_deals_product ON flash_deals(product_id)`);
-  ready = true;
-}
 
 /** A deal is live only while active, started, unexpired and still in stock. */
 export const LIVE_DEAL_PREDICATE = `
@@ -53,7 +31,7 @@ export async function liveDealPrices(
   if (ids.length === 0) return map;
   // Deliberately NOT wrapped in try/catch: callers run inside a transaction,
   // where a swallowed query error would poison every later statement. The table
-  // is guaranteed by ensureFlashDealsSchema() at boot.
+  // is part of the frozen shared schema (see SCHEMA_CHANGES.md).
   const { rows } = await q.query(
       `SELECT fd.product_id, MIN(fd.deal_price) AS deal_price
          FROM flash_deals fd

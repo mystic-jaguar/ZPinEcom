@@ -5,7 +5,7 @@ import { authenticate, AuthRequest } from '../middleware/auth';
 import { productListLimiter, reviewLimiter, reviewUploadLimiter } from '../middleware/rateLimits';
 import { generateId } from '../utils/id';
 import { expandSearchTerms } from '../utils/searchSynonyms';
-import { AUTO_HIDE_THRESHOLD, ensureModerationSchema } from '../utils/moderationSchema';
+import { AUTO_HIDE_THRESHOLD } from '../utils/moderationSchema';
 import { withMarkup, withoutMarkup } from '../utils/pricing';
 import { cacheDel, cacheDelPattern, cacheGet, cacheSet } from '../utils/redis';
 import { logger } from '../utils/logger';
@@ -55,22 +55,17 @@ const reviewImageUpload = multer({
  * Postgres, and a trigram index answers "kurti" → "kurta" without a new
  * dependency, a new container, or an index to keep in sync.
  *
- * Both the extension and the index are attempted once, at first search, and
- * every failure is swallowed: on a DB role that may not CREATE EXTENSION the
- * search simply stays exact-match, which is what it does today.
+ * The extension and its index (`idx_products_name_trgm`) are part of the frozen
+ * shared schema (SCHEMA_CHANGES.md) — this only CHECKS the extension is present,
+ * once, and never creates anything. Absent → search stays exact-match.
  */
 let trigramReady: boolean | null = null;
 async function ensureTrigram(): Promise<boolean> {
   if (trigramReady !== null) return trigramReady;
   try {
     const { rows } = await pool.query(`SELECT 1 FROM pg_extension WHERE extname = 'pg_trgm'`);
-    if (!rows.length) await pool.query('CREATE EXTENSION IF NOT EXISTS pg_trgm');
-    // Without this index every fuzzy search is a sequential scan over products.
-    await pool.query(
-      `CREATE INDEX IF NOT EXISTS idx_products_name_trgm
-         ON products USING gin (LOWER(product_name) gin_trgm_ops)`
-    );
-    trigramReady = true;
+    trigramReady = rows.length > 0;
+    if (!trigramReady) throw new Error('pg_trgm extension not installed');
   } catch (err) {
     logger.warn('search.trigram_unavailable', {
       error: (err as any)?.message ?? String(err),
@@ -914,7 +909,6 @@ router.get('/:id/reviews', async (req: Request, res: Response): Promise<void> =>
   }
 
   try {
-    await ensureModerationSchema();
     const page = Math.max(Number(req.query.page) || 1, 1);
     const limit = Math.min(Math.max(Number(req.query.limit) || 10, 1), 100);
     const offset = (page - 1) * limit;
@@ -1272,7 +1266,6 @@ router.post('/:id/reviews/:reviewId/report', authenticate, reviewLimiter, async 
   const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim().slice(0, 500) : '';
 
   try {
-    await ensureModerationSchema();
 
     const reviewRes = await pool.query(
       'SELECT id, product_id, user_id::text as user_id FROM product_reviews WHERE id = $1',

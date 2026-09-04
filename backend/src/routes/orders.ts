@@ -66,113 +66,6 @@ export const ITEM_CONDITIONS = ['ok', 'damaged'];
 const ORDER_CANCELLATIONS = safeIdentifier('order_cancellations');
 const COUPON_REDEMPTIONS = safeIdentifier('coupon_redemptions');
 
-let supportTablesReady = false;
-
-export async function ensureOrderSupportTables() {
-  if (supportTablesReady) return;
-
-  try {
-    await pool.query(
-      `CREATE TABLE IF NOT EXISTS ${RETURN_REQUESTS} (
-        id VARCHAR(7) PRIMARY KEY,
-        order_id VARCHAR(7) NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-        user_id VARCHAR(7) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        order_item_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
-        reason TEXT NOT NULL,
-        description TEXT,
-        status VARCHAR(50) NOT NULL DEFAULT 'requested',
-        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMP NOT NULL DEFAULT NOW()
-      )`
-    );
-    await pool.query(
-      `CREATE INDEX IF NOT EXISTS idx_return_requests_order_id ON ${RETURN_REQUESTS}(order_id)`
-    );
-    await pool.query(
-      `CREATE INDEX IF NOT EXISTS idx_return_requests_user_id ON ${RETURN_REQUESTS}(user_id)`
-    );
-
-    // Wrap each ALTER TABLE in its own try/catch — column may already exist
-    const alterColumns = [
-      `ALTER TABLE ${RETURN_REQUESTS} ADD COLUMN IF NOT EXISTS picked_up_at TIMESTAMP`,
-      `ALTER TABLE ${RETURN_REQUESTS} ADD COLUMN IF NOT EXISTS refunded_at TIMESTAMP`,
-      `ALTER TABLE ${RETURN_REQUESTS} ADD COLUMN IF NOT EXISTS status_history JSONB DEFAULT '[]'::jsonb`,
-      // Keep the dev bootstrap's status vocabulary identical to prod's CHECK
-      // constraint. It drifted once already: prod allowed only
-      // requested/approved/rejected/completed while the code wrote picked_up
-      // and refunded, so the status-advance endpoint failed on prod alone.
-      // DROP-then-ADD is idempotent; both statements run in order.
-      // See migrations/2026-08-12-return-status-vocabulary.cjs.
-      `ALTER TABLE ${RETURN_REQUESTS} DROP CONSTRAINT IF EXISTS return_requests_status_check`,
-      `ALTER TABLE ${RETURN_REQUESTS} ADD CONSTRAINT return_requests_status_check
-         CHECK (status IN ('requested', 'approved', 'rejected', 'picked_up', 'refunded'))`,
-      // Multi-seller split: one checkout = one group_id shared by every seller's
-      // sub-order row (NULL for legacy pre-split orders = a group of one).
-      `ALTER TABLE ${ORDERS} ADD COLUMN IF NOT EXISTS group_id VARCHAR(7)`,
-      // Phase 9A — Instant Delivery "try first". is_trial marks the order at
-      // checkout; trial_expires_at is stamped by the delivery backend at /pickup
-      // and is the deadline for the customer's keep/return selection.
-      // order_items.is_returned records that per-item choice.
-      `ALTER TABLE ${ORDERS} ADD COLUMN IF NOT EXISTS is_trial BOOLEAN NOT NULL DEFAULT false`,
-      `ALTER TABLE ${ORDERS} ADD COLUMN IF NOT EXISTS trial_expires_at TIMESTAMP`,
-      `ALTER TABLE ${ORDER_ITEMS} ADD COLUMN IF NOT EXISTS is_returned BOOLEAN NOT NULL DEFAULT false`,
-      // Phase 11 — the size a line was bought in. Shared with the website, which
-      // writes the same column (it calls it `selected_size` in its cart payload).
-      `ALTER TABLE ${CART} ADD COLUMN IF NOT EXISTS variant VARCHAR(50)`,
-      `ALTER TABLE ${ORDER_ITEMS} ADD COLUMN IF NOT EXISTS variant VARCHAR(255)`,
-    ];
-    for (const sql of alterColumns) {
-      try {
-        await pool.query(sql);
-      } catch (alterErr: any) {
-        // Ignore "column already exists" errors (code 42701)
-        if (alterErr?.code !== '42701') {
-          logger.warn('ensureordersupporttables_alter_warning', { error: alterErr?.message });
-        }
-      }
-    }
-    await pool.query(
-      `CREATE INDEX IF NOT EXISTS idx_orders_group_id ON ${ORDERS}(group_id)`
-    );
-
-    await pool.query(
-      // order_id/user_id are 36 wide: website orders carry uuid ids and users.id
-      // is VARCHAR(36). The prod table was widened from 7 in parity Phase 12.
-      `CREATE TABLE IF NOT EXISTS ${ORDER_CANCELLATIONS} (
-        id VARCHAR(7) PRIMARY KEY,
-        order_id VARCHAR(36) NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-        user_id VARCHAR(36) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        reason TEXT NOT NULL,
-        refund_method VARCHAR(50) NOT NULL DEFAULT 'original',
-        created_at TIMESTAMP NOT NULL DEFAULT NOW()
-      )`
-    );
-    await pool.query(
-      `CREATE INDEX IF NOT EXISTS idx_order_cancellations_order_id ON ${ORDER_CANCELLATIONS}(order_id)`
-    );
-
-    // Records each coupon redemption so a coupon can be enforced as single-use
-    // per user. user_id/order_id are TEXT (not FK) so this survives the legacy
-    // prod schema divergence where those id columns may differ in type.
-    // ponytail: single redemption per (user, code). Add a per_user_limit column
-    // on coupons if a coupon ever needs to be reusable by the same user.
-    await pool.query(
-      `CREATE TABLE IF NOT EXISTS ${COUPON_REDEMPTIONS} (
-        id          VARCHAR(7)  PRIMARY KEY,
-        user_id     TEXT        NOT NULL,
-        coupon_code TEXT        NOT NULL,
-        order_id    TEXT,
-        created_at  TIMESTAMP   NOT NULL DEFAULT NOW(),
-        UNIQUE (user_id, coupon_code)
-      )`
-    );
-
-    supportTablesReady = true;
-  } catch (err: any) {
-    logger.error('ensureordersupporttables_failed', { error: err?.message });
-    throw err;
-  }
-}
 
 function buildTrackingHistory(order: any, returnRequest?: any) {
   const steps: Array<{ status: string; title: string; timestamp: string | null; note?: string }> = [
@@ -434,7 +327,6 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response): Promis
 // GET /api/v1/orders/:id/track
 router.get('/:id/track', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    await ensureOrderSupportTables();
 
     // delivery_status / delivery_boy_id are written by the delivery backend on the
     // shared orders table (accepted → picked_up → delivered). The cheap LEFT JOIN
@@ -513,7 +405,6 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
 
   // Ensure the coupon_redemptions table exists before the checkout transaction
   // may write to it (idempotent; a no-op after the first call / startup).
-  await ensureOrderSupportTables();
 
   // Give back stock held by checkouts that were abandoned without telling us,
   // BEFORE this checkout's own decrement runs — otherwise the last unit of a
@@ -1093,7 +984,6 @@ router.post('/:id/return', authenticate, async (req: AuthRequest, res: Response)
   }
 
   try {
-    await ensureOrderSupportTables();
 
     // Verify the order belongs to this user and is delivered
     const orderResult = await pool.query(
@@ -1346,7 +1236,6 @@ router.patch('/:id/return-status', authenticate, async (req: AuthRequest, res: R
 
   const client = await pool.connect();
   try {
-    await ensureOrderSupportTables();
     await client.query('BEGIN');
 
     // Only admins and delivery partners reach this far (see allowedRolesFor
@@ -1914,7 +1803,6 @@ router.patch('/:id/delivery-return', authenticate, async (req: AuthRequest, res:
 // GET /api/v1/orders/:id/return-status
 router.get('/:id/return-status', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    await ensureOrderSupportTables();
 
     const orderResult = await pool.query(
       `SELECT id, order_number, status, updated_at
@@ -2007,7 +1895,6 @@ router.get('/:id/return-status', authenticate, async (req: AuthRequest, res: Res
 router.patch('/:id/cancel-return', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
   const client = await pool.connect();
   try {
-    await ensureOrderSupportTables();
     await client.query('BEGIN');
 
     const returnResult = await client.query(
@@ -2086,12 +1973,11 @@ router.patch('/:id/cancel', authenticate, async (req: AuthRequest, res: Response
 
   const client = await pool.connect();
   try {
-    await ensureOrderSupportTables();
     await client.query('BEGIN');
 
     // Lock the order row and verify ownership + cancellable status
     const result = await client.query(
-      `SELECT id, final_amount, payment_status, payment_method, prepaid_amount
+      `SELECT id, final_amount, payment_status, payment_method, prepaid_amount, payment_id
        FROM ${ORDERS}
        WHERE id = $1 AND user_id = $2 AND status IN ('pending','confirmed')
        FOR UPDATE`,
@@ -2111,13 +1997,15 @@ router.patch('/:id/cancel', authenticate, async (req: AuthRequest, res: Response
     const refundAmount = order.payment_status === 'partial'
       ? Number(order.prepaid_amount || 0)
       : Number(order.final_amount);
-    const newPaymentStatus = wasPaid ? 'refunded' : order.payment_status;
 
+    // payment_status is deliberately NOT touched here. It flips to 'refunded'
+    // only after the gateway accepts the refund (below, after COMMIT) — writing
+    // 'refunded' up front with no gateway call is how ₹ silently went missing.
     await client.query(
       `UPDATE ${ORDERS}
-       SET status = 'cancelled', payment_status = $1, updated_at = NOW()
-       WHERE id = $2`,
-      [newPaymentStatus, req.params.id]
+       SET status = 'cancelled', updated_at = NOW()
+       WHERE id = $1`,
+      [req.params.id]
     );
     await recordOrderStatus(client, req.params.id, 'cancelled', `Cancelled by customer: ${reason}`);
 
@@ -2156,12 +2044,24 @@ router.patch('/:id/cancel', authenticate, async (req: AuthRequest, res: Response
 
     await client.query('COMMIT');
 
+    // Refund outside the transaction — a gateway failure must not undo the
+    // cancellation (stock is already back). A failed call leaves the row 'paid'
+    // + cancelled with a "needs manual action" history line for support.
+    let refundStatus: 'initiated' | 'failed' | 'not_applicable' = 'not_applicable';
+    if (wasPaid && refundAmount > 0) {
+      const ok = await issueGatewayRefund(order.id, order.payment_id, refundAmount, 'cancelled');
+      if (ok) {
+        await pool.query(`UPDATE ${ORDERS} SET payment_status = 'refunded', updated_at = NOW() WHERE id = $1`, [order.id]);
+      }
+      refundStatus = ok ? 'initiated' : 'failed';
+    }
+
     res.json({
       success: true,
       data: {
         message: 'Order cancelled',
         refundAmount: wasPaid ? refundAmount : 0,
-        refundStatus: wasPaid ? 'initiated' : 'not_applicable',
+        refundStatus,
         refundMethod: 'original',
       },
     });
@@ -2482,7 +2382,7 @@ router.post('/:id/trial-selection', authenticate, async (req: AuthRequest, res: 
     // Refund outside the transaction — a gateway failure must not undo the
     // customer's selection. It is retried by support, not silently swallowed.
     if (refundAmount > 0) {
-      await issueTrialRefund(order.id, order.payment_id, refundAmount);
+      await issueGatewayRefund(order.id, order.payment_id, refundAmount, 'awaiting_collection');
     }
 
     res.json({
@@ -2506,10 +2406,11 @@ router.post('/:id/trial-selection', authenticate, async (req: AuthRequest, res: 
   }
 });
 
-// Refund the over-payment on a trial order back to the card/UPI that paid the
-// delivery fee. Logged either way — a failed gateway call leaves an auditable
-// 'refund_failed' row rather than a silent loss.
-async function issueTrialRefund(orderId: string, paymentId: string | null, amount: number): Promise<void> {
+// Refund `amount` back to the card/UPI that paid for the order — used by the
+// customer cancel flow and the trial over-payment. Logged either way — a failed
+// gateway call leaves an auditable "needs manual action" history row rather than
+// a silent loss. `historyStatus` is the order status the history line sits under.
+async function issueGatewayRefund(orderId: string, paymentId: string | null, amount: number, historyStatus: string): Promise<boolean> {
   try {
     if (!paymentId) throw new Error('order has no payment_id to refund against');
     if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
@@ -2521,11 +2422,13 @@ async function issueTrialRefund(orderId: string, paymentId: string | null, amoun
       key_secret: process.env.RAZORPAY_KEY_SECRET,
     });
     await rzp.payments.refund(paymentId, { amount: Math.round(amount * 100), speed: 'normal' });
-    await recordOrderStatus(null, orderId, 'awaiting_collection', `Refund of ₹${amount.toFixed(2)} issued to the original payment method`);
+    await recordOrderStatus(null, orderId, historyStatus, `Refund of ₹${amount.toFixed(2)} issued to the original payment method`);
+    return true;
   } catch (err: any) {
-    logger.error('issuetrialrefund_failed', { orderId, error: err?.message });
-    await recordOrderStatus(null, orderId, 'awaiting_collection', `Refund of ₹${amount.toFixed(2)} FAILED (${err?.message}) — needs manual action`)
+    logger.error('issuegatewayrefund_failed', { orderId, amount, error: err?.message });
+    await recordOrderStatus(null, orderId, historyStatus, `Refund of ₹${amount.toFixed(2)} FAILED (${err?.message}) — needs manual action`)
       .catch(() => { /* history is best-effort */ });
+    return false;
   }
 }
 

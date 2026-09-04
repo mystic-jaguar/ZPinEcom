@@ -33,15 +33,30 @@ const PENDING_SIGNUPS = safeIdentifier('pending_signups');
  * Applied to every path that mints tokens: password login, refresh, Google, Apple.
  * The account stays recoverable for 30 days, so this is a refusal, not a 404.
  */
-const isDeletedAccount = (row: any): boolean => Boolean(row?.deleted_at);
-
-const rejectDeletedAccount = (req: Request, res: Response, userId: string, method: string): void => {
-  logger.authFailure(req.ip || '', method, 'account_deleted', userId);
-  res.status(403).json({
-    success: false,
-    message: 'This account has been deleted. Contact support if you want it restored.',
-    code: 'ACCOUNT_DELETED',
-  });
+/**
+ * The ONE gate every token-minting path runs (password login, refresh, Google,
+ * Apple). Returns true when a 403 has been sent and the caller must stop.
+ * Handles both a soft-deleted row and an admin-suspended one (`is_active`),
+ * so no path can ever check one and forget the other again. Tolerates an
+ * undefined row (Google/Apple first sign-in) — nothing to block yet.
+ */
+const rejectBlockedAccount = (req: Request, res: Response, row: any, method: string): boolean => {
+  if (!row) return false;
+  if (row.deleted_at) {
+    logger.authFailure(req.ip || '', method, 'account_deleted', row.id);
+    res.status(403).json({
+      success: false,
+      message: 'This account has been deleted. Contact support if you want it restored.',
+      code: 'ACCOUNT_DELETED',
+    });
+    return true;
+  }
+  if (row.is_active === false) {
+    logger.authFailure(req.ip || '', method, 'account_deactivated', row.id);
+    res.status(403).json({ success: false, message: 'Account is deactivated', code: 'ACCOUNT_DEACTIVATED' });
+    return true;
+  }
+  return false;
 };
 
 // ─── Rate Limiters ────────────────────────────────────────────────────────────
@@ -301,16 +316,7 @@ router.post('/login', loginLimiter, async (req: Request, res: Response): Promise
 
     const row = result.rows[0];
 
-    if (isDeletedAccount(row)) {
-      rejectDeletedAccount(req, res, row.id, 'login');
-      return;
-    }
-
-    if (!row.is_active) {
-      logger.authFailure(req.ip || '', 'login', 'account_deactivated', row.id);
-      res.status(403).json({ success: false, message: 'Account is deactivated' });
-      return;
-    }
+    if (rejectBlockedAccount(req, res, row, 'login')) return;
 
     if (!row.password_hash) {
       logger.authFailure(req.ip || '', 'login', 'social_login_account', row.id);
@@ -387,10 +393,7 @@ router.post('/refresh-token', refreshLimiter, async (req: Request, res: Response
       return;
     }
 
-    if (isDeletedAccount(userResult.rows[0])) {
-      rejectDeletedAccount(req, res, decoded.userId, 'refresh_token');
-      return;
-    }
+    if (rejectBlockedAccount(req, res, userResult.rows[0], 'refresh_token')) return;
 
     const user = normalizeUser(userResult.rows[0]);
     const tokens = generateTokens(user.id, user.userRole);
@@ -862,10 +865,7 @@ router.post('/google', loginLimiter, async (req: Request, res: Response): Promis
 
     // Before the link/update branch below: a deleted account must not be
     // silently revived (and re-verified) by signing in with Google.
-    if (isDeletedAccount(user)) {
-      rejectDeletedAccount(req, res, user.id, 'google_login');
-      return;
-    }
+    if (rejectBlockedAccount(req, res, user, 'google_login')) return;
 
     if (!user) {
       // Create new user from Google account
@@ -945,15 +945,6 @@ const appleAudience = (() => {
   return ids.length > 0 ? ids : ['com.zpin.ecom'];
 })();
 
-// The apple_id column is new (not present on already-deployed databases). Ensure
-// it exists once, idempotently, before the first Apple sign-in touches it.
-let appleColumnReady = false;
-export async function ensureAppleColumn() {
-  if (appleColumnReady) return;
-  await pool.query(`ALTER TABLE ${USERS} ADD COLUMN IF NOT EXISTS apple_id VARCHAR(255)`);
-  appleColumnReady = true;
-}
-
 function composeAppleName(fullName: any): string | null {
   if (!fullName) return null;
   const parts = [fullName.givenName, fullName.familyName].filter(Boolean);
@@ -969,7 +960,6 @@ router.post('/apple', loginLimiter, async (req: Request, res: Response): Promise
   }
 
   try {
-    await ensureAppleColumn();
 
     // Verify signature against Apple's public keys + audience + expiry.
     const claims = await appleSignin.verifyIdToken(identityToken, {
@@ -1006,10 +996,7 @@ router.post('/apple', loginLimiter, async (req: Request, res: Response): Promise
     }
 
     // Same as Google: signing in with Apple must not revive a deleted account.
-    if (isDeletedAccount(user)) {
-      rejectDeletedAccount(req, res, user.id, 'apple_login');
-      return;
-    }
+    if (rejectBlockedAccount(req, res, user, 'apple_login')) return;
 
     if (!user) {
       // First-ever sign-in: Apple only returns the email (and name) once, here.
