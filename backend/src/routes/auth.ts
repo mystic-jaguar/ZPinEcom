@@ -90,6 +90,17 @@ const otpVerifyLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// Same cap as otpVerifyLimiter but its OWN counter: resetPassword re-checks the
+// OTP, so it needs brute-force protection — but sharing one counter meant two
+// typos on the verify screen left no attempt for the reset itself.
+const resetPasswordLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: isProd ? 3 : 1000,
+  message: { success: false, code: 'RATE_LIMITED', message: 'Too many password reset attempts. Please wait 15 minutes, then request a fresh code.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // 10 token refresh attempts per 15 minutes per IP (dev: relaxed)
 const refreshLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -195,7 +206,7 @@ router.post('/signup', signupLimiter, async (req: Request, res: Response): Promi
 
   try {
     const existing = await pool.query(
-      `SELECT id, is_verified, google_id, apple_id, password_hash FROM ${USERS} WHERE email = $1`, [email.toLowerCase()]
+      `SELECT id, is_verified, google_id, apple_id, password_hash, user_role FROM ${USERS} WHERE email = $1`, [email.toLowerCase()]
     );
     if (existing.rows.length > 0) {
       if (existing.rows[0].is_verified) {
@@ -210,9 +221,15 @@ router.post('/signup', signupLimiter, async (req: Request, res: Response): Promi
         });
         return;
       }
-      // Legacy unverified account (created before the verify-first flow). Remove it
-      // so the email is freed and the user can complete a clean pending signup.
-      await pool.query(`DELETE FROM ${USERS} WHERE id = $1`, [existing.rows[0].id]);
+      // Legacy unverified CUSTOMER account (created before the verify-first flow).
+      // Remove it so the email is freed and the user can complete a clean pending
+      // signup. The users table is shared: an unverified seller / delivery /
+      // admin row belongs to another surface's signup and is not ours to erase.
+      if (existing.rows[0].user_role !== 'customer') {
+        res.status(409).json({ success: false, code: 'EMAIL_TAKEN', message: 'Email already registered. Please log in instead.' });
+        return;
+      }
+      await pool.query(`DELETE FROM ${USERS} WHERE id = $1 AND user_role = 'customer' AND is_verified = false`, [existing.rows[0].id]);
     }
 
     // Reject a mobile already owned by a fully registered (verified) account.
@@ -468,7 +485,7 @@ router.post('/push/register', authenticate, async (req: AuthRequest, res: Respon
 });
 
 router.post('/push/unregister', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
-  await removePushToken(req.body?.token);
+  await removePushToken(req.body?.token, req.userId!);
   res.json({ success: true });
 });
 
@@ -588,7 +605,7 @@ router.post('/forgetPassword/verifyOTP', otpVerifyLimiter, async (req: Request, 
 
 // ─── POST /api/v1/auth/forgetPassword/resetPassword ──────────────────────────
 
-router.post('/forgetPassword/resetPassword', otpVerifyLimiter, async (req: Request, res: Response): Promise<void> => {
+router.post('/forgetPassword/resetPassword', resetPasswordLimiter, async (req: Request, res: Response): Promise<void> => {
   const { resetToken, newPassword } = req.body;
   if (!resetToken || !newPassword) {
     res.status(400).json({ success: false, message: 'Reset token and new password are required' });
@@ -809,6 +826,13 @@ router.post('/google', loginLimiter, async (req: Request, res: Response): Promis
     const payload = ticket.getPayload();
     if (!payload || !payload.email) {
       res.status(401).json({ success: false, message: 'Invalid Google token' });
+      return;
+    }
+    // The row is looked up BY EMAIL below and the Google id is linked to it. A
+    // Google account whose address Google has not verified could otherwise claim
+    // any existing ZPIN account that uses that address.
+    if (payload.email_verified !== true) {
+      res.status(401).json({ success: false, message: 'Your Google account email is not verified' });
       return;
     }
 

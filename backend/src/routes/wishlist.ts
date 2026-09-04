@@ -34,7 +34,7 @@ router.delete('/clear', authenticate, async (req: AuthRequest, res: Response): P
 // GET /api/v1/wishlist
 router.get('/', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
   const page = Number(req.query.page) || 1;
-  const limit = Number(req.query.limit) || 20;
+  const limit = Math.min(Math.max(1, Math.floor(Number(req.query.limit)) || 20), 100);
   const offset = (page - 1) * limit;
 
   try {

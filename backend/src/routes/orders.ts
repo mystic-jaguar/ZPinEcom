@@ -231,7 +231,7 @@ function normalizeOrder(row: any) {
 // GET /api/v1/orders
 router.get('/', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
   const page = Number(req.query.page) || 1;
-  const limit = Number(req.query.limit) || 20;
+  const limit = Math.min(Math.max(1, Math.floor(Number(req.query.limit)) || 20), 100);
   const offset = (page - 1) * limit;
 
   try {
@@ -394,6 +394,10 @@ router.get('/:id/track', authenticate, async (req: AuthRequest, res: Response): 
   }
 });
 
+// Hard ceiling per cart line. Nobody buys 500 of one thing at a door-step
+// shop; anything above this is a tampered client, not a customer.
+const MAX_LINE_QUANTITY = 20;
+
 // POST /api/v1/orders
 router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res: Response): Promise<void> => {
   const { shippingAddressId, paymentMethod, notes, cartItems: bodyCartItems, couponDiscount: clientCouponDiscount } = req.body;
@@ -441,7 +445,9 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
         .filter((i: any) => i.productId)
         .map((i: any) => ({
           productId: i.productId,
-          quantity: i.quantity || 1,
+          // The client says HOW MANY, never the price — but "how many" must still
+          // be a sane positive integer, not 0, -3, 1e9 or "abc".
+          quantity: Math.min(Math.max(1, Math.floor(Number(i.quantity)) || 1), MAX_LINE_QUANTITY),
           variant: typeof i.variant === 'string' && i.variant.trim() !== ''
             ? i.variant.trim().slice(0, 50)
             : (typeof i.selectedSize === 'string' && i.selectedSize.trim() !== ''
@@ -501,7 +507,6 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
 
     if (cartResult.rows.length === 0) {
       await client.query('ROLLBACK');
-      client.release();
       res.status(400).json({ success: false, message: 'Cart is empty' });
       return;
     }
@@ -512,7 +517,6 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
     const offline = cartResult.rows.find((r: any) => r.seller_is_live === false);
     if (offline) {
       await client.query('ROLLBACK');
-      client.release();
       res.status(409).json({
         success: false,
         message: `${offline.product_name} is unavailable right now — the seller is offline. Please remove it and try again.`,
@@ -526,7 +530,6 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
     );
     if (addrResult.rows.length === 0) {
       await client.query('ROLLBACK');
-      client.release();
       res.status(404).json({ success: false, message: 'Shipping address not found' });
       return;
     }
@@ -538,7 +541,6 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
     // can't. The customer's own location is irrelevant; only this address matters.
     if (!isPuneAddress(addr.city, addr.pincode)) {
       await client.query('ROLLBACK');
-      client.release();
       res.status(400).json({ success: false, message: OUT_OF_AREA_MESSAGE });
       return;
     }
@@ -771,6 +773,10 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
                in_stock = CASE WHEN quantity - $1 <= 0 THEN false ELSE in_stock END,
                updated_at = NOW()
            WHERE id = $2 AND quantity >= $1
+             -- Per-size stock is checked too: a sold-out size must not sell
+             -- while other sizes still hold the product total up.
+             AND (COALESCE(size_quantities ? $3::text, false) = false
+                  OR COALESCE((size_quantities->>$3)::int, 0) >= $1)
            RETURNING id`,
           [item.quantity, item.product_id, item.variant || null]
         );
@@ -969,6 +975,30 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
   }
 });
 
+// Put units back in the SAME place checkout took them from: the product total
+// AND, where the line carried a size, that size's own count. Every path that
+// returns stock to the shelf (cancel, refund, return-to-seller, reclaim, trial
+// door return) goes through here; restoring only `quantity` left
+// size_quantities drained a little further with every returned parcel.
+async function restockLine(client: any, productId: string | null, quantity: number, variant: string | null | undefined): Promise<void> {
+  if (!productId) return;
+  const qty = Math.max(1, Number(quantity) || 1);
+  await client.query(
+    `UPDATE products
+     SET size_quantities = CASE
+           WHEN $3::text IS NOT NULL AND size_quantities ? $3 THEN
+             jsonb_set(size_quantities, ARRAY[$3::text],
+               to_jsonb(COALESCE((size_quantities->>$3)::int, 0) + $1))
+           ELSE size_quantities
+         END,
+         quantity = quantity + $1,
+         in_stock = true,
+         updated_at = NOW()
+     WHERE id = $2`,
+    [qty, productId, variant || null]
+  );
+}
+
 // Standard delivery allows returns within this many days of placement. Must
 // match STANDARD_RETURN_DAYS on the customer website — the two surfaces must not
 // disagree about whether an order is still returnable.
@@ -983,16 +1013,22 @@ router.post('/:id/return', authenticate, async (req: AuthRequest, res: Response)
     return;
   }
 
+  // One transaction with the order row locked: two taps (or app + website at
+  // once) used to each pass the "already open?" check and insert two returns.
+  // Now the second waits on the lock and then finds the first one's return.
+  const client = await pool.connect();
   try {
+    await client.query('BEGIN');
 
     // Verify the order belongs to this user and is delivered
-    const orderResult = await pool.query(
+    const orderResult = await client.query(
       `SELECT id, status, final_amount, delivery_type, created_at
-         FROM ${ORDERS} WHERE id = $1 AND user_id = $2`,
+         FROM ${ORDERS} WHERE id = $1 AND user_id = $2 FOR UPDATE`,
       [req.params.id, req.userId]
     );
 
     if (orderResult.rows.length === 0) {
+      await client.query('ROLLBACK');
       res.status(404).json({ success: false, message: 'Order not found' });
       return;
     }
@@ -1005,6 +1041,7 @@ router.post('/:id/return', authenticate, async (req: AuthRequest, res: Response)
     // at the door, then raise a pickup return on the same order. The customer
     // website has always refused this; the app must too.
     if (String(order.delivery_type || 'standard').toLowerCase() === 'flash') {
+      await client.query('ROLLBACK');
       res.status(400).json({
         success: false,
         message: 'Instant Delivery orders are returned at the door to the delivery agent.',
@@ -1013,6 +1050,7 @@ router.post('/:id/return', authenticate, async (req: AuthRequest, res: Response)
     }
 
     if (!['delivered', 'return_requested'].includes(order.status)) {
+      await client.query('ROLLBACK');
       res.status(400).json({ success: false, message: 'Only delivered orders can be returned' });
       return;
     }
@@ -1024,12 +1062,13 @@ router.post('/:id/return', authenticate, async (req: AuthRequest, res: Response)
     // to collect them.
     const placedAt = new Date(order.created_at).getTime();
     if (Date.now() > placedAt + STANDARD_RETURN_DAYS * 24 * 60 * 60 * 1000) {
+      await client.query('ROLLBACK');
       res.status(400).json({ success: false, message: 'The 7-day return window has closed.' });
       return;
     }
 
     const orderItems = (
-      await pool.query(
+      await client.query(
         `SELECT id, price, quantity FROM ${ORDER_ITEMS} WHERE order_id = $1`,
         [req.params.id]
       )
@@ -1041,7 +1080,7 @@ router.post('/:id/return', authenticate, async (req: AuthRequest, res: Response)
     // moment earlier — got "Every item on this order has already been returned"
     // under a red "Return Failed" heading. Their return was fine; only the order
     // of the checks was wrong. Answer with the open return instead.
-    const existingReturn = await pool.query(
+    const existingReturn = await client.query(
       `SELECT id, status, order_item_ids, created_at, updated_at
        FROM ${RETURN_REQUESTS}
        WHERE order_id = $1 AND user_id = $2 AND status IN ('requested', 'approved', 'picked_up')
@@ -1052,6 +1091,7 @@ router.post('/:id/return', authenticate, async (req: AuthRequest, res: Response)
 
     if (existingReturn.rows.length > 0) {
       const activeReturn = existingReturn.rows[0];
+      await client.query('ROLLBACK');
       res.json({
         success: true,
         data: {
@@ -1076,7 +1116,7 @@ router.post('/:id/return', authenticate, async (req: AuthRequest, res: Response)
     // return gives its units back; every other state (requested/approved/
     // picked_up/refunded) is still holding them, so 2-of-5 followed by another
     // 4-of-5 must be refused rather than silently over-refunding.
-    const priorReturns = await pool.query(
+    const priorReturns = await client.query(
       `SELECT order_item_ids FROM ${RETURN_REQUESTS}
        WHERE order_id = $1 AND status <> 'rejected'`,
       [req.params.id]
@@ -1095,6 +1135,7 @@ router.post('/:id/return', authenticate, async (req: AuthRequest, res: Response)
     // Only reachable when every prior return is SETTLED (refunded) — an open one
     // was answered above — so this really is a finished order.
     if (remainingItems.length === 0) {
+      await client.query('ROLLBACK');
       res.status(400).json({
         success: false,
         message: 'Every item on this order has already been returned and refunded.',
@@ -1111,6 +1152,7 @@ router.post('/:id/return', authenticate, async (req: AuthRequest, res: Response)
       for (const line of parseReturnLines(requested)) {
         const left = remainingById.get(line.id);
         if (left === undefined) {
+          await client.query('ROLLBACK');
           res.status(400).json({
             success: false,
             message: 'One of the selected items is not on this order, or has already been returned',
@@ -1118,6 +1160,7 @@ router.post('/:id/return', authenticate, async (req: AuthRequest, res: Response)
           return;
         }
         if (line.quantity !== null && line.quantity > left) {
+          await client.query('ROLLBACK');
           res.status(400).json({
             success: false,
             message: `You can return at most ${left} of that item`,
@@ -1129,6 +1172,7 @@ router.post('/:id/return', authenticate, async (req: AuthRequest, res: Response)
 
     const resolvedLines = resolveReturnLines(requested, remainingItems);
     if (resolvedLines.length === 0) {
+      await client.query('ROLLBACK');
       res.status(400).json({ success: false, message: 'Select at least one item to return' });
       return;
     }
@@ -1144,7 +1188,7 @@ router.post('/:id/return', authenticate, async (req: AuthRequest, res: Response)
 
     // Insert into return_requests table
     const returnId = generateId();
-    await pool.query(
+    await client.query(
       `INSERT INTO ${RETURN_REQUESTS} (id, order_id, user_id, order_item_ids, reason, description, status, picked_up_at, refunded_at, status_history, created_at, updated_at)
        VALUES ($1, $2, $3, $4, $5, $6, 'approved', NULL, NULL, $7, NOW(), NOW())`,
       [
@@ -1164,15 +1208,16 @@ router.post('/:id/return', authenticate, async (req: AuthRequest, res: Response)
     );
 
     // Update order status to 'return_requested'
-    await pool.query(
+    await client.query(
       `UPDATE ${ORDERS} SET status = 'return_requested', updated_at = NOW() WHERE id = $1`,
       [req.params.id]
     );
-    await recordOrderStatus(null, req.params.id, 'return_requested', `Return requested: ${reason}`);
-    await recordOrderStatus(null, req.params.id, 'return_requested', 'Return approved — pickup will be scheduled');
+    await recordOrderStatus(client, req.params.id, 'return_requested', `Return requested: ${reason}`);
+    await recordOrderStatus(client, req.params.id, 'return_requested', 'Return approved — pickup will be scheduled');
 
     // The seller learns a return is coming; the customer gets the inbox row.
     // Not awaited: a notification must never delay or fail the request.
+    await client.query('COMMIT');
     void notifyReturnTransition(req.params.id, 'requested', reason);
 
     res.json({
@@ -1187,8 +1232,11 @@ router.post('/:id/return', authenticate, async (req: AuthRequest, res: Response)
       },
     });
   } catch (err) {
+    try { await client.query('ROLLBACK'); } catch { /* connection already gone */ }
     logger.error('returnorder_error', { error: (err as any)?.message ?? String(err) });
     res.status(500).json({ success: false, message: 'Server error' });
+  } finally {
+    client.release();
   }
 });
 
@@ -1384,7 +1432,7 @@ router.patch('/:id/return-status', authenticate, async (req: AuthRequest, res: R
     if (nextStatus === 'refunded') {
       const orderItems = (
         await client.query(
-          `SELECT id, product_id, price, quantity FROM ${ORDER_ITEMS} WHERE order_id = $1`,
+          `SELECT id, product_id, price, quantity, variant FROM ${ORDER_ITEMS} WHERE order_id = $1`,
           [req.params.id]
         )
       ).rows;
@@ -1432,12 +1480,7 @@ router.patch('/:id/return-status', authenticate, async (req: AuthRequest, res: R
       // received the item back — the same promise the customer is shown.
       // Restock the RETURNED unit count, not the whole line: 2 of 5 puts 2 back.
       for (const line of settledLines) {
-        await client.query(
-          `UPDATE products
-           SET quantity = quantity + $1, in_stock = true, updated_at = NOW()
-           WHERE id = $2`,
-          [line.quantity, (line.item as any).product_id]
-        );
+        await restockLine(client, (line.item as any).product_id, line.quantity, (line.item as any).variant);
       }
 
       await recordOrderStatus(
@@ -1691,20 +1734,14 @@ router.patch('/:id/delivery-return', authenticate, async (req: AuthRequest, res:
     }
 
     const itemsResult = await client.query(
-      `SELECT id, product_id, quantity FROM ${ORDER_ITEMS} WHERE order_id = $1`,
+      `SELECT id, product_id, quantity, variant FROM ${ORDER_ITEMS} WHERE order_id = $1`,
       [req.params.id]
     );
 
     // Nothing was ever delivered, so the WHOLE order comes back — unlike a
     // customer return, there are no kept lines and no partial quantities.
     for (const item of itemsResult.rows) {
-      if (!item.product_id) continue;
-      await client.query(
-        `UPDATE products
-         SET quantity = quantity + $1, in_stock = true, updated_at = NOW()
-         WHERE id = $2`,
-        [Math.max(1, Number(item.quantity) || 1), item.product_id]
-      );
+      await restockLine(client, item.product_id, item.quantity, item.variant);
     }
 
     await client.query(
@@ -2015,23 +2052,7 @@ router.patch('/:id/cancel', authenticate, async (req: AuthRequest, res: Response
       [req.params.id]
     );
     for (const item of cancelledItems.rows) {
-      // Put the units back in the SAME place checkout took them from: the total
-      // and, where the line carried a size, that size's own count. Restoring
-      // only `quantity` left size_quantities drained by every cancelled order.
-      await client.query(
-        `UPDATE products
-         SET size_quantities = CASE
-               WHEN $3::text IS NOT NULL AND size_quantities ? $3 THEN
-                 jsonb_set(size_quantities, ARRAY[$3::text],
-                   to_jsonb(COALESCE((size_quantities->>$3)::int, 0) + $1))
-               ELSE size_quantities
-             END,
-             quantity = quantity + $1,
-             in_stock = true,
-             updated_at = NOW()
-         WHERE id = $2`,
-        [item.quantity, item.product_id, item.variant || null]
-      );
+      await restockLine(client, item.product_id, item.quantity, item.variant);
     }
 
     // Paid orders are always refunded to the original payment method. (The ZPIN
@@ -2094,16 +2115,11 @@ async function reclaimOrders(client: any, rows: any[]): Promise<string[]> {
 
   // Put back everything checkout took: product stock and flash-deal stock.
   const items = await client.query(
-    `SELECT product_id, quantity FROM ${ORDER_ITEMS} WHERE order_id = ANY($1)`,
+    `SELECT product_id, quantity, variant FROM ${ORDER_ITEMS} WHERE order_id = ANY($1)`,
     [ids]
   );
   for (const item of items.rows) {
-    await client.query(
-      `UPDATE products
-          SET quantity = quantity + $1, in_stock = true, updated_at = NOW()
-        WHERE id = $2`,
-      [item.quantity, item.product_id]
-    );
+    await restockLine(client, item.product_id, item.quantity, item.variant);
     await releaseDealStock(client, item.product_id, item.quantity);
   }
 
@@ -2289,7 +2305,7 @@ router.post('/:id/trial-selection', authenticate, async (req: AuthRequest, res: 
     }
 
     const itemsResult = await client.query(
-      `SELECT id, product_id, product_name, quantity, price FROM ${ORDER_ITEMS} WHERE order_id = $1`,
+      `SELECT id, product_id, product_name, quantity, price, variant FROM ${ORDER_ITEMS} WHERE order_id = $1`,
       [order.id]
     );
     const returnSet = new Set(returnItemIds);
@@ -2307,10 +2323,7 @@ router.post('/:id/trial-selection', authenticate, async (req: AuthRequest, res: 
 
     // Returned goods go straight back on the shelf — the partner is carrying them.
     for (const item of itemsResult.rows.filter((r: any) => returnSet.has(r.id))) {
-      await client.query(
-        `UPDATE products SET quantity = quantity + $1, in_stock = true, updated_at = NOW() WHERE id = $2`,
-        [item.quantity, item.product_id]
-      );
+      await restockLine(client, item.product_id, item.quantity, item.variant);
     }
 
     // Money, on the customer-charged (marked-up) prices — same basis createOrder used.
@@ -2434,15 +2447,16 @@ async function issueGatewayRefund(orderId: string, paymentId: string | null, amo
 
 // PATCH /api/v1/orders/:id/confirm — Vendor accepts the order
 router.patch('/:id/confirm', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
-  // Only admins and delivery partners can confirm orders
-  if (req.userRole === 'customer') {
+  // Allow-list, not a deny-list: only the seller (own orders) and admin confirm.
+  // A delivery or any other service token has no business here.
+  if (!['admin', 'seller'].includes(String(req.userRole))) {
     res.status(403).json({ success: false, message: 'Forbidden' });
     return;
   }
 
   try {
     // Sellers may only confirm orders that contain their own products.
-    // Admins and delivery partners may confirm any order.
+    // Admins may confirm any order.
     if (req.userRole === 'seller') {
       const ownershipCheck = await pool.query(
         `SELECT DISTINCT o.id

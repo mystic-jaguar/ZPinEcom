@@ -171,6 +171,13 @@ async function resolveProductUUID(id: string): Promise<string | null> {
   return result.rows[0].id as string;
 }
 
+// Review photos are only ever the URLs POST /reviews/upload handed back, i.e.
+// this account's Cloudinary uploads. Anything else stored here would be served
+// to every other customer straight from the review card.
+const MAX_REVIEW_IMAGES = 4;
+const isReviewImageUrl = (u: string) =>
+  u.length <= 500 && /^https:\/\/res\.cloudinary\.com\/[A-Za-z0-9_-]+\/image\/upload\//.test(u);
+
 function normalizeReviewImages(images: unknown): string[] {
   if (Array.isArray(images)) {
     return images.filter((image): image is string => typeof image === 'string');
@@ -338,6 +345,10 @@ router.get('/recommended', authenticate, async (req: AuthRequest, res: Response)
   }
 });
 
+// A user-typed search term is a LIKE *pattern* unless its wildcards are
+// escaped: "%" alone matched every product, "_" matched any character.
+const escapeLike = (s: string) => s.replace(/[\\%_]/g, '\\$&');
+
 // GET /api/v1/products/search?q= — full-text product name search with related products
 router.get('/search', productListLimiter, async (req: Request, res: Response): Promise<void> => {
   const q = (req.query.q as string || '').trim();
@@ -356,9 +367,9 @@ router.get('/search', productListLimiter, async (req: Request, res: Response): P
     // Same synonym/typo expansion the customer website uses, so "sari", "jaket"
     // or "chappal" find the same products on both surfaces.
     const terms = expandSearchTerms(q);
-    const params: any[] = [`%${normalized}%`, `%${spaced}%`];
+    const params: any[] = [`%${escapeLike(normalized)}%`, `%${escapeLike(spaced)}%`];
     const termClauses = terms.map((t) => {
-      params.push(`%${t}%`);
+      params.push(`%${escapeLike(t)}%`);
       const i = params.length;
       return `(p.product_name ILIKE $${i} OR p.description ILIKE $${i} OR p.deepest_category_name ILIKE $${i})`;
     });
@@ -1083,6 +1094,10 @@ router.post('/:id/reviews', authenticate, reviewLimiter, async (req: AuthRequest
     res.status(400).json({ success: false, message: 'Images must be an array of strings' });
     return;
   }
+  if (normalizedImages.length > MAX_REVIEW_IMAGES || !normalizedImages.every(isReviewImageUrl)) {
+    res.status(400).json({ success: false, message: `Images must be up to ${MAX_REVIEW_IMAGES} uploaded review photos` });
+    return;
+  }
 
   try {
     // Verify product exists and resolve UUID
@@ -1156,6 +1171,10 @@ router.put('/:id/reviews/:reviewId', authenticate, async (req: AuthRequest, res:
   const normalizedImages = images !== undefined ? normalizeReviewImages(images) : [];
   if (images !== undefined && normalizedImages.length !== images.length) {
     res.status(400).json({ success: false, message: 'Images must be an array of strings' });
+    return;
+  }
+  if (normalizedImages.length > MAX_REVIEW_IMAGES || !normalizedImages.every(isReviewImageUrl)) {
+    res.status(400).json({ success: false, message: `Images must be up to ${MAX_REVIEW_IMAGES} uploaded review photos` });
     return;
   }
 

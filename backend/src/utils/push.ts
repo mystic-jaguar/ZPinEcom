@@ -66,10 +66,14 @@ export async function registerPushToken(
   return true;
 }
 
-/** Logout: drop this device's token so the next user of the phone gets nothing. */
-export async function removePushToken(token: unknown): Promise<boolean> {
+/**
+ * Logout: drop this device's token so the next user of the phone gets nothing.
+ * Scoped to the caller — a token string is not a secret, so anyone who had one
+ * could otherwise silence another customer's order updates.
+ */
+export async function removePushToken(token: unknown, userId: string): Promise<boolean> {
   if (!isExpoPushToken(token) || !(await tableReady())) return false;
-  await pool.query('DELETE FROM push_tokens WHERE token = $1', [token]);
+  await pool.query('DELETE FROM push_tokens WHERE token = $1 AND user_id = $2', [token, userId]);
   return true;
 }
 

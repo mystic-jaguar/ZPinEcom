@@ -7,6 +7,9 @@ const json429 = (msg: string) => ({
 
 const isProd = process.env.NODE_ENV === 'production';
 
+const SELF_LIMITED_AUTH =
+  /^\/api\/v1\/auth\/(login|signup|refresh-token|google|apple|forgetPassword\/.+|verification\/.+)$/;
+
 // ── Global API limiter — applied to every route ───────────────────────────────
 // Production: 1000 req/15min — blocks scrapers and bots
 // Development: 2000 req/15min — allows normal dev/testing without hitting limits
@@ -20,11 +23,13 @@ export const globalLimiter = rateLimit({
   message: json429('Too many requests. Please slow down.'),
   standardHeaders: true,
   legacyHeaders: false,
-  // Auth routes carry their own limiters with action-specific messages ("Too many
-  // OTP requests…", "Too many signup attempts…"). Letting the global limiter fire
-  // first replaced those with a useless generic 429 — and on mobile carrier NAT,
-  // where many users share one IP, it tripped far earlier than intended.
-  skip: (req) => req.path === '/health' || req.path.startsWith('/api/v1/auth/'),
+  // Auth routes that carry their own limiter with an action-specific message
+  // ("Too many OTP requests…", "Too many signup attempts…") are skipped: letting
+  // the global limiter fire first replaced those with a useless generic 429 —
+  // and on mobile carrier NAT, where many users share one IP, it tripped far
+  // earlier than intended. Only THOSE routes — logout and the push-token
+  // endpoints have no limiter of their own and stay under the global one.
+  skip: (req) => req.path === '/health' || SELF_LIMITED_AUTH.test(req.path),
 });
 
 // ── Product listing — public, high-value scraping target ─────────────────────

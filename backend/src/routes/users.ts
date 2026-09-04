@@ -170,6 +170,10 @@ router.get('/shipping-addresses', authenticate, async (req: AuthRequest, res: Re
 // ── PUT /api/v1/users/profileDetails ─────────────────────────────────────────
 // Single UPDATE on users — profile fields are now columns on the same table.
 
+// The three values the app's picker offers (auth/complete-profile.tsx and
+// profile/edit-profile.tsx). Anything else in the column is a tampered client.
+const GENDERS = ['Male', 'Female', 'Do not wish to specify'];
+
 router.put('/profileDetails', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
   const {
     name, userName, dob, gender, profileImage,
@@ -186,6 +190,19 @@ router.put('/profileDetails', authenticate, async (req: AuthRequest, res: Respon
     return;
   }
 
+  // Shape-check every field before it reaches the row — these used to be
+  // written verbatim, so a 50 KB name or a javascript: profile image went in.
+  const bad = (message: string) => { res.status(400).json({ success: false, message }); };
+  if (name && (typeof name !== 'string' || name.trim().length < 1 || name.length > 100)) { bad('Name must be 1–100 characters'); return; }
+  if (userName && (typeof userName !== 'string' || !/^[A-Za-z0-9_.]{3,30}$/.test(userName))) { bad('Username must be 3–30 letters, digits, dots or underscores'); return; }
+  if (dob && (typeof dob !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(dob) || Number.isNaN(Date.parse(dob)) || Date.parse(dob) > Date.now())) { bad('Date of birth must be a past date in YYYY-MM-DD form'); return; }
+  if (gender && !GENDERS.includes(gender)) { bad(`Gender must be one of: ${GENDERS.join(', ')}`); return; }
+  if (profileImage !== undefined && profileImage !== null && profileImage !== ''
+      && (typeof profileImage !== 'string' || profileImage.length > 500 || !/^https:\/\//.test(profileImage))) { bad('Profile image must be an https URL'); return; }
+  for (const flag of [receivePushNotifications, receiveEmailUpdates, receiveOrderUpdates]) {
+    if (flag !== undefined && typeof flag !== 'boolean') { bad('Notification preferences must be true or false'); return; }
+  }
+
   try {
     const setClauses: string[] = [];
     const values: any[] = [];
@@ -196,7 +213,7 @@ router.put('/profileDetails', authenticate, async (req: AuthRequest, res: Respon
       setClauses.push(`${safeIdentifier(col)} = $${values.length}`);
     };
 
-    if (name)                                  push('name', name);
+    if (name)                                  push('name', name.trim());
     if (userName)                              push('user_name', userName);
     if (dob)                                   push('dob', dob);
     if (gender)                                push('gender', gender);
@@ -527,29 +544,33 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response): Promis
 
 // ── POST /api/v1/users/shipping-address ──────────────────────────────────────
 
+// One shape check for a full address, shared by create and update (update runs
+// it on the MERGED result, so a partial edit can't sneak a bad value past it).
+// Returns the message to reject with, or null when the address is acceptable.
+function addressProblem(a: Record<string, unknown>): string | null {
+  const { name, phone, addressLine1, city, state, pincode } = a;
+  if (!name || !phone || !addressLine1 || !city || !state || !pincode) {
+    return 'name, phone, addressLine1, city, state, and pincode are required';
+  }
+  for (const [k, max] of [['name', 100], ['addressLine1', 200], ['addressLine2', 200], ['city', 100], ['state', 100], ['country', 100], ['landmark', 200], ['label', 30]] as const) {
+    const v = a[k];
+    if (v !== undefined && v !== null && (typeof v !== 'string' || v.length > max)) return `${k} must be text of at most ${max} characters`;
+  }
+  // Basic phone validation — digits only, 7–15 chars
+  if (!/^\+?[\d\s\-]{7,15}$/.test(String(phone))) return 'Invalid phone number';
+  // Pincode validation — 6 digits for India
+  if (!/^\d{6}$/.test(String(pincode))) return 'Invalid pincode — must be 6 digits';
+  // Delivery is Pune-only. The customer can be anywhere; the address can't.
+  if (!isPuneAddress(String(city), String(pincode))) return OUT_OF_AREA_MESSAGE;
+  return null;
+}
+
 router.post('/shipping-address', authenticate, addressLimiter, async (req: AuthRequest, res: Response): Promise<void> => {
   const { name, phone, addressLine1, addressLine2, city, state, pincode, country, landmark, label, isDefault } = req.body;
 
-  if (!name || !phone || !addressLine1 || !city || !state || !pincode) {
-    res.status(400).json({ success: false, message: 'name, phone, addressLine1, city, state, and pincode are required' });
-    return;
-  }
-
-  // Basic phone validation — digits only, 7–15 chars
-  if (!/^\+?[\d\s\-]{7,15}$/.test(String(phone))) {
-    res.status(400).json({ success: false, message: 'Invalid phone number' });
-    return;
-  }
-
-  // Pincode validation — 6 digits for India
-  if (!/^\d{6}$/.test(String(pincode))) {
-    res.status(400).json({ success: false, message: 'Invalid pincode — must be 6 digits' });
-    return;
-  }
-
-  // Delivery is Pune-only. The customer can be anywhere; the address can't.
-  if (!isPuneAddress(city, pincode)) {
-    res.status(400).json({ success: false, message: OUT_OF_AREA_MESSAGE });
+  const problem = addressProblem(req.body);
+  if (problem) {
+    res.status(400).json({ success: false, message: problem });
     return;
   }
 
@@ -630,26 +651,37 @@ router.put('/shipping-address/:addressId', authenticate, async (req: AuthRequest
     const hasAddressField = name || phone || addressLine1 || addressLine2 !== undefined
       || city || state || pincode || country || landmark !== undefined;
 
-    if (hasAddressField) {
-      // Re-check the merged result, not just the fields sent — a partial update
-      // that moves city or pincode out of Pune must fail too.
-      if (!isPuneAddress(city ?? current.city, pincode ?? current.pincode)) {
-        res.status(400).json({ success: false, message: OUT_OF_AREA_MESSAGE });
+    if (hasAddressField || label !== undefined) {
+      // Validate the merged result, not just the fields sent — a partial update
+      // that moves city or pincode out of Pune, or blanks a required field, must
+      // fail exactly as a create would.
+      const next = {
+        name:         name          ?? current.name,
+        phone:        phone         ?? current.phone,
+        addressLine1: addressLine1  ?? current.address_line1,
+        addressLine2: addressLine2  !== undefined ? addressLine2 : current.address_line2,
+        city:         city          ?? current.city,
+        state:        state         ?? current.state,
+        pincode:      pincode       ?? current.pincode,
+        country:      country       ?? current.country ?? 'India',
+        landmark:     landmark      !== undefined ? landmark : current.landmark,
+        label,
+      };
+      const problem = addressProblem(next);
+      if (problem) {
+        res.status(400).json({ success: false, message: problem });
         return;
       }
-      const merged = encryptAddressPayload({
-        name:          name          ?? current.name,
-        phone:         phone         ?? current.phone,
-        address_line1: addressLine1  ?? current.address_line1,
-        address_line2: addressLine2  !== undefined ? addressLine2 : current.address_line2,
-        city:          city          ?? current.city,
-        state:         state         ?? current.state,
-        pincode:       pincode       ?? current.pincode,
-        country:       country       ?? current.country ?? 'India',
-        landmark:      landmark      !== undefined ? landmark : current.landmark,
-      });
-      for (const [col, val] of Object.entries(merged)) {
-        push(col, val);
+      if (hasAddressField) {
+        const merged = encryptAddressPayload({
+          name: next.name, phone: next.phone,
+          address_line1: next.addressLine1, address_line2: next.addressLine2,
+          city: next.city, state: next.state, pincode: next.pincode,
+          country: next.country, landmark: next.landmark,
+        });
+        for (const [col, val] of Object.entries(merged)) {
+          push(col, val);
+        }
       }
     }
 
