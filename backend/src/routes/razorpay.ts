@@ -171,6 +171,20 @@ router.post('/verify', authenticate, async (req: AuthRequest, res: Response): Pr
       return;
     }
 
+    // Bind the Razorpay order to THIS app order. The signature only proves the
+    // Razorpay order/payment pair is genuine — not that it was minted for this
+    // checkout. Without this, a paid ₹1 order's ids verify any unpaid order.
+    const expectedPaise = Math.round(groupRows.reduce((s: number, r: any) => s + amountToCharge(r), 0) * 100);
+    const rzpOrder: any = await getRazorpay().orders.fetch(razorpayOrderId);
+    const rzpReceipt = String(rzpOrder?.receipt ?? rzpOrder?.notes?.app_order_id ?? '');
+    const boundToGroup = rzpReceipt === String(appOrderId) || groupRows.some((r: any) => String(r.id) === rzpReceipt);
+    if (!boundToGroup || Number(rzpOrder?.amount) !== expectedPaise || rzpOrder?.status !== 'paid') {
+      await client.query('ROLLBACK');
+      logger.warn('razorpay.verify_mismatch', { appOrderId, razorpayOrderId, rzpReceipt, rzpAmount: rzpOrder?.amount, expectedPaise, rzpStatus: rzpOrder?.status });
+      res.status(400).json({ success: false, message: 'Payment does not match this order' });
+      return;
+    }
+
     // Mark every sub-order in the group settled, each judged on its own amount so
     // the rows stay individually honest. An instant+COD order only prepaid its
     // delivery fee, so it becomes 'partial' (not 'paid') and keeps its COD
