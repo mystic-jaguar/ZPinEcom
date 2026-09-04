@@ -1,29 +1,15 @@
 import crypto from 'crypto';
 import { Response, Router } from 'express';
-import Razorpay from 'razorpay';
 import { pool } from '../db';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { amountToCharge } from '../utils/collect';
-import { generateId } from '../utils/id';
-import { recordOrderStatus } from '../utils/orderHistory';
-import { sendPush } from '../utils/push';
-import { sendOrderEmail } from '../utils/orderEmail';
-import { notifySellersOfPaidOrders, pushSellersOfPaidOrders } from '../utils/sellerOrderNotify';
+import { afterSettle, getRazorpay, settleGroupPayment } from '../utils/settlePayment';
 import { safeIdentifier } from '../utils/sql';
 import { logger } from '../utils/logger';
 
 const router = Router();
 const ORDERS = safeIdentifier('orders');
 
-function getRazorpay() {
-  if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
-    throw new Error('Razorpay credentials not configured');
-  }
-  return new Razorpay({
-    key_id: process.env.RAZORPAY_KEY_ID,
-    key_secret: process.env.RAZORPAY_KEY_SECRET,
-  });
-}
 
 // POST /api/v1/razorpay/create-order
 // Creates a Razorpay order for the given app order ID
@@ -200,64 +186,13 @@ router.post('/verify', authenticate, async (req: AuthRequest, res: Response): Pr
       return;
     }
 
-    // Mark every sub-order in the group settled, each judged on its own amount so
-    // the rows stay individually honest. An instant+COD order only prepaid its
-    // delivery fee, so it becomes 'partial' (not 'paid') and keeps its COD
-    // payment_method — the delivery app must still collect the balance at the door.
-    let groupTotal = 0;
-    for (const row of groupRows) {
-      const charged = amountToCharge(row);
-      groupTotal += charged;
-      const isFull = charged >= Number(row.final_amount);
-      await client.query(
-        `UPDATE ${ORDERS}
-            SET payment_status = $1::varchar,
-                status         = CASE WHEN $1::varchar = 'paid' THEN 'confirmed' ELSE status END,
-                payment_id     = $2,
-                payment_method = CASE WHEN $1::varchar = 'paid' THEN 'razorpay' ELSE payment_method END,
-                prepaid_amount = $3,
-                updated_at     = NOW()
-          WHERE id = $4`,
-        [isFull ? 'paid' : 'partial', razorpayPaymentId, charged, row.id]
-      );
-      await recordOrderStatus(
-        client,
-        row.id,
-        isFull ? 'confirmed' : 'pending',
-        `Payment of ₹${charged.toFixed(2)} verified (${razorpayPaymentId})`
-      );
-    }
-
-    // Notify the customer that payment succeeded (audit trail via notifications).
-    const txnId = generateId();
-    await client.query(
-      `INSERT INTO notifications (id, user_id, title, message, type, data, is_read, created_at)
-       VALUES ($1, $2, $3, $4, 'payment_success', $5, false, NOW())`,
-      [
-        txnId,
-        req.userId,
-        `Payment Successful: ${order.order_number}`,
-        `Your payment of ₹${groupTotal.toFixed(2)} for order ${order.order_number} was successful.`,
-        JSON.stringify({ orderId: appOrderId, groupId: order.group_id ?? null, paymentId: razorpayPaymentId, amount: groupTotal }),
-      ]
+    const { groupTotal, paidOrderIds } = await settleGroupPayment(
+      client, req.userId!, order, groupRows, razorpayPaymentId
     );
-
-    // The sellers were deliberately NOT told at checkout — a prepaid order that
-    // is never paid for gets deleted, and the seller must not have been buzzed
-    // about it in the meantime. Now that the money is in, tell them.
-    const paidOrderIds = groupRows.map((r: any) => r.id);
-    await notifySellersOfPaidOrders(client, paidOrderIds);
 
     await client.query('COMMIT');
 
-    await pushSellersOfPaidOrders(client, paidOrderIds);
-
-    sendPush(req.userId, `Payment successful: ${order.order_number}`,
-      `Your payment of ₹${groupTotal.toFixed(2)} for order ${order.order_number} was successful.`,
-      { orderId: appOrderId, paymentId: razorpayPaymentId, type: 'payment_success' });
-
-    // Confirmation email for prepaid checkouts (COD ones were mailed at checkout).
-    sendOrderEmail(req.userId!, order.group_id ? `ZP-${order.group_id}` : order.order_number, paidOrderIds);
+    await afterSettle(client, req.userId!, order, paidOrderIds, groupTotal, razorpayPaymentId);
 
     res.json({
       success: true,

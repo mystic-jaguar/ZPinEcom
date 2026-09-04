@@ -26,6 +26,7 @@ import { cacheDel, cacheDelPattern } from '../utils/redis';
 import { sendPush } from '../utils/push';
 import { sendOrderEmail } from '../utils/orderEmail';
 import { ORDER_ITEMS_JSON } from '../utils/orderItemsSql';
+import { afterSettle, findPaidRazorpayPayment, settleGroupPayment } from '../utils/settlePayment';
 import { safeIdentifier } from '../utils/sql';
 import { logger } from '../utils/logger';
 
@@ -2153,6 +2154,66 @@ async function reclaimOrders(client: any, rows: any[]): Promise<string[]> {
   return ids;
 }
 
+/** Group the sweep's candidate rows by checkout (group_id, or the row's own id). */
+function groupCandidates(rows: any[]): any[][] {
+  const byGroup = new Map<string, any[]>();
+  for (const r of rows) {
+    const key = String(r.group_id ?? r.id);
+    byGroup.set(key, [...(byGroup.get(key) ?? []), r]);
+  }
+  return [...byGroup.values()];
+}
+
+/**
+ * Reconcile one stale checkout against Razorpay. Returns true if money was found
+ * (and the checkout settled, so the sweep must leave it alone), false if it was
+ * genuinely never paid for.
+ *
+ * Fails CLOSED on any error: if Razorpay can't be reached we cannot prove the
+ * checkout is unpaid, and keeping stock reserved for another 30 minutes is far
+ * cheaper than deleting an order somebody paid for.
+ */
+async function rescuePaidCheckout(client: any, group: any[], settled: (() => Promise<void>)[]): Promise<boolean> {
+  const ids = group.map((r: any) => r.id);
+  try {
+    const paid = await findPaidRazorpayPayment(ids);
+    if (!paid) return false;
+
+    // Same replay guard as verify — a payment id already bound to another order
+    // means something is wrong; leave the rows alone for a human rather than
+    // settling them twice.
+    const dup = await client.query(
+      `SELECT id FROM ${ORDERS} WHERE payment_id = $1 AND NOT (id = ANY($2))`,
+      [paid.paymentId, ids]
+    );
+    if (dup.rows.length > 0) {
+      logger.warn('sweepstalecheckouts_payment_id_reused', { ids, paymentId: paid.paymentId });
+      return true;
+    }
+
+    const rows = (await client.query(
+      `SELECT id, group_id, user_id, order_number, final_amount, payment_status, status,
+              payment_method, delivery_type, delivery_fee, is_trial
+         FROM ${ORDERS} WHERE id = ANY($1) ORDER BY id`,
+      [ids]
+    )).rows;
+    if (rows.length === 0) return true;
+
+    const { groupTotal, paidOrderIds } = await settleGroupPayment(
+      client, rows[0].user_id, rows[0], rows, paid.paymentId
+    );
+    logger.warn('sweepstalecheckouts_rescued_paid_order', {
+      ids, paymentId: paid.paymentId, amountPaise: paid.amountPaise,
+    });
+    // Side effects must not fire until the caller COMMITs, so hand them back.
+    settled.push(() => afterSettle(client, rows[0].user_id, rows[0], paidOrderIds, groupTotal, paid.paymentId));
+    return true;
+  } catch (err: any) {
+    logger.warn('sweepstalecheckouts_reconcile_failed', { ids, error: err?.message });
+    return true; // fail closed — never delete what we could not prove unpaid
+  }
+}
+
 /**
  * Reclaim checkouts that took stock and then went silent. The frontend calls
  * DELETE /:id/abandon when the customer closes the Razorpay sheet, but that call
@@ -2191,9 +2252,26 @@ async function sweepStaleCheckouts(): Promise<void> {
       return;
     }
 
-    const ids = await reclaimOrders(client, stale.rows);
+    // A checkout that was actually paid for looks EXACTLY like an abandoned one
+    // when /razorpay/verify never got to run (app killed, network dropped on the
+    // way back). Deleting it would leave a real charge with no order. Razorpay is
+    // the only party that knows the difference, so every candidate group is
+    // reconciled against it before anything is deleted — and a group it says was
+    // paid is settled here, exactly as verify would have.
+    const survived = new Set<string>();
+    const settled: (() => Promise<void>)[] = [];
+    for (const group of groupCandidates(stale.rows)) {
+      const rescued = await rescuePaidCheckout(client, group, settled);
+      if (rescued) group.forEach((r: any) => survived.add(r.id));
+    }
+    const toReclaim = stale.rows.filter((r: any) => !survived.has(r.id));
+
+    const ids = toReclaim.length > 0 ? await reclaimOrders(client, toReclaim) : [];
     await client.query('COMMIT');
-    logger.info('sweepstalecheckouts_reclaimed', { count: ids.length });
+    logger.info('sweepstalecheckouts_reclaimed', { count: ids.length, rescued: survived.size });
+    for (const notify of settled) {
+      await notify().catch((e: any) => logger.warn('sweepstalecheckouts_notify_failed', { error: e?.message }));
+    }
   } catch (err: any) {
     try { await client.query('ROLLBACK'); } catch { /* ignore */ }
     // Best-effort, exactly like finalizeExpiredTrials: a failed sweep must never
