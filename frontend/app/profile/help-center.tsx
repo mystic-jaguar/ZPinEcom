@@ -4,11 +4,12 @@ import SupportChatBot from '@/components/common/SupportChatBot';
 import { useRouter } from 'expo-router';
 import { ChevronDown, ChevronRight, ChevronUp, CreditCard, FileText, Mail, MessageCircle, Phone, RotateCcw, Search, Shield, Trash2 } from 'lucide-react-native';
 import React, { useState } from 'react';
-import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Linking, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader, ZText } from '../../components/ui';
 import { SUPPORT_EMAIL, SUPPORT_FAQS, SUPPORT_PHONE } from '../../constants/supportContent';
-import { colors, fonts, palette, radius } from '../../constants/theme';
+import { createStyles, colors, fonts, palette, radius } from '../../constants/theme';
+import { Text, TextInput } from '../../components/ui/ScaledText';
 
 // FAQs come from constants/supportContent.ts — the same list the ZPIN
 // Assistant answers from, so the two can't drift apart.
@@ -164,7 +165,7 @@ export default function HelpCenterScreen() {
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     container: { flex: 1, backgroundColor: palette.paperWarm },
     content: { padding: 20, paddingTop: 4 },
     hero: { backgroundColor: colors.surfaceInverse, borderRadius: radius.xl, padding: 20, marginBottom: 20 },

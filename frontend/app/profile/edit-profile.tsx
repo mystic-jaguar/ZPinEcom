@@ -1,13 +1,14 @@
 import { useRouter } from 'expo-router';
 import { BadgeCheck, Calendar, Check, ChevronDown } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, Switch, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
 import { AppHeader, BottomBar, ZButton, ZInput, ZText } from '../../components/ui';
-import { colors, fonts, palette, radius } from '../../constants/theme';
+import { createStyles, colors, fonts, palette, radius } from '../../constants/theme';
 import { useUser } from '../../context/UserContext';
 import { userService } from '../../services/user';
+import { Text, TextInput } from '../../components/ui/ScaledText';
 
 function initialsOf(name?: string) {
     if (!name) return 'ZP';
@@ -192,7 +193,7 @@ export default function EditProfileScreen() {
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     container: { flex: 1, backgroundColor: palette.paperWarm },
     content: { padding: 26, paddingTop: 8 },
     avatarWrap: { alignSelf: 'center', marginBottom: 26 },

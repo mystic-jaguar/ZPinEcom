@@ -1,4 +1,6 @@
-import { StyleProp, StyleSheet, Text, TextInput, TextInputProps, View, ViewStyle } from 'react-native';
+import { StyleProp, TextInputProps, View, ViewStyle } from 'react-native';
+import { Text, TextInput } from '../ui/ScaledText';
+import { createStyles } from '../../constants/theme';
 
 interface InputProps extends TextInputProps {
     label?: string;
@@ -24,7 +26,7 @@ export default function Input({ label, error, style, containerStyle, ...props }:
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     container: {
         marginBottom: 16
     },

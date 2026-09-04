@@ -3,23 +3,21 @@ import { useRouter } from 'expo-router';
 import { Check, Lock, Mail, User } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import {
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
 import LegalDocModal, { LegalDocType } from '../../components/common/LegalDocModal';
 import { AppHeader, GoogleGlyph, ZButton, ZInput, ZText } from '../../components/ui';
-import { colors, fonts, palette, radius } from '../../constants/theme';
+import { createStyles, colors, fonts, palette, radius } from '../../constants/theme';
 import { useUser } from '../../context/UserContext';
 import { appleAuthService, authService, googleAuthService } from '../../services/auth';
 import { validatePassword } from '../../utils/validation';
+import { Text, TextInput } from '../../components/ui/ScaledText';
 
 // Google Sign-In requires a native build — not available in Expo Go
 let isGoogleSignInAvailable = false;
@@ -225,7 +223,7 @@ export default function SignupScreen() {
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     container: { flex: 1, backgroundColor: palette.paperWarm },
     flex: { flex: 1 },
     scrollContent: { paddingHorizontal: 26, paddingBottom: 30 },

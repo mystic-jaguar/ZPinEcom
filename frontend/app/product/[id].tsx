@@ -3,7 +3,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { RotateCcw, Shirt, ShoppingCart, Zap } from 'lucide-react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, RefreshControl, ScrollView, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AccordionItem from '../../components/common/AccordionItem';
 import ActionModal from '../../components/common/ActionModal';
@@ -21,9 +21,10 @@ import { productService } from '../../services/product';
 import * as ImagePicker from 'expo-image-picker';
 import { MAX_REVIEW_IMAGES, reviewService } from '../../services/review';
 import { userService } from '../../services/user';
-import { colors, fonts, palette, radius } from '../../constants/theme';
+import { createStyles, colors, fonts, palette, radius } from '../../constants/theme';
 import { ProductObject, ReviewObject } from '../../types/types';
 import { productOneLiner } from '../../utils/productDetail';
+import { Text, TextInput } from '../../components/ui/ScaledText';
 
 export default function ProductDetails() {
     const { id } = useLocalSearchParams();
@@ -878,7 +879,7 @@ export default function ProductDetails() {
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     container: {
         flex: 1,
         backgroundColor: '#fff'

@@ -3,18 +3,19 @@ import * as ExpoLocation from 'expo-location';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { ArrowRight, ChevronDown, Heart, MapPin, Search, ShoppingBag, Star, Tag, Zap } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, AppStateStatus, Linking, NativeScrollEvent, NativeSyntheticEvent, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, AppState, AppStateStatus, Linking, NativeScrollEvent, NativeSyntheticEvent, Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
 import LegalDocModal, { LegalDocType } from '../../components/common/LegalDocModal';
 import { ProductCard, SectionHeader, ZText } from '../../components/ui';
 import { DELIVERY_CITY, isPuneLocation } from '../../constants/delivery';
-import { colors, fonts, palette, radius, shadow } from '../../constants/theme';
+import { createStyles, colors, fonts, palette, radius, shadow, productGridCardWidth } from '../../constants/theme';
 import { useSearch } from '../../context/SearchContext';
 import { FlashDeal, flashDealService } from '../../services/flashDeals';
 import { PromoBanner, bannerService } from '../../services/banners';
 import { productService } from '../../services/product';
 import { productOneLiner } from '../../utils/productDetail';
+import { Text } from '../../components/ui/ScaledText';
 
 const CATEGORIES = [
     { id: 'fashion', name: 'Fashion', image: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=200&q=80' },
@@ -576,7 +577,7 @@ export default function HomeScreen() {
                     {recommended.map((item) => (
                         <ProductCard
                             key={item.id}
-                            width={168}
+                            width={productGridCardWidth}
                             style={styles.hCard}
                             image={item.image}
                             brand="ZPIN"
@@ -632,7 +633,7 @@ export default function HomeScreen() {
                             {flashDeals.slice(0, 8).map((deal) => (
                                 <ProductCard
                                     key={deal.id}
-                                    width={168}
+                                    width={productGridCardWidth}
                                     style={styles.hCard}
                                     image={deal.images?.[0] || ''}
                                     brand={deal.label}
@@ -768,7 +769,7 @@ export default function HomeScreen() {
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     container: { flex: 1, backgroundColor: palette.paperWarm },
     scrollContent: { paddingBottom: 130 },
 
@@ -825,7 +826,7 @@ const styles = StyleSheet.create({
 
     section: { paddingHorizontal: 20, marginTop: 28 },
     hList: { paddingHorizontal: 20, gap: 14 },
-    hCard: { width: 168 },
+    hCard: {},
 
     freshCard: { width: 160, height: 220, borderRadius: radius.lg, overflow: 'hidden', backgroundColor: colors.surfaceSunken },
     freshImage: { width: '100%', height: '100%' },
@@ -859,7 +860,7 @@ const styles = StyleSheet.create({
     discountDesc: { fontFamily: fonts.bodyRegular, fontSize: 13, color: colors.textMuted, marginTop: 1 },
 
     fyGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 20, justifyContent: 'space-between', rowGap: 20, marginTop: 4 },
-    fyCard: { width: '47.5%' },
+    fyCard: {},
     fyLoader: { paddingVertical: 24, alignItems: 'center' },
     fyBanner: { width: '100%', flexDirection: 'row', alignItems: 'center', gap: 14, borderRadius: 20, paddingVertical: 16, paddingHorizontal: 16, overflow: 'hidden' },
     fyBannerIcon: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },

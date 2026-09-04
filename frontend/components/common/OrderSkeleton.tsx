@@ -1,6 +1,7 @@
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import SkeletonLoader from './SkeletonLoader';
+import { createStyles } from '../../constants/theme';
 
 export default function OrderSkeleton() {
     return (
@@ -32,7 +33,7 @@ export default function OrderSkeleton() {
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     container: {
         backgroundColor: '#fff',
         borderRadius: 16,

@@ -2,18 +2,19 @@ import { Image } from 'expo-image';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { ChevronLeft, PackageSearch, Search, ShoppingBag, SlidersHorizontal } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Dimensions, FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Dimensions, FlatList, Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import FilterModal, { FilterState } from '../components/product/FilterModal';
 import SkeletonCard from '../components/product/SkeletonCard';
 import { ProductCard, ZButton, ZText } from '../components/ui';
 import { CATEGORY_DATA, CategoryNode } from '../constants/categories';
-import { colors, fonts, palette, radius } from '../constants/theme';
+import { createStyles, colors, fonts, palette, radius, productGridCardWidth } from '../constants/theme';
 import { useSearch } from '../context/SearchContext';
 import { useWishlist } from '../context/WishlistContext';
 import { productService, ProductListParams } from '../services/product';
 import { ProductObject } from '../types/types';
 import { productOneLiner } from '../utils/productDetail';
+import { Text } from '../components/ui/ScaledText';
 
 const { width } = Dimensions.get('window');
 const PAGE_SIZE = 20;
@@ -179,6 +180,7 @@ export default function ProductListing() {
 
     const renderProductItem = ({ item }: { item: ProductObject }) => (
         <ProductCard
+            width={productGridCardWidth}
             style={styles.gridCard}
             image={item.images?.[0] ?? require('../assets/images/icon_backup.png')}
             brand={item.deepestCategoryName || item.subtitle || 'CLASSIC'}
@@ -301,7 +303,7 @@ export default function ProductListing() {
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     container: { flex: 1, backgroundColor: palette.paperWarm },
     center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
@@ -323,7 +325,7 @@ const styles = StyleSheet.create({
 
     listContent: { flexGrow: 1, paddingHorizontal: 20, paddingBottom: 30 },
     columnWrapper: { justifyContent: 'space-between' },
-    gridCard: { width: (width - 40 - 14) / 2, marginBottom: 20 },
+    gridCard: { marginBottom: 20 },
     footerLoader: { paddingVertical: 20, alignItems: 'center' },
     skeletonGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 16 },
     empty: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40, paddingBottom: 40 },

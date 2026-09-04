@@ -1,12 +1,13 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Bell, CheckCheck, PackageCheck, Truck, Wallet, XCircle } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader, ZText } from '../../components/ui';
-import { colors, fonts, palette, radius } from '../../constants/theme';
+import { createStyles, colors, fonts, palette, radius } from '../../constants/theme';
 import { useNotificationsBadge } from '../../context/NotificationsContext';
 import { NotificationItem, notificationService, routeForNotification } from '../../services/notification';
+import { Text } from '../../components/ui/ScaledText';
 
 function iconFor(n: NotificationItem) {
     const status = n.data?.status;
@@ -119,7 +120,7 @@ export default function NotificationsScreen() {
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     container: { flex: 1, backgroundColor: palette.paperWarm },
     markAllBtn: { width: 40, height: 40, borderRadius: 20, borderWidth: 2, borderColor: colors.borderInk, alignItems: 'center', justifyContent: 'center' },
     content: { padding: 20, paddingTop: 4 },

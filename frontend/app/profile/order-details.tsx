@@ -2,12 +2,12 @@ import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Bike, Check, Download, MapPin, Package, RotateCcw, Zap } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Linking, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, Modal, Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
 import InvoicePreviewModal from '../../components/common/InvoicePreviewModal';
 import { AppHeader, ZButton, ZText } from '../../components/ui';
-import { colors, fonts, palette, radius } from '../../constants/theme';
+import { createStyles, colors, fonts, palette, radius } from '../../constants/theme';
 import { DELIVERY_ETA } from '../../constants/delivery';
 import { useOrder } from '../../context/OrderContext';
 import { orderService } from '../../services/order';
@@ -16,6 +16,7 @@ import { groupOrders } from '../../utils/orderGroups';
 import { isReturnInProgress, statusLabel } from '../../utils/orderStatus';
 import { buildInvoiceHtml, InvoiceData } from '../../utils/invoiceHtml';
 import { useUser } from '../../context/UserContext';
+import { Text } from '../../components/ui/ScaledText';
 
 /**
  * Is this order still returnable at all?
@@ -560,7 +561,7 @@ function BillRow({ label, value, mono, red, sub }: { label: string; value: strin
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     // Phase 9A trial window. Neutral by default; yellow at 1 min to go, red once
     // the window has closed — no new palette entries, same tokens as everywhere.
     trialCard: { backgroundColor: colors.surfaceCard, borderRadius: radius.lg, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: colors.borderSubtle },

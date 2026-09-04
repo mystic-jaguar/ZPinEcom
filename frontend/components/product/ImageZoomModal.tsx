@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useState } from 'react';
-import { Dimensions, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Dimensions, Modal, Platform, Pressable, View } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import { createStyles } from '../../constants/theme';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
@@ -171,7 +172,7 @@ export default function ImageZoomModal({
                             {source && (
                                 <Animated.Image
                                     source={source}
-                                    style={[styles.image, animatedStyle]}
+                                    style={[styles.image, { width: SCREEN_W, height: SCREEN_H }, animatedStyle]}
                                     resizeMode="contain"
                                 />
                             )}
@@ -196,7 +197,7 @@ export default function ImageZoomModal({
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     backdrop: { flex: 1, backgroundColor: '#000000' },
     close: {
         position: 'absolute', top: 48, right: 20, zIndex: 10,
@@ -217,5 +218,7 @@ const styles = StyleSheet.create({
     dot: { height: 4, borderRadius: 2, marginHorizontal: 3 },
     activeDot: { width: 20, backgroundColor: '#FBBF24' },
     inactiveDot: { width: 10, backgroundColor: 'rgba(255,255,255,0.35)' },
-    image: { width: SCREEN_W, height: SCREEN_H },
+    // width/height applied inline: exactly one screen, and the pan maths above
+    // depends on it, so it must not be device-scaled a second time.
+    image: {},
 });

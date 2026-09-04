@@ -1,6 +1,7 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { colors, fonts, palette } from '../../constants/theme';
+import { View } from 'react-native';
+import { createStyles, colors, fonts, palette } from '../../constants/theme';
+import { Text } from './ScaledText';
 
 const LABELS = ['ADDRESS', 'SUMMARY', 'PAYMENT'];
 
@@ -30,7 +31,7 @@ export default function CheckoutSteps({ step }: { step: 1 | 2 | 3 }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   wrap: { paddingHorizontal: 20, paddingBottom: 16 },
   bars: { flexDirection: 'row', gap: 8, marginBottom: 8 },
   bar: { flex: 1, height: 5, borderRadius: 3 },

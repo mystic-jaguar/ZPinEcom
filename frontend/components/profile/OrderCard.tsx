@@ -1,5 +1,7 @@
 import React from 'react';
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, TouchableOpacity, View } from 'react-native';
+import { Text } from '../ui/ScaledText';
+import { createStyles } from '../../constants/theme';
 
 export type OrderStatus = 'Processing' | 'Delivered' | 'Cancelled' | 'Shipped' | 'In Progress';
 
@@ -91,7 +93,7 @@ export default function OrderCard({ order, onPress, onTrack, onBuyAgain }: Order
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     card: {
         backgroundColor: '#fff',
         borderRadius: 16,

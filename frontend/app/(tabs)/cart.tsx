@@ -3,14 +3,15 @@ import { useRouter } from 'expo-router';
 import { ArrowRight, ChevronDown, Minus, Plus, ShoppingCart, X, Zap } from 'lucide-react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Pressable, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
 import { ZButton, ZText } from '../../components/ui';
-import { colors, fonts, palette, radius, shadow } from '../../constants/theme';
+import { createStyles, colors, fonts, palette, radius, shadow } from '../../constants/theme';
 import { DELIVERY_ETA } from '../../constants/delivery';
 import { StockLimitError, useCart } from '../../context/CartContext';
 import { useCheckout } from '../../context/CheckoutContext';
+import { Text } from '../../components/ui/ScaledText';
 
 interface CartItemProps {
     item: any;
@@ -281,7 +282,7 @@ export default function CartScreen() {
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     container: { flex: 1, backgroundColor: palette.paperWarm },
     header: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 14 },
     eyebrowRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },

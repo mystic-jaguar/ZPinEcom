@@ -1,6 +1,8 @@
 import { Feather } from '@expo/vector-icons';
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { TouchableOpacity, View } from 'react-native';
+import { Text } from '../ui/ScaledText';
+import { createStyles } from '../../constants/theme';
 
 interface Props {
     children: ReactNode;
@@ -66,7 +68,7 @@ class ErrorBoundary extends Component<Props, State> {
     }
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     container: {
         flex: 1,
         justifyContent: 'center',

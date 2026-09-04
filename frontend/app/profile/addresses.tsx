@@ -1,11 +1,12 @@
 import { useRouter } from 'expo-router';
 import { Briefcase, Home, MapPin, Pencil, Plus, Trash2 } from 'lucide-react-native';
 import React from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader, BottomBar, ZButton } from '../../components/ui';
-import { colors, fonts, palette, radius } from '../../constants/theme';
+import { createStyles, colors, fonts, palette, radius } from '../../constants/theme';
 import { useAddress } from '../../context/AddressContext';
+import { Text } from '../../components/ui/ScaledText';
 
 export default function SavedAddressesScreen() {
     const { addresses, removeAddress, setDefaultAddress } = useAddress();
@@ -60,7 +61,7 @@ export default function SavedAddressesScreen() {
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     container: { flex: 1, backgroundColor: palette.paperWarm },
     list: { padding: 20, paddingTop: 6 },
     card: { backgroundColor: colors.surfaceCard, borderRadius: radius.lg, padding: 16, marginBottom: 14 },

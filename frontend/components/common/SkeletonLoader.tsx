@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, Easing, StyleSheet } from 'react-native';
+import { Animated, Easing } from 'react-native';
+import { createStyles } from '../../constants/theme';
 
 interface SkeletonLoaderProps {
     width?: number | string;
@@ -56,7 +57,7 @@ export default function SkeletonLoader({
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     skeleton: {
         backgroundColor: '#E0E0E0',
     },

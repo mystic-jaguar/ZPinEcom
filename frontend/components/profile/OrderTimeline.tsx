@@ -1,7 +1,9 @@
 import { Feather } from '@expo/vector-icons';
 import React, { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, Text, View } from 'react-native';
+import { Animated, View } from 'react-native';
 import { stepIndex, TRACK_STEPS } from '../../utils/orderStatus';
+import { Text } from '../ui/ScaledText';
+import { createStyles } from '../../constants/theme';
 
 // Five stages, shared with the customer website (see utils/orderStatus).
 const STEPS = TRACK_STEPS;
@@ -107,7 +109,7 @@ export default function OrderTimeline({ status, deliveryStatus, dates }: OrderTi
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     container: {
         backgroundColor: '#fff',
         borderRadius: 20,

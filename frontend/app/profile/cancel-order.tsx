@@ -2,13 +2,14 @@ import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Check, Info } from 'lucide-react-native';
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
 import { AppHeader, ZButton, ZText } from '../../components/ui';
-import { colors, fonts, palette, radius } from '../../constants/theme';
+import { createStyles, colors, fonts, palette, radius } from '../../constants/theme';
 import { useOrder } from '../../context/OrderContext';
 import { orderService } from '../../services/order';
+import { Text, TextInput } from '../../components/ui/ScaledText';
 
 const CANCELLATION_REASONS = ['Ordered by mistake', 'Found a better price', 'Delivery taking too long', 'Changed my mind', 'Item not needed anymore', 'Other'];
 const RETURN_REASONS = ['Defective product', 'Product not working', 'Different from description', 'Wrong item received', 'Size issue', 'Quality not as expected', 'Other'];
@@ -248,7 +249,7 @@ export default function CancelOrderScreen() {
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     container: { flex: 1, backgroundColor: palette.paperWarm },
     center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
     content: { padding: 20, paddingTop: 4, paddingBottom: 24 },

@@ -1,5 +1,7 @@
 import React from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity } from 'react-native';
+import { ScrollView, TouchableOpacity } from 'react-native';
+import { Text } from '../ui/ScaledText';
+import { createStyles } from '../../constants/theme';
 
 interface OrderFiltersProps {
     selectedFilter: string;
@@ -38,7 +40,7 @@ export default function OrderFilters({ selectedFilter, onSelectFilter }: OrderFi
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     container: {
         paddingHorizontal: 20,
         paddingVertical: 15,

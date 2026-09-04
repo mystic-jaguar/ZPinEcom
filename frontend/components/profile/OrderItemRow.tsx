@@ -1,5 +1,7 @@
 import React from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { Image, View } from 'react-native';
+import { Text } from '../ui/ScaledText';
+import { createStyles } from '../../constants/theme';
 
 interface OrderItemRowProps {
     image: any;
@@ -43,7 +45,7 @@ export default function OrderItemRow({
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     container: {
         flexDirection: 'row',
         paddingVertical: 12,

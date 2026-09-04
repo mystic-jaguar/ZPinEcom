@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Modal, Pressable, TouchableOpacity, View } from 'react-native';
+import { Text } from '../ui/ScaledText';
+import { createStyles } from '../../constants/theme';
 
 interface VariantSelectorProps {
     sizes?: string[];
@@ -111,7 +113,7 @@ export default function VariantSelector({
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     container: { marginTop: 15 },
     section: { marginBottom: 20 },
     row: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },

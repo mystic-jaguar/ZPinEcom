@@ -4,11 +4,12 @@ import { useCheckout } from '@/context/CheckoutContext';
 import { useRouter } from 'expo-router';
 import { ArrowRight, Check, MapPin, Pencil, Plus, Trash2 } from 'lucide-react-native';
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader, BottomBar, CheckoutSteps, ZButton, ZText } from '../../components/ui';
 import { DELIVERY_CITY, isPuneAddress } from '../../constants/delivery';
-import { colors, fonts, palette, radius } from '../../constants/theme';
+import { createStyles, colors, fonts, palette, radius } from '../../constants/theme';
+import { Text } from '../../components/ui/ScaledText';
 
 export default function CheckoutAddressScreen() {
     const router = useRouter();
@@ -125,7 +126,7 @@ export default function CheckoutAddressScreen() {
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     container: { flex: 1, backgroundColor: palette.paperWarm },
     content: { padding: 20, paddingTop: 4 },
     eyebrowRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14 },

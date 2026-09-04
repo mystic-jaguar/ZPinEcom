@@ -1,6 +1,8 @@
 import { Feather } from '@expo/vector-icons';
 import React from 'react';
-import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Modal, TouchableOpacity, View } from 'react-native';
+import { Text } from '../ui/ScaledText';
+import { createStyles } from '../../constants/theme';
 
 interface ActionModalProps {
     visible: boolean;
@@ -64,7 +66,7 @@ export default function ActionModal({
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     overlay: {
         flex: 1,
         backgroundColor: 'rgba(0,0,0,0.5)',

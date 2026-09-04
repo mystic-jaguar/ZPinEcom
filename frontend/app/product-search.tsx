@@ -1,15 +1,16 @@
 import { Stack, useRouter } from 'expo-router';
 import { ArrowUpLeft, Clock, Search, TrendingUp, X } from 'lucide-react-native';
 import React, { useState } from 'react';
-import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import SkeletonCard from '../components/product/SkeletonCard';
 import { ProductCard, ZText } from '../components/ui';
-import { colors, fonts, palette, radius } from '../constants/theme';
+import { createStyles, colors, fonts, palette, radius, productGridCardWidth } from '../constants/theme';
 import { useSearch } from '../context/SearchContext';
 import apiClient from '../services/api';
 import { ProductObject } from '../types/types';
 import { productOneLiner } from '../utils/productDetail';
+import { Text, TextInput } from '../components/ui/ScaledText';
 
 const TRENDING = ['Denim jeans', 'Anti-aging serum', 'Kurta sets', 'Sunglasses', 'Messenger bag'];
 
@@ -78,6 +79,7 @@ export default function ProductSearchScreen() {
 
     const renderProductItem = ({ item }: { item: ProductObject }) => (
         <ProductCard
+            width={productGridCardWidth}
             style={styles.gridCard}
             image={item.images?.[0] ?? require('../assets/images/icon_backup.png')}
             brand={item.deepestCategoryName}
@@ -183,7 +185,7 @@ export default function ProductSearchScreen() {
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     container: { flex: 1, backgroundColor: palette.paperWarm },
     header: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingTop: 6, paddingBottom: 16 },
     searchField: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 11, backgroundColor: colors.surfaceCard, borderWidth: 2, borderColor: colors.borderInk, borderRadius: radius.md, height: 50, paddingHorizontal: 15 },
@@ -192,7 +194,7 @@ const styles = StyleSheet.create({
 
     listContent: { padding: 20, paddingBottom: 40 },
     columnWrapper: { justifyContent: 'space-between' },
-    gridCard: { width: '48%', marginBottom: 18 },
+    gridCard: { marginBottom: 18 },
     resultLabel: { fontFamily: fonts.bodySemiBold, fontSize: 13, color: colors.textMuted, marginBottom: 12 },
 
     skeletonGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 8 },

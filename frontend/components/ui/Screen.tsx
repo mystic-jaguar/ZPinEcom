@@ -1,7 +1,7 @@
 import React from 'react';
-import { StyleSheet, View, ViewStyle } from 'react-native';
+import { View, ViewStyle } from 'react-native';
 import { Edge, SafeAreaView } from 'react-native-safe-area-context';
-import { colors, palette } from '../../constants/theme';
+import { createStyles, colors, palette } from '../../constants/theme';
 
 interface ScreenProps {
   children: React.ReactNode;
@@ -20,7 +20,7 @@ export default function Screen({ children, bg = palette.paperWarm, edges = ['top
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   safe: { flex: 1 },
   body: { flex: 1 },
 });

@@ -1,16 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import {
-    Linking,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Linking,
+  Modal,
+  ScrollView,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { PRIVACY_POLICY_URL, TERMS_URL } from '../../constants/legal';
+import { Text } from '../ui/ScaledText';
+import { createStyles } from '../../constants/theme';
 
 const PRIVACY_POLICY = `PRIVACY POLICY - ZPIN
 Last Updated: September 2026
@@ -368,7 +368,7 @@ export default function LegalDocModal({ visible, docType, onClose }: LegalDocMod
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     container: {
         flex: 1,
         backgroundColor: '#fff',

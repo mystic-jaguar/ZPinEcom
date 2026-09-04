@@ -5,10 +5,11 @@ import { useCheckout } from '@/context/CheckoutContext';
 import { useRouter } from 'expo-router';
 import { ArrowRight, Check, MapPin, Receipt, Ticket, Zap } from 'lucide-react-native';
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppHeader, CheckoutSteps, ZButton, ZText } from '../../components/ui';
-import { colors, fonts, palette, radius, shadow } from '../../constants/theme';
+import { createStyles, colors, fonts, palette, radius, shadow } from '../../constants/theme';
+import { Text, TextInput } from '../../components/ui/ScaledText';
 
 export default function CheckoutSummaryScreen() {
     const router = useRouter();
@@ -171,7 +172,7 @@ function BillRow({ label, value, mono, red }: { label: string; value: string; mo
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     container: { flex: 1, backgroundColor: palette.paperWarm },
     content: { padding: 20, paddingTop: 4, paddingBottom: 24 },
     eyebrowRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 },

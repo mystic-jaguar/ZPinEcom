@@ -1,8 +1,9 @@
 import { Image } from 'expo-image';
 import { Heart, Zap } from 'lucide-react-native';
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { colors, fonts, palette, radius } from '../../constants/theme';
+import { Pressable, View } from 'react-native';
+import { createStyles, colors, fonts, palette, radius, productGridCardWidth } from '../../constants/theme';
+import { Text } from './ScaledText';
 
 export interface ProductCardProps {
   image: any; // uri string or require()
@@ -30,7 +31,7 @@ export default function ProductCard({
 }: ProductCardProps) {
   const src = typeof image === 'string' ? { uri: image } : image;
   return (
-    <Pressable onPress={onPress} style={[styles.card, width ? { width } : null, style]}>
+    <Pressable onPress={onPress} style={[styles.card, { width: width ?? productGridCardWidth }, style]}>
       <View style={styles.imageWrap}>
         <Image source={src} style={styles.image} contentFit="cover" transition={150} />
         {onWishlist ? (
@@ -59,8 +60,8 @@ export default function ProductCard({
   );
 }
 
-const styles = StyleSheet.create({
-  card: { width: 168 },
+const styles = createStyles({
+  card: {},
   imageWrap: {
     width: '100%', aspectRatio: 0.82, borderRadius: radius.lg, overflow: 'hidden',
     backgroundColor: colors.surfaceSunken, marginBottom: 8, position: 'relative',

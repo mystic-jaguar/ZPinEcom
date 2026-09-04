@@ -1,6 +1,8 @@
 import { Feather } from '@expo/vector-icons';
 import React, { useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { TouchableOpacity, View } from 'react-native';
+import { Text } from '../ui/ScaledText';
+import { createStyles } from '../../constants/theme';
 
 interface AccordionItemProps {
     title: string;
@@ -34,7 +36,7 @@ export default function AccordionItem({ title, children, initiallyExpanded = fal
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     container: {
         borderBottomWidth: 1,
         borderBottomColor: '#f0f0f0',

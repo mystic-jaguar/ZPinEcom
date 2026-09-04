@@ -1,7 +1,11 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, Dimensions, StyleSheet, View } from 'react-native';
+import { Animated, View } from 'react-native';
+import { createStyles, productGridCardWidth } from '../../constants/theme';
 
-const CARD_WIDTH = (Dimensions.get('window').width / 2) - 20;
+// Must equal the real ProductCard width, or the grid jumps when data arrives.
+// Applied inline below rather than in the sheet: it is already device-derived,
+// and createStyles would scale it a second time.
+const CARD_WIDTH = productGridCardWidth;
 
 export default function SkeletonCard() {
     const shimmer = useRef(new Animated.Value(0)).current;
@@ -18,8 +22,8 @@ export default function SkeletonCard() {
     const opacity = shimmer.interpolate({ inputRange: [0, 1], outputRange: [0.4, 0.9] });
 
     return (
-        <Animated.View style={[styles.card, { opacity }]}>
-            <View style={styles.image} />
+        <Animated.View style={[styles.card, { width: CARD_WIDTH, opacity }]}>
+            <View style={[styles.image, { height: Math.round(CARD_WIDTH * 1.3) }]} />
             <View style={styles.line1} />
             <View style={styles.line2} />
             <View style={styles.line3} />
@@ -27,13 +31,11 @@ export default function SkeletonCard() {
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     card: {
-        width: CARD_WIDTH,
         marginBottom: 20,
     },
     image: {
-        height: CARD_WIDTH * 1.3,
         borderRadius: 12,
         backgroundColor: '#E5E7EB',
         marginBottom: 10,

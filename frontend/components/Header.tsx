@@ -1,10 +1,10 @@
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback } from 'react';
-import { Dimensions, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, TouchableOpacity, View } from 'react-native';
 import { useNotificationsBadge } from '../context/NotificationsContext';
-
-const { width } = Dimensions.get('window');
+import { Text } from './ui/ScaledText';
+import { createStyles } from '../constants/theme';
 
 interface HeaderProps {
     // Add props if needed in future (e.g., title for other screens)
@@ -48,7 +48,7 @@ export default function Header({ }: HeaderProps) {
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -59,8 +59,8 @@ const styles = StyleSheet.create({
         backgroundColor: '#fff',
     },
     logoContainer: {
-        height: width * 0.175,
-        width: width * 0.35,
+        height: 68,  // 0.175 x 390dp baseline; createStyles scales it per device
+        width: 137,  // 0.35 x 390dp baseline
         justifyContent: 'center',
         alignItems: 'flex-start',
     },
@@ -72,7 +72,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
     },
     iconButton: {
-        marginLeft: width * 0.038,
+        marginLeft: 15, // 0.038 x 390dp baseline
     },
     badge: {
         position: 'absolute',

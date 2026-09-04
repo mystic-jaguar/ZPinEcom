@@ -1,8 +1,9 @@
 import { Eye, EyeOff, LucideIcon } from 'lucide-react-native';
 import React, { useState } from 'react';
-import { StyleSheet, TextInput, TextInputProps, View } from 'react-native';
-import { colors, fonts, radius } from '../../constants/theme';
+import { TextInputProps, View } from 'react-native';
+import { createStyles, colors, fonts, radius } from '../../constants/theme';
 import ZText from './ZText';
+import { TextInput } from './ScaledText';
 
 interface ZInputProps extends TextInputProps {
   label?: string;
@@ -39,7 +40,7 @@ export default function ZInput({ label, icon: Icon, secure, containerStyle, styl
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   wrap: { marginBottom: 16 },
   label: { marginBottom: 8 },
   field: {

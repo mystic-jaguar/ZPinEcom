@@ -1,7 +1,8 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { colors, fonts } from '../../constants/theme';
+import { Pressable, View } from 'react-native';
+import { createStyles, colors, fonts } from '../../constants/theme';
 import ZText from './ZText';
+import { Text } from './ScaledText';
 
 interface SectionHeaderProps {
   eyebrow?: string;
@@ -28,7 +29,7 @@ export default function SectionHeader({ eyebrow, title, actionLabel, onAction, s
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 14 },
   left: { flex: 1 },
   eyebrow: { marginBottom: 3 },

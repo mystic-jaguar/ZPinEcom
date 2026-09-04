@@ -20,9 +20,9 @@
 import { Mail, Phone, Send, User, X } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Linking, Modal, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors, fonts, palette, radius } from '../../constants/theme';
+import { createStyles, colors, fonts, palette, radius } from '../../constants/theme';
 import { SUPPORT_EMAIL, SUPPORT_PHONE } from '../../constants/supportContent';
 import {
     AFFIRMATIVE,
@@ -33,6 +33,7 @@ import {
     THANKS_RE,
     tokenize,
 } from '../../constants/supportMatcher';
+import { Text, TextInput } from '../ui/ScaledText';
 
 const QUICK_REPLIES = [
     'How fast is delivery?',
@@ -253,7 +254,7 @@ export default function SupportChatBot({ visible, onClose }: { visible: boolean;
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     container: { flex: 1, backgroundColor: palette.paperWarm },
     header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: palette.neutral200, backgroundColor: colors.surfaceCard },
     title: { fontFamily: fonts.displaySemiBold, fontSize: 16, color: colors.textStrong },

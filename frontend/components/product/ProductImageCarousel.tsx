@@ -1,7 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useRef, useState } from 'react';
-import { Dimensions, Image, NativeScrollEvent, NativeSyntheticEvent, ScrollView, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, Image, NativeScrollEvent, NativeSyntheticEvent, ScrollView, Share, TouchableOpacity, View } from 'react-native';
 import ImageZoomModal from './ImageZoomModal';
+import { Text } from '../ui/ScaledText';
+import { createStyles } from '../../constants/theme';
 
 const { width } = Dimensions.get('window');
 
@@ -74,7 +76,7 @@ export default function ProductImageCarousel({ images, isLightningFast, onBack, 
                 style={styles.scrollView}
             >
                 {safeImages.map((img, index) => (
-                    <View key={index} style={styles.imageContainer}>
+                    <View key={index} style={[styles.imageContainer, { width }]}>
                         {img ? (
                             <TouchableOpacity activeOpacity={0.9} style={styles.imageTouch} onPress={() => setZoomIndex(index)}>
                                 <Image
@@ -125,7 +127,7 @@ export default function ProductImageCarousel({ images, isLightningFast, onBack, 
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     container: {
         height: 400,
         width: '100%',
@@ -158,7 +160,9 @@ const styles = StyleSheet.create({
         flex: 1
     },
     imageContainer: {
-        width: width,
+        // width is applied inline from the real window width: it must match the
+        // scroll offset exactly for paging to land on the right image, so it must
+        // not go through createStyles' device scaling.
         height: 400,
         justifyContent: 'center',
         alignItems: 'center'

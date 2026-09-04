@@ -1,6 +1,8 @@
 import { Feather } from '@expo/vector-icons';
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { TouchableOpacity, View } from 'react-native';
+import { Text } from '../ui/ScaledText';
+import { createStyles } from '../../constants/theme';
 
 interface ProfileOptionProps {
     label: string;
@@ -40,7 +42,7 @@ export default function ProfileOption({
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     container: {
         flexDirection: 'row',
         alignItems: 'center',

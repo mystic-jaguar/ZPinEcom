@@ -1,5 +1,7 @@
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { TouchableOpacity, View } from 'react-native';
+import { Text } from '../ui/ScaledText';
+import { createStyles } from '../../constants/theme';
 
 interface DeliveryOptionSelectorProps {
     selectedOption: 'instant' | 'standard';
@@ -44,7 +46,7 @@ export default function DeliveryOptionSelector({ selectedOption, onSelect }: Del
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     container: {
         flexDirection: 'row',
         backgroundColor: '#F3F4F6',

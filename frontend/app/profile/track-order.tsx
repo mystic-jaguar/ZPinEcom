@@ -1,15 +1,16 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Check, Headphones, HelpCircle, MessageCircle, Phone, Shirt, Timer, Zap } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { Linking, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import RouteTrack, { RoutePhase } from '../../components/profile/RouteTrack';
 import { AppHeader, ZButton, ZText } from '../../components/ui';
-import { colors, fonts, palette, radius } from '../../constants/theme';
+import { createStyles, colors, fonts, palette, radius } from '../../constants/theme';
 import { DELIVERY_ETA } from '../../constants/delivery';
 import { useOrder } from '../../context/OrderContext';
 import { orderService } from '../../services/order';
 import { FAILURE_TEXT, RETURN_STEPS, returnStage, stepIndex, TRACK_STEPS } from '../../utils/orderStatus';
+import { Text } from '../../components/ui/ScaledText';
 
 const ELECTRIC_DELAY_MS = 5 * 60 * 1000; // 5 min after delivery before the surge kicks in
 
@@ -238,7 +239,7 @@ export default function TrackOrderScreen() {
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     container: { flex: 1, backgroundColor: palette.paperWarm },
     helpBtn: { width: 40, height: 40, borderRadius: 20, borderWidth: 2, borderColor: colors.borderInk, alignItems: 'center', justifyContent: 'center' },
 

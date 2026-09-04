@@ -1,15 +1,16 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Briefcase, Home, MapPin } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
 import { AppHeader, BottomBar, ZButton, ZInput, ZText } from '../../components/ui';
-import { colors, fonts, palette, radius } from '../../constants/theme';
+import { createStyles, colors, fonts, palette, radius } from '../../constants/theme';
 import { DELIVERY_CITY, isPuneCity, isPunePincode } from '../../constants/delivery';
 import { useAddress } from '../../context/AddressContext';
 import { useUser } from '../../context/UserContext';
 import { lookupPincode } from '../../services/location';
+import { Text, TextInput } from '../../components/ui/ScaledText';
 
 const LABELS = [
     { key: 'Home', icon: Home },
@@ -191,7 +192,7 @@ export default function AddAddressScreen() {
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     container: { flex: 1, backgroundColor: palette.paperWarm },
     content: { padding: 26, paddingTop: 8, paddingBottom: 40 },
     label: { marginTop: 16, marginBottom: 7 },

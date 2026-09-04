@@ -1,5 +1,7 @@
 import React from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { Image, View } from 'react-native';
+import { Text } from '../ui/ScaledText';
+import { createStyles } from '../../constants/theme';
 
 interface AvatarInitialsProps {
     name: string;
@@ -54,7 +56,7 @@ export default function AvatarInitials({
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     circle: {
         backgroundColor: '#fff',
         justifyContent: 'center',

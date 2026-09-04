@@ -1,8 +1,8 @@
 import { Feather } from '@expo/vector-icons';
 import React from 'react';
-import { Dimensions, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
-
-const { width } = Dimensions.get('window');
+import { TouchableOpacity, View } from 'react-native';
+import { TextInput } from './ui/ScaledText';
+import { createStyles } from '../constants/theme';
 
 interface SearchBarProps {
     placeholder?: string;
@@ -51,7 +51,7 @@ export default function SearchBar({
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     searchContainer: {
         paddingHorizontal: '5%',
         paddingBottom: '4%',
@@ -63,7 +63,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#F7F7F7',
         borderRadius: 25,
         paddingHorizontal: '4%',
-        height: width * 0.112,
+        height: 44, // 0.112 x 390dp baseline; createStyles scales it per device
         borderWidth: 1,
         borderColor: '#EEEEEE',
     },
@@ -71,7 +71,7 @@ const styles = StyleSheet.create({
         flex: 1,
         marginLeft: '2.5%',
         marginRight: '2.5%',
-        fontSize: width * 0.035,
+        fontSize: 14, // 0.035 x 390dp baseline
         color: '#333',
     },
 });

@@ -1,10 +1,11 @@
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { Home, LayoutGrid, LucideIcon, ShoppingCart, User } from 'lucide-react-native';
 import React, { useEffect } from 'react';
-import { LayoutAnimation, Platform, Pressable, StyleSheet, Text, UIManager, View } from 'react-native';
+import { LayoutAnimation, Platform, Pressable, UIManager, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, fonts, palette, shadow } from '../constants/theme';
+import { createStyles, colors, fonts, palette, shadow } from '../constants/theme';
 import { useCart } from '../context/CartContext';
+import { Text } from './ui/ScaledText';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -70,7 +71,7 @@ export default function TabBar({ state, navigation }: BottomTabBarProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   host: {
     position: 'absolute',
     left: 0,

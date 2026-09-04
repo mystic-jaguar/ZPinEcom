@@ -1,6 +1,8 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { View } from 'react-native';
+import { Text } from '../ui/ScaledText';
+import { createStyles } from '../../constants/theme';
 
 export default function StandardDeliveryCard() {
     return (
@@ -22,7 +24,7 @@ export default function StandardDeliveryCard() {
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     container: {
         backgroundColor: '#fff',
         borderRadius: 20,

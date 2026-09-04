@@ -1,6 +1,8 @@
 import { Feather } from '@expo/vector-icons';
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { View } from 'react-native';
+import { Text } from '../ui/ScaledText';
+import { createStyles } from '../../constants/theme';
 
 interface DeliveryStatusCardProps {
     status: string;
@@ -26,7 +28,7 @@ export default function DeliveryStatusCard({
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     card: {
         backgroundColor: '#FFFBEB', // Amber-50 (Light Yellow)
         borderRadius: 12,

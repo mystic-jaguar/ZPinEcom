@@ -2,11 +2,12 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { Download, X } from 'lucide-react-native';
 import React, { useState } from 'react';
-import { ActivityIndicator, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Modal, Platform, Pressable, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
-import { colors, fonts, palette, radius } from '../../constants/theme';
+import { createStyles, colors, fonts, palette, radius } from '../../constants/theme';
 import { invoiceFileName } from '../../utils/invoiceHtml';
+import { Text } from '../ui/ScaledText';
 
 interface Props {
     visible: boolean;
@@ -83,7 +84,7 @@ export default function InvoicePreviewModal({ visible, html, orderNumber, onClos
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     container: { flex: 1, backgroundColor: palette.paperWarm },
     header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12 },
     closeBtn: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceCard, borderWidth: 1, borderColor: colors.borderSubtle },

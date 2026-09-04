@@ -1,8 +1,10 @@
 import { Feather } from '@expo/vector-icons';
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNetwork } from '../../context/NetworkContext';
+import { Text } from '../ui/ScaledText';
+import { createStyles } from '../../constants/theme';
 
 // App-wide connectivity strip. Mounted once at the root so every screen gets it
 // without opting in; renders nothing while online.
@@ -26,7 +28,7 @@ export default function OfflineBanner() {
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     bar: {
         position: 'absolute',
         top: 0,

@@ -2,11 +2,12 @@ import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
 import { Ticket } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader, ZText } from '../../components/ui';
-import { colors, fonts, palette, radius } from '../../constants/theme';
+import { createStyles, colors, fonts, palette, radius } from '../../constants/theme';
 import { useCart } from '../../context/CartContext';
+import { Text, TextInput } from '../../components/ui/ScaledText';
 
 const TABS = ['All', 'Active', 'Expired'];
 
@@ -113,7 +114,7 @@ export default function CouponsScreen() {
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     container: { flex: 1, backgroundColor: palette.paperWarm },
     applyWrap: { paddingHorizontal: 20, paddingBottom: 12 },
     applyField: { flexDirection: 'row', alignItems: 'center', gap: 11, backgroundColor: colors.surfaceCard, borderWidth: 1.5, borderColor: '#C9C5B8', borderStyle: 'dashed', borderRadius: radius.md, paddingHorizontal: 15, height: 52 },

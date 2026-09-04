@@ -1,7 +1,7 @@
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors } from '../../constants/theme';
+import { createStyles, colors } from '../../constants/theme';
 
 /** Sticky bottom action bar (white, hairline top border) for CTA buttons. */
 export default function BottomBar({ children }: { children: React.ReactNode }) {
@@ -11,7 +11,7 @@ export default function BottomBar({ children }: { children: React.ReactNode }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   bar: {
     backgroundColor: colors.surfaceCard,
     borderTopWidth: 1,

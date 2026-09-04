@@ -1,12 +1,13 @@
 import { useRouter } from 'expo-router';
 import { Calendar, Check, Zap } from 'lucide-react-native';
 import React, { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
 import { ZButton, ZText } from '../../components/ui';
-import { colors, fonts, palette, radius } from '../../constants/theme';
+import { createStyles, colors, fonts, palette, radius } from '../../constants/theme';
 import { useUser } from '../../context/UserContext';
+import { Text, TextInput } from '../../components/ui/ScaledText';
 
 const GENDER_OPTIONS = ['Male', 'Female', 'Do not wish to specify'];
 
@@ -121,7 +122,7 @@ export default function CompleteProfileScreen() {
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     container: { flex: 1, backgroundColor: palette.paperWarm },
     flex: { flex: 1 },
     content: { paddingHorizontal: 26, paddingTop: 12, paddingBottom: 30 },

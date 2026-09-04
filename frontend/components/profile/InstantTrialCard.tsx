@@ -1,6 +1,8 @@
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import React, { useEffect, useRef, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { View } from 'react-native';
+import { Text } from '../ui/ScaledText';
+import { createStyles } from '../../constants/theme';
 
 interface InstantTrialCardProps {
     isDelivered?: boolean;
@@ -104,7 +106,7 @@ export default function InstantTrialCard({ isDelivered = false, deliveredAt }: I
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     container: {
         backgroundColor: '#fff',
         borderRadius: 20,

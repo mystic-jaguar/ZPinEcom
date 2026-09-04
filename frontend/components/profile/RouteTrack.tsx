@@ -2,7 +2,7 @@ import { Bike, Home, Store } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
-import { colors, palette } from '../../constants/theme';
+import { createStyles, colors, palette } from '../../constants/theme';
 
 export type RoutePhase = 'confirmed' | 'shipped' | 'delivered';
 
@@ -240,7 +240,7 @@ export default function RouteTrack({ phase, electric, reverse }: { phase: RouteP
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     route: { flexDirection: 'row', alignItems: 'center' },
     nodeSmall: { width: 26, height: 26, borderRadius: 13, backgroundColor: palette.yellow500, alignItems: 'center', justifyContent: 'center', zIndex: 2 },
     nodeBig: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#fff', borderWidth: 2, borderColor: 'rgba(255,255,255,0.3)', alignItems: 'center', justifyContent: 'center', zIndex: 2 },

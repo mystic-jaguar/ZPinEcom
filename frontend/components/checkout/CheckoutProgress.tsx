@@ -1,6 +1,8 @@
 import { Colors } from '@/constants/Colors';
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { View } from 'react-native';
+import { Text } from '../ui/ScaledText';
+import { createStyles } from '../../constants/theme';
 
 interface CheckoutProgressProps {
     currentStep: 1 | 2 | 3; // 1: Address, 2: Payment, 3: Summary
@@ -57,7 +59,7 @@ export const CheckoutProgress: React.FC<CheckoutProgressProps> = ({ currentStep 
     );
 };
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     container: {
         flexDirection: 'row',
         alignItems: 'center',

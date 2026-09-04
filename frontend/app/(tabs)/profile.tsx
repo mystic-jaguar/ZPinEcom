@@ -10,11 +10,12 @@ import {
     Bell, ChevronRight, Heart, LifeBuoy, LogOut, MapPin, RotateCcw, Settings, Shield, ShoppingBag, Ticket, User, Zap,
 } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ZText } from '../../components/ui';
-import { colors, fonts, palette, radius, shadow } from '../../constants/theme';
+import { createStyles, colors, fonts, palette, radius, shadow } from '../../constants/theme';
 import { useUser } from '../../context/UserContext';
+import { Text } from '../../components/ui/ScaledText';
 
 function initialsOf(name?: string) {
     if (!name) return 'ZP';
@@ -178,7 +179,7 @@ export default function ProfileScreen() {
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     container: { flex: 1, backgroundColor: palette.paperWarm },
     scroll: { paddingBottom: 130 },
     headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 6, paddingBottom: 14 },

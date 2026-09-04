@@ -1,8 +1,9 @@
 import { CalendarDays, Grid3x3, MapPin, Palette, Ruler, Shirt, Tag, Waypoints } from 'lucide-react-native';
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { colors, palette, radius } from '../../constants/theme';
+import { View } from 'react-native';
+import { createStyles, colors, palette, radius } from '../../constants/theme';
 import { ProductSpecification } from '../../types/types';
+import { Text } from '../ui/ScaledText';
 
 // Same loose code match (and the same icon meanings) as the customer website's
 // Specifications card, so a new EAV attribute still gets a sane default icon
@@ -49,7 +50,7 @@ export default function ProductSpecifications({ specs }: { specs: ProductSpecifi
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     wrap: { marginTop: 16 },
     heading: { fontSize: 14, fontWeight: '700', color: colors.textStrong, marginBottom: 10 },
     row: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },

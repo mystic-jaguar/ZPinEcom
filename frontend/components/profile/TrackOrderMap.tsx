@@ -1,6 +1,8 @@
 import { Feather, FontAwesome5, Ionicons } from '@expo/vector-icons';
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { View } from 'react-native';
+import { Text } from '../ui/ScaledText';
+import { createStyles } from '../../constants/theme';
 
 interface TrackOrderMapProps {
     isInstant?: boolean;
@@ -64,7 +66,7 @@ export default function TrackOrderMap({ isInstant = true, orderId = "ZPIN-88219"
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     container: {
         height: 400, // Increase height slightly to accommodate lower content
         backgroundColor: '#FFD700',

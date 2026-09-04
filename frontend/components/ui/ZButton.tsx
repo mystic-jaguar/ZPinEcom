@@ -1,7 +1,8 @@
 import { LucideIcon } from 'lucide-react-native';
 import React from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View, ViewStyle } from 'react-native';
-import { colors, fonts, shadow } from '../../constants/theme';
+import { ActivityIndicator, Pressable, View, ViewStyle } from 'react-native';
+import { createStyles, colors, fonts, shadow } from '../../constants/theme';
+import { Text } from './ScaledText';
 
 export type ZButtonVariant = 'primary' | 'ink' | 'outline' | 'light' | 'red';
 export type ZButtonSize = 'lg' | 'md' | 'sm';
@@ -88,7 +89,7 @@ export default function ZButton({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   base: { borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   pressed: { transform: [{ scale: 0.98 }], opacity: 0.95 },

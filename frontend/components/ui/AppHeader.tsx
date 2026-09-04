@@ -1,8 +1,8 @@
 import { useRouter } from 'expo-router';
 import { ChevronLeft } from 'lucide-react-native';
 import React from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
-import { colors } from '../../constants/theme';
+import { Pressable, View } from 'react-native';
+import { createStyles, colors } from '../../constants/theme';
 import ZText from './ZText';
 
 interface AppHeaderProps {
@@ -39,7 +39,7 @@ export default function AppHeader({ title, onBack, right }: AppHeaderProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   row: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -2,14 +2,15 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, ArrowUpRight, ChevronDown, ChevronRight, Search, X, Zap } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
-import { BackHandler, Dimensions, Image, LayoutAnimation, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, UIManager, View } from 'react-native';
+import { BackHandler, Dimensions, Image, LayoutAnimation, Platform, ScrollView, StyleSheet, TouchableOpacity, UIManager, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ZText } from '../../components/ui';
 import { CATEGORY_DATA, CategoryNode } from '../../constants/categories';
 import { categoryImageUrl } from '../../constants/cloudinary';
-import { colors, fonts, palette, radius } from '../../constants/theme';
+import { createStyles, colors, fonts, palette, radius } from '../../constants/theme';
 import { useSearch } from '../../context/SearchContext';
 import { fuzzyScore } from '../../utils/fuzzy';
+import { Text, TextInput } from '../../components/ui/ScaledText';
 
 // Landing-card artwork + unit noun per root category (reused from home).
 const CATEGORY_META: Record<string, { image: any; unit: string }> = {
@@ -53,6 +54,20 @@ const CIRCLE_SIZE = Math.min(70, Math.floor(columnWidth - 12));
 const CIRCLE_RADIUS = CIRCLE_SIZE / 2;
 const RECT_WIDTH = CIRCLE_SIZE;
 const RECT_HEIGHT = Math.floor(CIRCLE_SIZE * (85 / 70));
+
+/**
+ * Already derived from the real window width, so these are device-correct as-is
+ * and are applied OUTSIDE createStyles — running them through it would scale an
+ * already-proportional number a second time, and would also put the circle frame
+ * out of step with the <NodeImage size={CIRCLE_SIZE}> it wraps, since a prop is
+ * not reachable by the stylesheet.
+ */
+const gridMetrics = {
+    circle: { width: CIRCLE_SIZE, height: CIRCLE_SIZE, borderRadius: CIRCLE_RADIUS },
+    rect: { width: RECT_WIDTH, height: RECT_HEIGHT },
+    level2: { marginHorizontal: LEVEL2_MARGIN },
+    level3: { paddingHorizontal: LEVEL3_PADDING },
+} as const;
 
 // Card-grid landing (matches design doc): a hero feature tile for the first
 // category, an image grid for the rest, and popular quick-access chips.
@@ -151,7 +166,7 @@ const CategoryGridSection = ({ sectionTitle, items, onItemPress }: { sectionTitl
                     const useRect = hasChildren && !!item.image;
                     return (
                         <TouchableOpacity key={item.id} style={styles.gridItemContainer} onPress={() => onItemPress(item)}>
-                            <View style={[styles.gridImageContainer, useRect ? styles.rectImage : styles.circleImage, !useRect && styles.highlightedBorder]}>
+                            <View style={[styles.gridImageContainer, useRect ? gridMetrics.rect : gridMetrics.circle, useRect ? styles.rectImage : styles.circleImage, !useRect && styles.highlightedBorder]}>
                                 <NodeImage node={item} size={useRect ? RECT_HEIGHT : CIRCLE_SIZE} />
                             </View>
                             <Text style={styles.gridItemText} numberOfLines={2}>{item.name}</Text>
@@ -177,7 +192,7 @@ const MainCategoryView = ({ category, onLeafPress }: { category: CategoryNode; o
                 category.children?.map((child) => {
                     const isExpanded = expandedSection === child.id;
                     return (
-                        <View key={child.id} style={styles.level2Container}>
+                        <View key={child.id} style={[styles.level2Container, gridMetrics.level2]}>
                             <TouchableOpacity
                                 style={styles.level2Header}
                                 onPress={() => {
@@ -189,14 +204,14 @@ const MainCategoryView = ({ category, onLeafPress }: { category: CategoryNode; o
                                 {isExpanded ? <ChevronDown size={20} color={palette.yellow600} /> : <ChevronRight size={20} color={palette.yellow600} />}
                             </TouchableOpacity>
                             {isExpanded && child.children && (
-                                <View style={styles.level3Container}>
+                                <View style={[styles.level3Container, gridMetrics.level3]}>
                                     {child.children.map((grandChild) => {
                                         if (grandChild.children && grandChild.children.length > 0) {
                                             return <CategoryGridSection key={grandChild.id} sectionTitle={grandChild.name} items={grandChild.children} onItemPress={handleNodePress} />;
                                         }
                                         return (
                                             <TouchableOpacity key={grandChild.id} style={styles.leafRow} onPress={() => handleNodePress(grandChild)}>
-                                                <View style={[styles.circleImage, styles.highlightedBorder, styles.leafCircle]}>
+                                                <View style={[gridMetrics.circle, styles.circleImage, styles.highlightedBorder, styles.leafCircle]}>
                                                     <NodeImage node={grandChild} size={40} />
                                                 </View>
                                                 <Text style={styles.leafRowText}>{grandChild.name}</Text>
@@ -346,7 +361,7 @@ export default function CategoriesScreen() {
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     container: { flex: 1, backgroundColor: palette.paperWarm },
     titleBlock: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 12 },
     eyebrowRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 5 },
@@ -386,10 +401,10 @@ const styles = StyleSheet.create({
     categoryTitle: { fontFamily: fonts.displayBold, fontSize: 26, letterSpacing: -0.8, color: colors.textStrong },
     rightScroll: { paddingBottom: 50 },
 
-    level2Container: { marginBottom: 10, backgroundColor: colors.surfaceCard, marginHorizontal: LEVEL2_MARGIN, borderRadius: radius.lg, borderWidth: 1, borderColor: palette.neutral200, overflow: 'hidden', paddingBottom: 10 },
+    level2Container: { marginBottom: 10, backgroundColor: colors.surfaceCard, borderRadius: radius.lg, borderWidth: 1, borderColor: palette.neutral200, overflow: 'hidden', paddingBottom: 10 },
     level2Header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 18 },
     level2Title: { fontFamily: fonts.displaySemiBold, fontSize: 17, color: colors.textStrong },
-    level3Container: { paddingHorizontal: LEVEL3_PADDING },
+    level3Container: {},
 
     gridSection: { marginBottom: 20 },
     sectionHeaderRow: { marginBottom: 14, paddingHorizontal: 5 },
@@ -397,9 +412,9 @@ const styles = StyleSheet.create({
     gridContainer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-start' },
     gridItemContainer: { width: '33.33%', alignItems: 'center', marginBottom: 15 },
     gridImageContainer: { marginBottom: 8, overflow: 'hidden' },
-    circleImage: { width: CIRCLE_SIZE, height: CIRCLE_SIZE, borderRadius: CIRCLE_RADIUS, borderWidth: 2, borderColor: colors.surfaceCard },
+    circleImage: { borderWidth: 2, borderColor: colors.surfaceCard },
     highlightedBorder: { borderColor: palette.yellow500, borderWidth: 2 },
-    rectImage: { width: RECT_WIDTH, height: RECT_HEIGHT, borderRadius: 12 },
+    rectImage: { borderRadius: 12 },
     gridImage: { width: '100%', height: '100%', resizeMode: 'cover' },
     placeholder: { backgroundColor: colors.surfaceSunken, alignItems: 'center', justifyContent: 'center' },
     placeholderText: { fontFamily: fonts.bodyBold, fontSize: 14, color: colors.textFaint, textAlign: 'center' },

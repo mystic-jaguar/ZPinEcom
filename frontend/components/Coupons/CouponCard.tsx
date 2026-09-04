@@ -1,7 +1,9 @@
 import { Feather } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { TouchableOpacity, View } from 'react-native';
+import { Text } from '../ui/ScaledText';
+import { createStyles } from '../../constants/theme';
 
 export type CouponStatus = 'active' | 'used' | 'expired';
 export type CouponType = 'Fashion' | 'Footwear' | 'Beauty' | 'Free Shipping';
@@ -116,7 +118,7 @@ export default function CouponCard({
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     container: {
         backgroundColor: '#fff',
         borderRadius: 16,

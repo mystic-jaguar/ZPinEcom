@@ -2,11 +2,12 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { Heart, ShoppingCart } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
-import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, RefreshControl, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader, ZButton, ZText } from '../../components/ui';
-import { colors, fonts, palette, radius } from '../../constants/theme';
+import { createStyles, colors, fonts, palette, radius } from '../../constants/theme';
 import { useWishlist } from '../../context/WishlistContext';
+import { Text } from '../../components/ui/ScaledText';
 
 export default function WishlistScreen() {
     const router = useRouter();
@@ -68,7 +69,7 @@ export default function WishlistScreen() {
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     container: { flex: 1, backgroundColor: palette.paperWarm },
     list: { padding: 20, paddingTop: 6 },
     card: { width: '48%', marginBottom: 18 },

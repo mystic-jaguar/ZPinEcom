@@ -1,6 +1,7 @@
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import SkeletonLoader from './SkeletonLoader';
+import { createStyles } from '../../constants/theme';
 
 interface ProductSkeletonProps {
     variant?: 'list' | 'grid';
@@ -33,7 +34,7 @@ export default function ProductSkeleton({ variant = 'grid' }: ProductSkeletonPro
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     gridContainer: {
         width: 140,
         marginRight: 15,

@@ -2,16 +2,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { X } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import {
-    Modal,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  Modal,
+  Pressable,
+  ScrollView,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, fonts, palette, radius } from '../../constants/theme';
+import { createStyles, colors, fonts, palette, radius } from '../../constants/theme';
+import { Text } from '../ui/ScaledText';
 
 export interface FilterState {
     sortBy: 'relevance' | 'new' | 'price_low' | 'price_high' | 'rating' | 'discount';
@@ -252,7 +251,7 @@ export default function FilterModal({ visible, onClose, onApply, initialFilters,
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     modalContainer: {
         flex: 1,
         backgroundColor: palette.paperWarm,

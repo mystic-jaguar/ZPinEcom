@@ -8,14 +8,15 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { Banknote, Check, Landmark, Lock, LucideIcon, Smartphone } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 import RazorpayCheckout from 'react-native-razorpay';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useExitGuard } from '../../hooks/useExitGuard';
 import { AppHeader, CheckoutSteps, ZText } from '../../components/ui';
-import { colors, fonts, palette, radius, shadow } from '../../constants/theme';
+import { createStyles, colors, fonts, palette, radius, shadow } from '../../constants/theme';
 import { orderService } from '../../services/order';
 import { paymentService } from '../../services/payment';
+import { Text } from '../../components/ui/ScaledText';
 
 export default function CheckoutPaymentScreen() {
     const router = useRouter();
@@ -321,7 +322,7 @@ export default function CheckoutPaymentScreen() {
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     container: { flex: 1, backgroundColor: palette.paperWarm },
     content: { padding: 20, paddingTop: 4, paddingBottom: 24 },
     eyebrowRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12, marginTop: 8 },

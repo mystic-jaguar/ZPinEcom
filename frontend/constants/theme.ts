@@ -3,6 +3,84 @@
  * Single source of truth for colour, type, spacing, radius, shadow and motion.
  * Screens should import from here rather than hard-coding hex/px values.
  */
+import { Dimensions, PixelRatio, StyleSheet } from 'react-native';
+import { deviceScale, scaleTree } from '../utils/scaleStyles';
+
+/* ============ DEVICE SCALING ============ */
+/**
+ * Device-width scaling for every size token in this file.
+ *
+ * The app is portrait-locked and phones-only (app.json: orientation "portrait",
+ * ios.supportsTablet false), so the window width never changes at runtime and
+ * reading it once at module load is safe — no hook, no re-render, and the tokens
+ * below stay plain numbers that StyleSheet can hoist.
+ *
+ * Percentages were considered and rejected: `width: '40%'` fixes side-by-side
+ * layout but does nothing for type, icons or tap targets, which is exactly where
+ * a 320dp budget Android and a 430dp Pro Max actually diverge.
+ *
+ * The clamp is the whole point: raw width/BASELINE makes a large phone absurd,
+ * so the ceiling is 1.10 — a modest, uniform lift rather than a stretched layout.
+ *
+ * The floor is 1.0 — this app never scales DOWN — and that is a deliberate
+ * departure from the vendor app's 0.88 floor. Shrinking a 320dp phone by 12%
+ * takes a 44dp tap target to 39dp, under both the iOS 44pt and Android 48dp
+ * minimums, and 14px body text to 12px: it would have made small, cheap devices
+ * strictly worse than they are today in order to make them "consistent".
+ * Consistency here means the design holds its proportions, not that small phones
+ * get a miniature of it.
+ *
+ * The real small-screen failure was never type size — it was fixed-width tiles
+ * overflowing (two 168px cards do not fit in 320dp). That is fixed properly by
+ * productGridCardWidth below, which derives tile widths from the actual window,
+ * so the floor does not need to paper over it.
+ */
+// The clamp itself lives in utils/scaleStyles so it can be unit-tested without a
+// React Native runtime; this module only supplies the real window width.
+const SCALE = deviceScale(Dimensions.get('window').width);
+
+/** Scale a design-baseline pixel value to this device. Rounds to a real pixel. */
+export const s = (n: number): number => PixelRatio.roundToNearestPixel(n * SCALE);
+
+/**
+ * Cap for the OS font-size accessibility setting, applied by components/ui/ScaledText,
+ * which every screen imports Text/TextInput from.
+ *
+ * 1 means the app ignores the OS font-size setting entirely: text renders at the
+ * same size for everyone, which is what keeps every screen pixel-consistent across
+ * devices. This matches the vendor app and is a deliberate product decision.
+ *
+ * The cost is real and worth restating before anyone "tidies" this away: a customer
+ * who has enlarged their system font because they cannot comfortably read small text
+ * gets no benefit from it anywhere in this app. If that ever needs undoing, raise
+ * this value and give the dense screens (checkout, order detail, product detail)
+ * room to wrap — they are the reason it is capped.
+ */
+export const MAX_FONT_SCALE = 1;
+
+/**
+ * Drop-in for StyleSheet.create that runs every measurement through s().
+ *
+ * THE ONE RULE: createStyles is the single scaling point. The size tokens below
+ * (fontSize, space, gutter, radius, shadow) are deliberately left at the 390dp
+ * design baseline and are NOT pre-scaled. Do not "helpfully" wrap them in s() —
+ * 34 files mix `borderRadius: radius.md` with `padding: 14` in the same style
+ * object, so pre-scaling the token would scale it twice while the raw number
+ * scaled once, and the two would drift apart on exactly the small and large
+ * devices this exists to keep consistent.
+ *
+ * Corollary: a measurement written OUTSIDE a stylesheet (an inline style object,
+ * or a numeric prop like an icon `size=`) is not reached by createStyles — call
+ * s() on it explicitly there.
+ *
+ * Every screen uses this instead of StyleSheet.create, so the ~460 hardcoded
+ * font sizes and ~295 hardcoded box measurements scattered across the app scale
+ * with the device without touching a single one of them — and anything written
+ * later scales by default. Percent strings, 'auto' and colours pass through
+ * untouched. Which properties count as measurements lives in utils/scaleStyles.
+ */
+export const createStyles = <T extends StyleSheet.NamedStyles<T>>(styles: T): T =>
+  StyleSheet.create(scaleTree(styles, s) as T);
 
 /* ============ PALETTE ============ */
 export const palette = {
@@ -127,7 +205,7 @@ export const fonts = {
   monoBold: 'SpaceMono_700Bold',
 } as const;
 
-// px sizes from the design type scale
+// px sizes from the design type scale, at the 390dp design baseline.
 export const fontSize = {
   display: 56,
   h1: 40,
@@ -176,6 +254,27 @@ export const gutter = {
   card: 16, // card interior padding
 } as const;
 
+/* ============ GRID METRICS ============ */
+/**
+ * Width of one card in the app's standard 2-up product grid.
+ *
+ * There were six different formulas for this — (width-40-14)/2, '48%', '47.5%',
+ * (width-48)/2, (width/2)-20 and a hardcoded 168 — which agreed only at the 390dp
+ * baseline and drifted apart on every other device; the loading skeleton never
+ * matched the card it stood in for, so the grid visibly jumped when data arrived.
+ * One derivation, used by the listing, search, for-you, flash-deals and skeleton
+ * grids alike.
+ *
+ * Already derived from the real window width, so it is device-correct as-is and
+ * must NOT be passed through createStyles — that would scale an already
+ * proportional number a second time. Apply it inline or via a `width` prop.
+ */
+export const GRID_GAP = 14;
+export const productGridCardWidth = Math.floor(
+  (Dimensions.get('window').width - s(gutter.page) * 2 - GRID_GAP) / 2,
+);
+
+
 /* ============ RADII ============ */
 export const radius = {
   xs: 6,
@@ -184,9 +283,11 @@ export const radius = {
   lg: 20, // cards
   xl: 28, // sheets, hero tiles
   '2xl': 36,
-  full: 999,
+  full: 999, // pill sentinel — "round the ends", not a measurement. Never scale.
 } as const;
 
+// Never scaled: a 1px rule is a hairline on every phone, and scaling it only
+// makes it blurry or erases it. Matches the borderWidth exclusion in scaleStyles.
 export const border = {
   hair: 1,
   thin: 1.5,
@@ -215,6 +316,8 @@ export const shadow: Record<'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'brand' | 'sheet'
 export const duration = { fast: 120, base: 200, slow: 320 } as const;
 
 export const theme = {
+  s,
+  createStyles,
   palette,
   colors,
   fonts,

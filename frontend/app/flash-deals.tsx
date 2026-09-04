@@ -1,14 +1,15 @@
 import { Stack, useRouter } from 'expo-router';
 import { Zap } from 'lucide-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Dimensions, FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Dimensions, FlatList, RefreshControl, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader, ProductCard, ZText } from '../components/ui';
-import { colors, fonts, palette, radius } from '../constants/theme';
+import { createStyles, colors, fonts, palette, radius, productGridCardWidth } from '../constants/theme';
 import { FlashDeal, flashDealService } from '../services/flashDeals';
+import { Text } from '../components/ui/ScaledText';
 
 const { width } = Dimensions.get('window');
-const CARD_W = (width - 48) / 2;
+const CARD_W = productGridCardWidth;
 
 /** mm:ss / h:mm:ss left, or 'Ended'. Ticks once a second. */
 export function useCountdown(endsAt: string): string {
@@ -109,7 +110,7 @@ export default function FlashDealsScreen() {
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     screen: { flex: 1, backgroundColor: colors.surfacePage },
     sub: { paddingHorizontal: 20, paddingBottom: 10, color: colors.textMuted },
     list: { paddingHorizontal: 20, paddingBottom: 32, gap: 18 },

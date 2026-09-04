@@ -1,6 +1,8 @@
 import React from 'react';
-import { StyleSheet, Text, TextProps } from 'react-native';
-import { colors, fonts, fontSize } from '../../constants/theme';
+import { StyleSheet, TextProps } from 'react-native';
+import { s as scale, colors, fonts, fontSize } from '../../constants/theme';
+import { scaleTree } from '../../utils/scaleStyles';
+import { Text } from './ScaledText';
 
 /**
  * Typography primitive for the ZPIN design system.
@@ -23,7 +25,7 @@ export type ZTextVariant =
   | 'price'       // Space Grotesk numerals
   | 'eyebrow';    // mono uppercase label
 
-const V: Record<ZTextVariant, any> = {
+const BASE: Record<ZTextVariant, any> = {
   display: { fontFamily: fonts.displayBold, fontSize: fontSize.display, color: colors.textStrong, letterSpacing: -1.2 },
   h1: { fontFamily: fonts.displayBold, fontSize: fontSize.h1, color: colors.textStrong, letterSpacing: -1 },
   h2: { fontFamily: fonts.displayBold, fontSize: fontSize.h2, color: colors.textStrong, letterSpacing: -0.6 },
@@ -48,5 +50,14 @@ export interface ZTextProps extends TextProps {
 export default function ZText({ variant = 'body', color, style, ...rest }: ZTextProps) {
   return <Text {...rest} style={[V[variant], color ? { color } : null, style]} />;
 }
+
+/**
+ * Scaled once, here, rather than via createStyles: ZText applies `V[variant]` as a
+ * plain style object (not through a StyleSheet), so it would otherwise be the one
+ * place in the app that never followed the device. Scaling BASE once and using it
+ * for both the inline object and the sheet keeps them a single source of truth and
+ * avoids double-scaling.
+ */
+const V: Record<ZTextVariant, any> = scaleTree(BASE, scale);
 
 export const zText = StyleSheet.create(V as any);

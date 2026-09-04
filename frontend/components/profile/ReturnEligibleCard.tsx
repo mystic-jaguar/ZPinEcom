@@ -1,5 +1,7 @@
 import React from 'react';
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, TouchableOpacity, View } from 'react-native';
+import { Text } from '../ui/ScaledText';
+import { createStyles } from '../../constants/theme';
 
 interface ReturnEligibleCardProps {
     image: any;
@@ -42,7 +44,7 @@ export default function ReturnEligibleCard({
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     card: {
         backgroundColor: '#fff',
         borderRadius: 24,

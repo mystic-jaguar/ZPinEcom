@@ -1,13 +1,15 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MessageSquare } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
 import { AppHeader, ZButton, ZText } from '../../components/ui';
-import { colors, fonts, palette } from '../../constants/theme';
+import { createStyles, colors, fonts, palette } from '../../constants/theme';
 import { useUser } from '../../context/UserContext';
 import { authService } from '../../services/auth';
+import type { TextInput as RNTextInput } from 'react-native';
+import { Text, TextInput } from '../../components/ui/ScaledText';
 
 export default function VerifyOTPScreen() {
     const router = useRouter();
@@ -25,7 +27,7 @@ export default function VerifyOTPScreen() {
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [modalMessage, setModalMessage] = useState('');
 
-    const inputRefs = useRef<Array<TextInput | null>>([]);
+    const inputRefs = useRef<Array<RNTextInput | null>>([]);
 
     useEffect(() => {
         const timer = setInterval(() => {
@@ -156,7 +158,7 @@ export default function VerifyOTPScreen() {
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     container: { flex: 1, backgroundColor: palette.paperWarm },
     content: { flex: 1, paddingHorizontal: 26 },
     iconTile: {

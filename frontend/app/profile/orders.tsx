@@ -3,15 +3,16 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { Bike, Headphones, HelpCircle, Repeat, RotateCcw, XCircle } from 'lucide-react-native';
 import React, { useCallback, useMemo, useState } from 'react';
-import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, RefreshControl, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
 import { AppHeader, ZText } from '../../components/ui';
-import { colors, fonts, palette, radius } from '../../constants/theme';
+import { createStyles, colors, fonts, palette, radius } from '../../constants/theme';
 import { useOrder } from '../../context/OrderContext';
 import { orderService } from '../../services/order';
 import { groupOrders, groupStatus, OrderGroup } from '../../utils/orderGroups';
 import { isInProgress, isReturnInProgress, statusLabel, TERMINATED } from '../../utils/orderStatus';
+import { Text } from '../../components/ui/ScaledText';
 
 const FILTERS = ['All', 'In Progress', 'Completed', 'Cancelled'];
 
@@ -223,7 +224,7 @@ export default function AllOrdersScreen() {
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     container: { flex: 1, backgroundColor: palette.paperWarm },
     helpBtn: { width: 40, height: 40, borderRadius: 20, borderWidth: 2, borderColor: colors.borderInk, alignItems: 'center', justifyContent: 'center' },
     filters: { flexDirection: 'row', flexWrap: 'wrap', gap: 9, paddingHorizontal: 20, paddingBottom: 14 },

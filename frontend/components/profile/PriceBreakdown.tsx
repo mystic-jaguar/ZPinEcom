@@ -1,5 +1,7 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { View } from 'react-native';
+import { Text } from '../ui/ScaledText';
+import { createStyles } from '../../constants/theme';
 
 interface PriceBreakdownProps {
     itemsTotal: number;
@@ -74,7 +76,7 @@ export default function PriceBreakdown({
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     container: {
         marginTop: 10,
     },

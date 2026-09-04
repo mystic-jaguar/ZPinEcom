@@ -1,6 +1,8 @@
 import { Feather, FontAwesome } from '@expo/vector-icons';
 import React from 'react';
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, TouchableOpacity, View } from 'react-native';
+import { Text } from '../ui/ScaledText';
+import { createStyles } from '../../constants/theme';
 
 export default function DeliveryPartnerCard() {
     return (
@@ -37,7 +39,7 @@ export default function DeliveryPartnerCard() {
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     container: {
         backgroundColor: '#FFFFFF', // Off-white/Grayish background from design
         borderRadius: 20,

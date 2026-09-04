@@ -2,11 +2,13 @@ import ActionModal from '@/components/common/ActionModal';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Mail } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader, ZButton, ZText } from '../../components/ui';
-import { colors, fonts, palette } from '../../constants/theme';
+import { createStyles, colors, fonts, palette } from '../../constants/theme';
 import { authService } from '../../services/auth';
+import type { TextInput as RNTextInput } from 'react-native';
+import { Text, TextInput } from '../../components/ui/ScaledText';
 
 export default function VerifyResetOTPScreen() {
     const router = useRouter();
@@ -23,7 +25,7 @@ export default function VerifyResetOTPScreen() {
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
     const [resetToken, setResetToken] = useState('');
-    const inputRefs = useRef<Array<TextInput | null>>([]);
+    const inputRefs = useRef<Array<RNTextInput | null>>([]);
 
     useEffect(() => {
         if (resendTimer > 0) {
@@ -145,7 +147,7 @@ export default function VerifyResetOTPScreen() {
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     container: { flex: 1, backgroundColor: palette.paperWarm },
     content: { flex: 1, paddingHorizontal: 26 },
     iconTile: { width: 64, height: 64, borderRadius: 20, backgroundColor: colors.surfaceInverse, alignItems: 'center', justifyContent: 'center', marginTop: 24 },

@@ -13,15 +13,17 @@
 import { useRouter } from 'expo-router';
 import { AlertTriangle, Trash2 } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
 import { AppHeader, ZButton, ZText } from '../../components/ui';
-import { colors, fonts, palette, radius } from '../../constants/theme';
+import { createStyles, colors, fonts, palette, radius } from '../../constants/theme';
 import { useCart } from '../../context/CartContext';
 import { useUser } from '../../context/UserContext';
 import { useWishlist } from '../../context/WishlistContext';
 import { authService, DeletionBlocker } from '../../services/auth';
+import type { TextInput as RNTextInput } from 'react-native';
+import { Text, TextInput } from '../../components/ui/ScaledText';
 
 const RESEND_SECONDS = 30;
 
@@ -43,7 +45,7 @@ export default function DeleteAccountScreen() {
     const [errorMessage, setErrorMessage] = useState('');
     const [deletedOn, setDeletedOn] = useState<string | null>(null);
 
-    const inputRefs = useRef<Array<TextInput | null>>([]);
+    const inputRefs = useRef<Array<RNTextInput | null>>([]);
 
     // Only counts down on the code step, so the timer doesn't run out before the
     // first code is even requested.
@@ -244,7 +246,7 @@ export default function DeleteAccountScreen() {
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     container: { flex: 1, backgroundColor: palette.paperWarm },
     content: { paddingHorizontal: 22, paddingTop: 8 },
     warnCard: {

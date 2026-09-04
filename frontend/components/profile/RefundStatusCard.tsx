@@ -1,6 +1,8 @@
 import { Feather } from '@expo/vector-icons';
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { View } from 'react-native';
+import { Text } from '../ui/ScaledText';
+import { createStyles } from '../../constants/theme';
 
 export type RefundStepState = 'pending' | 'active' | 'completed';
 
@@ -77,7 +79,7 @@ export default function RefundStatusCard({
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     card: {
         backgroundColor: '#fff',
         borderRadius: 24,

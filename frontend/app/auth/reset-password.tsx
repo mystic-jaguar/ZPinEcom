@@ -2,12 +2,13 @@ import ActionModal from '@/components/common/ActionModal';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Lock } from 'lucide-react-native';
 import React, { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader, ZButton, ZInput, ZText } from '../../components/ui';
-import { colors, fonts, palette } from '../../constants/theme';
+import { createStyles, colors, fonts, palette } from '../../constants/theme';
 import { authService } from '../../services/auth';
 import { validatePassword } from '../../utils/validation';
+import { Text } from '../../components/ui/ScaledText';
 
 export default function ResetPasswordScreen() {
     const router = useRouter();
@@ -96,7 +97,7 @@ export default function ResetPasswordScreen() {
     );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
     container: { flex: 1, backgroundColor: palette.paperWarm },
     flex: { flex: 1 },
     content: { paddingHorizontal: 26, paddingBottom: 30 },
