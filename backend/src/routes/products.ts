@@ -366,6 +366,16 @@ router.get('/search', productListLimiter, async (req: Request, res: Response): P
     return;
   }
 
+  // Search was the only read route here that never cached, though TTL_SEARCH
+  // had been declared for it all along. Every debounced keystroke that reached
+  // the server ran the full scan; popular queries repeat constantly across
+  // users, so this collapses them onto one. Same 1m TTL reasoning as the list
+  // keys: price/stock edits happen in other backends that cannot invalidate
+  // this Redis, so the window is kept short rather than invalidated.
+  const cacheKey = `search:${q.toLowerCase()}:l${limit}`;
+  const cached = await cacheGet(cacheKey);
+  if (cached) { res.json(cached); return; }
+
   try {
     // Normalize query — treat "keychain" and "key chain" as equivalent
     const normalized = q.replace(/\s+/g, '').toLowerCase();
@@ -511,7 +521,9 @@ router.get('/search', productListLimiter, async (req: Request, res: Response): P
       related = relatedResult.rows.map(normalizeProduct);
     }
 
-    res.json({ success: true, products, related });
+    const response = { success: true, products, related };
+    await cacheSet(cacheKey, response, TTL_SEARCH);
+    res.json(response);
   } catch (err) {
     logger.error('search_error', { error: (err as any)?.message ?? String(err) });
     res.status(500).json({ success: false, message: 'Server error' });
