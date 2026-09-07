@@ -17,6 +17,7 @@ import notificationRoutes from './routes/notifications';
 import orderRoutes from './routes/orders';
 import productRoutes from './routes/products';
 import razorpayRoutes from './routes/razorpay';
+import supportChatRoutes from './routes/supportChat';
 import userRoutes from './routes/users';
 import wishlistRoutes from './routes/wishlist';
 import { prepareSensitiveDataEncryption } from './utils/encryption';
@@ -104,6 +105,11 @@ app.use('/api/v1/flash-deals', flashDealRoutes);
 app.use('/api/v1/banners', bannerRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
 app.use('/api/v1/razorpay', razorpayRoutes);
+// Same tables and same thread as the customer website's ChatBot (one row per
+// customer in customer_support_threads) — a customer who asked for help on the
+// web and then opens the app sees the same conversation, and the admin inbox
+// has one thread to answer, not two.
+app.use('/api/v1/support-chat', supportChatRoutes);
 
 // Health check — excluded from rate limiting
 app.get('/health', (_, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
