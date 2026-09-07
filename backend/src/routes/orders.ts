@@ -98,6 +98,25 @@ function buildTrackingHistory(order: any, returnRequest?: any) {
     });
   }
 
+  // The attempt failed and the courier has given up on it: the parcel is
+  // travelling back. `orders.status` deliberately stays 'delivery_failed' until
+  // the seller confirms receipt (the delivery backend owns only delivery_status
+  // — see its /orders/:id/resolve), so without this branch the timeline lost the
+  // failure event entirely at this point and fell back to plain "Order shipped".
+  if (order.delivery_status === 'returned') {
+    steps.push({
+      status: 'delivery_failed',
+      title: 'Delivery attempt failed',
+      timestamp: order.updated_at,
+    });
+    steps.push({
+      status: 'returning_to_seller',
+      title: 'Returning to the seller',
+      timestamp: order.updated_at,
+      note: 'Any refund due will be reviewed by our team once the seller confirms receipt.',
+    });
+  }
+
   if (order.status === 'cancelled') {
     steps.push({
       status: 'cancelled',
@@ -382,8 +401,17 @@ router.get('/:id/track', authenticate, async (req: AuthRequest, res: Response): 
         // Phase 9 — an attempt was made and did not complete. The customer sees
         // the reason so a second attempt is not a surprise. Only the fixed
         // reason word is exposed; the partner's free-text note is internal.
-        deliveryFailure: order.delivery_status === 'failed'
-          ? { reason: String(order.delivery_failure_reason || 'other').split(':')[0], at: order.updated_at }
+        // 'returned' is included deliberately: the parcel going back to the
+        // seller does not un-fail the delivery, and dropping the banner at that
+        // moment was how the customer silently lost the only explanation they
+        // had. `returning` tells the app to say "on its way back" rather than
+        // "we will try again".
+        deliveryFailure: order.delivery_status === 'failed' || order.delivery_status === 'returned'
+          ? {
+              reason: String(order.delivery_failure_reason || 'other').split(':')[0],
+              at: order.updated_at,
+              returning: order.delivery_status === 'returned',
+            }
           : null,
         estimatedDelivery: order.estimated_delivery,
         trackingHistory,

@@ -60,9 +60,11 @@ export default function TrackOrderScreen() {
     const courier = trackingData?.courier ?? null;
     // Backend only sends this while the order is out for delivery.
     const deliveryOtp: string | null = trackingData?.deliveryOtp ?? null;
-    // Phase 9 — an attempt was made and did not complete. Non-null only while the
-    // order sits in that state; it clears on retry, return or delivery.
-    const deliveryFailure: { reason?: string } | null = trackingData?.deliveryFailure ?? null;
+    // Phase 9 — an attempt was made and did not complete. Non-null while the order
+    // sits in that state; it clears on retry and on delivery, but NOT on return:
+    // `returning` says the courier has given up and the parcel is travelling back
+    // to the seller, so the banner must stop promising another attempt.
+    const deliveryFailure: { reason?: string; returning?: boolean } | null = trackingData?.deliveryFailure ?? null;
     const liveEta = trackingData?.estimatedDelivery || order?.estimatedDelivery;
     const canCancel = order && ['pending', 'confirmed'].includes(liveStatus);
     // A return replaces the fulfilment timeline entirely — by the time one exists
@@ -162,12 +164,14 @@ export default function TrackOrderScreen() {
                         the timeline look stuck at "Out for delivery". */}
                     {deliveryFailure && (
                         <View style={styles.failCard}>
-                            <ZText variant="eyebrow">Delivery attempt failed</ZText>
+                            <ZText variant="eyebrow">{deliveryFailure.returning ? 'Returning to the seller' : 'Delivery attempt failed'}</ZText>
                             <Text style={styles.failText}>
                                 {FAILURE_TEXT[deliveryFailure.reason || 'other'] || FAILURE_TEXT.other}
                             </Text>
                             <Text style={styles.failNote}>
-                                Your courier will try again or return the order to the seller. Keep your phone reachable.
+                                {deliveryFailure.returning
+                                    ? 'Your order is on its way back to the seller. Any refund due will be reviewed by our team once the seller confirms receipt.'
+                                    : 'Your courier will try again or return the order to the seller. Keep your phone reachable.'}
                             </Text>
                         </View>
                     )}
