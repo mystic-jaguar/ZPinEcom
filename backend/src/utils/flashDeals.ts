@@ -70,3 +70,40 @@ export async function releaseDealStock(
     [productId, Math.max(1, Number(quantity) || 1)]
   );
 }
+
+/**
+ * The live deal on ONE product, for the product detail page.
+ *
+ * Without this the app showed a flash-deal product at its full `products.price`
+ * the moment the customer tapped the deal card, then charged the deal price at
+ * checkout (orders.ts already resolves it via liveDealPrices) — the discount
+ * advertised on the Flash Deals screen simply vanished on the way to the buy
+ * button. Returns raw vendor prices; the caller applies the markup.
+ */
+export async function liveDealForProduct(
+  productId: string
+): Promise<{ dealPrice: number; endsAt: string; label: string; stockRemaining: number } | null> {
+  try {
+    const { rows } = await pool.query(
+      `SELECT fd.deal_price, fd.ends_at, fd.label, fd.stock_remaining
+         FROM flash_deals fd
+        WHERE fd.product_id = $1::uuid AND ${LIVE_DEAL_PREDICATE}
+        ORDER BY fd.deal_price ASC
+        LIMIT 1`,
+      [productId]
+    );
+    const r = rows[0];
+    if (!r) return null;
+    return {
+      dealPrice: Number(r.deal_price),
+      endsAt: r.ends_at,
+      label: r.label || 'Flash Deal',
+      stockRemaining: r.stock_remaining,
+    };
+  } catch {
+    // A deal we can't read is a deal we don't show. Never fail the product page
+    // over it — the price shown then is the regular one, which is also what a
+    // product with no deal is charged.
+    return null;
+  }
+}

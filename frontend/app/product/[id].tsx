@@ -23,6 +23,7 @@ import { MAX_REVIEW_IMAGES, reviewService } from '../../services/review';
 import { userService } from '../../services/user';
 import { createStyles, colors, fonts, palette, radius } from '../../constants/theme';
 import { ProductObject, ReviewObject } from '../../types/types';
+import { useCountdown } from '../flash-deals';
 import { productOneLiner } from '../../utils/productDetail';
 import { Text, TextInput } from '../../components/ui/ScaledText';
 
@@ -349,6 +350,12 @@ export default function ProductDetails() {
         setShowSuccessModal(true);
     };
 
+    // A live flash deal on this product. Hooks run before the loading guard, so
+    // the countdown can't be conditional on the product having loaded.
+    const deal = Boolean(product?.dealPrice);
+    const dealTime = useCountdown(product?.dealEndsAt || '');
+    const effectivePrice = (deal ? product!.dealPrice! : product?.price) ?? 0;
+
     if (loading) {
         return (
             <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
@@ -427,14 +434,38 @@ export default function ProductDetails() {
                     )}
 
                     <View style={styles.priceRow}>
-                        <Text style={styles.price}>₹{product.price.toLocaleString()}</Text>
-                        {product.originalPrice && (
+                        <Text style={styles.price}>₹{effectivePrice.toLocaleString()}</Text>
+                        {deal ? (
+                            // On a live deal the regular price is what's struck through:
+                            // it is the price this deal is actually saving the customer.
+                            <>
+                                <Text style={styles.originalPrice}>₹{product.price.toLocaleString()}</Text>
+                                <Text style={styles.discountText}>({product.dealDiscountPercent}% OFF)</Text>
+                            </>
+                        ) : product.originalPrice ? (
                             <>
                                 <Text style={styles.originalPrice}>₹{product.originalPrice.toLocaleString()}</Text>
                                 <Text style={styles.discountText}>({product.discount}% OFF)</Text>
                             </>
-                        )}
+                        ) : null}
                     </View>
+
+                    {/* Live flash deal. Checkout has always charged this price
+                        (orders.ts resolves it server-side); until now the screen
+                        showed the full one, so the deal silently disappeared
+                        between the Flash Deals card and the buy button. */}
+                    {deal && (
+                        <View style={styles.dealBanner}>
+                            <Zap size={14} color={palette.yellow900} fill={palette.yellow500} />
+                            <Text style={styles.dealLabel} numberOfLines={1}>{product.dealLabel}</Text>
+                            <Text style={[styles.dealTimer, dealTime.urgent && styles.dealTimerUrgent]}>
+                                {dealTime.label}
+                            </Text>
+                            {typeof product.dealStockRemaining === 'number' && product.dealStockRemaining <= 5 && (
+                                <Text style={styles.dealStock}>Only {product.dealStockRemaining} left!</Text>
+                            )}
+                        </View>
+                    )}
 
                     {/* Coupon Banner — from database */}
                     {activeCoupon && (
@@ -794,7 +825,7 @@ export default function ProductDetails() {
                 </Pressable>
                 <Pressable style={styles.addBtn} onPress={() => handleAddToCart()}>
                     <ShoppingCart size={18} color={colors.textOnYellow} />
-                    <Text style={styles.addBtnText}>Add · ₹{product.price.toLocaleString('en-IN')}</Text>
+                    <Text style={styles.addBtnText}>Add · ₹{effectivePrice.toLocaleString('en-IN')}</Text>
                 </Pressable>
             </View>
 
@@ -947,6 +978,16 @@ const styles = createStyles({
         color: '#b3261e',
         marginBottom: 12
     },
+    dealBanner: {
+        flexDirection: 'row', alignItems: 'center', gap: 6,
+        alignSelf: 'flex-start', marginTop: 8,
+        paddingHorizontal: 10, paddingVertical: 6,
+        borderRadius: radius.sm, backgroundColor: palette.yellow100,
+    },
+    dealLabel: { fontFamily: fonts.bodyMedium, fontSize: 11, color: palette.yellow900, textTransform: 'uppercase', letterSpacing: 0.4 },
+    dealTimer: { fontFamily: fonts.bodyMedium, fontSize: 11, color: palette.yellow900 },
+    dealTimerUrgent: { color: palette.red600 },
+    dealStock: { fontFamily: fonts.bodyMedium, fontSize: 11, color: palette.red600 },
     priceRow: {
         flexDirection: 'row',
         alignItems: 'baseline',

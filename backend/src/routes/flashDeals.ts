@@ -18,6 +18,13 @@ router.get('/', async (_req: Request, res: Response) => {
        LEFT JOIN product_images pi ON pi.product_id = p.id
        LEFT JOIN product_reviews pr ON pr.product_id = p.id AND pr.is_hidden = false
        WHERE ${LIVE_DEAL_PREDICATE} AND p.in_stock = true AND p.is_approved = true
+         -- Same display filter the customer website applies: a deal whose product
+         -- has no usable image renders as a blank card. The row is untouched.
+         AND EXISTS (
+           SELECT 1 FROM product_images img
+            WHERE img.product_id = p.id
+              AND btrim(COALESCE(img.image_url, '')) <> ''
+         )
        GROUP BY fd.id, p.product_name, p.price, p.description, p.in_stock
        ORDER BY fd.ends_at ASC
        LIMIT 20`

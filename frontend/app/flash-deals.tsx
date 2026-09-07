@@ -12,29 +12,34 @@ const { width } = Dimensions.get('window');
 const CARD_W = productGridCardWidth;
 
 /** mm:ss / h:mm:ss left, or 'Ended'. Ticks once a second. */
-export function useCountdown(endsAt: string): string {
-    const [label, setLabel] = useState('');
+export function useCountdown(endsAt: string): { label: string; urgent: boolean } {
+    const [state, setState] = useState({ label: '', urgent: false });
     useEffect(() => {
         const tick = () => {
             const diff = new Date(endsAt).getTime() - Date.now();
-            if (!Number.isFinite(diff) || diff <= 0) return setLabel('Ended');
+            if (!Number.isFinite(diff) || diff <= 0) return setState({ label: 'Ended', urgent: false });
             const h = Math.floor(diff / 3600000);
             const m = Math.floor((diff % 3600000) / 60000);
             const s = Math.floor((diff % 60000) / 1000);
-            setLabel(`${h > 0 ? `${h}h ` : ''}${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`);
+            setState({
+                label: `${h > 0 ? `${h}h ` : ''}${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`,
+                // Under an hour reads red, same threshold as the website's timer.
+                urgent: diff < 3600000,
+            });
         };
         tick();
         const id = setInterval(tick, 1000);
         return () => clearInterval(id);
     }, [endsAt]);
-    return label;
+    return state;
 }
 
 function DealCard({ deal, onPress }: { deal: FlashDeal; onPress: () => void }) {
-    const left = useCountdown(deal.endsAt);
+    const { label: left, urgent } = useCountdown(deal.endsAt);
     const soldPct = deal.totalStock > 0
         ? Math.min(100, Math.round(((deal.totalStock - deal.stockRemaining) / deal.totalStock) * 100))
         : 0;
+    const lowStock = deal.stockRemaining > 0 && deal.stockRemaining <= 5;
 
     return (
         <View style={{ width: CARD_W }}>
@@ -48,14 +53,22 @@ function DealCard({ deal, onPress }: { deal: FlashDeal; onPress: () => void }) {
                 onPress={onPress}
             />
             <View style={styles.meta}>
+                {/* The admin sets a label per deal ("Weekend Steal", "Festive Drop");
+                    it was fetched but never shown, so every deal read as generic. */}
+                <View style={styles.labelChip}>
+                    <Zap size={9} color={palette.yellow900} fill={palette.yellow500} />
+                    <Text style={styles.labelText} numberOfLines={1}>{deal.label}</Text>
+                </View>
                 <View style={styles.timerRow}>
-                    <Zap size={11} color={palette.yellow600} fill={palette.yellow500} />
-                    <Text style={styles.timer}>{left}</Text>
+                    <Zap size={11} color={urgent ? palette.red600 : palette.yellow600} fill={urgent ? palette.red500 : palette.yellow500} />
+                    <Text style={[styles.timer, urgent && styles.timerUrgent]}>{left}</Text>
                 </View>
                 <View style={styles.barTrack}>
-                    <View style={[styles.barFill, { width: `${soldPct}%` }]} />
+                    <View style={[styles.barFill, lowStock && styles.barFillLow, { width: `${soldPct}%` }]} />
                 </View>
-                <Text style={styles.stock}>{deal.stockRemaining} left of {deal.totalStock}</Text>
+                <Text style={[styles.stock, lowStock && styles.stockLow]}>
+                    {lowStock ? `Only ${deal.stockRemaining} left!` : `${deal.stockRemaining} left of ${deal.totalStock}`}
+                </Text>
             </View>
         </View>
     );
@@ -118,7 +131,16 @@ const styles = createStyles({
     empty: { color: colors.textMuted },
     meta: { marginTop: 6, gap: 5 },
     timerRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+    labelChip: {
+        flexDirection: 'row', alignItems: 'center', gap: 3, alignSelf: 'flex-start',
+        paddingHorizontal: 6, paddingVertical: 2,
+        borderRadius: radius.sm, backgroundColor: palette.yellow100,
+    },
+    labelText: { fontFamily: fonts.bodyMedium, fontSize: 9, color: palette.yellow900, textTransform: 'uppercase', letterSpacing: 0.4 },
     timer: { fontFamily: fonts.bodyMedium, fontSize: 11, color: palette.yellow900 },
+    timerUrgent: { color: palette.red600 },
+    barFillLow: { backgroundColor: palette.red500 },
+    stockLow: { color: palette.red600, fontFamily: fonts.bodyMedium },
     barTrack: { height: 4, borderRadius: radius.sm, backgroundColor: palette.neutral200, overflow: 'hidden' },
     barFill: { height: 4, borderRadius: radius.sm, backgroundColor: palette.yellow500 },
     stock: { fontFamily: fonts.bodyRegular, fontSize: 10, color: colors.textMuted },

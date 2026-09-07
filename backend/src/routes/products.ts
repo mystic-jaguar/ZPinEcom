@@ -7,6 +7,7 @@ import { generateId } from '../utils/id';
 import { expandSearchTerms } from '../utils/searchSynonyms';
 import { AUTO_HIDE_THRESHOLD } from '../utils/moderationSchema';
 import { withMarkup, withoutMarkup } from '../utils/pricing';
+import { liveDealForProduct } from '../utils/flashDeals';
 import { cacheDel, cacheDelPattern, cacheGet, cacheSet } from '../utils/redis';
 import { logger } from '../utils/logger';
 import multer from 'multer';
@@ -772,6 +773,32 @@ router.get('/', productListLimiter, async (req: Request, res: Response): Promise
 });
 
 // GET /api/v1/products/:id
+/**
+ * Merge the product's live flash deal into a detail payload.
+ *
+ * Applied AFTER the cache read on both paths and never stored in the cached
+ * blob: a deal starts and ends on a clock, and the cache stamp only tracks
+ * products.updated_at, so a cached page would keep advertising a deal that
+ * expired up to 2h ago (or miss one that just started).
+ */
+async function attachDeal(response: any, productId: string): Promise<any> {
+  const deal = await liveDealForProduct(productId);
+  if (!deal) return response;
+  const dealPrice = withMarkup(deal.dealPrice);
+  const base = Number(response?.data?.price) || 0;
+  return {
+    ...response,
+    data: {
+      ...response.data,
+      dealPrice,
+      dealEndsAt: deal.endsAt,
+      dealLabel: deal.label,
+      dealStockRemaining: deal.stockRemaining,
+      dealDiscountPercent: base > 0 ? Math.round(((base - dealPrice) / base) * 100) : 0,
+    },
+  };
+}
+
 router.get('/:id', async (req: Request, res: Response): Promise<void> => {
   const { id } = req.params;
   // Accept both UUID format (legacy) and 7-char alphanumeric IDs
@@ -813,7 +840,7 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
       : null;
   } catch { /* fall through to a full rebuild */ }
   if (cached?.response && freshStamp && cached.stamp === freshStamp) {
-    res.json(cached.response);
+    res.json(await attachDeal(cached.response, id));
     return;
   }
 
@@ -882,7 +909,7 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
       },
     };
     if (freshStamp) await cacheSet(cacheKey, { stamp: freshStamp, response }, TTL_PRODUCT);
-    res.json(response);
+    res.json(await attachDeal(response, id));
   } catch (err) {
     logger.error('getproduct_error', { error: (err as any)?.message ?? String(err) });
     res.status(500).json({ success: false, message: 'Server error' });

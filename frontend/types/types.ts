@@ -206,6 +206,15 @@ export interface ProductObject {
     sellerIsLive?: boolean;                // users.is_live — false blocks buying
     variants?: ProductVariant[];           // detail endpoint only, sibling colors/designs
     specifications?: ProductSpecification[]; // detail endpoint only, EAV attributes (same shape as the website)
+
+    // Live flash deal on this product (detail endpoint only, never cached — see
+    // attachDeal in the backend's routes/products.ts). Present only while the
+    // deal is active, started, unexpired and still in deal stock.
+    dealPrice?: number;                    // marked-up deal price — what checkout actually charges
+    dealEndsAt?: string;                   // ISO 8601
+    dealLabel?: string;
+    dealStockRemaining?: number;
+    dealDiscountPercent?: number;
 }
 
 export interface ProductSpecification {
