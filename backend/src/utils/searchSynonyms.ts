@@ -1,8 +1,13 @@
 /**
- * searchSynonyms.ts — copied verbatim from the customer website's
- * productController.js (SYNONYMS + levenshtein + expandSearchTerms) so both
- * surfaces expand a search query the same way. Keep the two in sync: a term
- * that finds a product on the website must find it in the app.
+ * searchSynonyms.ts — the SYNONYMS table and levenshtein() came from the
+ * customer website's productController.js so both surfaces resolve a search
+ * term the same way. Keep the table in sync: a term that finds a product on
+ * the website must find it in the app.
+ *
+ * Expansion itself is now per-TOKEN (expandToken) rather than per-phrase: the
+ * website's whole-phrase expandSearchTerms could not handle "blue cotton
+ * kurta", and its substring rung expanded "laptop bag" into blouses because
+ * the phrase contains the synonym key "top". See CROSS_SURFACE_CHANGES.md.
  */
 
 // Each key maps to an array of equivalent terms. Search expands to OR across all.
@@ -115,33 +120,62 @@ function levenshtein(a: string, b: string): number {
   return prev[n];
 }
 
-/**
- * Expand a search term to include synonyms.
- * Returns array of all terms to OR together.
- */
-export function expandSearchTerms(term: string): string[] {
-  const lower = term.toLowerCase().trim();
-  // direct match
-  if (SYNONYMS[lower]) return [...new Set([lower, ...SYNONYMS[lower]])];
-  // partial match — check if any synonym key is contained in the term
-  for (const [key, vals] of Object.entries(SYNONYMS)) {
-    if (lower.includes(key) || key.includes(lower)) {
-      return [...new Set([lower, ...vals])];
+/** Reverse index: every word appearing in a synonym VALUE maps to the groups
+ *  that contain it. Built once. Without this, a token that is only ever a value
+ *  ("shirt" lives in the "top" and "t-shirt" groups but is not itself a key)
+ *  falls through to the edit-distance rung and lands on "skirt". */
+const VALUE_INDEX: Record<string, string[]> = (() => {
+  const idx: Record<string, Set<string>> = {};
+  for (const vals of Object.values(SYNONYMS)) {
+    for (const val of vals) {
+      for (const word of val.split(/[^a-z0-9]+/).filter(Boolean)) {
+        const set = (idx[word] ??= new Set<string>());
+        vals.forEach((v) => set.add(v));
+      }
     }
   }
-  // typo tolerance — no exact/partial hit, so look for a synonym key that's a
-  // close misspelling (e.g. "jaket" -> "jacket", "swetaer" -> "sweater").
-  // Distance threshold scales with word length so short words don't over-match.
-  const maxDist = lower.length <= 4 ? 1 : lower.length <= 7 ? 2 : 3;
+  return Object.fromEntries(Object.entries(idx).map(([k, v]) => [k, [...v]]));
+})();
+
+/** Best synonym-key match for a misspelling, or null. Threshold scales with
+ *  word length so short words don't over-match ("shirt" -> "short"). */
+function nearestKey(word: string): string | null {
+  const maxDist = word.length <= 4 ? 1 : word.length <= 7 ? 2 : 3;
   let bestKey: string | null = null;
   let bestDist = Infinity;
   for (const key of Object.keys(SYNONYMS)) {
-    const dist = levenshtein(lower, key);
+    const dist = levenshtein(word, key);
     if (dist <= maxDist && dist < bestDist) {
       bestDist = dist;
       bestKey = key;
     }
   }
-  if (bestKey) return [...new Set([lower, ...SYNONYMS[bestKey]])];
+  return bestKey;
+}
+
+/**
+ * Expand ONE word of a query. Exact key first, then a close misspelling
+ * ("jaket" -> "jacket", "kurtas" -> "kurta"). Returns the word itself when
+ * nothing matches, so an unknown brand still searches for itself.
+ *
+ * Deliberately has no substring rung: at the token level "kurt" is already
+ * within edit distance of "kurta", and substring matching is what made
+ * "laptop" expand to blouse/shirt (it contains the key "top").
+ */
+export function expandToken(word: string): string[] {
+  const lower = word.toLowerCase().trim();
+  if (!lower) return [];
+  if (SYNONYMS[lower]) return [...new Set([lower, ...SYNONYMS[lower]])];
+  if (VALUE_INDEX[lower]) return [...new Set([lower, ...VALUE_INDEX[lower]])];
+  // Typo: put the CORRECTED term first. Callers rank on expansions[0], so
+  // "kurtaa" must rank as "kurta"; the raw token stays in the list so a
+  // literal ILIKE on it still works.
+  const key = nearestKey(lower);
+  if (key) return [...new Set([...SYNONYMS[key], lower])];
   return [lower];
+}
+
+/** Split a raw query into searchable tokens (drops punctuation and 1-char noise). */
+export function tokenize(q: string): string[] {
+  return q.toLowerCase().split(/[^a-z0-9]+/).filter((t) => t.length >= 2);
 }

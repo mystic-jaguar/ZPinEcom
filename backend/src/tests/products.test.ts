@@ -91,8 +91,11 @@ describe('GET /products/search', () => {
   });
 
   it('returns matching products with related products', async () => {
-    // main search query
-    getDbMock().mockResolvedValueOnce({ rows: [productRow({ product_name: 'Keychain' })] });
+    // main search query — 5+ literal hits, so the fuzzy top-up does not fire
+    getDbMock().mockResolvedValueOnce({
+      rows: Array.from({ length: 5 }, (_, i) =>
+        productRow({ product_name: `Keychain ${i}`, id: `PRD000${i}` })),
+    });
     // related products query
     getDbMock().mockResolvedValueOnce({ rows: [] });
 
@@ -101,9 +104,22 @@ describe('GET /products/search', () => {
     expect(res.body.products.length).toBeGreaterThan(0);
   });
 
+  // Thin literal results now get topped up with typo matches; this used to
+  // happen only when the literal search returned nothing at all.
+  it('tops up thin results with fuzzy matches', async () => {
+    getDbMock().mockResolvedValueOnce({ rows: [productRow({ product_name: 'Keychain', id: 'PRD0001' })] });
+    getDbMock().mockResolvedValueOnce({ rows: [{ '?column?': 1 }] });   // pg_trgm present
+    getDbMock().mockResolvedValueOnce({ rows: [productRow({ product_name: 'Key Chain', id: 'PRD0002' })] });
+    getDbMock().mockResolvedValueOnce({ rows: [] });                     // related
+
+    const res = await request(app).get(`${BASE}/search?q=kechain`);
+    expect(res.status).toBe(200);
+    expect(res.body.products).toHaveLength(2);
+  });
+
   it('returns empty products array when no results found', async () => {
-    // main search — no results
-    getDbMock().mockResolvedValueOnce({ rows: [] });
+    getDbMock().mockResolvedValueOnce({ rows: [] });   // main search — no results
+    getDbMock().mockResolvedValueOnce({ rows: [] });   // fuzzy top-up — also none
 
     const res = await request(app).get(`${BASE}/search?q=xyznotexist`);
     expect(res.status).toBe(200);

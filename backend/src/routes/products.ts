@@ -4,7 +4,7 @@ import { pool } from '../db';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { productListLimiter, reviewLimiter, reviewUploadLimiter } from '../middleware/rateLimits';
 import { generateId } from '../utils/id';
-import { expandSearchTerms } from '../utils/searchSynonyms';
+import { expandToken, tokenize } from '../utils/searchSynonyms';
 import { AUTO_HIDE_THRESHOLD } from '../utils/moderationSchema';
 import { withMarkup, withoutMarkup } from '../utils/pricing';
 import { liveDealForProduct } from '../utils/flashDeals';
@@ -77,9 +77,15 @@ async function ensureTrigram(): Promise<boolean> {
   return trigramReady;
 }
 
-// How close a name has to be to count as a typo match. 0.3 is Postgres' own
-// default: below it "shirt" starts matching "shorts".
-const TRIGRAM_THRESHOLD = 0.3;
+// How close a token has to be to a word inside the name to count as a typo
+// match. word_similarity() scores higher than similarity() for the same pair
+// (it only measures the best-matching extent), so the bar sits above the 0.3
+// similarity() default: below ~0.5 "shirt" starts matching "shorts".
+const WORD_SIMILARITY_THRESHOLD = 0.5;
+
+// Top up with fuzzy matches when the literal search returned fewer than this.
+// Was "only when it returned nothing", which one junk description hit defeated.
+const FUZZY_TOPUP_BELOW = 5;
 
 export function normalizeProduct(row: any) {
   // Extract sizes from size_quantities keys (e.g. {S:10, M:15} → ['S','M']).
@@ -365,15 +371,61 @@ router.get('/search', productListLimiter, async (req: Request, res: Response): P
     const normalized = q.replace(/\s+/g, '').toLowerCase();
     const spaced = q.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase();
 
-    // Same synonym/typo expansion the customer website uses, so "sari", "jaket"
-    // or "chappal" find the same products on both surfaces.
-    const terms = expandSearchTerms(q);
+    // Multi-word queries used to be matched as one blob: "blue cotton kurta"
+    // only hit if a single field contained that literal string. Match per token
+    // instead — every token must appear SOMEWHERE (AND across tokens), each
+    // token independently synonym-expanded and typo-corrected (OR within it).
+    const tokens = tokenize(q);
     const params: any[] = [`%${escapeLike(normalized)}%`, `%${escapeLike(spaced)}%`];
-    const termClauses = terms.map((t) => {
-      params.push(`%${escapeLike(t)}%`);
-      const i = params.length;
-      return `(p.product_name ILIKE $${i} OR p.description ILIKE $${i} OR p.deepest_category_name ILIKE $${i})`;
+
+    // Fields a token may match. brand and search_tags were never searched at
+    // all, so a brand name only worked when it happened to be in product_name.
+    const fieldMatch = (i: number) =>
+      `(p.product_name ILIKE $${i} OR p.description ILIKE $${i}
+        OR p.deepest_category_name ILIKE $${i} OR p.brand ILIKE $${i}
+        OR array_to_string(p.search_tags, ' ') ILIKE $${i})`;
+
+    // Corrected tokens feed the relevance ranking below, so a misspelled query
+    // still ranks by what the user meant.
+    const corrected: string[] = [];
+    const tokenClauses = (tokens.length > 0 ? tokens : [q.toLowerCase()]).map((tok) => {
+      const expansions = expandToken(tok);
+      corrected.push(expansions[0] ?? tok);
+      const ors = expansions.map((t) => {
+        params.push(`%${escapeLike(t)}%`);
+        return fieldMatch(params.length);
+      });
+      return `(${ors.join(' OR ')})`;
     });
+
+    // Ranking. The schema already maintains products.search_vector (weighted
+    // A=name, B=description, C=tags) via a trigger, plus a GIN index — search
+    // ignored all of it and ordered by created_at, so an exact name match sat
+    // below any newer product that merely mentioned the word in its description.
+    // Tier on where the match landed first (robust even if search_vector was
+    // never backfilled for old rows), then refine with ts_rank, then recency.
+    const correctedQuery = corrected.join(' ');
+    params.push(correctedQuery);                       // exact
+    const pExact = params.length;
+    params.push(`${escapeLike(correctedQuery)}%`);     // prefix
+    const pPrefix = params.length;
+    params.push(`%${escapeLike(correctedQuery)}%`);    // contains
+    const pContains = params.length;
+    params.push(correctedQuery);                       // tsquery
+    const pTsq = params.length;
+
+    const RELEVANCE = `
+      (CASE
+         WHEN LOWER(p.product_name) = $${pExact} THEN 3
+         WHEN LOWER(p.product_name) LIKE $${pPrefix} THEN 2
+         WHEN LOWER(p.product_name) LIKE $${pContains} THEN 1
+         ELSE 0
+       END) DESC,
+      ts_rank(
+        COALESCE(p.search_vector, to_tsvector('english', COALESCE(p.product_name, ''))),
+        plainto_tsquery('english', $${pTsq})
+      ) DESC`;
+
     params.push(limit);
 
     const result = await pool.query(
@@ -387,40 +439,50 @@ router.get('/search', productListLimiter, async (req: Request, res: Response): P
          AND (
            LOWER(REPLACE(p.product_name, ' ', '')) LIKE $1
            OR LOWER(p.product_name) LIKE $2
-           OR ${termClauses.join(' OR ')}
+           OR (${tokenClauses.join(' AND ')})
          )
        GROUP BY p.id
-       ORDER BY p.created_at DESC
+       ORDER BY ${RELEVANCE}, p.created_at DESC
        LIMIT $${params.length}`,
       params
     );
 
-    // Nothing matched literally — try again allowing typos. Only on a miss, so
-    // the common case pays nothing for this.
+    // Thin results — try again allowing typos anywhere in the query, not just
+    // on words that happen to be synonym keys. This used to fire only on ZERO
+    // rows, so one junk description match suppressed it entirely.
     let rows = result.rows;
-    if (rows.length === 0 && q.length >= 3 && await ensureTrigram()) {
+    if (rows.length < FUZZY_TOPUP_BELOW && q.length >= 3 && await ensureTrigram()) {
+      const found = new Set(rows.map((r: any) => r.id));
+      // word_similarity(token, name) scores the best-matching WORD inside the
+      // name, so one typo in a three-word query no longer drags the whole
+      // query's score under the threshold the way similarity() did. Averaging
+      // over tokens keeps every token accountable.
       const fuzzy = await pool.query(
         `SELECT p.*,
           COALESCE(json_agg(DISTINCT pi.image_url) FILTER (WHERE pi.image_url IS NOT NULL), '[]') as images,
           COALESCE(AVG(pr.rating), 0) as average_rating,
-          GREATEST(
-            similarity(LOWER(p.product_name), $1),
-            similarity(LOWER(COALESCE(p.deepest_category_name, '')), $1)
-          ) AS match_score
+          ms.score AS match_score
          FROM products p
+         CROSS JOIN LATERAL (
+           SELECT AVG(GREATEST(
+             word_similarity(t, LOWER(p.product_name)),
+             word_similarity(t, LOWER(COALESCE(p.deepest_category_name, ''))),
+             word_similarity(t, LOWER(COALESCE(p.brand, '')))
+           )) AS score
+           FROM unnest($1::text[]) AS t
+         ) ms
          LEFT JOIN product_images pi ON pi.product_id = p.id
          LEFT JOIN product_reviews pr ON pr.product_id = p.id
          WHERE p.in_stock = true AND p.is_approved = true AND ${VARIANT_PRIMARY}
-           AND GREATEST(
-                 similarity(LOWER(p.product_name), $1),
-                 similarity(LOWER(COALESCE(p.deepest_category_name, '')), $1)
-               ) > $2
-         GROUP BY p.id
-         ORDER BY match_score DESC, p.created_at DESC
+           AND ms.score > $2
+         GROUP BY p.id, ms.score
+         ORDER BY ms.score DESC, p.created_at DESC
          LIMIT $3`,
-        [q.toLowerCase(), TRIGRAM_THRESHOLD, limit]
+        [tokens.length > 0 ? tokens : [q.toLowerCase()], WORD_SIMILARITY_THRESHOLD, limit]
       );
-      rows = fuzzy.rows;
+      // Literal matches keep their ranking; fuzzy ones top up below them.
+      const extra = fuzzy.rows.filter((r: any) => !found.has(r.id));
+      rows = [...rows, ...extra].slice(0, limit);
     }
 
     const products = rows.map(normalizeProduct);
