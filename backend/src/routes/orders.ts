@@ -8,6 +8,7 @@ import { consumeDealStock, liveDealPrices, releaseDealStock } from '../utils/fla
 import { generateId } from '../utils/id';
 import { recordOrderStatus } from '../utils/orderHistory';
 import { markupItems, withMarkup } from '../utils/pricing';
+import { raiseRefundClaim, readRefundSettlement, voidRefundClaim } from '../utils/refundClaim';
 import { notifyReturnTransition } from '../utils/returnNotify';
 import {
   parseReturnLines,
@@ -1236,6 +1237,10 @@ router.post('/:id/return', authenticate, async (req: AuthRequest, res: Response)
       ]
     );
 
+    // Raise the refund claim support settles by hand. Same transaction as the
+    // return itself: a return with no claim is a refund no admin will ever see.
+    await raiseRefundClaim(client, returnId, req.userId!, refundAmount);
+
     // Update order status to 'return_requested'
     await client.query(
       `UPDATE ${ORDERS} SET status = 'return_requested', updated_at = NOW() WHERE id = $1`,
@@ -1426,6 +1431,21 @@ router.patch('/:id/return-status', authenticate, async (req: AuthRequest, res: R
     );
 
     if (nextStatus === 'approved') {
+      // Returns are auto-approved at creation (2026-08-27), so this path only
+      // runs for a legacy row still sitting at 'requested' — it still has to
+      // raise the claim, or that refund is invisible to support forever.
+      const orderItems = (
+        await client.query(
+          `SELECT id, price, quantity FROM ${ORDER_ITEMS} WHERE order_id = $1`,
+          [req.params.id]
+        )
+      ).rows;
+      const approvedRefund = refundForLines(
+        resolveReturnLines(currentReturn.order_item_ids, orderItems),
+        withMarkup
+      ).total;
+      await raiseRefundClaim(client, currentReturn.id, currentReturn.user_id, approvedRefund);
+
       await recordOrderStatus(
         client,
         req.params.id,
@@ -1435,6 +1455,10 @@ router.patch('/:id/return-status', authenticate, async (req: AuthRequest, res: R
     }
 
     if (nextStatus === 'rejected') {
+      // Nothing is owed any more — close the claim so it stops looking payable
+      // in the admin Settlements queue.
+      await voidRefundClaim(client, currentReturn.id, note ? `Return rejected: ${note}` : 'Return rejected');
+
       // A refused return leaves the order exactly as it was: delivered and paid.
       // Without this the customer is stranded on 'return_requested' forever.
       await client.query(
@@ -1942,6 +1966,12 @@ router.get('/:id/return-status', authenticate, async (req: AuthRequest, res: Res
         refundDisclaimer: ['requested', 'approved', 'picked_up'].includes(rr.status)
           ? RETURN_REFUND_DISCLAIMER
           : null,
+        // How the money actually reached them. Refunds are settled by hand from
+        // the admin website (SETTLEMENTS_PLAN.md) — until now 'Refunded' was a
+        // bare timestamp with no amount, mode or reference anywhere the
+        // customer could see. null while the claim is still pending, or when
+        // the settlements table is not on this database yet.
+        settlement: await readRefundSettlement(pool, rr.id),
       },
     });
   } catch (err) {
@@ -2008,6 +2038,10 @@ router.patch('/:id/cancel-return', authenticate, async (req: AuthRequest, res: R
         }]),
       ]
     );
+
+    // The customer called it off, so there is nothing to pay — take the claim
+    // out of the admin Settlements queue.
+    await voidRefundClaim(client, current.id, 'Cancelled by the customer');
 
     await client.query(
       `UPDATE ${ORDERS} SET status = 'delivered', updated_at = NOW() WHERE id = $1`,

@@ -18,6 +18,17 @@ type ReturnStatusRecord = {
     // not the order total. A 1-of-5 return must never quote the whole order.
     refundAmount?: number | null;
     statusHistory?: Array<{ status: string; at: string; note?: string }>;
+    // How support actually paid the refund (SETTLEMENTS_PLAN.md). Refunds are
+    // settled by hand, so 'Refunded' used to be a bare timestamp with no amount,
+    // mode or reference the customer could check against their bank statement.
+    settlement?: {
+        status: string; amount: number | null; mode: string | null;
+        reference: string | null; date: string | null; note: string | null;
+    } | null;
+};
+
+const MODE_LABEL: Record<string, string> = {
+    bank_transfer: 'Bank transfer', upi: 'UPI', cash: 'Cash', other: 'Other',
 };
 
 const RETURN_WINDOW_DAYS = 7;
@@ -138,6 +149,12 @@ export default function ReturnsRefundsScreen() {
             };
         });
 
+    // A refund that has been paid out. Not an "active" return any more, so
+    // without this section the settlement details have nowhere to show at all.
+    const settledReturns = orders
+        .map(o => ({ order: o, s: returnStatusByOrder[o.id]?.settlement }))
+        .filter(({ order, s }) => returnStatusByOrder[order.id]?.returnStatus === 'refunded' && s?.status === 'settled');
+
     const RefundProgress = ({ step }: { step: number }) => {
         // 0 requested, 1 approved, 2 picked up, 3 refunded — REFUND_STEPS order.
         const labels = ['REQUESTED', 'APPROVED', 'PICKED UP', 'REFUNDED'];
@@ -183,6 +200,28 @@ export default function ReturnsRefundsScreen() {
                                 </View>
                                 <RefundProgress step={step} />
                                 {!!disclaimer && <Text style={styles.disclaimer}>{disclaimer}</Text>}
+                            </View>
+                        ))}
+                    </>
+                )}
+
+                {settledReturns.length > 0 && (
+                    <>
+                        <ZText variant="eyebrow" style={styles.sectionLabel}>Refunded</ZText>
+                        {settledReturns.map(({ order, s }) => (
+                            <View key={order.id} style={styles.card}>
+                                <View style={styles.itemRow}>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.itemName} numberOfLines={1}>{order.orderNumber}</Text>
+                                        <Text style={styles.itemSub}>Refunded ₹{Number(s?.amount || 0).toLocaleString('en-IN')}</Text>
+                                    </View>
+                                    <View style={styles.statusChip}><Text style={styles.statusChipText}>REFUNDED</Text></View>
+                                </View>
+                                <Text style={styles.disclaimer}>
+                                    {[MODE_LABEL[String(s?.mode)] || s?.mode, s?.reference ? `Ref ${s.reference}` : null, s?.date ? new Date(s.date).toLocaleDateString('en-IN') : null]
+                                        .filter(Boolean).join(' · ')}
+                                </Text>
+                                {!!s?.note && <Text style={styles.disclaimer}>{s.note}</Text>}
                             </View>
                         ))}
                     </>
