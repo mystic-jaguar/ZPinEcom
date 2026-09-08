@@ -182,7 +182,7 @@ export default function AllOrdersScreen() {
                 right={<Pressable style={styles.helpBtn} onPress={() => router.push('/profile/help-center')}><HelpCircle size={20} color={colors.textStrong} /></Pressable>}
             />
 
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filtersScroll} contentContainerStyle={styles.filters}>
                 {FILTERS.map((f) => (
                     <Pressable key={f} style={[styles.filter, activeFilter === f && styles.filterOn]} onPress={() => setActiveFilter(f)}>
                         <Text style={[styles.filterText, activeFilter === f && styles.filterTextOn]}>{f}</Text>
@@ -227,6 +227,7 @@ export default function AllOrdersScreen() {
 const styles = createStyles({
     container: { flex: 1, backgroundColor: palette.paperWarm },
     helpBtn: { width: 40, height: 40, borderRadius: 20, borderWidth: 2, borderColor: colors.borderInk, alignItems: 'center', justifyContent: 'center' },
+    filtersScroll: { flexGrow: 0, flexShrink: 0 },
     filters: { flexDirection: 'row', gap: 9, paddingHorizontal: 20, paddingBottom: 14 },
     filter: { paddingHorizontal: 15, paddingVertical: 8, borderRadius: 100, borderWidth: 2, borderColor: colors.borderSubtle, backgroundColor: colors.surfaceCard },
     filterOn: { backgroundColor: colors.surfaceInverse, borderColor: colors.surfaceInverse },
