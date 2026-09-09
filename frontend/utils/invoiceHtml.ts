@@ -13,6 +13,10 @@ export interface InvoiceData {
     orderNumber: string;
     createdAt?: string;
     paymentMethod?: string;
+    // 'paid' | 'partial' | 'refunded' | 'pending' | 'failed'. A COD order stays
+    // 'pending' until the money is handed over at the door, so the grand-total
+    // line must not claim it was paid.
+    paymentStatus?: string;
     shippingAddress?: any;
     items: { productName: string; quantity: number; price: number; total?: number }[];
     deliveryFee: number;
@@ -117,7 +121,7 @@ export function buildInvoiceHtml(order: InvoiceData, customerEmail?: string): st
     <div><span class="label">Subtotal</span><span>${fmt(subtotal)}</span></div>
     <div><span class="label">Delivery Fee</span><span>${Number(order.deliveryFee || 0) === 0 ? 'FREE' : fmt(order.deliveryFee)}</span></div>
     <div><span class="label">Tax (18% GST)</span><span>${fmt(tax)}</span></div>
-    <div class="grand"><span>Total Paid</span><span>${fmt(order.totalAmount)}</span></div>
+    <div class="grand"><span>${['paid', 'partial', 'refunded'].includes(String(order.paymentStatus || '').toLowerCase()) ? 'Total Paid' : 'Amount Payable'}</span><span>${fmt(order.totalAmount)}</span></div>
   </div>
 
   <footer>

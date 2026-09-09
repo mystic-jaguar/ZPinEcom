@@ -13,7 +13,7 @@ import { useOrder } from '../../context/OrderContext';
 import { orderService } from '../../services/order';
 import { OrderObject } from '../../types/types';
 import { groupOrders } from '../../utils/orderGroups';
-import { isReturnInProgress, statusLabel } from '../../utils/orderStatus';
+import { isPaidStatus, isReturnInProgress, statusLabel } from '../../utils/orderStatus';
 import { buildInvoiceHtml, InvoiceData } from '../../utils/invoiceHtml';
 import { useUser } from '../../context/UserContext';
 import { Text } from '../../components/ui/ScaledText';
@@ -168,6 +168,9 @@ export default function OrderDetailsScreen() {
         const tax = group.orders.reduce((s, o) => s + Number(o.taxAmount || 0), 0);
         const discount = Math.max(0, Number((subtotal + shipping + tax - group.total).toFixed(2)));
         const paymentMethod = group.orders[0].paymentMethod;
+        // COD money only exists once it is handed over at the door. Labelling an
+        // unpaid COD order "Paid" is what made a cancelled order look refundable.
+        const groupPaid = isPaidStatus(group.orders[0].paymentStatus);
 
         return (
             <SafeAreaView style={styles.container} edges={['top']}>
@@ -254,7 +257,7 @@ export default function OrderDetailsScreen() {
                         {tax > 0 && <BillRow label="Tax (GST)" value={money(tax)} />}
                         {discount > 0 && <BillRow label="Coupon" value={`−${money(discount)}`} red />}
                         <View style={styles.billTotal}>
-                            <Text style={styles.payLabel}>Paid · {paymentMethod === 'cod' ? 'COD' : paymentMethod === 'razorpay' ? 'UPI' : paymentMethod}</Text>
+                            <Text style={styles.payLabel}>{groupPaid ? 'Paid' : 'Payable'} · {paymentMethod === 'cod' ? 'COD' : paymentMethod === 'razorpay' ? 'UPI' : paymentMethod}</Text>
                             <Text style={styles.payValue}>{money(group.total)}</Text>
                         </View>
                     </View>
@@ -264,6 +267,7 @@ export default function OrderDetailsScreen() {
                             orderNumber: group.groupNumber,
                             createdAt: group.createdAt,
                             paymentMethod,
+                            paymentStatus: group.orders[0].paymentStatus,
                             shippingAddress: addr,
                             items: group.orders.flatMap(o => o.items),
                             deliveryFee: shipping,
@@ -444,7 +448,7 @@ export default function OrderDetailsScreen() {
                     {gstAmount > 0 && <BillRow label="Tax (GST)" value={money(gstAmount)} />}
                     {couponDiscount > 0 && <BillRow label={couponCode ? `Coupon ${couponCode}` : 'Coupon'} value={`−${money(couponDiscount)}`} red />}
                     <View style={styles.billTotal}>
-                        <Text style={styles.payLabel}>Paid · {order.paymentMethod === 'cod' ? 'COD' : order.paymentMethod === 'razorpay' ? 'UPI' : order.paymentMethod}</Text>
+                        <Text style={styles.payLabel}>{isPaidStatus(order.paymentStatus) ? 'Paid' : 'Payable'} · {order.paymentMethod === 'cod' ? 'COD' : order.paymentMethod === 'razorpay' ? 'UPI' : order.paymentMethod}</Text>
                         <Text style={styles.payValue}>{money(order.finalAmount)}</Text>
                     </View>
                 </View>
@@ -475,6 +479,7 @@ export default function OrderDetailsScreen() {
                         orderNumber: order.orderNumber,
                         createdAt: order.createdAt,
                         paymentMethod: order.paymentMethod,
+                        paymentStatus: order.paymentStatus,
                         shippingAddress: addr,
                         items: order.items,
                         deliveryFee: shippingFee,

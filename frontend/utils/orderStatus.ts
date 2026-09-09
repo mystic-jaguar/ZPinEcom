@@ -143,3 +143,13 @@ export const ACTIVE_RETURN_STATUSES = new Set(['requested', 'approved', 'picked_
 export function isReturnInProgress(returnStatus?: string | null): boolean {
     return ACTIVE_RETURN_STATUSES.has(String(returnStatus || '').toLowerCase());
 }
+
+/**
+ * Has money actually reached ZPIN for this order? A COD order sits at
+ * payment_status='pending' until it is handed over at the door, so every
+ * "Paid"/"refunded to you" wording must be gated on this — an unpaid COD order
+ * that gets cancelled has nothing to refund.
+ */
+export function isPaidStatus(paymentStatus?: string | null): boolean {
+    return ['paid', 'partial', 'refunded'].includes(String(paymentStatus || '').toLowerCase());
+}

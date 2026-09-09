@@ -9,6 +9,7 @@ import { AppHeader, ZButton, ZText } from '../../components/ui';
 import { createStyles, colors, fonts, palette, radius } from '../../constants/theme';
 import { useOrder } from '../../context/OrderContext';
 import { orderService } from '../../services/order';
+import { isPaidStatus } from '../../utils/orderStatus';
 import { Text, TextInput } from '../../components/ui/ScaledText';
 
 const CANCELLATION_REASONS = ['Ordered by mistake', 'Found a better price', 'Delivery taking too long', 'Changed my mind', 'Item not needed anymore', 'Other'];
@@ -137,6 +138,10 @@ export default function CancelOrderScreen() {
                 msg += isReturn
                     ? `\n\nRefund of ₹${response.refundAmount.toFixed(2)}. ${response.refundDisclaimer || 'This amount will be refunded once the seller receives the product.'}`
                     : `\n\nRefund of ₹${response.refundAmount.toFixed(2)} credited to your original payment method.`;
+            } else if (!isReturn && !isPaidStatus(order.paymentStatus)) {
+                // Nothing was ever collected (COD before hand-over) — do not imply
+                // money is on its way back.
+                msg += '\n\nNothing was paid for this order, so there is no refund.';
             }
             setSuccessMessage(msg);
             setIsSubmitting(false);
@@ -217,7 +222,13 @@ export default function CancelOrderScreen() {
                             Refund of <Text style={{ fontFamily: fonts.bodyBold }}>{money(estimatedRefund)}</Text> for the {returnUnits} item{returnUnits > 1 ? 's' : ''} you are sending back. This amount will be refunded once the seller receives the product. The delivery charge is not refunded.
                         </Text>
                     ) : (
-                        <Text style={styles.infoText}>Refund of <Text style={{ fontFamily: fonts.bodyBold }}>{money(order.finalAmount)}</Text> will hit your {order.paymentMethod === 'cod' ? 'account' : 'original payment method'} within 3–4 business days.</Text>
+                        // An unpaid order (COD before hand-over) has nothing to refund;
+                        // promising money back was the bug.
+                        isPaidStatus(order.paymentStatus) ? (
+                            <Text style={styles.infoText}>Refund of <Text style={{ fontFamily: fonts.bodyBold }}>{money(order.finalAmount)}</Text> will hit your original payment method within 3–4 business days.</Text>
+                        ) : (
+                            <Text style={styles.infoText}>You have not paid for this order yet, so there is nothing to refund. You will not be charged.</Text>
+                        )
                     )}
                 </View>
             </ScrollView>
