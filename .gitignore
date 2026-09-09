@@ -89,3 +89,7 @@ cloudinary-upload/
 
 CLAUDE.md
 CROSS_SURFACE_CHANGES.md
+
+# Build artifacts
+*.apk
+*.aab
