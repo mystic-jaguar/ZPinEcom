@@ -99,7 +99,10 @@
         "expo-build-properties",
         {
           "android": {
-            "usesCleartextTraffic": false
+            "usesCleartextTraffic": false,
+            "enableProguardInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true,
+            "extraProguardRules": "-keepattributes *Annotation*,Signature,SourceFile,LineNumberTable\n-keep class com.razorpay.** { *; }\n-dontwarn com.razorpay.**\n-optimizations !method/inlining/*\n-keepclasseswithmembers class * { public void onPayment*(...); }\n"
           }
         }
       ],
