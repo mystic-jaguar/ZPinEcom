@@ -23,8 +23,25 @@ export class StockLimitError extends Error {
     }
 }
 
+/**
+ * Identity of a cart line for selection purposes. Deliberately product+size and
+ * not cartItemId: a freshly added line carries a locally synthesized id until
+ * the server cart is pulled, and keying selection on that would lose the tick
+ * the moment the real UUID arrived. Same key cart.tsx uses for its list.
+ */
+export const cartLineKey = (item: { productId: string; selectedSize?: string }) =>
+    `${item.productId}-${item.selectedSize || ''}`;
+
 interface CartContextType {
     cartItems: CartItemObject[];
+    /** Lines ticked for checkout. Everything is ticked by default. */
+    selectedItems: CartItemObject[];
+    isSelected: (item: CartItemObject) => boolean;
+    toggleSelected: (item: CartItemObject) => void;
+    /** Tick only this line — used by Buy now, which checks out one product. */
+    selectOnly: (item: { productId: string; selectedSize?: string }) => void;
+    /** Remove just the checked-out lines, leaving the unticked ones in the cart. */
+    clearSelectedItems: () => Promise<void>;
     addToCart: (product: ProductObject, selectedColor?: string, selectedSize?: string) => void;
     removeFromCart: (cartItemId: string) => void;
     updateQuantity: (cartItemId: string, quantity: number) => void;
@@ -52,6 +69,9 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 export const CartProvider = ({ children }: { children: ReactNode }) => {
     const [cartItems, setCartItems] = useState<CartItemObject[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    // Stored as the *un*ticked keys so anything new — an item added later, a line
+    // that arrives with the next server pull — is selected by default.
+    const [deselectedKeys, setDeselectedKeys] = useState<string[]>([]);
 
     const { isAuthenticated, isLoading: isUserLoading } = useUser();
     const { onReconnect } = useNetwork();
@@ -365,9 +385,37 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     // most likely left stale/empty, instead of waiting for the next screen focus.
     useEffect(() => onReconnect(() => { loadCart(); refreshCoupons(); }), [onReconnect, refreshCoupons, loadCart]);
 
-    const totalPrice = cartItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
-    const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0);
-    const totalSavings = cartItems.reduce((sum, item) => {
+    const isSelected = useCallback(
+        (item: CartItemObject) => !deselectedKeys.includes(cartLineKey(item)),
+        [deselectedKeys]
+    );
+
+    const toggleSelected = useCallback((item: CartItemObject) => {
+        const key = cartLineKey(item);
+        setDeselectedKeys(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
+    }, []);
+
+    const selectOnly = useCallback((item: { productId: string; selectedSize?: string }) => {
+        const key = cartLineKey(item);
+        setDeselectedKeys(cartItemsRef.current.map(cartLineKey).filter(k => k !== key));
+    }, []);
+
+    // Drop keys for lines that are no longer in the cart, so re-adding a product
+    // the user had unticked doesn't bring it back already unticked.
+    useEffect(() => {
+        if (isLoading || deselectedKeys.length === 0) return;
+        const live = new Set(cartItems.map(cartLineKey));
+        const pruned = deselectedKeys.filter(k => live.has(k));
+        if (pruned.length !== deselectedKeys.length) setDeselectedKeys(pruned);
+    }, [cartItems, isLoading, deselectedKeys]);
+
+    const selectedItems = cartItems.filter(isSelected);
+
+    // Money always follows the ticked lines: the bar, the bill and the order all
+    // read these, so an unticked item is invisible to every total.
+    const totalPrice = selectedItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+    const totalItems = selectedItems.reduce((sum, item) => sum + item.quantity, 0);
+    const totalSavings = selectedItems.reduce((sum, item) => {
         const originalPrice = item.product.originalPrice || item.product.price;
         return sum + ((originalPrice - item.product.price) * item.quantity);
     }, 0);
@@ -411,12 +459,32 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
         setAppliedCoupon(null);
     };
 
+    // After an order is placed only the purchased lines go; the rest stay in the
+    // cart. Removing every line is still the clearCart path (logout, delete account).
+    const clearSelectedItems = useCallback(async () => {
+        const toRemove = cartItemsRef.current.filter(isSelected);
+        if (toRemove.length === cartItemsRef.current.length) return clearCart();
+        setAppliedCoupon(null);
+        for (const item of toRemove) {
+            try {
+                await removeFromCart(item.cartItemId);
+            } catch (error) {
+                console.error('Error removing ordered item:', error);
+            }
+        }
+    }, [isSelected, removeFromCart]);
+
     const hasUnavailableItems = cartItems.some(item => !item.isAvailable);
     const hasPriceChanges = cartItems.some(item => item.priceAtAdd !== item.product.price);
 
     return (
         <CartContext.Provider value={{
             cartItems,
+            selectedItems,
+            isSelected,
+            toggleSelected,
+            selectOnly,
+            clearSelectedItems,
             addToCart,
             removeFromCart,
             updateQuantity,

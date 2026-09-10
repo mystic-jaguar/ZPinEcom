@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { ArrowRight, ChevronDown, Minus, Plus, ShoppingCart, X, Zap } from 'lucide-react-native';
+import { ArrowRight, Check, ChevronDown, Minus, Plus, ShoppingCart, X, Zap } from 'lucide-react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, View } from 'react-native';
@@ -15,6 +15,8 @@ import { Text } from '../../components/ui/ScaledText';
 
 interface CartItemProps {
     item: any;
+    selected: boolean;
+    onToggleSelect: (item: any) => void;
     onRemove: (cartItemId: string) => void;
     onUpdateQuantity: (cartItemId: string, quantity: number) => Promise<void>;
     onChangeSize: (cartItemId: string, size: string) => void;
@@ -32,7 +34,7 @@ function sortSizes(sizes: string[]) {
     });
 }
 
-function CartItem({ item, onRemove, onUpdateQuantity, onChangeSize }: CartItemProps) {
+function CartItem({ item, selected, onToggleSelect, onRemove, onUpdateQuantity, onChangeSize }: CartItemProps) {
     const router = useRouter();
     const [changingSize, setChangingSize] = React.useState(false);
     // Guards the stepper against double-taps: without it, two rapid presses each
@@ -77,7 +79,19 @@ function CartItem({ item, onRemove, onUpdateQuantity, onChangeSize }: CartItemPr
     };
 
     return (
-        <Animated.View style={[styles.item, { opacity: fadeAnim, transform: [{ translateX: slideAnim }] }]}>
+        <Animated.View style={[styles.item, !selected && styles.itemUnselected, { opacity: fadeAnim, transform: [{ translateX: slideAnim }] }]}>
+            <Pressable
+                onPress={() => onToggleSelect(item)}
+                hitSlop={8}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: selected }}
+                accessibilityLabel={`Select ${item.product?.productName || item.name} for checkout`}
+                style={styles.checkboxHit}
+            >
+                <View style={[styles.checkbox, selected && styles.checkboxOn]}>
+                    {selected ? <Check size={13} color={colors.textOnYellow} strokeWidth={3} /> : null}
+                </View>
+            </Pressable>
             <Pressable onPress={() => router.push(`/product/${item.productId || item.product?.productId || item.id}`)}>
                 <Image source={img} style={styles.itemImage} contentFit="cover" />
             </Pressable>
@@ -153,7 +167,7 @@ function CartItem({ item, onRemove, onUpdateQuantity, onChangeSize }: CartItemPr
 const MemoCartItem = React.memo(CartItem);
 
 export default function CartScreen() {
-    const { cartItems, updateQuantity, removeFromCart, changeSize, totalPrice, totalSavings, refreshCart } = useCart();
+    const { cartItems, selectedItems, isSelected, toggleSelected, updateQuantity, removeFromCart, changeSize, totalPrice, totalSavings, refreshCart } = useCart();
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const [stockMessage, setStockMessage] = useState<string | null>(null);
@@ -196,10 +210,21 @@ export default function CartScreen() {
 
     const renderItem = useCallback(
         ({ item }: { item: any }) => (
-            <MemoCartItem item={item} onRemove={removeFromCart} onUpdateQuantity={handleUpdateQuantity} onChangeSize={changeSize} />
+            <MemoCartItem
+                item={item}
+                selected={isSelected(item)}
+                onToggleSelect={toggleSelected}
+                onRemove={removeFromCart}
+                onUpdateQuantity={handleUpdateQuantity}
+                onChangeSize={changeSize}
+            />
         ),
-        [removeFromCart, handleUpdateQuantity, changeSize]
+        [isSelected, toggleSelected, removeFromCart, handleUpdateQuantity, changeSize]
     );
+
+    // Checkout only ever covers the ticked lines, so an empty selection has
+    // nothing to check out.
+    const selectedCount = selectedItems.length;
 
     return (
         <SafeAreaView style={styles.container} edges={['top']}>
@@ -264,7 +289,12 @@ export default function CartScreen() {
                                 <Text style={styles.eta}>{freeDeliveryUnlocked ? DELIVERY_ETA : `₹${amountToFree.toLocaleString('en-IN')} to free`}</Text>
                             </View>
                         </View>
-                        <ZButton label="Checkout" icon={ArrowRight} onPress={() => router.push(resumeRoute)} />
+                        <ZButton
+                            label={selectedCount === count ? 'Checkout' : `Checkout · ${selectedCount} of ${count}`}
+                            icon={ArrowRight}
+                            disabled={selectedCount === 0}
+                            onPress={() => router.push(resumeRoute)}
+                        />
                     </View>
                 </>
             )}
@@ -296,6 +326,13 @@ const styles = createStyles({
     freeFill: { height: '100%', backgroundColor: palette.yellow500 },
 
     list: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 200 },
+    checkboxHit: { justifyContent: 'center' },
+    checkbox: {
+        width: 22, height: 22, borderRadius: radius.xs, borderWidth: 1.5, borderColor: colors.borderStrong,
+        alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceCard,
+    },
+    checkboxOn: { backgroundColor: palette.yellow500, borderColor: palette.yellow500 },
+    itemUnselected: { opacity: 0.55 },
     item: { flexDirection: 'row', gap: 13, backgroundColor: colors.surfaceCard, borderWidth: 1, borderColor: palette.neutral200, borderRadius: radius.lg, padding: 12, marginBottom: 14 },
     itemImage: { width: 84, height: 96, borderRadius: radius.md, backgroundColor: colors.surfaceSunken },
     itemBody: { flex: 1, justifyContent: 'space-between' },

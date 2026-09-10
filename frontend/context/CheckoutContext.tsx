@@ -24,7 +24,9 @@ const CheckoutContext = createContext<CheckoutContextType | undefined>(undefined
 export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
     const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
     const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string | null>(null);
-    const [deliveryType, setDeliveryType] = useState<'Standard' | 'Instant'>('Standard');
+    // Instant (Try-at-Door) is the default offer — the product page's Buy now and
+    // the summary's delivery picker both start on it.
+    const [deliveryType, setDeliveryType] = useState<'Standard' | 'Instant'>('Instant');
     const [lastStep, setLastStep] = useState(1);
     const [isRestored, setIsRestored] = useState(false);
 
@@ -38,7 +40,7 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
                     const saved = JSON.parse(raw);
                     setSelectedAddressId(saved.selectedAddressId ?? null);
                     setSelectedPaymentMethod(saved.selectedPaymentMethod ?? null);
-                    setDeliveryType(saved.deliveryType === 'Instant' ? 'Instant' : 'Standard');
+                    setDeliveryType(saved.deliveryType === 'Standard' ? 'Standard' : 'Instant');
                     setLastStep(saved.lastStep ?? 1);
                 }
             })
@@ -56,7 +58,7 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
 
     const resetCheckout = React.useCallback(() => {
         setSelectedPaymentMethod(null);
-        setDeliveryType('Standard');
+        setDeliveryType('Instant');
         setLastStep(1);
         AsyncStorage.removeItem(CHECKOUT_STORAGE_KEY).catch(() => { });
     }, []);

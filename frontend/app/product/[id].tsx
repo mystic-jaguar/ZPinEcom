@@ -13,6 +13,8 @@ import ProductSpecifications from '../../components/product/ProductSpecification
 import VariantSelector from '../../components/product/VariantSelector';
 import { useCart } from '../../context/CartContext';
 import { useCheckout } from '../../context/CheckoutContext';
+import { useAddress } from '../../context/AddressContext';
+import { isPuneAddress } from '../../constants/delivery';
 import { useOrder } from '../../context/OrderContext';
 import { useUser } from '../../context/UserContext';
 import { useWishlist } from '../../context/WishlistContext';
@@ -32,8 +34,9 @@ export default function ProductDetails() {
     const productId = Array.isArray(id) ? id[0] : id;
     const router = useRouter();
     const insets = useSafeAreaInsets();
-    const { addToCart, remainingStock } = useCart();
-    const { setDeliveryType } = useCheckout();
+    const { addToCart, remainingStock, selectOnly } = useCart();
+    const { setDeliveryType, selectedAddressId, setSelectedAddressId } = useCheckout();
+    const { addresses } = useAddress();
     const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
     const { user, isAuthenticated } = useUser();
     const { orders, isLoading: isOrdersLoading } = useOrder();
@@ -342,9 +345,21 @@ export default function ProductDetails() {
             return;
         }
 
+        // Buy now: check out this product alone, on the Try-at-Door option. With a
+        // usable address already saved there is nothing to ask on step 1, so go
+        // straight to the summary — an address outside the delivery area still
+        // needs the address screen, which is where that is explained.
         if (tryAtDoor) {
             setDeliveryType('Instant');
-            router.push('/(tabs)/cart');
+            selectOnly({ productId: product.productId, selectedSize });
+            const current = addresses.find(a => a.id === selectedAddressId);
+            const target = current || addresses.find(a => a.isDefault) || addresses[0];
+            if (target && isPuneAddress(target.city, target.pincode)) {
+                if (target.id !== selectedAddressId) setSelectedAddressId(target.id);
+                router.push('/checkout/summary');
+            } else {
+                router.push('/checkout/address');
+            }
             return;
         }
         setShowSuccessModal(true);
@@ -820,8 +835,8 @@ export default function ProductDetails() {
                     style={styles.tryBtn}
                     onPress={() => { setDeliveryOption('instant'); handleAddToCart(true); }}
                 >
-                    <Shirt size={18} color={colors.textStrong} />
-                    <Text style={styles.tryBtnText}>Try at door</Text>
+                    <Zap size={18} color={colors.textStrong} />
+                    <Text style={styles.tryBtnText}>Buy now</Text>
                 </Pressable>
                 <Pressable style={styles.addBtn} onPress={() => handleAddToCart()}>
                     <ShoppingCart size={18} color={colors.textOnYellow} />

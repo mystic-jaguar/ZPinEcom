@@ -22,7 +22,7 @@ export default function CheckoutPaymentScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const { selectedPaymentMethod, setSelectedPaymentMethod, deliveryType, selectedAddressId, setLastStep, resetCheckout } = useCheckout();
-    const { totalPrice, cartItems, clearCart, couponDiscount, appliedCoupon } = useCart();
+    const { totalPrice, selectedItems, clearSelectedItems, couponDiscount, appliedCoupon } = useCart();
     const { addOrder, refreshOrders } = useOrder();
     const { user } = useUser();
     const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -47,11 +47,11 @@ export default function CheckoutPaymentScreen() {
     const hasRedirectedRef = React.useRef(false);
     useFocusEffect(
         useCallback(() => {
-            if (cartItems.length === 0 && !showSuccessModal && !hasRedirectedRef.current) {
+            if (selectedItems.length === 0 && !showSuccessModal && !hasRedirectedRef.current) {
                 hasRedirectedRef.current = true;
                 router.replace('/(tabs)/cart');
             }
-        }, [cartItems.length, showSuccessModal])
+        }, [selectedItems.length, showSuccessModal])
     );
 
     const isInstant = deliveryType === 'Instant';
@@ -66,7 +66,7 @@ export default function CheckoutPaymentScreen() {
     const finalTotal = confirmedFinalAmount ?? estimatedTotal;
 
     const handleConfirm = async () => {
-        if (cartItems.length === 0 || !selectedAddressId || isSubmitting) return;
+        if (selectedItems.length === 0 || !selectedAddressId || isSubmitting) return;
         if (!selectedPaymentMethod) {
             setOrderError('Please select a payment method to continue.');
             return;
@@ -89,7 +89,7 @@ export default function CheckoutPaymentScreen() {
         let createdOrderId: string | null = null;
         let sheetResolved = false;
         try {
-            const cartPayload = cartItems.map(item => ({
+            const cartPayload = selectedItems.map(item => ({
                 productId: item.productId,
                 quantity: item.quantity,
                 variant: item.selectedSize,
@@ -200,7 +200,7 @@ export default function CheckoutPaymentScreen() {
 
     const handleModalPrimary = () => {
         setShowSuccessModal(false);
-        clearCart();
+        clearSelectedItems();
         resetCheckout();
         router.dismissAll();
         router.replace('/(tabs)');
@@ -209,7 +209,7 @@ export default function CheckoutPaymentScreen() {
 
     const handleModalClose = () => {
         setShowSuccessModal(false);
-        clearCart();
+        clearSelectedItems();
         resetCheckout();
         router.dismissAll();
         router.replace('/(tabs)');

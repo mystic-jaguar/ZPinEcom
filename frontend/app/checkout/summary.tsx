@@ -15,7 +15,7 @@ export default function CheckoutSummaryScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const { addresses } = useAddress();
-    const { cartItems, totalPrice, totalSavings, appliedCoupon, couponDiscount, applyCoupon, removeCoupon } = useCart();
+    const { selectedItems, totalPrice, totalSavings, appliedCoupon, couponDiscount, applyCoupon, removeCoupon } = useCart();
     const { selectedAddressId, deliveryType, setDeliveryType, setLastStep } = useCheckout();
 
     React.useEffect(() => { setLastStep(2); }, []);
@@ -138,7 +138,7 @@ export default function CheckoutSummaryScreen() {
                     <ZText variant="eyebrow" color={colors.textMuted}>Bill details</ZText>
                 </View>
                 <View style={styles.billCard}>
-                    <BillRow label={`Subtotal (${cartItems.length} items)`} value={money(totalPrice)} />
+                    <BillRow label={`Subtotal (${selectedItems.length} items)`} value={money(totalPrice)} />
                     <BillRow label="Delivery" value={shippingFee === 0 ? 'FREE' : money(shippingFee)} mono={shippingFee === 0} />
                     {isInstant && <BillRow label="Instant trial fee" value={money(instantTrialFee)} />}
                     <BillRow label="Tax (GST 18%)" value={money(gst)} />
