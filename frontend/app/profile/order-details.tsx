@@ -206,14 +206,14 @@ export default function OrderDetailsScreen() {
                                     </View>
                                 </View>
                                 {parcel.items.map((it, i) => (
-                                    <View key={i} style={[styles.itemRow, styles.itemRowBorder]}>
+                                    <Pressable key={i} style={[styles.itemRow, styles.itemRowBorder]} onPress={() => it.productId && router.push(`/product/${it.productId}`)}>
                                         <Image source={it.image ? { uri: it.image as string } : require('../../assets/images/icon_backup.png')} style={styles.itemImg} contentFit="cover" />
                                         <View style={{ flex: 1 }}>
                                             <Text style={styles.itemName} numberOfLines={1}>{it.productName}</Text>
                                             <Text style={styles.itemVariant}>{it.variant ? `${it.variant} · ` : ''}Qty {it.quantity}</Text>
                                         </View>
                                         <Text style={styles.itemPrice}>{money(it.price)}</Text>
-                                    </View>
+                                    </Pressable>
                                 ))}
                                 <View style={styles.parcelActions}>
                                     {canTrack && (
@@ -415,14 +415,14 @@ export default function OrderDetailsScreen() {
                 <View style={styles.card}>
                     <ZText variant="eyebrow" style={{ marginBottom: 14 }}>{order.items.length} item{order.items.length !== 1 ? 's' : ''}</ZText>
                     {order.items.map((it, i) => (
-                        <View key={i} style={[styles.itemRow, i > 0 && styles.itemRowBorder]}>
+                        <Pressable key={i} style={[styles.itemRow, i > 0 && styles.itemRowBorder]} onPress={() => it.productId && router.push(`/product/${it.productId}`)}>
                             <Image source={it.image ? { uri: it.image as string } : require('../../assets/images/icon_backup.png')} style={styles.itemImg} contentFit="cover" />
                             <View style={{ flex: 1 }}>
                                 <Text style={styles.itemName} numberOfLines={1}>{it.productName}</Text>
                                 <Text style={styles.itemVariant}>{it.variant ? `${it.variant} · ` : ''}Qty {it.quantity}{it.isReturned ? ' · Returned' : ''}</Text>
                             </View>
                             <Text style={styles.itemPrice}>{money(it.price)}</Text>
-                        </View>
+                        </Pressable>
                     ))}
                 </View>
 
