@@ -67,18 +67,28 @@ function useCategoryItems(category: string, limit: number, fallback: Item[], min
 
 /* ── shared bits ─────────────────────────────────────────────────────────── */
 
-function RowHeader({ kicker, title, actionLabel, onAction }: { kicker?: string; title: string; actionLabel?: string; onAction?: () => void }) {
+/**
+ * Kicker / title+action / sub, as one block so every line shares a left edge.
+ *
+ * `inset` is for headers that sit inside a bordered card (essentialCard), whose
+ * body padding is 16 — without it the header sat flush against the card edge while
+ * the sub line and the product row were indented.
+ *
+ * The action is a plain Text, not a Pressable, so `alignItems: 'baseline'` has two
+ * real text baselines to align (Yoga gives a View its bottom edge instead, which
+ * left "View All" floating above the title).
+ */
+function RowHeader({ kicker, title, sub, actionLabel, onAction, inset }: { kicker?: string; title: string; sub?: string; actionLabel?: string; onAction?: () => void; inset?: boolean }) {
     return (
-        <View style={styles.rowHeader}>
-            <View style={{ flex: 1 }}>
-                {!!kicker && <Text style={styles.kicker}>{kicker}</Text>}
+        <View style={[styles.rowHeader, inset && styles.rowHeaderInset]}>
+            {!!kicker && <Text style={styles.kicker}>{kicker}</Text>}
+            <View style={styles.rowTitleLine}>
                 <Text style={styles.rowTitle}>{title}</Text>
+                {!!actionLabel && (
+                    <Text style={styles.viewAll} onPress={onAction} suppressHighlighting>{actionLabel} →</Text>
+                )}
             </View>
-            {!!actionLabel && (
-                <Pressable onPress={onAction} hitSlop={8}>
-                    <Text style={styles.viewAll}>{actionLabel} →</Text>
-                </Pressable>
-            )}
+            {!!sub && <Text style={styles.rowSub}>{sub}</Text>}
         </View>
     );
 }
@@ -177,7 +187,7 @@ export function ExploreCategories() {
             </View>
 
             {/* Hero — Holistic Wellness */}
-            <Pressable style={styles.heroCard} onPress={() => go({ categoryName: 'Beauty', subCategoryName: 'Skincare' })}>
+            <Pressable style={[styles.heroCard, styles.heroSpaced]} onPress={() => go({ categoryName: 'Beauty', subCategoryName: 'Skincare' })}>
                 <Image
                     source={{ uri: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=600&auto=format&fit=crop' }}
                     style={styles.heroImage}
@@ -337,8 +347,7 @@ export function EssentialsGrid() {
     // body would remount (and scroll-reset) both rows on every state change.
     const renderRow = ({ kicker, title, sub, items, nav }: { kicker: string; title: string; sub: string; items: Item[]; nav: NavTarget }) => (
         <View style={styles.essentialCard}>
-            <RowHeader kicker={kicker} title={title} actionLabel="View All" onAction={() => go(nav)} />
-            <Text style={styles.essentialSub}>{sub}</Text>
+            <RowHeader kicker={kicker} title={title} sub={sub} actionLabel="View All" onAction={() => go(nav)} inset />
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.essentialRow}>
                 {items.map(item => <MiniCard key={item.id} item={item} width={cardWidth} onPress={() => go(item.nav)} />)}
             </ScrollView>
@@ -383,10 +392,11 @@ export function EssentialsGrid() {
                 <RowHeader
                     kicker="STYLE & TECH"
                     title="Watches & More"
+                    sub="Timeless accessories"
                     actionLabel="View All"
                     onAction={() => go({ categoryName: 'Accessories', subCategoryName: 'Watches' })}
+                    inset
                 />
-                <Text style={styles.essentialSub}>Timeless accessories</Text>
                 <View style={styles.iconRow}>
                     {WATCH_ICONS.map(({ label, Icon, sub }) => (
                         <Pressable key={label} style={styles.iconItem} onPress={() => go({ categoryName: 'Accessories', subCategoryName: sub })}>
@@ -482,8 +492,7 @@ export function DiscoverSection({ deals, areaLabel }: { deals: FlashDeal[]; area
             </Pressable>
 
             <View style={styles.essentialCard}>
-                <RowHeader title="Try Before Buying" actionLabel="View All" onAction={() => go({})} />
-                <Text style={styles.essentialSub}>Trial available on these categories</Text>
+                <RowHeader title="Try Before Buying" sub="Trial available on these categories" actionLabel="View All" onAction={() => go({})} inset />
                 <View style={styles.tbbGrid}>
                     {TRY_BEFORE.map(({ label, Icon, nav }) => (
                         <Pressable key={label} style={styles.tbbItem} onPress={() => go(nav)}>
@@ -524,8 +533,11 @@ const styles = createStyles({
     kicker: { fontFamily: fonts.monoBold, fontSize: 9, letterSpacing: 1.2, color: colors.textFaint, marginBottom: 4 },
 
     rowBlock: { paddingHorizontal: 20, marginTop: 24 },
-    rowHeader: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 12 },
-    rowTitle: { fontFamily: fonts.displayBold, fontSize: 18, letterSpacing: -0.4, color: colors.textStrong },
+    rowHeader: { marginBottom: 12 },
+    rowHeaderInset: { paddingHorizontal: 16 },
+    rowTitleLine: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 },
+    rowTitle: { flexShrink: 1, fontFamily: fonts.displayBold, fontSize: 18, letterSpacing: -0.4, color: colors.textStrong },
+    rowSub: { fontFamily: fonts.bodyRegular, fontSize: 12, color: colors.textMuted, marginTop: 4 },
     viewAll: { fontFamily: fonts.bodyBold, fontSize: 12, color: colors.brandPress },
     hList: { paddingHorizontal: 20, gap: 12 },
 
@@ -535,6 +547,7 @@ const styles = createStyles({
     miniName: { fontFamily: fonts.bodySemiBold, fontSize: 13, color: colors.textStrong },
     miniPrice: { fontFamily: fonts.displayBold, fontSize: 14, color: colors.textStrong, marginTop: 2 },
 
+    heroSpaced: { marginTop: 18 },
     heroCard: { marginHorizontal: 20, minHeight: 210, borderRadius: radius.xl, overflow: 'hidden', backgroundColor: colors.surfaceSunken, justifyContent: 'flex-end' },
     heroImage: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
     heroScrim: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(14,13,11,0.42)' },
@@ -592,7 +605,6 @@ const styles = createStyles({
     featureBtnText: { fontFamily: fonts.bodyBold, fontSize: 12, color: colors.textInvert },
 
     essentialCard: { marginHorizontal: 20, marginTop: 14, borderRadius: radius.lg, backgroundColor: colors.surfaceCard, borderWidth: 1, borderColor: colors.borderSubtle, paddingVertical: 16 },
-    essentialSub: { fontFamily: fonts.bodyRegular, fontSize: 12, color: colors.textMuted, paddingHorizontal: 16, marginTop: -6, marginBottom: 12 },
     essentialRow: { paddingHorizontal: 16, gap: 12 },
 
     promoTile: { marginHorizontal: 20, marginTop: 14, borderRadius: radius.lg, padding: 20 },

@@ -1,6 +1,6 @@
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { useRouter } from 'expo-router';
-import { ArrowRight, Lock, Mail } from 'lucide-react-native';
+import { ArrowRight, Lock, Mail, Zap } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import {
   Image,
@@ -13,7 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
 import { GoogleGlyph, ZButton, ZInput, ZText } from '../../components/ui';
-import { createStyles, colors, fonts, palette, radius } from '../../constants/theme';
+import { createStyles, colors, fonts, palette, radius, shadow } from '../../constants/theme';
 import { useUser } from '../../context/UserContext';
 import { userDataManager } from '../../services/api';
 import { appleAuthService, authService, googleAuthService } from '../../services/auth';
@@ -140,15 +140,28 @@ export default function LoginScreen() {
                     keyboardShouldPersistTaps="handled"
                     showsVerticalScrollIndicator={false}
                 >
-                    <Image
-                        source={require('../../assets/images/zpin_wordmark.png')}
-                        style={styles.logo}
-                        resizeMode="contain"
-                    />
+                    <View style={styles.brand}>
+                        <Image
+                            source={require('../../assets/images/zpin_wordmark.png')}
+                            style={styles.logo}
+                            resizeMode="contain"
+                        />
+                        <Text style={styles.brandTag}>
+                            Shop Faster. <Text style={styles.brandTagMuted}>Live Better.</Text>
+                        </Text>
+                    </View>
 
-                    <ZText variant="screenTitle" style={styles.title}>Welcome back.</ZText>
+                    <View style={styles.card}>
+                    <View style={styles.badgeRow}>
+                        <View style={styles.badge}>
+                            <Zap size={13} color={palette.yellow600} fill={palette.yellow600} />
+                            <Text style={styles.badgeText}>Welcome to ZPIN</Text>
+                        </View>
+                    </View>
+
+                    <ZText variant="screenTitle" style={styles.title}>Welcome Back</ZText>
                     <ZText variant="muted" style={styles.subtitle}>
-                        Log in to shop bike-fast and try at your door.
+                        Login to your account to continue shopping
                     </ZText>
 
                     <ZInput
@@ -186,7 +199,7 @@ export default function LoginScreen() {
 
                     <View style={styles.divider}>
                         <View style={styles.dividerLine} />
-                        <Text style={styles.dividerText}>OR CONTINUE WITH</Text>
+                        <Text style={styles.dividerText}>OR</Text>
                         <View style={styles.dividerLine} />
                     </View>
 
@@ -206,6 +219,7 @@ export default function LoginScreen() {
                                 onPress={handleAppleSignIn}
                             />
                         )}
+                    </View>
                     </View>
 
                     <Pressable style={styles.footer} onPress={() => router.push('/auth/signup')}>
@@ -231,10 +245,33 @@ export default function LoginScreen() {
 const styles = createStyles({
     container: { flex: 1, backgroundColor: palette.paperWarm },
     flex: { flex: 1 },
-    scrollContent: { flexGrow: 1, paddingHorizontal: 26, paddingBottom: 30 },
-    logo: { height: 28, width: 63, marginTop: 30, marginBottom: 4 },
-    title: { marginTop: 20 },
-    subtitle: { marginTop: 8, marginBottom: 28 },
+    scrollContent: { flexGrow: 1, paddingHorizontal: 16, paddingBottom: 30 },
+
+    // The website's mobile auth view: centred wordmark + tagline above a single
+    // white card holding the whole form (see website-customer Pages/Auth/AuthBrand.css,
+    // the max-width:860px block).
+    brand: { alignItems: 'center', marginTop: 26, marginBottom: 18 },
+    logo: { height: 34, width: 77, marginBottom: 8 },
+    brandTag: { fontFamily: fonts.bodyBold, fontSize: 14, color: colors.textStrong },
+    brandTagMuted: { fontFamily: fonts.bodyRegular, color: colors.textMuted },
+
+    card: {
+        backgroundColor: colors.surfaceCard,
+        borderRadius: radius.xl,
+        paddingHorizontal: 20,
+        paddingVertical: 26,
+        ...shadow.md,
+    },
+    badgeRow: { alignItems: 'center', marginBottom: 18 },
+    badge: {
+        flexDirection: 'row', alignItems: 'center', gap: 6,
+        backgroundColor: palette.yellow100, borderRadius: 999,
+        paddingHorizontal: 13, paddingVertical: 7,
+    },
+    badgeText: { fontFamily: fonts.bodyBold, fontSize: 12, color: colors.textStrong },
+
+    title: { textAlign: 'center' },
+    subtitle: { textAlign: 'center', marginTop: 8, marginBottom: 26 },
     forgot: { alignSelf: 'flex-end', marginTop: 4, marginBottom: 20 },
     forgotText: { fontFamily: fonts.bodyBold, fontSize: 12, color: palette.yellow600 },
     divider: { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 20 },
