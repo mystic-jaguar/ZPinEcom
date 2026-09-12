@@ -4,7 +4,7 @@ import { ArrowRight, KeyRound, Mail } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { AppHeader, ZButton, ZInput, ZText } from '../../components/ui';
+import { AppHeader, AuthCard, ZButton, ZInput } from '../../components/ui';
 import { createStyles, colors, fonts, palette } from '../../constants/theme';
 import { authService } from '../../services/auth';
 import { Text } from '../../components/ui/ScaledText';
@@ -52,13 +52,13 @@ export default function ForgotPasswordScreen() {
             <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.flex}>
                 <AppHeader onBack={() => router.back()} />
                 <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-                    <View style={styles.iconTile}>
-                        <KeyRound size={30} color={colors.textStrong} />
-                    </View>
-                    <ZText variant="h2" style={styles.title}>Forgot password?</ZText>
-                    <ZText variant="muted" style={styles.subtitle}>
-                        Enter your email and we&apos;ll send a code to reset it. Quick as a courier.
-                    </ZText>
+                    <AuthCard
+                        icon={KeyRound}
+                        iconBg={palette.yellow500}
+                        iconColor={colors.textStrong}
+                        title="Forgot password?"
+                        subtitle="Enter your email and we'll send a code to reset it. Quick as a courier."
+                    >
                     <ZInput
                         label="Email"
                         icon={Mail}
@@ -71,6 +71,7 @@ export default function ForgotPasswordScreen() {
                     />
                     <View style={{ height: 8 }} />
                     <ZButton label={loading ? 'Sending…' : 'Send reset code'} icon={ArrowRight} onPress={handleSendResetLink} loading={loading} />
+                    </AuthCard>
                     <Text style={styles.back} onPress={() => router.back()}>Back to log in</Text>
                 </ScrollView>
             </KeyboardAvoidingView>
@@ -95,9 +96,6 @@ export default function ForgotPasswordScreen() {
 const styles = createStyles({
     container: { flex: 1, backgroundColor: palette.paperWarm },
     flex: { flex: 1 },
-    content: { paddingHorizontal: 26, paddingBottom: 30 },
-    iconTile: { width: 64, height: 64, borderRadius: 20, backgroundColor: palette.yellow500, alignItems: 'center', justifyContent: 'center', marginTop: 24 },
-    title: { marginTop: 22 },
-    subtitle: { marginTop: 10, marginBottom: 28, lineHeight: 23 },
+    content: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 30 },
     back: { fontFamily: fonts.bodyBold, fontSize: 14, color: colors.textStrong, textAlign: 'center', marginTop: 20 },
 });

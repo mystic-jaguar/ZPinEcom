@@ -1,4 +1,5 @@
 export { default as AppHeader } from './AppHeader';
+export { default as AuthCard } from './AuthCard';
 export { default as BottomBar } from './BottomBar';
 export { default as CheckoutSteps } from './CheckoutSteps';
 export { default as GoogleGlyph } from './GoogleGlyph';
@@ -10,3 +11,4 @@ export { default as ZInput } from './ZInput';
 export { default as ZText } from './ZText';
 export type { ZButtonVariant } from './ZButton';
 export type { ZTextVariant } from './ZText';
+export type { AuthCardProps } from './AuthCard';

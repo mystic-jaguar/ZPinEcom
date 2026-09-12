@@ -12,8 +12,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
 import LegalDocModal, { LegalDocType } from '../../components/common/LegalDocModal';
-import { AppHeader, GoogleGlyph, ZButton, ZInput, ZText } from '../../components/ui';
-import { createStyles, colors, fonts, palette, radius, shadow } from '../../constants/theme';
+import { AppHeader, AuthCard, GoogleGlyph, ZButton, ZInput, ZText } from '../../components/ui';
+import { createStyles, colors, fonts, palette, radius } from '../../constants/theme';
 import { useUser } from '../../context/UserContext';
 import { appleAuthService, authService, googleAuthService } from '../../services/auth';
 import { validatePassword } from '../../utils/validation';
@@ -147,16 +147,16 @@ export default function SignupScreen() {
                     keyboardShouldPersistTaps="handled"
                     showsVerticalScrollIndicator={false}
                 >
-                    <View style={styles.card}>
-                    <View style={styles.badgeRow}>
-                        <View style={styles.badge}>
-                            <Zap size={13} color={palette.yellow600} fill={palette.yellow600} />
-                            <Text style={styles.badgeText}>Welcome to ZPIN</Text>
-                        </View>
-                    </View>
+                    <Text style={styles.script}>{'Faster" + chr(92) + "nFashion" + chr(92) + "nHappier" + chr(92) + "nYou'}</Text>
 
-                    <ZText variant="screenTitle" style={styles.title}>Create Account</ZText>
-                    <ZText variant="muted" style={styles.subtitle}>Join us and start your shopping journey</ZText>
+                    <AuthCard
+                        badge="Welcome to ZPIN"
+                        badgeIcon={Zap}
+                        title="Create Account"
+                        titleVariant="screenTitle"
+                        subtitle="Join us and start your shopping journey"
+                        style={styles.card}
+                    >
 
                     <ZInput label="Full name" icon={User} placeholder="Aarav Sharma" value={name} onChangeText={setName} editable={!loading} />
                     <ZInput label="Email" icon={Mail} placeholder="you@email.com" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" editable={!loading} />
@@ -217,7 +217,7 @@ export default function SignupScreen() {
                             />
                         )}
                     </View>
-                    </View>
+                    </AuthCard>
 
                     <Pressable style={styles.footer} onPress={() => router.back()}>
                         <Text style={styles.footerText}>Already have an account? </Text>
@@ -237,24 +237,15 @@ const styles = createStyles({
     flex: { flex: 1 },
     scrollContent: { paddingHorizontal: 16, paddingBottom: 30 },
 
-    // Matches the login screen and the website's mobile auth card.
-    card: {
-        backgroundColor: colors.surfaceCard,
-        borderRadius: radius.xl,
-        paddingHorizontal: 20,
-        paddingVertical: 26,
-        marginTop: 6,
-        ...shadow.md,
+    // Right-aligned rather than absolute like login's: this screen has an AppHeader
+    // above it, and the card starts immediately.
+    script: {
+        alignSelf: 'flex-end', marginTop: 2, marginBottom: 8, marginRight: 4,
+        fontFamily: fonts.displayMedium, fontSize: 15, lineHeight: 18,
+        color: palette.yellow500, opacity: 0.55, textAlign: 'right',
+        letterSpacing: -0.3, transform: [{ rotate: '-4deg' }],
     },
-    badgeRow: { alignItems: 'center', marginBottom: 18 },
-    badge: {
-        flexDirection: 'row', alignItems: 'center', gap: 6,
-        backgroundColor: palette.yellow100, borderRadius: 999,
-        paddingHorizontal: 13, paddingVertical: 7,
-    },
-    badgeText: { fontFamily: fonts.bodyBold, fontSize: 12, color: colors.textStrong },
-    title: { textAlign: 'center' },
-    subtitle: { textAlign: 'center', marginTop: 8, marginBottom: 24 },
+    card: { marginTop: 2 },
     label: { marginBottom: 7 },
     mobileField: {
         flexDirection: 'row', alignItems: 'center', gap: 11,

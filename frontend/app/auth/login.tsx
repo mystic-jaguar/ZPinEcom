@@ -12,8 +12,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
-import { GoogleGlyph, ZButton, ZInput, ZText } from '../../components/ui';
-import { createStyles, colors, fonts, palette, radius, shadow } from '../../constants/theme';
+import { AuthCard, GoogleGlyph, ZButton, ZInput } from '../../components/ui';
+import { createStyles, colors, fonts, palette, radius } from '../../constants/theme';
 import { useUser } from '../../context/UserContext';
 import { userDataManager } from '../../services/api';
 import { appleAuthService, authService, googleAuthService } from '../../services/auth';
@@ -140,6 +140,8 @@ export default function LoginScreen() {
                     keyboardShouldPersistTaps="handled"
                     showsVerticalScrollIndicator={false}
                 >
+                    <Text style={styles.script}>{'Faster\nFashion\nHappier\nYou'}</Text>
+
                     <View style={styles.brand}>
                         <Image
                             source={require('../../assets/images/zpin_wordmark.png')}
@@ -151,19 +153,13 @@ export default function LoginScreen() {
                         </Text>
                     </View>
 
-                    <View style={styles.card}>
-                    <View style={styles.badgeRow}>
-                        <View style={styles.badge}>
-                            <Zap size={13} color={palette.yellow600} fill={palette.yellow600} />
-                            <Text style={styles.badgeText}>Welcome to ZPIN</Text>
-                        </View>
-                    </View>
-
-                    <ZText variant="screenTitle" style={styles.title}>Welcome Back</ZText>
-                    <ZText variant="muted" style={styles.subtitle}>
-                        Login to your account to continue shopping
-                    </ZText>
-
+                    <AuthCard
+                        badge="Welcome to ZPIN"
+                        badgeIcon={Zap}
+                        title="Welcome Back"
+                        titleVariant="screenTitle"
+                        subtitle="Login to your account to continue shopping"
+                    >
                     <ZInput
                         label="Email or username"
                         icon={Mail}
@@ -220,7 +216,7 @@ export default function LoginScreen() {
                             />
                         )}
                     </View>
-                    </View>
+                    </AuthCard>
 
                     <Pressable style={styles.footer} onPress={() => router.push('/auth/signup')}>
                         <Text style={styles.footerText}>New to ZPIN? </Text>
@@ -247,31 +243,25 @@ const styles = createStyles({
     flex: { flex: 1 },
     scrollContent: { flexGrow: 1, paddingHorizontal: 16, paddingBottom: 30 },
 
-    // The website's mobile auth view: centred wordmark + tagline above a single
-    // white card holding the whole form (see website-customer Pages/Auth/AuthBrand.css,
-    // the max-width:860px block).
+    // The website's decorative corner mark (.zl-right-handwritten). ZPIN loads no
+    // script face, so this is Space Grotesk rotated and knocked back rather than a
+    // new font dependency for four words.
+    // ponytail: swap in a real script family (@expo-google-fonts/caveat) only if the
+    // brand ever asks for one elsewhere too.
+    script: {
+        position: 'absolute', top: 10, right: 4,
+        fontFamily: fonts.displayMedium, fontSize: 15, lineHeight: 18,
+        color: palette.yellow500, opacity: 0.55, textAlign: 'right',
+        letterSpacing: -0.3, transform: [{ rotate: '-4deg' }],
+    },
+
+    // Centred wordmark + tagline above the card, as the website's mobile auth view
+    // does (website-customer Pages/Auth/AuthBrand.css, the max-width:860px block).
     brand: { alignItems: 'center', marginTop: 26, marginBottom: 18 },
     logo: { height: 34, width: 77, marginBottom: 8 },
     brandTag: { fontFamily: fonts.bodyBold, fontSize: 14, color: colors.textStrong },
     brandTagMuted: { fontFamily: fonts.bodyRegular, color: colors.textMuted },
 
-    card: {
-        backgroundColor: colors.surfaceCard,
-        borderRadius: radius.xl,
-        paddingHorizontal: 20,
-        paddingVertical: 26,
-        ...shadow.md,
-    },
-    badgeRow: { alignItems: 'center', marginBottom: 18 },
-    badge: {
-        flexDirection: 'row', alignItems: 'center', gap: 6,
-        backgroundColor: palette.yellow100, borderRadius: 999,
-        paddingHorizontal: 13, paddingVertical: 7,
-    },
-    badgeText: { fontFamily: fonts.bodyBold, fontSize: 12, color: colors.textStrong },
-
-    title: { textAlign: 'center' },
-    subtitle: { textAlign: 'center', marginTop: 8, marginBottom: 26 },
     forgot: { alignSelf: 'flex-end', marginTop: 4, marginBottom: 20 },
     forgotText: { fontFamily: fonts.bodyBold, fontSize: 12, color: palette.yellow600 },
     divider: { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 20 },

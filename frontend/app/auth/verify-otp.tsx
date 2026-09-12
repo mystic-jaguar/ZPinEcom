@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
-import { AppHeader, ZButton, ZText } from '../../components/ui';
+import { AppHeader, AuthCard, ZButton } from '../../components/ui';
 import { createStyles, colors, fonts, palette } from '../../constants/theme';
 import { useUser } from '../../context/UserContext';
 import { authService } from '../../services/auth';
@@ -108,14 +108,14 @@ export default function VerifyOTPScreen() {
         <SafeAreaView style={styles.container} edges={['top']}>
             <AppHeader onBack={() => router.back()} />
             <View style={styles.content}>
-                <View style={styles.iconTile}>
-                    <MessageSquare size={30} color={palette.yellow500} />
-                </View>
-                <ZText variant="h2" style={styles.title}>Verify your number</ZText>
-                <ZText variant="muted" style={styles.subtitle}>
-                    Enter the 6-digit code we sent to{'\n'}
-                    <Text style={styles.email}>{email}</Text>
-                </ZText>
+                <AuthCard
+                    icon={MessageSquare}
+                    title="Verify your number"
+                    subtitle={<>
+                        Enter the 6-digit code we sent to{'\n'}
+                        <Text style={styles.email}>{email}</Text>
+                    </>}
+                >
 
                 <View style={styles.otpRow}>
                     {otp.map((digit, index) => (
@@ -150,6 +150,7 @@ export default function VerifyOTPScreen() {
                         <Text style={styles.resendMuted}>Resend in 0:{String(resendTimer).padStart(2, '0')}</Text>
                     )}
                 </View>
+                </AuthCard>
             </View>
 
             <ActionModal visible={showErrorModal} title="Error" message={modalMessage} icon="x-circle" primaryButtonText="OK" onPrimaryPress={() => setShowErrorModal(false)} onClose={() => setShowErrorModal(false)} />
@@ -160,13 +161,7 @@ export default function VerifyOTPScreen() {
 
 const styles = createStyles({
     container: { flex: 1, backgroundColor: palette.paperWarm },
-    content: { flex: 1, paddingHorizontal: 26 },
-    iconTile: {
-        width: 64, height: 64, borderRadius: 20, backgroundColor: colors.surfaceInverse,
-        alignItems: 'center', justifyContent: 'center', marginTop: 24,
-    },
-    title: { marginTop: 22 },
-    subtitle: { marginTop: 10, marginBottom: 32, lineHeight: 23 },
+    content: { flex: 1, paddingHorizontal: 16, paddingTop: 10 },
     email: { fontFamily: fonts.bodyBold, color: colors.textStrong },
     otpRow: { flexDirection: 'row', gap: 9, marginBottom: 30 },
     otpBox: {

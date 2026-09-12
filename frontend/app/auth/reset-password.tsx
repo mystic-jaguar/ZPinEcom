@@ -4,7 +4,7 @@ import { Lock } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { AppHeader, ZButton, ZInput, ZText } from '../../components/ui';
+import { AppHeader, AuthCard, ZButton, ZInput } from '../../components/ui';
 import { createStyles, colors, fonts, palette } from '../../constants/theme';
 import { authService } from '../../services/auth';
 import { validatePassword } from '../../utils/validation';
@@ -60,10 +60,11 @@ export default function ResetPasswordScreen() {
             <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.flex}>
                 <AppHeader onBack={() => router.back()} />
                 <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-                    <ZText variant="h2" style={styles.title}>Set a new password</ZText>
-                    <ZText variant="muted" style={styles.subtitle}>
-                        Make it strong. At least 8 characters with a number and a symbol.
-                    </ZText>
+                    <AuthCard
+                        icon={Lock}
+                        title="Set a new password"
+                        subtitle="Make it strong. At least 8 characters with a number and a symbol."
+                    >
 
                     <ZInput label="New password" icon={Lock} secure placeholder="Enter new password" value={newPassword} onChangeText={setNewPassword} autoCapitalize="none" editable={!loading} containerStyle={{ marginBottom: 8 }} />
                     {newPassword.length > 0 && (
@@ -80,6 +81,7 @@ export default function ResetPasswordScreen() {
                     <ZInput label="Confirm password" icon={Lock} secure placeholder="Re-enter new password" value={confirmPassword} onChangeText={setConfirmPassword} autoCapitalize="none" editable={!loading} containerStyle={{ marginTop: 12, marginBottom: 24 }} />
 
                     <ZButton label={loading ? 'Resetting…' : 'Reset password'} onPress={handleResetPassword} loading={loading} />
+                    </AuthCard>
                 </ScrollView>
             </KeyboardAvoidingView>
 
@@ -100,9 +102,7 @@ export default function ResetPasswordScreen() {
 const styles = createStyles({
     container: { flex: 1, backgroundColor: palette.paperWarm },
     flex: { flex: 1 },
-    content: { paddingHorizontal: 26, paddingBottom: 30 },
-    title: { marginTop: 24 },
-    subtitle: { marginTop: 10, marginBottom: 28, lineHeight: 23 },
+    content: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 30 },
     meter: { flexDirection: 'row', gap: 6, marginBottom: 8 },
     meterSeg: { flex: 1, height: 5, borderRadius: 3 },
     strengthLabel: { fontFamily: fonts.monoBold, fontSize: 10, letterSpacing: 0.6 },
