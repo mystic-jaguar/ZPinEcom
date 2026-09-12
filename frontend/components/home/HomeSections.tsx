@@ -169,7 +169,7 @@ export function ExploreCategories() {
                         <View style={styles.tileBody}>
                             <Text style={styles.tileTag}>{t.tag}</Text>
                             <Text style={styles.tileTitle} numberOfLines={1}>{t.label}</Text>
-                            <Text style={styles.tileSub} numberOfLines={1}>{t.sub}</Text>
+                            <Text style={[styles.tileSub, styles.tileSubGrid]} numberOfLines={2}>{t.sub}</Text>
                             <Text style={styles.tileExplore}>Explore →</Text>
                         </View>
                     </Pressable>
@@ -391,7 +391,7 @@ export function EssentialsGrid() {
                     {WATCH_ICONS.map(({ label, Icon, sub }) => (
                         <Pressable key={label} style={styles.iconItem} onPress={() => go({ categoryName: 'Accessories', subCategoryName: sub })}>
                             <View style={styles.iconCircle}><Icon size={s(18)} color={colors.textStrong} /></View>
-                            <Text style={styles.iconLabel} numberOfLines={1}>{label}</Text>
+                            <Text style={styles.iconLabel} numberOfLines={2}>{label}</Text>
                         </Pressable>
                     ))}
                 </View>
@@ -488,7 +488,7 @@ export function DiscoverSection({ deals, areaLabel }: { deals: FlashDeal[]; area
                     {TRY_BEFORE.map(({ label, Icon, nav }) => (
                         <Pressable key={label} style={styles.tbbItem} onPress={() => go(nav)}>
                             <View style={styles.iconCircle}><Icon size={s(18)} color={colors.textStrong} /></View>
-                            <Text style={styles.iconLabel} numberOfLines={1}>{label}</Text>
+                            <Text style={styles.iconLabel} numberOfLines={2}>{label}</Text>
                         </Pressable>
                     ))}
                 </View>
@@ -535,7 +535,7 @@ const styles = createStyles({
     miniName: { fontFamily: fonts.bodySemiBold, fontSize: 13, color: colors.textStrong },
     miniPrice: { fontFamily: fonts.displayBold, fontSize: 14, color: colors.textStrong, marginTop: 2 },
 
-    heroCard: { marginHorizontal: 20, height: 210, borderRadius: radius.xl, overflow: 'hidden', backgroundColor: colors.surfaceSunken, justifyContent: 'flex-end' },
+    heroCard: { marginHorizontal: 20, minHeight: 210, borderRadius: radius.xl, overflow: 'hidden', backgroundColor: colors.surfaceSunken, justifyContent: 'flex-end' },
     heroImage: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
     heroScrim: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(14,13,11,0.42)' },
     heroBody: { padding: 20 },
@@ -552,19 +552,22 @@ const styles = createStyles({
     tileBody: { padding: 12 },
     tileTag: { fontFamily: fonts.monoBold, fontSize: 8, letterSpacing: 1, color: palette.yellow700, marginBottom: 4 },
     tileTitle: { fontFamily: fonts.bodyBold, fontSize: 14, color: colors.textStrong },
-    tileSub: { fontFamily: fonts.bodyRegular, fontSize: 11, color: colors.textMuted, marginTop: 2 },
+    tileSub: { fontFamily: fonts.bodyRegular, fontSize: 11, lineHeight: 14, color: colors.textMuted, marginTop: 2 },
+    // Two lines held open: on a 320dp phone some of the four subs wrap and some
+    // do not, and without the reserve each tile's "Explore" sat at its own height.
+    tileSubGrid: { minHeight: 28 },
     tileExplore: { fontFamily: fonts.bodyBold, fontSize: 11, color: colors.brandPress, marginTop: 8 },
 
     wideTile: { marginHorizontal: 20, marginTop: 14, flexDirection: 'row', borderRadius: radius.lg, overflow: 'hidden', backgroundColor: colors.surfaceCard, borderWidth: 1, borderColor: colors.borderSubtle },
     wideTileImage: { width: 110, height: 110, backgroundColor: colors.surfaceSunken },
     wideTileBody: { flex: 1, padding: 13 },
 
-    arrivals: { marginHorizontal: 20, marginTop: 20, height: 190, borderRadius: radius.xl, overflow: 'hidden', backgroundColor: colors.surfaceInverse, justifyContent: 'center' },
+    arrivals: { marginHorizontal: 20, marginTop: 20, minHeight: 190, borderRadius: radius.xl, overflow: 'hidden', backgroundColor: colors.surfaceInverse, justifyContent: 'center' },
     arrivalsImage: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
     arrivalsScrim: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(14,13,11,0.55)' },
     arrivalsBody: { padding: 20 },
     arrivalsTag: { fontFamily: fonts.monoBold, fontSize: 9, letterSpacing: 1.2, color: palette.yellow400, marginBottom: 6 },
-    arrivalsTitle: { fontFamily: fonts.displayBold, fontSize: 22, letterSpacing: -0.6, color: colors.textInvert },
+    arrivalsTitle: { fontFamily: fonts.displayBold, fontSize: 22, lineHeight: 26, letterSpacing: -0.6, color: colors.textInvert },
     arrivalsSub: { fontFamily: fonts.bodyRegular, fontSize: 12, color: 'rgba(255,255,255,0.8)', marginTop: 5, marginBottom: 14 },
     arrivalsCta: { alignSelf: 'flex-start', backgroundColor: palette.yellow500, borderRadius: 100, paddingVertical: 10, paddingHorizontal: 18 },
     arrivalsCtaText: { fontFamily: fonts.bodyBold, fontSize: 13, color: colors.textOnYellow },
@@ -601,7 +604,7 @@ const styles = createStyles({
     iconRow: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16 },
     iconItem: { alignItems: 'center', width: '23%' },
     iconCircle: { width: 46, height: 46, borderRadius: 23, backgroundColor: colors.surfaceSunken, alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
-    iconLabel: { fontFamily: fonts.bodyMedium, fontSize: 10, color: colors.textBody, textAlign: 'center' },
+    iconLabel: { fontFamily: fonts.bodyMedium, fontSize: 10, lineHeight: 13, color: colors.textBody, textAlign: 'center' },
 
     localCard: { marginHorizontal: 20, marginTop: 20, borderRadius: radius.lg, backgroundColor: colors.surfaceInverse, padding: 20 },
     localTag: { fontFamily: fonts.monoBold, fontSize: 9, letterSpacing: 1.2, color: palette.yellow400, marginBottom: 8 },
