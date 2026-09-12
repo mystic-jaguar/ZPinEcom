@@ -140,7 +140,6 @@ export default function LoginScreen() {
                     keyboardShouldPersistTaps="handled"
                     showsVerticalScrollIndicator={false}
                 >
-                    <Text style={styles.script}>{'Faster\nFashion\nHappier\nYou'}</Text>
 
                     <View style={styles.brand}>
                         <Image
@@ -155,6 +154,7 @@ export default function LoginScreen() {
 
                     <AuthCard
                         badge="Welcome to ZPIN"
+                        mark
                         badgeIcon={Zap}
                         title="Welcome Back"
                         titleVariant="screenTitle"
@@ -242,18 +242,6 @@ const styles = createStyles({
     container: { flex: 1, backgroundColor: palette.paperWarm },
     flex: { flex: 1 },
     scrollContent: { flexGrow: 1, paddingHorizontal: 16, paddingBottom: 30 },
-
-    // The website's decorative corner mark (.zl-right-handwritten). ZPIN loads no
-    // script face, so this is Space Grotesk rotated and knocked back rather than a
-    // new font dependency for four words.
-    // ponytail: swap in a real script family (@expo-google-fonts/caveat) only if the
-    // brand ever asks for one elsewhere too.
-    script: {
-        position: 'absolute', top: 10, right: 4,
-        fontFamily: fonts.displayMedium, fontSize: 15, lineHeight: 18,
-        color: palette.yellow500, opacity: 0.55, textAlign: 'right',
-        letterSpacing: -0.3, transform: [{ rotate: '-4deg' }],
-    },
 
     // Centred wordmark + tagline above the card, as the website's mobile auth view
     // does (website-customer Pages/Auth/AuthBrand.css, the max-width:860px block).

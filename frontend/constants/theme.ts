@@ -201,6 +201,10 @@ export const fonts = {
   bodyBlack: 'HankenGrotesk_800ExtraBold',
 
   // Space Mono — eyebrows / codes / labels
+  // Caveat — the website's handwritten corner mark (.zl-right-handwritten uses
+  // Segoe Script, a Windows-only licensed face; Caveat is the closest OFL match).
+  script: 'Caveat_400Regular',
+
   monoRegular: 'SpaceMono_400Regular',
   monoBold: 'SpaceMono_700Bold',
 } as const;

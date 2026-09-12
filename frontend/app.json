@@ -91,7 +91,8 @@
             "./assets/fonts/SpaceGrotesk_600SemiBold.ttf",
             "./assets/fonts/SpaceGrotesk_700Bold.ttf",
             "./assets/fonts/SpaceMono_400Regular.ttf",
-            "./assets/fonts/SpaceMono_700Bold.ttf"
+            "./assets/fonts/SpaceMono_700Bold.ttf",
+            "./assets/fonts/Caveat_400Regular.ttf"
           ]
         }
       ],

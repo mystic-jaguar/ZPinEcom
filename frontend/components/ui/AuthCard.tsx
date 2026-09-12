@@ -1,6 +1,6 @@
 import { LucideIcon } from 'lucide-react-native';
 import React from 'react';
-import { View } from 'react-native';
+import { Text, View } from 'react-native';
 import { createStyles, colors, fonts, palette, radius, shadow } from '../../constants/theme';
 import ZText, { ZTextVariant } from './ZText';
 
@@ -27,6 +27,8 @@ export interface AuthCardProps {
     title: string;
     titleVariant?: ZTextVariant;
     subtitle?: React.ReactNode;
+    /** The website's handwritten corner mark, inside the card (login + signup). */
+    mark?: boolean;
     children: React.ReactNode;
     style?: any;
 }
@@ -40,11 +42,14 @@ export default function AuthCard({
     title,
     titleVariant = 'h2',
     subtitle,
+    mark = false,
     children,
     style,
 }: AuthCardProps) {
     return (
         <View style={[styles.card, style]}>
+            {mark && <Text style={styles.mark}>{`Faster\nFashion\nHappier\nYou`}</Text>}
+
             {!!badge && (
                 <View style={styles.crest}>
                     <View style={styles.badge}>
@@ -77,6 +82,13 @@ const styles = createStyles({
         paddingHorizontal: 20,
         paddingVertical: 26,
         ...shadow.md,
+    },
+    // .zl-right-handwritten — top-right corner of the card, behind nothing (the
+    // crest is centred), so it never overlaps the badge.
+    mark: {
+        position: 'absolute', top: 14, right: 16,
+        fontFamily: fonts.script, fontSize: 17, lineHeight: 19,
+        color: palette.yellow500, opacity: 0.75, textAlign: 'right',
     },
     crest: { alignItems: 'center', marginBottom: 18 },
     badge: {

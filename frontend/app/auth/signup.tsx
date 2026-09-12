@@ -147,9 +147,8 @@ export default function SignupScreen() {
                     keyboardShouldPersistTaps="handled"
                     showsVerticalScrollIndicator={false}
                 >
-                    <Text style={styles.script}>{'Faster" + chr(92) + "nFashion" + chr(92) + "nHappier" + chr(92) + "nYou'}</Text>
-
                     <AuthCard
+                        mark
                         badge="Welcome to ZPIN"
                         badgeIcon={Zap}
                         title="Create Account"
@@ -237,14 +236,6 @@ const styles = createStyles({
     flex: { flex: 1 },
     scrollContent: { paddingHorizontal: 16, paddingBottom: 30 },
 
-    // Right-aligned rather than absolute like login's: this screen has an AppHeader
-    // above it, and the card starts immediately.
-    script: {
-        alignSelf: 'flex-end', marginTop: 2, marginBottom: 8, marginRight: 4,
-        fontFamily: fonts.displayMedium, fontSize: 15, lineHeight: 18,
-        color: palette.yellow500, opacity: 0.55, textAlign: 'right',
-        letterSpacing: -0.3, transform: [{ rotate: '-4deg' }],
-    },
     card: { marginTop: 2 },
     label: { marginBottom: 7 },
     mobileField: {
