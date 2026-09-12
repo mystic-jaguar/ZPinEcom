@@ -2585,77 +2585,14 @@ async function issueGatewayRefund(orderId: string, paymentId: string | null, amo
   }
 }
 
-// PATCH /api/v1/orders/:id/confirm — Vendor accepts the order
-router.patch('/:id/confirm', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
-  // Allow-list, not a deny-list: only the seller (own orders) and admin confirm.
-  // A delivery or any other service token has no business here.
-  if (!['admin', 'seller'].includes(String(req.userRole))) {
-    res.status(403).json({ success: false, message: 'Forbidden' });
-    return;
-  }
-
-  try {
-    // Sellers may only confirm orders that contain their own products.
-    // Admins may confirm any order.
-    if (req.userRole === 'seller') {
-      const ownershipCheck = await pool.query(
-        `SELECT DISTINCT o.id
-         FROM ${ORDERS} o
-         JOIN ${ORDER_ITEMS} oi ON oi.order_id = o.id
-         JOIN products p ON p.id = oi.product_id
-         WHERE o.id = $1 AND p.user_id = $2 AND o.status = 'pending'`,
-        [req.params.id, req.userId]
-      );
-      if (ownershipCheck.rows.length === 0) {
-        res.status(404).json({ success: false, message: 'Order not found or cannot be confirmed' });
-        return;
-      }
-    }
-
-    const result = await pool.query(
-      `UPDATE ${ORDERS}
-       SET status = 'confirmed', updated_at = NOW()
-       WHERE id = $1 AND status = 'pending'
-       RETURNING id, order_number, status, user_id`,
-      [req.params.id]
-    );
-
-    if (result.rows.length === 0) {
-      res.status(400).json({ success: false, message: 'Order not found or cannot be confirmed' });
-      return;
-    }
-
-    const order = result.rows[0];
-
-    await recordOrderStatus(null, order.id, 'confirmed', 'Order accepted by seller');
-
-    // Notify the customer
-    await pool.query(
-      `INSERT INTO notifications (id, user_id, type, title, message, data, created_at)
-       VALUES ($1,$2,'order_update',$3,$4,$5, NOW())`,
-      [
-        generateId(),
-        order.user_id,
-        `Order Confirmed: ${order.order_number}`,
-        `Your order ${order.order_number} has been accepted and is being prepared.`,
-        JSON.stringify({ orderId: order.id, orderNumber: order.order_number, status: 'confirmed' }),
-      ]
-    );
-
-    sendPush(order.user_id, `Order confirmed: ${order.order_number}`,
-      `Your order ${order.order_number} has been accepted and is being prepared.`,
-      { orderId: order.id, orderNumber: order.order_number, status: 'confirmed' });
-
-    res.json({
-      success: true,
-      data: { orderId: order.id, orderNumber: order.order_number, status: 'confirmed' },
-      message: 'Order confirmed successfully',
-    });
-  } catch (err) {
-    logger.error('confirmorder_error', { error: (err as any)?.message ?? String(err) });
-    res.status(500).json({ success: false, message: 'Server error' });
-  }
-});
+// There is deliberately NO seller "accept order" endpoint here.
+// A PATCH /:id/confirm used to live at this spot and had no caller on any
+// surface. 'confirmed' is written by ONE thing platform-wide: the customer
+// website's Razorpay verification / settlePayment, i.e. a fully prepaid order —
+// which is why both seller surfaces render that status as "Prepaid". Anything
+// else writing 'confirmed' mislabels a COD order as paid. The seller's only
+// forward action is Mark as Ready (PATCH /:id/stage, pending|confirmed ->
+// processing). Do not reintroduce an accept step without a status of its own.
 
 export default router;
 
