@@ -85,10 +85,13 @@ const styles = createStyles({
     },
     // .zl-right-handwritten — top-right corner of the card, behind nothing (the
     // crest is centred), so it never overlaps the badge.
+    // Caveat runs small for its px size, so 18/17 here reads about the same as the
+    // website's 1.05rem/1.25 — and the tight leading keeps all four lines clear of
+    // the title below.
     mark: {
-        position: 'absolute', top: 14, right: 16,
-        fontFamily: fonts.script, fontSize: 17, lineHeight: 19,
-        color: palette.yellow500, opacity: 0.75, textAlign: 'right',
+        position: 'absolute', top: 12, right: 16,
+        fontFamily: fonts.script, fontSize: 18, lineHeight: 17,
+        color: palette.yellow500, opacity: 0.7, textAlign: 'right',
     },
     crest: { alignItems: 'center', marginBottom: 18 },
     badge: {
