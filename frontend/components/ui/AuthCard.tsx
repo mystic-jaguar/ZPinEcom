@@ -1,7 +1,8 @@
 import { LucideIcon } from 'lucide-react-native';
 import React from 'react';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
 import { createStyles, colors, fonts, palette, radius, shadow } from '../../constants/theme';
+import { Text } from './ScaledText';
 import ZText, { ZTextVariant } from './ZText';
 
 /**
