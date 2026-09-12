@@ -108,6 +108,23 @@ const FORYOU_BANNER_STYLES = {
 
 export default function HomeScreen() {
     const router = useRouter();
+
+    /**
+     * Navigate to a banner's admin-authored destination.
+     *
+     * `promo_banners.action_url` is one column read by BOTH the customer website
+     * and this app, so an admin can legitimately save a website path (`/EthnicWear`)
+     * that is not an expo-router route here. Never let that dead-end a tap: fall
+     * back to the full listing, which is always a sensible destination for a
+     * merchandising banner.
+     */
+    const goToBannerTarget = useCallback((actionUrl?: string | null) => {
+        try {
+            router.push((actionUrl || '/product-listing') as any);
+        } catch {
+            router.push('/product-listing' as any);
+        }
+    }, [router]);
     const { recentSearches, isLoading: searchLoading } = useSearch();
     const [freshArrivals, setFreshArrivals] = useState<any[]>(FRESH_ARRIVALS);
     // Admin-managed flash deals. The strip only exists while a deal is live.
@@ -484,7 +501,7 @@ export default function HomeScreen() {
         const v = FORYOU_BANNER_STYLES[b.variant];
         const Icon = b.icon === 'star' ? Star : b.icon === 'tag' ? Tag : Zap;
         return (
-            <Pressable key={key} style={[styles.fyBanner, v.card]} onPress={() => router.push((b.actionUrl || '/product-listing') as any)}>
+            <Pressable key={key} style={[styles.fyBanner, v.card]} onPress={() => goToBannerTarget(b.actionUrl)}>
                 {b.imageUrl ? (
                     <Image source={{ uri: b.imageUrl }} style={styles.fyBannerImage} contentFit="cover" />
                 ) : (
@@ -685,7 +702,7 @@ export default function HomeScreen() {
                                 <Pressable
                                     style={[styles.promoCard, b.bgColor ? { backgroundColor: b.bgColor } : null]}
                                     disabled={!b.actionUrl}
-                                    onPress={() => { if (!b.actionUrl) return; try { router.push(b.actionUrl as any); } catch { /* admin-authored URL may not be an app route */ } }}
+                                    onPress={() => goToBannerTarget(b.actionUrl)}
                                 >
                                     {b.imageUrl ? (
                                         <Image source={{ uri: b.imageUrl }} style={styles.promoImage} contentFit="cover" />
