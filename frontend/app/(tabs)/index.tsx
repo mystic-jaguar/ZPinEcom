@@ -3,10 +3,12 @@ import * as ExpoLocation from 'expo-location';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { ArrowRight, ChevronDown, Heart, MapPin, Search, ShoppingBag, Star, Tag, Zap } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, AppStateStatus, Linking, NativeScrollEvent, NativeSyntheticEvent, Pressable, RefreshControl, ScrollView, View } from 'react-native';
+import { ActivityIndicator, AppState, AppStateStatus, Dimensions, Linking, NativeScrollEvent, NativeSyntheticEvent, Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
 import LegalDocModal, { LegalDocType } from '../../components/common/LegalDocModal';
+import DealCountdown from '../../components/home/DealCountdown';
+import { DiscoverSection, EssentialsGrid, ExploreCategories } from '../../components/home/HomeSections';
 import { ProductCard, SectionHeader, ZText } from '../../components/ui';
 import { DELIVERY_CITY, isPuneLocation } from '../../constants/delivery';
 import { createStyles, colors, fonts, palette, radius, shadow, productGridCardWidth } from '../../constants/theme';
@@ -54,6 +56,20 @@ const BIG_DISCOUNTS = [
 ];
 
 // "For you" infinite grid: paginate up to a cap, then stop and offer "See all".
+const SCREEN_W = Dimensions.get('window').width;
+const BANNER_AUTO_MS = 5000;
+
+/**
+ * Shown when the admin panel has no active promo banner — the app used to hide the
+ * carousel entirely, which left a hole in the page whenever merchandising lapsed.
+ * Same fallback set (and same reasoning) as the website homepage.
+ */
+const FALLBACK_BANNERS: PromoBanner[] = [
+    { id: 'fb1', title: 'Style, delivered in hours', subtitle: 'Shop the new season edit', imageUrl: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?w=1200&auto=format&fit=crop', actionUrl: '/product-listing', bgColor: null },
+    { id: 'fb2', title: 'Try-at-door', subtitle: 'Wear it before you buy it', imageUrl: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=1200&auto=format&fit=crop', actionUrl: '/product-listing', bgColor: null },
+    { id: 'fb3', title: 'Beauty picks', subtitle: 'Skincare & makeup from ₹249', imageUrl: 'https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=1200&auto=format&fit=crop', actionUrl: '/product-listing', bgColor: null },
+];
+
 const FORYOU_PAGE_SIZE = 12;
 const FORYOU_MAX = 60;      // stop auto-loading past this; show "See all products" instead
 const BANNER_EVERY = 6;     // drop a banner card after every N products (even → keeps 2-col pairs intact)
@@ -83,6 +99,8 @@ export default function HomeScreen() {
     const [flashDeals, setFlashDeals] = useState<FlashDeal[]>([]);
     // Admin-managed promo banners (promo_banners). Empty list hides the carousel.
     const [promoBanners, setPromoBanners] = useState<PromoBanner[]>([]);
+    const bannerRef = useRef<ScrollView>(null);
+    const [bannerIndex, setBannerIndex] = useState(0);
     const [recommended, setRecommended] = useState<any[]>(RECOMMENDED);
     const [nearby, setNearby] = useState<any[]>(NEARBY_FALLBACK);
     const [locationLabel, setLocationLabel] = useState<string>('Your Area');
@@ -385,6 +403,23 @@ export default function HomeScreen() {
     );
 
     // Near-bottom detection on the page scroll (avoids nesting a FlatList in the ScrollView).
+    // Promo banners: admin-authored when any are active, editorial fallback otherwise.
+    const banners = promoBanners.length ? promoBanners : FALLBACK_BANNERS;
+
+    // Auto-advance the carousel, looping back to the first — the website's 5s timer.
+    // Swipe + dots are the mobile equivalent of the website's prev/next arrows.
+    useEffect(() => {
+        if (banners.length <= 1) return;
+        const timer = setInterval(() => {
+            setBannerIndex(prev => {
+                const next = (prev + 1) % banners.length;
+                bannerRef.current?.scrollTo({ x: SCREEN_W * next, animated: true });
+                return next;
+            });
+        }, BANNER_AUTO_MS);
+        return () => clearInterval(timer);
+    }, [banners.length]);
+
     const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
         if (!fyBootstrapped.current) return;
         const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
@@ -589,35 +624,44 @@ export default function HomeScreen() {
                     ))}
                 </ScrollView>
 
-                {/* Promo banners — authored in the admin panel (promo_banners).
-                    Hidden entirely when nothing is active, same as the website. */}
-                {promoBanners.length > 0 && (
+                {/* Promo banners — admin-authored (promo_banners), with an editorial
+                    fallback set so the slot is never empty. Auto-advances every 5s;
+                    swipe or the dots below move it by hand. */}
+                <View style={styles.promoScroll}>
                     <ScrollView
+                        ref={bannerRef}
                         horizontal
                         pagingEnabled
                         showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={styles.promoList}
-                        style={styles.promoScroll}
+                        onMomentumScrollEnd={e => setBannerIndex(Math.round(e.nativeEvent.contentOffset.x / SCREEN_W))}
                     >
-                        {promoBanners.map((b) => (
-                            <Pressable
-                                key={b.id}
-                                style={[styles.promoCard, b.bgColor ? { backgroundColor: b.bgColor } : null]}
-                                disabled={!b.actionUrl}
-                                onPress={() => { if (!b.actionUrl) return; try { router.push(b.actionUrl as any); } catch { /* admin-authored URL may not be an app route */ } }}
-                            >
-                                {b.imageUrl ? (
-                                    <Image source={{ uri: b.imageUrl }} style={styles.promoImage} contentFit="cover" />
-                                ) : (
-                                    <View style={styles.promoTextWrap}>
-                                        <Text style={styles.promoTitle} numberOfLines={2}>{b.title}</Text>
-                                        {!!b.subtitle && <Text style={styles.promoSub} numberOfLines={2}>{b.subtitle}</Text>}
-                                    </View>
-                                )}
-                            </Pressable>
+                        {banners.map((b) => (
+                            <View key={b.id} style={[styles.promoPage, { width: SCREEN_W }]}>
+                                <Pressable
+                                    style={[styles.promoCard, b.bgColor ? { backgroundColor: b.bgColor } : null]}
+                                    disabled={!b.actionUrl}
+                                    onPress={() => { if (!b.actionUrl) return; try { router.push(b.actionUrl as any); } catch { /* admin-authored URL may not be an app route */ } }}
+                                >
+                                    {b.imageUrl ? (
+                                        <Image source={{ uri: b.imageUrl }} style={styles.promoImage} contentFit="cover" />
+                                    ) : (
+                                        <View style={styles.promoTextWrap}>
+                                            <Text style={styles.promoTitle} numberOfLines={2}>{b.title}</Text>
+                                            {!!b.subtitle && <Text style={styles.promoSub} numberOfLines={2}>{b.subtitle}</Text>}
+                                        </View>
+                                    )}
+                                </Pressable>
+                            </View>
                         ))}
                     </ScrollView>
-                )}
+                    {banners.length > 1 && (
+                        <View style={styles.promoDots}>
+                            {banners.map((b, i) => (
+                                <View key={b.id} style={[styles.promoDot, i === bannerIndex && styles.promoDotActive]} />
+                            ))}
+                        </View>
+                    )}
+                </View>
 
                 {/* Flash Deals — admin-managed, hidden when nothing is running */}
                 {flashDeals.length > 0 && (
@@ -631,22 +675,26 @@ export default function HomeScreen() {
                         />
                         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hList}>
                             {flashDeals.slice(0, 8).map((deal) => (
-                                <ProductCard
-                                    key={deal.id}
-                                    width={productGridCardWidth}
-                                    style={styles.hCard}
-                                    image={deal.images?.[0] || ''}
-                                    brand={deal.label}
-                                    name={deal.productName}
-                                    price={deal.dealPrice}
-                                    originalPrice={deal.originalPrice}
-                                    discount={deal.discountPercent > 0 ? `${deal.discountPercent}%` : undefined}
-                                    onPress={() => router.push(`/product/${deal.productId}`)}
-                                />
+                                <View key={deal.id} style={{ width: productGridCardWidth }}>
+                                    <ProductCard
+                                        width={productGridCardWidth}
+                                        style={styles.hCard}
+                                        image={deal.images?.[0] || ''}
+                                        brand={deal.label}
+                                        name={deal.productName}
+                                        price={deal.dealPrice}
+                                        originalPrice={deal.originalPrice}
+                                        discount={deal.discountPercent > 0 ? `${deal.discountPercent}%` : undefined}
+                                        onPress={() => router.push(`/product/${deal.productId}`)}
+                                    />
+                                    <DealCountdown endsAt={deal.endsAt} />
+                                </View>
                             ))}
                         </ScrollView>
                     </>
                 )}
+
+                <EssentialsGrid />
 
                 {/* Fresh Arrivals */}
                 <SectionHeader eyebrow="Just dropped" title="Fresh arrivals" style={styles.section} />
@@ -698,6 +746,8 @@ export default function HomeScreen() {
                     </Pressable>
                 )}
 
+                <ExploreCategories />
+
                 {/* Big Discounts */}
                 <SectionHeader eyebrow="Mega hours" title="Big discounts" style={styles.section} />
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hList}>
@@ -712,6 +762,8 @@ export default function HomeScreen() {
                         </Pressable>
                     ))}
                 </ScrollView>
+
+                <DiscoverSection deals={flashDeals} areaLabel={locationGranted ? locationLabel : 'your area'} />
 
                 {/* For you — personalized infinite grid */}
                 <SectionHeader
@@ -804,8 +856,15 @@ const styles = createStyles({
     heroImage: { width: '100%', height: '100%' },
 
     promoScroll: { marginTop: 18 },
-    promoList: { paddingHorizontal: 20, gap: 12 },
-    promoCard: { width: 300, height: 150, borderRadius: 22, overflow: 'hidden', backgroundColor: palette.neutral200, justifyContent: 'center' },
+    // Each page is exactly one screen wide so pagingEnabled lands cleanly; the card
+    // inset lives inside the page, not on the scroll container.
+    // width is applied inline: SCREEN_W is a real device measurement and must not
+    // go through createStyles' s() scaling, or the page stops being one screen wide.
+    promoPage: { paddingHorizontal: 20 },
+    promoCard: { width: '100%', height: 150, borderRadius: 22, overflow: 'hidden', backgroundColor: palette.neutral200, justifyContent: 'center' },
+    promoDots: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 10 },
+    promoDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.borderStrong },
+    promoDotActive: { width: 18, backgroundColor: palette.yellow500 },
     promoImage: { width: '100%', height: '100%' },
     promoTextWrap: { padding: 20 },
     promoTitle: { fontFamily: fonts.displayBold, fontSize: 20, color: palette.ink },
