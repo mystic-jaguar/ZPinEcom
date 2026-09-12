@@ -11,6 +11,31 @@ import { pool } from '../db';
  * `products.price` — the 20% ZPIN markup is applied on read (utils/pricing).
  */
 
+/**
+ * Master on/off switch for the *display* of flash deals (admin → Flash Deals →
+ * "Show flash deals"), stored in `platform_settings`. Display only: a deal that
+ * is already live is still priced and sold at its deal price, so nobody loses a
+ * price mid-checkout because the section was hidden.
+ *
+ * Fails OPEN — a missing `platform_settings` table (migration not run on this
+ * environment) reads as enabled, so behaviour is unchanged until it is.
+ * Cached for a minute; this is read on every storefront home load.
+ */
+let flagCache: { value: boolean; at: number } | null = null;
+
+export async function flashDealsEnabled(): Promise<boolean> {
+  if (flagCache && Date.now() - flagCache.at < 60_000) return flagCache.value;
+  let value = true;
+  try {
+    const { rows } = await pool.query(
+      `SELECT value FROM platform_settings WHERE key = 'flash_deals_enabled'`
+    );
+    if (rows[0]) value = String(rows[0].value).toLowerCase() !== 'false';
+  } catch { /* table absent → enabled */ }
+  flagCache = { value, at: Date.now() };
+  return value;
+}
+
 /** A deal is live only while active, started, unexpired and still in stock. */
 export const LIVE_DEAL_PREDICATE = `
   fd.is_active = true AND fd.starts_at <= NOW() AND fd.ends_at > NOW() AND fd.stock_remaining > 0

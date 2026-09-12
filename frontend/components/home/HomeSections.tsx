@@ -410,12 +410,6 @@ const POPULAR_FALLBACK: Item[] = [
     { id: 'p5', name: 'Wall Clock', price: 599, image: 'https://images.unsplash.com/photo-1563861826100-9cb868fdbe1c?w=400&auto=format&fit=crop', nav: { categoryName: 'Home & Living' } },
 ];
 
-const BARGAIN_FALLBACK = [
-    { id: 'b1', name: 'Elite Backpack', price: 1200, discount: '40% OFF', image: 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=500&auto=format&fit=crop', nav: { categoryName: 'Accessories' } as NavTarget },
-    { id: 'b2', name: 'Luxury Handbag', price: 850, discount: '55% OFF', image: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=500&auto=format&fit=crop', nav: { categoryName: 'Accessories' } as NavTarget },
-    { id: 'b3', name: 'Classic Chrono', price: 2499, discount: '35% OFF', image: 'https://images.unsplash.com/photo-1524805444758-089113d48a6d?w=500&auto=format&fit=crop', nav: { categoryName: 'Accessories' } as NavTarget },
-    { id: 'b4', name: 'Urban Sneakers', price: 999, discount: 'HOT DEAL', image: 'https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?w=500&auto=format&fit=crop', nav: { categoryName: 'Footwear' } as NavTarget },
-];
 
 const TRY_BEFORE = [
     { label: 'Clothes', Icon: Shirt, nav: { categoryName: 'Fashion' } as NavTarget },
@@ -453,16 +447,18 @@ export function DiscoverSection({ deals, areaLabel }: { deals: FlashDeal[]; area
         return () => { cancelled = true; };
     }, []);
 
-    const bargains = deals.length
-        ? deals.slice(0, 4).map(d => ({
-            id: d.id,
-            name: d.productName,
-            price: d.dealPrice,
-            discount: d.discountPercent > 0 ? `${d.discountPercent}% OFF` : 'HOT DEAL',
-            image: d.images?.[0] || '',
-            nav: { productId: d.productId } as NavTarget,
-        }))
-        : BARGAIN_FALLBACK;
+    // Bargain Deals is a live-deal section, not editorial copy: with no active
+    // flash deal there is nothing to advertise, so it hides itself entirely
+    // (same rule as the promo banner carousel). Never fall back to invented
+    // "% OFF" numbers — a discount shown is a discount the customer can buy.
+    const bargains = deals.slice(0, 4).map(d => ({
+        id: d.id,
+        name: d.productName,
+        price: d.dealPrice,
+        discount: d.discountPercent > 0 ? `${d.discountPercent}% OFF` : 'HOT DEAL',
+        image: d.images?.[0] || '',
+        nav: { productId: d.productId } as NavTarget,
+    }));
 
     return (
         <View style={styles.section}>
@@ -498,6 +494,7 @@ export function DiscoverSection({ deals, areaLabel }: { deals: FlashDeal[]; area
                 </View>
             </View>
 
+            {bargains.length > 0 && <>
             <View style={styles.rowBlock}>
                 <RowHeader title="Bargain Deals 🔥" actionLabel="View All" onAction={() => go({})} />
             </View>
@@ -513,6 +510,7 @@ export function DiscoverSection({ deals, areaLabel }: { deals: FlashDeal[]; area
                     </Pressable>
                 ))}
             </View>
+            </>}
         </View>
     );
 }
