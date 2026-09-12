@@ -75,7 +75,22 @@ const FORYOU_MAX = 60;      // stop auto-loading past this; show "See all produc
 const BANNER_EVERY = 6;     // drop a banner card after every N products (even → keeps 2-col pairs intact)
 
 // Rotating banner cards to break the grid monotony — different look + copy each.
-type ForYouBanner = { key: string; variant: 'dark' | 'yellow' | 'light' | 'green'; icon: 'zap' | 'star' | 'tag'; eyebrow: string; title: string; sub: string };
+type ForYouBanner = {
+    key: string;
+    variant: 'dark' | 'yellow' | 'light' | 'green';
+    icon: 'zap' | 'star' | 'tag';
+    eyebrow: string;
+    title: string;
+    sub: string;
+    imageUrl?: string | null;   // admin creative, shown instead of the icon tile
+    actionUrl?: string | null;  // admin destination, else the full listing
+};
+
+/**
+ * Editorial fallback for the in-feed cards, used only while the `feed_inline`
+ * placement has nothing live in the admin panel — the same rule the top
+ * carousel follows. Admin-authored banners take over the moment any exist.
+ */
 const FORYOU_BANNERS: ForYouBanner[] = [
     { key: 'delivery', variant: 'dark', icon: 'zap', eyebrow: 'LIVE IN YOUR AREA', title: 'Estimated delivery within 12 hrs', sub: 'Bike-fast, straight to your door' },
     { key: 'try', variant: 'yellow', icon: 'zap', eyebrow: 'TRY-AT-DOOR', title: 'Try it on before you pay', sub: 'Keep what fits, send back the rest' },
@@ -99,6 +114,9 @@ export default function HomeScreen() {
     const [flashDeals, setFlashDeals] = useState<FlashDeal[]>([]);
     // Admin-managed promo banners (promo_banners). Empty list hides the carousel.
     const [promoBanners, setPromoBanners] = useState<PromoBanner[]>([]);
+    // Admin-managed in-feed banners (placement = feed_inline). Empty → the
+    // editorial FORYOU_BANNERS set below, so the feed is never left bare.
+    const [feedBanners, setFeedBanners] = useState<PromoBanner[]>([]);
     const bannerRef = useRef<ScrollView>(null);
     const [bannerIndex, setBannerIndex] = useState(0);
     const [recommended, setRecommended] = useState<any[]>(RECOMMENDED);
@@ -185,7 +203,8 @@ export default function HomeScreen() {
     // hides the strip.
     useEffect(() => {
         flashDealService.getFlashDeals().then(setFlashDeals).catch(() => setFlashDeals([]));
-        bannerService.getBanners().then(setPromoBanners).catch(() => setPromoBanners([]));
+        bannerService.getBanners('top_carousel').then(setPromoBanners).catch(() => setPromoBanners([]));
+        bannerService.getBanners('feed_inline').then(setFeedBanners).catch(() => setFeedBanners([]));
     }, []);
 
     useEffect(() => {
@@ -426,29 +445,55 @@ export default function HomeScreen() {
         if (contentSize.height - contentOffset.y - layoutMeasurement.height < 700) loadForYou(true);
     };
 
+    /**
+     * The in-feed cards: admin-authored when any are live, editorial otherwise.
+     * `promo_banners` carries only a title, subtitle, image and destination, so
+     * the eyebrow is left empty and the look (variant/icon) keeps cycling the
+     * way the editorial set does — no two consecutive cards look alike.
+     */
+    const fyBanners: ForYouBanner[] = useMemo(() => {
+        if (!feedBanners.length) return FORYOU_BANNERS;
+        const variants = ['dark', 'yellow', 'light', 'green'] as const;
+        const icons = ['zap', 'star', 'tag'] as const;
+        return feedBanners.map((b, i) => ({
+            key: b.id,
+            variant: variants[i % variants.length],
+            icon: icons[i % icons.length],
+            eyebrow: '',
+            title: b.title,
+            sub: b.subtitle || '',
+            imageUrl: b.imageUrl,
+            actionUrl: b.actionUrl,
+        }));
+    }, [feedBanners]);
+
     // Weave banner cards into the product stream every BANNER_EVERY items.
     const forYouItems = useMemo(() => {
         const out: { type: 'product' | 'banner'; data: any; key: string }[] = [];
         forYou.forEach((p, i) => {
             out.push({ type: 'product', data: p, key: `p-${p.productId}` });
             if ((i + 1) % BANNER_EVERY === 0 && i + 1 < forYou.length) {
-                const b = FORYOU_BANNERS[Math.floor(i / BANNER_EVERY) % FORYOU_BANNERS.length];
+                const b = fyBanners[Math.floor(i / BANNER_EVERY) % fyBanners.length];
                 out.push({ type: 'banner', data: b, key: `b-${i}-${b.key}` });
             }
         });
         return out;
-    }, [forYou]);
+    }, [forYou, fyBanners]);
 
     const renderForYouBanner = (b: ForYouBanner, key: string) => {
         const v = FORYOU_BANNER_STYLES[b.variant];
         const Icon = b.icon === 'star' ? Star : b.icon === 'tag' ? Tag : Zap;
         return (
-            <Pressable key={key} style={[styles.fyBanner, v.card]} onPress={() => router.push('/product-listing')}>
-                <View style={[styles.fyBannerIcon, { backgroundColor: v.iconBg }]}>
-                    <Icon size={20} color={v.iconColor} fill={b.icon === 'star' ? v.iconColor : 'transparent'} />
-                </View>
+            <Pressable key={key} style={[styles.fyBanner, v.card]} onPress={() => router.push((b.actionUrl || '/product-listing') as any)}>
+                {b.imageUrl ? (
+                    <Image source={{ uri: b.imageUrl }} style={styles.fyBannerImage} contentFit="cover" />
+                ) : (
+                    <View style={[styles.fyBannerIcon, { backgroundColor: v.iconBg }]}>
+                        <Icon size={20} color={v.iconColor} fill={b.icon === 'star' ? v.iconColor : 'transparent'} />
+                    </View>
+                )}
                 <View style={styles.fyBannerText}>
-                    <Text style={[styles.fyBannerEyebrow, { color: v.eyebrow }]}>{b.eyebrow}</Text>
+                    {!!b.eyebrow && <Text style={[styles.fyBannerEyebrow, { color: v.eyebrow }]}>{b.eyebrow}</Text>}
                     <Text style={[styles.fyBannerTitle, { color: v.title }]} numberOfLines={1}>{b.title}</Text>
                     <Text style={[styles.fyBannerSub, { color: v.sub }]} numberOfLines={1}>{b.sub}</Text>
                 </View>
@@ -923,6 +968,7 @@ const styles = createStyles({
     fyLoader: { paddingVertical: 24, alignItems: 'center' },
     fyBanner: { width: '100%', flexDirection: 'row', alignItems: 'center', gap: 14, borderRadius: 20, paddingVertical: 16, paddingHorizontal: 16, overflow: 'hidden' },
     fyBannerIcon: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+    fyBannerImage: { width: 44, height: 44, borderRadius: 14 },
     fyBannerText: { flex: 1 },
     fyBannerEyebrow: { fontFamily: fonts.monoBold, fontSize: 9, letterSpacing: 1.2, marginBottom: 4 },
     fyBannerTitle: { fontFamily: fonts.bodyBold, fontSize: 15, marginBottom: 2 },
