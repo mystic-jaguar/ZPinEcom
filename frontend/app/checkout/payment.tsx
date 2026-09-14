@@ -319,7 +319,8 @@ export default function CheckoutPaymentScreen() {
                     {isSubmitting ? <ActivityIndicator color={colors.textOnYellow} /> : (
                         <>
                             <Lock size={17} color={colors.textOnYellow} />
-                            <Text style={styles.payText}>Pay now</Text>
+                            {/* Instant+COD still prepays the delivery fee online, so it keeps "Pay now". */}
+                            <Text style={styles.payText}>{selectedPaymentMethod === 'cod' && !isTrialSelection ? 'Pay at Door' : 'Pay now'}</Text>
                         </>
                     )}
                 </Pressable>
