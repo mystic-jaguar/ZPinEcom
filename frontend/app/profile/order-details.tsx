@@ -96,6 +96,7 @@ export default function OrderDetailsScreen() {
                     status: o.status, paymentStatus: o.paymentStatus,
                     totalAmount: Number(o.totalAmount || 0), shippingAmount: Number(o.shippingAmount || 0),
                     taxAmount: Number(o.taxAmount || 0), finalAmount: Number(o.finalAmount || 0),
+                    fulfilledBy: o.fulfilledBy ?? null,
                     shippingAddress: o.shippingAddress || {}, paymentMethod: o.paymentMethod || 'cod', paymentId: o.paymentId,
                     items: Array.isArray(o.items) ? o.items.map((item: any) => ({
                         orderItemId: item.orderItemId || item.id, productId: item.productId, productName: item.productName,
@@ -272,6 +273,10 @@ export default function OrderDetailsScreen() {
                             items: group.orders.flatMap(o => o.items),
                             deliveryFee: shipping,
                             taxAmount: tax,
+                            discount,
+                            // Each shipment can be a different seller — list every
+                            // distinct store name rather than picking just one.
+                            fulfilledBy: Array.from(new Set(group.orders.map(o => o.fulfilledBy).filter(Boolean))).join(', ') || undefined,
                             totalAmount: group.total,
                         })}>
                             <Download size={17} color={colors.textOnYellow} />
@@ -484,6 +489,9 @@ export default function OrderDetailsScreen() {
                         items: order.items,
                         deliveryFee: shippingFee,
                         taxAmount: gstAmount,
+                        discount: couponDiscount,
+                        prepaidAmount,
+                        fulfilledBy: order.fulfilledBy || undefined,
                         totalAmount: Number(order.finalAmount || 0),
                     })}>
                         <Download size={17} color={colors.textOnYellow} />

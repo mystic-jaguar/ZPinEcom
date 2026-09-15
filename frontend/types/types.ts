@@ -382,6 +382,9 @@ export interface OrderObject {
     trialExpiresAt?: string | null;
     // Present only once a delivery partner has accepted (delivery_boy_id set).
     courier?: { name: string | null; phone: string | null } | null;
+    // The seller's store name only — never their GSTIN/address/phone. Printed
+    // on the invoice as "Fulfilled by"; ZPIN is the invoicing party.
+    fulfilledBy?: string | null;
     partnerEarning?: number;
     distance?: number;                     // km
     estimatedTime?: number;                // minutes

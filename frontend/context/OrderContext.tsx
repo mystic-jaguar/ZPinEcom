@@ -59,6 +59,7 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
                     totalAmount: Number(o.totalAmount || 0),
                     shippingAmount: Number(o.shippingAmount || 0),
                     taxAmount: Number(o.taxAmount || 0),
+                    fulfilledBy: o.fulfilledBy ?? null,
                     finalAmount: Number(o.finalAmount || 0),
                     shippingAddress: o.shippingAddress || {},
                     paymentMethod: o.paymentMethod || 'cod',

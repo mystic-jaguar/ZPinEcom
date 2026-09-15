@@ -73,6 +73,7 @@ function normalizeOrder(row: any) {
     totalAmount: Number(row.total_amount || 0),
     shippingAmount: Number(row.shipping_amount || 0),
     taxAmount: Number(row.tax_amount || 0),
+    fulfilledBy: row.fulfilled_by ?? null,
     finalAmount: Number(row.final_amount || 0),
     shippingAddress: decryptAddressPayload(row.shipping_address || {}),
     paymentMethod: row.payment_method || 'cod',
@@ -124,11 +125,14 @@ router.get('/orders', authenticate, async (req: AuthRequest, res: Response): Pro
         (SELECT r.status FROM return_requests r
           WHERE r.order_id = o.id AND r.status IN ('requested', 'approved', 'picked_up')
           ORDER BY r.created_at DESC LIMIT 1) AS return_status,
+        -- Store name only, for the invoice's "Fulfilled by" line — see routes/orders.ts.
+        sbd.business_name AS fulfilled_by,
         COALESCE(json_agg(${ORDER_ITEMS_JSON}) FILTER (WHERE oi.id IS NOT NULL), '[]') as items
        FROM ${ORDERS} o
        LEFT JOIN ${ORDER_ITEMS} oi ON oi.order_id = o.id
+       LEFT JOIN seller_business_details sbd ON sbd.user_id::text = o.seller_id::text
        WHERE o.user_id = $1 AND NOT ${abandonedCheckout}
-       GROUP BY o.id
+       GROUP BY o.id, sbd.business_name
        ORDER BY o.created_at DESC
        LIMIT $2 OFFSET $3`,
       [req.userId, limit, offset]

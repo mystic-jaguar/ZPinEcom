@@ -212,6 +212,7 @@ function normalizeOrder(row: any) {
     totalAmount: Number(row.total_amount),
     shippingAmount: Number(row.shipping_amount || 0),
     taxAmount: Number(row.tax_amount || 0),
+    fulfilledBy: row.fulfilled_by ?? null,
     finalAmount: Number(row.final_amount),
     shippingAddress: decryptAddressPayload(row.shipping_address),
     paymentMethod: row.payment_method,
@@ -324,12 +325,16 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response): Promis
             AND h.note LIKE 'Rejected by seller:%'
           ORDER BY h.created_at DESC LIMIT 1) AS cancellation_reason,
         dp.name AS courier_name, dp.mobile AS courier_phone,
+        -- The tax invoice names the store that fulfils the parcel. Store name
+        -- ONLY: the seller's GSTIN, address and phone never reach a customer.
+        sbd.business_name AS fulfilled_by,
         COALESCE(json_agg(${ORDER_ITEMS_JSON}) FILTER (WHERE oi.id IS NOT NULL), '[]') as items
        FROM ${ORDERS} o
        LEFT JOIN ${ORDER_ITEMS} oi ON oi.order_id = o.id
        LEFT JOIN delivery_partner_profiles dp ON dp.id::text = o.delivery_boy_id::text
+       LEFT JOIN seller_business_details sbd ON sbd.user_id::text = o.seller_id::text
        WHERE o.id = $1 AND o.user_id = $2
-       GROUP BY o.id, dp.name, dp.mobile`,
+       GROUP BY o.id, dp.name, dp.mobile, sbd.business_name`,
       [req.params.id, req.userId]
     );
 
