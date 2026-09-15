@@ -1,13 +1,22 @@
 // Serviceable delivery area. The CUSTOMER may live anywhere — only the delivery
-// address has to be inside Pune. Kept byte-for-byte in sync with:
+// address has to be inside a zone. Kept in sync with:
 //   ZPinEcom/frontend/constants/delivery.ts
 //   website-customer/backend/utils/delivery.js
 //   website-customer/src/utils/delivery.js
-// Change one, change all four.
+// Change one, change all four. (The SQL helpers at the bottom are backend-only.)
+//
+// Zones (2026-09-15): Pune = 411xxx/412xxx AND a Pune/PCMC city; Muzaffarpur =
+// exactly 842001–842004, pincode alone decides. A seller's products are shown to,
+// and orderable by, customers in the SELLER's zone only.
+
+export type Zone = 'pune' | 'muzaffarpur';
 
 export const DELIVERY_CITY = 'Pune';
+export const MUZAFFARPUR_PINCODES = ['842001', '842002', '842003', '842004'];
 export const OUT_OF_AREA_MESSAGE =
-  'We currently deliver only within Pune. Please use a Pune delivery address (pincode 411xxx / 412xxx).';
+  'We currently deliver only within Pune (pincode 411xxx / 412xxx) and Muzaffarpur (842001–842004). Please use an address in one of these areas.';
+export const CROSS_ZONE_MESSAGE =
+  'is not available for delivery to this address — it ships from a seller in a different city. Please remove it and try again.';
 
 // Pune district pincodes: core Pune 411xxx, PCMC / greater Pune 412xxx.
 export function isPunePincode(pincode?: string | null): boolean {
@@ -21,7 +30,52 @@ export function isPuneCity(city?: string | null): boolean {
   return /pune|pimpri|chinchwad|pcmc/i.test(String(city).trim());
 }
 
-// A delivery address is serviceable only if BOTH pincode and city match Pune.
+// A Pune address needs BOTH pincode and city to match Pune.
 export function isPuneAddress(city?: string | null, pincode?: string | null): boolean {
   return isPunePincode(pincode) && isPuneCity(city);
+}
+
+// Which zone a pincode belongs to, or null when it is outside every zone.
+export function zoneForPincode(pincode?: string | null): Zone | null {
+  if (isPunePincode(pincode)) return 'pune';
+  if (MUZAFFARPUR_PINCODES.includes(String(pincode ?? '').trim())) return 'muzaffarpur';
+  return null;
+}
+
+export function isServiceablePincode(pincode?: string | null): boolean {
+  return zoneForPincode(pincode) !== null;
+}
+
+// Delivery-address gate: Pune checks pincode + city, Muzaffarpur pincode only.
+export function isServiceableAddress(city?: string | null, pincode?: string | null): boolean {
+  const zone = zoneForPincode(pincode);
+  return zone === 'muzaffarpur' || (zone === 'pune' && isPuneCity(city));
+}
+
+// A seller's zone from their shop pincode. Missing/unknown counts as Pune
+// (owner decision 2026-09-15 — every pre-existing seller is a Pune seller).
+export function sellerZone(pincode?: string | null): Zone {
+  return zoneForPincode(pincode) === 'muzaffarpur' ? 'muzaffarpur' : 'pune';
+}
+
+// ── Backend-only SQL helpers ────────────────────────────────────────────────
+
+// "This product's seller is in `zone`" — mirrors sellerZone(): only a
+// Muzaffarpur shop pincode makes a Muzaffarpur seller, everything else is Pune.
+// `zone` is always a Zone enum value, never raw request input.
+export function sellerInZoneSql(zone: Zone, userCol = 'p.user_id'): string {
+  const pins = MUZAFFARPUR_PINCODES.map((p) => `'${p}'`).join(',');
+  const muz = `EXISTS (SELECT 1 FROM seller_business_details sbd
+    WHERE sbd.user_id::text = ${userCol}::text AND btrim(sbd.pincode) IN (${pins}))`;
+  return zone === 'muzaffarpur' ? muz : `NOT ${muz}`;
+}
+
+// Catalogue filter from a `?pincode=` query param, plus a cache-key suffix.
+// No pincode → no filter (clients that don't send a location yet see everything);
+// a pincode outside every zone → nothing is listed.
+// ponytail: fail-open when absent; make it required once every client sends it.
+export function catalogZone(pincode: unknown): { sql: string; key: string } {
+  if (typeof pincode !== 'string' || pincode.trim() === '') return { sql: '', key: '' };
+  const zone = zoneForPincode(pincode);
+  return zone ? { sql: ` AND ${sellerInZoneSql(zone)}`, key: `:z${zone}` } : { sql: ' AND false', key: ':znone' };
 }

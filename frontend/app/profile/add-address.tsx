@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
 import { AppHeader, BottomBar, ZButton, ZInput, ZText } from '../../components/ui';
 import { createStyles, colors, fonts, palette, radius } from '../../constants/theme';
-import { DELIVERY_CITY, isPuneCity, isPunePincode } from '../../constants/delivery';
+import { SERVICE_AREAS_LABEL, isPuneCity, isServiceablePincode, zoneForPincode } from '../../constants/delivery';
 import { useAddress } from '../../context/AddressContext';
 import { useUser } from '../../context/UserContext';
 import { lookupPincode } from '../../services/location';
@@ -60,11 +60,11 @@ export default function AddAddressScreen() {
         if (!form.phone) e.phone = 'Phone is required';
         else if (form.phone.length < 10) e.phone = 'Invalid phone number';
         if (!form.pincode) e.pincode = 'Pincode is required';
-        else if (!isPunePincode(form.pincode)) e.pincode = `We currently deliver only in ${DELIVERY_CITY}`;
+        else if (!isServiceablePincode(form.pincode)) e.pincode = `We currently deliver only in ${SERVICE_AREAS_LABEL}`;
         if (!form.addressLine1) e.addressLine1 = 'Address is required';
         if (!form.addressLine2) e.addressLine2 = 'Locality is required';
         if (!form.city) e.city = 'City is required';
-        else if (!isPuneCity(form.city)) e.city = `We currently deliver only in ${DELIVERY_CITY}`;
+        else if (zoneForPincode(form.pincode) === 'pune' && !isPuneCity(form.city)) e.city = 'A Pune pincode needs a Pune / PCMC city';
         if (!form.state) e.state = 'State is required';
         setErrors(e);
         return Object.keys(e).length === 0;
@@ -88,7 +88,7 @@ export default function AddAddressScreen() {
     const onPincodeChange = (t: string) => {
         const pincode = t.replace(/[^0-9]/g, '');
         setForm(f => ({ ...f, pincode }));
-        if (isPunePincode(pincode)) setErrors(e => ({ ...e, pincode: '' }));
+        if (isServiceablePincode(pincode)) setErrors(e => ({ ...e, pincode: '' }));
         if (pincode.length !== 6) return;
         lookupPincode(pincode).then(loc => {
             if (!loc) return;

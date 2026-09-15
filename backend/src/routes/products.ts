@@ -10,6 +10,7 @@ import { withMarkup, withoutMarkup } from '../utils/pricing';
 import { liveDealForProduct } from '../utils/flashDeals';
 import { cacheDel, cacheDelPattern, cacheGet, cacheSet } from '../utils/redis';
 import { logger } from '../utils/logger';
+import { catalogZone } from '../utils/delivery';
 import multer from 'multer';
 import { looksLikeImage } from '../utils/imageBytes';
 import { isConfigured as cloudinaryConfigured, uploadReviewImage } from '../utils/cloudinary';
@@ -251,6 +252,7 @@ function getUserIdFromToken(token: string): string | null {
 // Signals (weighted): purchase history (+3/category), wishlist (+2/category), search terms (+1/category)
 // Excludes already-purchased product IDs. Falls back to latest products if no signals.
 router.get('/recommended', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+  const zone = catalogZone(req.query.pincode);
   const limit = Math.min(Number(req.query.limit) || 10, 30);
   const searchTerms: string[] = req.query.terms
     ? String(req.query.terms).split(',').map(t => t.trim()).filter(Boolean).slice(0, 5)
@@ -312,7 +314,7 @@ router.get('/recommended', authenticate, async (req: AuthRequest, res: Response)
          FROM products p
          LEFT JOIN product_images pi ON pi.product_id = p.id
          LEFT JOIN product_reviews pr ON pr.product_id = p.id
-         WHERE p.in_stock = true AND p.is_approved = true AND EXISTS (SELECT 1 FROM users su WHERE su.id = p.user_id AND su.is_active IS NOT FALSE AND su.deleted_at IS NULL) AND ${VARIANT_PRIMARY}
+         WHERE p.in_stock = true AND p.is_approved = true AND EXISTS (SELECT 1 FROM users su WHERE su.id = p.user_id AND su.is_active IS NOT FALSE AND su.deleted_at IS NULL) AND ${VARIANT_PRIMARY}${zone.sql}
          GROUP BY p.id
          ORDER BY p.created_at DESC
          LIMIT $1`,
@@ -336,7 +338,7 @@ router.get('/recommended', authenticate, async (req: AuthRequest, res: Response)
        FROM products p
        LEFT JOIN product_images pi ON pi.product_id = p.id
        LEFT JOIN product_reviews pr ON pr.product_id = p.id
-       WHERE p.in_stock = true AND p.is_approved = true AND EXISTS (SELECT 1 FROM users su WHERE su.id = p.user_id AND su.is_active IS NOT FALSE AND su.deleted_at IS NULL) AND ${VARIANT_PRIMARY}
+       WHERE p.in_stock = true AND p.is_approved = true AND EXISTS (SELECT 1 FROM users su WHERE su.id = p.user_id AND su.is_active IS NOT FALSE AND su.deleted_at IS NULL) AND ${VARIANT_PRIMARY}${zone.sql}
          AND p.deepest_category_name = ANY($1)
          AND p.id != ALL($2)
        GROUP BY p.id
@@ -358,6 +360,7 @@ const escapeLike = (s: string) => s.replace(/[\\%_]/g, '\\$&');
 
 // GET /api/v1/products/search?q= — full-text product name search with related products
 router.get('/search', productListLimiter, async (req: Request, res: Response): Promise<void> => {
+  const zone = catalogZone(req.query.pincode);
   const q = (req.query.q as string || '').trim();
   const limit = Math.min(Number(req.query.limit) || 50, 200);
 
@@ -372,7 +375,7 @@ router.get('/search', productListLimiter, async (req: Request, res: Response): P
   // users, so this collapses them onto one. Same 1m TTL reasoning as the list
   // keys: price/stock edits happen in other backends that cannot invalidate
   // this Redis, so the window is kept short rather than invalidated.
-  const cacheKey = `search:${q.toLowerCase()}:l${limit}`;
+  const cacheKey = `search:${q.toLowerCase()}:l${limit}${zone.key}`;
   const cached = await cacheGet(cacheKey);
   if (cached) { res.json(cached); return; }
 
@@ -445,7 +448,7 @@ router.get('/search', productListLimiter, async (req: Request, res: Response): P
        FROM products p
        LEFT JOIN product_images pi ON pi.product_id = p.id
        LEFT JOIN product_reviews pr ON pr.product_id = p.id
-       WHERE p.in_stock = true AND p.is_approved = true AND EXISTS (SELECT 1 FROM users su WHERE su.id = p.user_id AND su.is_active IS NOT FALSE AND su.deleted_at IS NULL) AND ${VARIANT_PRIMARY}
+       WHERE p.in_stock = true AND p.is_approved = true AND EXISTS (SELECT 1 FROM users su WHERE su.id = p.user_id AND su.is_active IS NOT FALSE AND su.deleted_at IS NULL) AND ${VARIANT_PRIMARY}${zone.sql}
          AND (
            LOWER(REPLACE(p.product_name, ' ', '')) LIKE $1
            OR LOWER(p.product_name) LIKE $2
@@ -483,7 +486,7 @@ router.get('/search', productListLimiter, async (req: Request, res: Response): P
          ) ms
          LEFT JOIN product_images pi ON pi.product_id = p.id
          LEFT JOIN product_reviews pr ON pr.product_id = p.id
-         WHERE p.in_stock = true AND p.is_approved = true AND EXISTS (SELECT 1 FROM users su WHERE su.id = p.user_id AND su.is_active IS NOT FALSE AND su.deleted_at IS NULL) AND ${VARIANT_PRIMARY}
+         WHERE p.in_stock = true AND p.is_approved = true AND EXISTS (SELECT 1 FROM users su WHERE su.id = p.user_id AND su.is_active IS NOT FALSE AND su.deleted_at IS NULL) AND ${VARIANT_PRIMARY}${zone.sql}
            AND ms.score > $2
          GROUP BY p.id, ms.score
          ORDER BY ms.score DESC, p.created_at DESC
@@ -510,7 +513,7 @@ router.get('/search', productListLimiter, async (req: Request, res: Response): P
          FROM products p
          LEFT JOIN product_images pi ON pi.product_id = p.id
          LEFT JOIN product_reviews pr ON pr.product_id = p.id
-         WHERE p.in_stock = true AND p.is_approved = true AND EXISTS (SELECT 1 FROM users su WHERE su.id = p.user_id AND su.is_active IS NOT FALSE AND su.deleted_at IS NULL) AND ${VARIANT_PRIMARY}
+         WHERE p.in_stock = true AND p.is_approved = true AND EXISTS (SELECT 1 FROM users su WHERE su.id = p.user_id AND su.is_active IS NOT FALSE AND su.deleted_at IS NULL) AND ${VARIANT_PRIMARY}${zone.sql}
            AND p.deepest_category_name = ANY($1)
            AND p.id != ALL($2)
          GROUP BY p.id
@@ -534,6 +537,7 @@ router.get('/search', productListLimiter, async (req: Request, res: Response): P
 // Since products don't have coordinates, we return counts per category
 // filtered by the 4 nearby categories: Men, Women, Kids, Makeup
 router.get('/nearby', async (req: Request, res: Response): Promise<void> => {
+  const zone = catalogZone(req.query.pincode);
   // lat/lng accepted for future geo-filtering; currently returns category counts
   const NEARBY_CATEGORIES = [
     { name: 'Men',    keywords: ['men', 'man', 'male'],          rootCategory: 'Fashion', subCategory: 'Men'    },
@@ -542,7 +546,7 @@ router.get('/nearby', async (req: Request, res: Response): Promise<void> => {
     { name: 'Makeup', keywords: ['makeup', 'make-up', 'cosmetic', 'beauty', 'skincare', 'haircare'], rootCategory: 'Beauty', subCategory: 'Makeup' },
   ];
 
-  const cacheKey = 'products:nearby';
+  const cacheKey = `products:nearby${zone.key}`;
   const cached = await cacheGet(cacheKey);
   if (cached) { res.json(cached); return; }
 
@@ -555,7 +559,7 @@ router.get('/nearby', async (req: Request, res: Response): Promise<void> => {
         const params = cat.keywords.map(k => `%${k}%`);
 
         const countResult = await pool.query(
-          `SELECT COUNT(*) FROM products p WHERE p.in_stock = true AND p.is_approved = true AND EXISTS (SELECT 1 FROM users su WHERE su.id = p.user_id AND su.is_active IS NOT FALSE AND su.deleted_at IS NULL) AND ${VARIANT_PRIMARY} AND (${likeConditions})`,
+          `SELECT COUNT(*) FROM products p WHERE p.in_stock = true AND p.is_approved = true AND EXISTS (SELECT 1 FROM users su WHERE su.id = p.user_id AND su.is_active IS NOT FALSE AND su.deleted_at IS NULL) AND ${VARIANT_PRIMARY}${zone.sql} AND (${likeConditions})`,
           params
         );
 
@@ -563,7 +567,7 @@ router.get('/nearby', async (req: Request, res: Response): Promise<void> => {
         const imgResult = await pool.query(
           `SELECT pi.image_url FROM products p
            JOIN product_images pi ON pi.product_id = p.id
-           WHERE p.in_stock = true AND p.is_approved = true AND EXISTS (SELECT 1 FROM users su WHERE su.id = p.user_id AND su.is_active IS NOT FALSE AND su.deleted_at IS NULL) AND ${VARIANT_PRIMARY} AND (${likeConditions})
+           WHERE p.in_stock = true AND p.is_approved = true AND EXISTS (SELECT 1 FROM users su WHERE su.id = p.user_id AND su.is_active IS NOT FALSE AND su.deleted_at IS NULL) AND ${VARIANT_PRIMARY}${zone.sql} AND (${likeConditions})
            LIMIT 1`,
           params
         );
@@ -589,7 +593,8 @@ router.get('/nearby', async (req: Request, res: Response): Promise<void> => {
 
 // GET /api/v1/products/fresh-categories — top 5 categories with the most recently added product
 router.get('/fresh-categories', async (req: Request, res: Response): Promise<void> => {
-  const cacheKey = 'products:fresh-categories';
+  const zone = catalogZone(req.query.pincode);
+  const cacheKey = `products:fresh-categories${zone.key}`;
   const cached = await cacheGet(cacheKey);
   if (cached) { res.json(cached); return; }
 
@@ -601,7 +606,7 @@ router.get('/fresh-categories', async (req: Request, res: Response): Promise<voi
         MAX(created_at) OVER (PARTITION BY deepest_category_name) AS latest_at,
         (SELECT image_url FROM product_images WHERE product_id = p.id LIMIT 1) AS image_url
       FROM products p
-      WHERE p.in_stock = true AND p.is_approved = true AND EXISTS (SELECT 1 FROM users su WHERE su.id = p.user_id AND su.is_active IS NOT FALSE AND su.deleted_at IS NULL) AND ${VARIANT_PRIMARY}
+      WHERE p.in_stock = true AND p.is_approved = true AND EXISTS (SELECT 1 FROM users su WHERE su.id = p.user_id AND su.is_active IS NOT FALSE AND su.deleted_at IS NULL) AND ${VARIANT_PRIMARY}${zone.sql}
         AND deepest_category_name IS NOT NULL
         AND deepest_category_name != ''
       ORDER BY deepest_category_name, created_at DESC
@@ -659,6 +664,7 @@ function parsePriceBands(raw: string): { min: number | null; max: number | null 
 // Supports server-side pagination (page, limit), sorting (sort), and filtering by
 // price (priceBands), customer rating (minRating), and brand/deepest category (brands).
 router.get('/category/:categoryName', productListLimiter, async (req: Request, res: Response): Promise<void> => {
+  const zone = catalogZone(req.query.pincode);
   const page = Math.max(Number(req.query.page) || 1, 1);
   const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 100); // default 20, max 100
   const offset = (page - 1) * limit;
@@ -677,7 +683,7 @@ router.get('/category/:categoryName', productListLimiter, async (req: Request, r
 
   const cacheKey =
     `products:category:${categoryName.toLowerCase()}:p${page}:l${limit}` +
-    `:s${sortKey}:r${minRating}:b${brands.join('|')}:pb${priceBandsRaw}`;
+    `:s${sortKey}:r${minRating}:b${brands.join('|')}:pb${priceBandsRaw}${zone.key}`;
   const cached = await cacheGet(cacheKey);
   if (cached) { res.json(cached); return; }
 
@@ -687,7 +693,7 @@ router.get('/category/:categoryName', productListLimiter, async (req: Request, r
   try {
     // $1 is always the category name. Subsequent filter params are appended dynamically.
     const params: any[] = [categoryName];
-    let where = `p.in_stock = true AND p.is_approved = true AND EXISTS (SELECT 1 FROM users su WHERE su.id = p.user_id AND su.is_active IS NOT FALSE AND su.deleted_at IS NULL) AND ${VARIANT_PRIMARY}
+    let where = `p.in_stock = true AND p.is_approved = true AND EXISTS (SELECT 1 FROM users su WHERE su.id = p.user_id AND su.is_active IS NOT FALSE AND su.deleted_at IS NULL) AND ${VARIANT_PRIMARY}${zone.sql}
       AND (
         LOWER(p.deepest_category_name) = LOWER($1)
         OR EXISTS (
@@ -742,7 +748,7 @@ router.get('/category/:categoryName', productListLimiter, async (req: Request, r
     const brandsResult = await pool.query(
       `SELECT DISTINCT p.deepest_category_name AS name
        FROM products p
-       WHERE p.in_stock = true AND p.is_approved = true AND EXISTS (SELECT 1 FROM users su WHERE su.id = p.user_id AND su.is_active IS NOT FALSE AND su.deleted_at IS NULL) AND ${VARIANT_PRIMARY}
+       WHERE p.in_stock = true AND p.is_approved = true AND EXISTS (SELECT 1 FROM users su WHERE su.id = p.user_id AND su.is_active IS NOT FALSE AND su.deleted_at IS NULL) AND ${VARIANT_PRIMARY}${zone.sql}
          AND p.deepest_category_name IS NOT NULL
          AND p.deepest_category_name <> ''
          AND (
@@ -800,16 +806,17 @@ router.get('/category/:categoryName', productListLimiter, async (req: Request, r
 
 // GET /api/v1/products — all products (paginated)
 router.get('/', productListLimiter, async (req: Request, res: Response): Promise<void> => {
+  const zone = catalogZone(req.query.pincode);
   const page = Number(req.query.page) || 1;
   const limit = Math.min(Number(req.query.limit) || 50, 200); // default 50, max 200
   const offset = (page - 1) * limit;
 
-  const cacheKey = `products:all:p${page}:l${limit}`;
+  const cacheKey = `products:all:p${page}:l${limit}${zone.key}`;
   const cached = await cacheGet(cacheKey);
   if (cached) { res.json(cached); return; }
 
   try {
-    const countResult = await pool.query(`SELECT COUNT(*) FROM products p WHERE p.in_stock = true AND p.is_approved = true AND EXISTS (SELECT 1 FROM users su WHERE su.id = p.user_id AND su.is_active IS NOT FALSE AND su.deleted_at IS NULL) AND ${VARIANT_PRIMARY}`);
+    const countResult = await pool.query(`SELECT COUNT(*) FROM products p WHERE p.in_stock = true AND p.is_approved = true AND EXISTS (SELECT 1 FROM users su WHERE su.id = p.user_id AND su.is_active IS NOT FALSE AND su.deleted_at IS NULL) AND ${VARIANT_PRIMARY}${zone.sql}`);
     const total = Number(countResult.rows[0].count);
 
     const result = await pool.query(
@@ -819,7 +826,7 @@ router.get('/', productListLimiter, async (req: Request, res: Response): Promise
        FROM products p
        LEFT JOIN product_images pi ON pi.product_id = p.id
        LEFT JOIN product_reviews pr ON pr.product_id = p.id
-       WHERE p.in_stock = true AND p.is_approved = true AND EXISTS (SELECT 1 FROM users su WHERE su.id = p.user_id AND su.is_active IS NOT FALSE AND su.deleted_at IS NULL) AND ${VARIANT_PRIMARY}
+       WHERE p.in_stock = true AND p.is_approved = true AND EXISTS (SELECT 1 FROM users su WHERE su.id = p.user_id AND su.is_active IS NOT FALSE AND su.deleted_at IS NULL) AND ${VARIANT_PRIMARY}${zone.sql}
        GROUP BY p.id
        ORDER BY p.created_at DESC, p.id ASC
        LIMIT $1 OFFSET $2`,

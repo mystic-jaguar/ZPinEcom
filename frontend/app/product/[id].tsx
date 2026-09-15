@@ -14,7 +14,7 @@ import VariantSelector from '../../components/product/VariantSelector';
 import { useCart } from '../../context/CartContext';
 import { useCheckout } from '../../context/CheckoutContext';
 import { useAddress } from '../../context/AddressContext';
-import { isPuneAddress } from '../../constants/delivery';
+import { isServiceableAddress } from '../../constants/delivery';
 import { useOrder } from '../../context/OrderContext';
 import { useUser } from '../../context/UserContext';
 import { useWishlist } from '../../context/WishlistContext';
@@ -354,7 +354,7 @@ export default function ProductDetails() {
             selectOnly({ productId: product.productId, selectedSize });
             const current = addresses.find(a => a.id === selectedAddressId);
             const target = current || addresses.find(a => a.isDefault) || addresses[0];
-            if (target && isPuneAddress(target.city, target.pincode)) {
+            if (target && isServiceableAddress(target.city, target.pincode)) {
                 if (target.id !== selectedAddressId) setSelectedAddressId(target.id);
                 router.push('/checkout/summary');
             } else {

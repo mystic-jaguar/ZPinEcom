@@ -2,7 +2,7 @@ import { Response, Router } from 'express';
 import { pool } from '../db';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { addressLimiter } from '../middleware/rateLimits';
-import { isPuneAddress, OUT_OF_AREA_MESSAGE } from '../utils/delivery';
+import { isServiceableAddress, OUT_OF_AREA_MESSAGE } from '../utils/delivery';
 import { revokeTokensFor } from '../middleware/auth';
 import { createEmailOtp, EMAIL_RE, maskEmail, normalizeEmail } from '../utils/emailOtp';
 import { sendDeletionConfirmedEmail, sendOTPEmail } from '../utils/mailer';
@@ -564,8 +564,8 @@ function addressProblem(a: Record<string, unknown>): string | null {
   if (!/^\+?[\d\s\-]{7,15}$/.test(String(phone))) return 'Invalid phone number';
   // Pincode validation — 6 digits for India
   if (!/^\d{6}$/.test(String(pincode))) return 'Invalid pincode — must be 6 digits';
-  // Delivery is Pune-only. The customer can be anywhere; the address can't.
-  if (!isPuneAddress(String(city), String(pincode))) return OUT_OF_AREA_MESSAGE;
+  // Delivery is zone-only (Pune / Muzaffarpur). The customer can be anywhere; the address can't.
+  if (!isServiceableAddress(String(city), String(pincode))) return OUT_OF_AREA_MESSAGE;
   return null;
 }
 

@@ -7,7 +7,7 @@ import React, { useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader, BottomBar, CheckoutSteps, ZButton, ZText } from '../../components/ui';
-import { DELIVERY_CITY, isPuneAddress } from '../../constants/delivery';
+import { SERVICE_AREAS_LABEL, isServiceableAddress } from '../../constants/delivery';
 import { createStyles, colors, fonts, palette, radius } from '../../constants/theme';
 import { Text } from '../../components/ui/ScaledText';
 
@@ -39,7 +39,7 @@ export default function CheckoutAddressScreen() {
     const handleConfirm = () => {
         const selected = addresses.find((a: any) => a.id === selectedAddressId);
         if (!selected) { setShowModal(true); return; }
-        if (!isPuneAddress(selected.city, selected.pincode)) { setShowAreaModal(true); return; }
+        if (!isServiceableAddress(selected.city, selected.pincode)) { setShowAreaModal(true); return; }
         router.push('/checkout/summary');
     };
 
@@ -103,7 +103,7 @@ export default function CheckoutAddressScreen() {
             </BottomBar>
 
             <ActionModal visible={showModal} title="No Address Selected" message="Please select a delivery address to continue." icon="map-pin" primaryButtonText="OK" onPrimaryPress={() => setShowModal(false)} onClose={() => setShowModal(false)} />
-            <ActionModal visible={showAreaModal} title="Outside delivery area" message={`We currently deliver only in ${DELIVERY_CITY}. Please select or add a ${DELIVERY_CITY} address to continue.`} icon="map-pin" primaryButtonText="OK" onPrimaryPress={() => setShowAreaModal(false)} onClose={() => setShowAreaModal(false)} />
+            <ActionModal visible={showAreaModal} title="Outside delivery area" message={`We currently deliver only in ${SERVICE_AREAS_LABEL}. Please select or add an address there to continue.`} icon="map-pin" primaryButtonText="OK" onPrimaryPress={() => setShowAreaModal(false)} onClose={() => setShowAreaModal(false)} />
             <ActionModal
                 visible={showDeleteModal}
                 title="Delete Address"

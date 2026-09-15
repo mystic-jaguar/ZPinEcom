@@ -2,7 +2,7 @@ import { Response, Router } from 'express';
 import { pool } from '../db';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { orderCreateLimiter } from '../middleware/rateLimits';
-import { isPuneAddress, OUT_OF_AREA_MESSAGE } from '../utils/delivery';
+import { CROSS_ZONE_MESSAGE, isServiceableAddress, OUT_OF_AREA_MESSAGE, sellerZone, zoneForPincode } from '../utils/delivery';
 import { decryptAddressPayload, encryptAddressPayload } from '../utils/encryption';
 import { consumeDealStock, liveDealPrices, releaseDealStock } from '../utils/flashDeals';
 import { generateId } from '../utils/id';
@@ -574,9 +574,25 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
     // Delivery is Pune-only. This is the authoritative gate — it also catches
     // addresses saved before the restriction existed, which the save-time check
     // can't. The customer's own location is irrelevant; only this address matters.
-    if (!isPuneAddress(addr.city, addr.pincode)) {
+    if (!isServiceableAddress(addr.city, addr.pincode)) {
       await client.query('ROLLBACK');
       res.status(400).json({ success: false, message: OUT_OF_AREA_MESSAGE });
+      return;
+    }
+
+    // Geofence: a seller only delivers inside their own zone (Pune sellers to
+    // Pune, Muzaffarpur sellers to 842001–842004). Listings are filtered too,
+    // but only this gate catches carts filled before an address change.
+    const addrZone = zoneForPincode(addr.pincode);
+    const shopPins = await client.query(
+      'SELECT user_id::text AS id, pincode FROM seller_business_details WHERE user_id::text = ANY($1::text[])',
+      [[...new Set(cartResult.rows.map((r: any) => String(r.seller_id)))]]
+    );
+    const pinOf = new Map(shopPins.rows.map((r: any) => [r.id, r.pincode]));
+    const crossZone = cartResult.rows.find((r: any) => sellerZone(pinOf.get(String(r.seller_id))) !== addrZone);
+    if (crossZone) {
+      await client.query('ROLLBACK');
+      res.status(409).json({ success: false, message: `${crossZone.product_name} ${CROSS_ZONE_MESSAGE}` });
       return;
     }
 
