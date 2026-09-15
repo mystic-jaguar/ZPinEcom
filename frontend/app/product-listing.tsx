@@ -11,6 +11,7 @@ import { CATEGORY_DATA, CategoryNode } from '../constants/categories';
 import { createStyles, colors, fonts, palette, radius, productGridCardWidth } from '../constants/theme';
 import { useSearch } from '../context/SearchContext';
 import { useWishlist } from '../context/WishlistContext';
+import { useRequireAuth } from '../context/AuthPromptContext';
 import { productService, ProductListParams } from '../services/product';
 import { ProductObject } from '../types/types';
 import { productOneLiner } from '../utils/productDetail';
@@ -36,6 +37,7 @@ export default function ProductListing() {
     const recommendMode = params.recommend === '1';
     const { recentSearches } = useSearch();
     const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
+    const requireAuth = useRequireAuth();
 
     const [products, setProducts] = useState<ProductObject[]>([]);
     const [loading, setLoading] = useState(true);
@@ -190,7 +192,10 @@ export default function ProductListing() {
             originalPrice={item.originalPrice ?? undefined}
             discount={(item.discount ?? 0) > 0 ? `${item.discount}% OFF` : undefined}
             wished={isInWishlist(item.productId)}
-            onWishlist={() => (isInWishlist(item.productId) ? removeFromWishlist(item.productId) : addToWishlist(item))}
+            onWishlist={() => {
+                if (!requireAuth('Log in to save items to your wishlist.')) return;
+                if (isInWishlist(item.productId)) removeFromWishlist(item.productId); else addToWishlist(item);
+            }}
             onPress={() => router.push(`/product/${item.productId}`)}
         />
     );

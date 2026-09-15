@@ -12,7 +12,8 @@ import {
 import React, { useCallback, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ZText } from '../../components/ui';
+import { ZButton, ZText } from '../../components/ui';
+import { ArrowRight } from 'lucide-react-native';
 import { createStyles, colors, fonts, palette, radius, shadow } from '../../constants/theme';
 import { useUser } from '../../context/UserContext';
 import { Text } from '../../components/ui/ScaledText';
@@ -23,7 +24,7 @@ function initialsOf(name?: string) {
 }
 
 export default function ProfileScreen() {
-    const { user, resetUser } = useUser();
+    const { user, resetUser, isAuthenticated } = useUser();
     const { clearCart, availableCoupons, refreshCoupons } = useCart();
     const { orders, totalOrders, refreshOrders } = useOrder();
     const { wishlistItems, clearWishlist, refreshWishlist } = useWishlist();
@@ -37,7 +38,7 @@ export default function ProfileScreen() {
 
     // Re-fetch the counts each time the profile is focused so a failed cold-start
     // load (Render backend waking up) self-heals instead of showing a stale 0.
-    useFocusEffect(useCallback(() => { refreshAll(); }, [refreshAll]));
+    useFocusEffect(useCallback(() => { if (isAuthenticated) refreshAll(); }, [refreshAll, isAuthenticated]));
 
     const onRefresh = useCallback(async () => {
         setRefreshing(true);
@@ -59,7 +60,7 @@ export default function ProfileScreen() {
             clearCart();
             clearWishlist();
             setLogoutModalVisible(false);
-            router.replace('/auth/login');
+            router.replace('/(tabs)');
         } catch (error) {
             console.error('Logout error:', error);
             setLogoutModalVisible(false);
@@ -80,6 +81,34 @@ export default function ProfileScreen() {
         { icon: LifeBuoy, label: 'Help & support', onPress: () => router.push('/profile/help-center') },
         { icon: Shield, label: 'Privacy & terms', onPress: () => openLegalDoc('privacy') },
     ];
+
+    if (!isAuthenticated) {
+        return (
+            <SafeAreaView style={styles.container} edges={['top']}>
+                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+                    <View style={styles.headerRow}>
+                        <ZText variant="h2">Profile</ZText>
+                    </View>
+                    <View style={styles.hero}>
+                        <Zap size={130} color="rgba(255,196,0,0.12)" fill="rgba(255,196,0,0.12)" style={styles.heroGlow} />
+                        <Text style={styles.heroName}>Welcome to ZPIN</Text>
+                        <Text style={styles.heroEmail}>Log in to see your orders, wishlist, coupons and saved addresses.</Text>
+                        <ZButton label="Log in" icon={ArrowRight} style={{ marginTop: 16 }} onPress={() => router.push('/auth/login')} />
+                    </View>
+                    <Pressable style={{ paddingVertical: 14 }} onPress={() => router.push('/auth/signup')}>
+                        <ZText variant="lg">New to ZPIN? Create account</ZText>
+                    </Pressable>
+                    <Pressable style={{ paddingVertical: 14 }} onPress={() => router.push('/profile/help-center')}>
+                        <ZText variant="lg">Help & support</ZText>
+                    </Pressable>
+                    <Pressable style={{ paddingVertical: 14 }} onPress={() => openLegalDoc('privacy')}>
+                        <ZText variant="lg">Privacy & terms</ZText>
+                    </Pressable>
+                </ScrollView>
+                <LegalDocModal visible={legalModalVisible} docType={legalDocType} onClose={() => setLegalModalVisible(false)} />
+            </SafeAreaView>
+        );
+    }
 
     return (
         <SafeAreaView style={styles.container} edges={['top']}>

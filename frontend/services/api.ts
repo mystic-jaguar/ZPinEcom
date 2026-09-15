@@ -60,11 +60,19 @@ const PUBLIC_ENDPOINTS = [
     'public/',
 ];
 
+// Geofence (2026-09-15): every catalogue GET carries the customer's pincode so the
+// backend lists only sellers in that zone. Set by context/ZoneContext — one source.
+let catalogPincode: string | null = null;
+export const setCatalogPincode = (pincode: string | null) => { catalogPincode = pincode; };
+
 // Request interceptor - Add auth token to requests
 // This backend uses HttpOnly cookie-based auth: token is sent as Cookie header
 apiClient.interceptors.request.use(
     async (config) => {
         const url = config.url || '';
+        if (catalogPincode && (config.method ?? 'get') === 'get' && /^(products|flash-deals)/.test(url)) {
+            config.params = { pincode: catalogPincode, ...config.params };
+        }
         const isPublicEndpoint = PUBLIC_ENDPOINTS.some(endpoint => url.startsWith(endpoint));
 
         if (__DEV__) {

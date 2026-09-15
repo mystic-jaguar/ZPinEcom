@@ -18,6 +18,7 @@ import { isServiceableAddress } from '../../constants/delivery';
 import { useOrder } from '../../context/OrderContext';
 import { useUser } from '../../context/UserContext';
 import { useWishlist } from '../../context/WishlistContext';
+import { useRequireAuth } from '../../context/AuthPromptContext';
 import apiClient, { tokenManager } from '../../services/api';
 import { productService } from '../../services/product';
 import * as ImagePicker from 'expo-image-picker';
@@ -39,6 +40,7 @@ export default function ProductDetails() {
     const { addresses } = useAddress();
     const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
     const { user, isAuthenticated } = useUser();
+    const requireAuth = useRequireAuth();
     const { orders, isLoading: isOrdersLoading } = useOrder();
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [showVariantWarningModal, setShowVariantWarningModal] = useState(false);
@@ -297,6 +299,7 @@ export default function ProductDetails() {
 
     const handleAddToCart = async (tryAtDoor = false) => {
         if (!product) return;
+        if (!requireAuth(tryAtDoor ? 'Log in to buy this item.' : 'Log in to add items to your cart.')) return;
 
         // users.is_live — same rule and same wording as the website's ProductDetail.
         if (product.sellerIsLive === false) {
@@ -413,6 +416,7 @@ export default function ProductDetails() {
                         productName={product.productName}
                         isWishlisted={isInWishlist(product.productId)}
                         onToggleWishlist={() => {
+                            if (!requireAuth('Log in to save items to your wishlist.')) return;
                             if (isInWishlist(product.productId)) {
                                 removeFromWishlist(product.productId);
                             } else {
@@ -773,7 +777,7 @@ export default function ProductDetails() {
                                         )}
                                         {r.userId !== user.id && (
                                             <View style={styles.reviewModerationRow}>
-                                                <TouchableOpacity style={styles.reviewModerationBtn} onPress={() => setReviewToReport(r)}>
+                                                <TouchableOpacity style={styles.reviewModerationBtn} onPress={() => requireAuth('Log in to report a review.') && setReviewToReport(r)}>
                                                     <Feather name="flag" size={12} color="#9CA3AF" />
                                                     <Text style={styles.reviewModerationText}>Report</Text>
                                                 </TouchableOpacity>

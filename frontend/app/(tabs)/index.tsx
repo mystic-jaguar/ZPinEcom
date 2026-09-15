@@ -1,16 +1,16 @@
 import { Image } from 'expo-image';
-import * as ExpoLocation from 'expo-location';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { ArrowRight, ChevronDown, Heart, MapPin, Search, ShoppingBag, Star, Tag, Zap } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, AppStateStatus, Dimensions, Linking, NativeScrollEvent, NativeSyntheticEvent, Pressable, RefreshControl, ScrollView, View } from 'react-native';
+import { ActivityIndicator, Dimensions, Linking, NativeScrollEvent, NativeSyntheticEvent, Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
 import LegalDocModal, { LegalDocType } from '../../components/common/LegalDocModal';
 import DealCountdown from '../../components/home/DealCountdown';
 import { DiscoverSection, EssentialsGrid, ExploreCategories } from '../../components/home/HomeSections';
 import { ProductCard, SectionHeader, ZText } from '../../components/ui';
-import { DELIVERY_CITY, isPuneLocation } from '../../constants/delivery';
+import { ComingSoonScreen } from '../../components/common/ZoneScreens';
+import { useZone } from '../../context/ZoneContext';
 import { createStyles, colors, fonts, palette, radius, shadow, productGridCardWidth } from '../../constants/theme';
 import { useSearch } from '../../context/SearchContext';
 import { FlashDeal, flashDealService } from '../../services/flashDeals';
@@ -106,8 +106,28 @@ const FORYOU_BANNER_STYLES = {
     green: { card: { backgroundColor: palette.green500 }, iconBg: 'rgba(255,255,255,0.14)', iconColor: palette.neutral0, eyebrow: palette.green100, title: palette.neutral0, sub: palette.green100 },
 } as const;
 
+/**
+ * Home tab. Location/zone is resolved once in ZoneContext: nothing renders until
+ * it is ready, outside every zone shows the coming-soon screen, and the feed is
+ * keyed by pincode so a new location remounts it and every section refetches.
+ */
 export default function HomeScreen() {
+    const zone = useZone();
+    if (zone.status !== 'ready') {
+        return (
+            <SafeAreaView style={[styles.container, { alignItems: 'center', justifyContent: 'center' }]}>
+                <ActivityIndicator color={palette.yellow600} />
+            </SafeAreaView>
+        );
+    }
+    if (!zone.inZone) return <ComingSoonScreen />;
+    return <HomeFeed key={zone.pincode ?? ''} />;
+}
+
+function HomeFeed() {
     const router = useRouter();
+    const zone = useZone();
+    const locationLabel = zone.label;
 
     /**
      * Navigate to a banner's admin-authored destination.
@@ -138,11 +158,6 @@ export default function HomeScreen() {
     const [bannerIndex, setBannerIndex] = useState(0);
     const [recommended, setRecommended] = useState<any[]>(RECOMMENDED);
     const [nearby, setNearby] = useState<any[]>(NEARBY_FALLBACK);
-    const [locationLabel, setLocationLabel] = useState<string>('Your Area');
-    const [locationGranted, setLocationGranted] = useState<boolean | null>(null);
-    const [inServiceArea, setInServiceArea] = useState<boolean | null>(null);
-    const [showAreaModal, setShowAreaModal] = useState(false);
-    const [showLocationModal, setShowLocationModal] = useState(false);
     const [isLoadingProducts, setIsLoadingProducts] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [refreshing, setRefreshing] = useState(false);
@@ -150,10 +165,7 @@ export default function HomeScreen() {
     const [legalDocType, setLegalDocType] = useState<LegalDocType>('privacy');
     const [contactModalVisible, setContactModalVisible] = useState(false);
     const [comingSoonModal, setComingSoonModal] = useState<{ visible: boolean; name: string }>({ visible: false, name: '' });
-    const appState = useRef(AppState.currentState);
-    const awaitingSettingsReturn = useRef(false);
     const lastFetchRef = useRef(0);
-    const lastCoordsRef = useRef<{ lat?: number; lng?: number }>({});
     const STALE_MS = 5 * 60 * 1000;
 
     // "For you" personalized infinite grid state
@@ -173,46 +185,13 @@ export default function HomeScreen() {
         setLegalModalVisible(true);
     };
 
-    // Robust GPS read: services must be on; try instant cached fix, then a live fix
-    // that can't hang forever (races a timeout). Returns undefined coords on failure.
-    const getCoords = async (): Promise<{ lat?: number; lng?: number }> => {
-        try {
-            const servicesOn = await ExpoLocation.hasServicesEnabledAsync();
-            if (!servicesOn) {
-                console.warn('Location services are disabled on this device');
-                return {};
-            }
-            const cached = await ExpoLocation.getLastKnownPositionAsync({ maxAge: 5 * 60 * 1000 });
-            if (cached) return { lat: cached.coords.latitude, lng: cached.coords.longitude };
-
-            const live = await Promise.race([
-                ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced }),
-                new Promise<null>((resolve) => setTimeout(() => resolve(null), 12000)),
-            ]);
-            if (live) return { lat: live.coords.latitude, lng: live.coords.longitude };
-            console.warn('getCurrentPositionAsync timed out after 12s');
-            return {};
-        } catch (e) {
-            console.warn('getCoords failed:', e);
-            return {};
-        }
-    };
-
     const onRefresh = async () => {
         setRefreshing(true);
         // Reset the "for you" feed so it re-personalizes from scratch.
         fyPage.current = 0; fyHasMore.current = true; fyCount.current = 0; fySeen.current.clear();
         setForYouDone(false);
         loadForYou(false);
-        const { status } = await ExpoLocation.getForegroundPermissionsAsync();
-        if (status === 'granted') {
-            setLocationGranted(true);
-            const { lat, lng } = await getCoords();
-            await applyLocationLabel(lat, lng);
-            await fetchProducts(lat, lng);
-        } else {
-            await fetchProducts();
-        }
+        await fetchProducts();
         setRefreshing(false);
     };
 
@@ -224,87 +203,18 @@ export default function HomeScreen() {
         bannerService.getBanners('feed_inline').then(setFeedBanners).catch(() => setFeedBanners([]));
     }, []);
 
-    useEffect(() => {
-        // Do NOT prompt for location at launch (App Store 5.1.1 — request in-context).
-        ExpoLocation.getForegroundPermissionsAsync().then(({ status }) => {
-            if (status === 'granted') {
-                requestLocationAndFetch();
-            } else {
-                setLocationGranted(false);
-                fetchProducts();
-            }
-        });
-    }, []);
+    // Zone is already resolved (see HomeScreen), so the first fetch is filtered.
+    useEffect(() => { fetchProducts(); }, []);
 
-    useEffect(() => {
-        const subscription = AppState.addEventListener('change', async (nextState: AppStateStatus) => {
-            if (appState.current.match(/inactive|background/) && nextState === 'active') {
-                if (awaitingSettingsReturn.current) {
-                    awaitingSettingsReturn.current = false;
-                    const { status } = await ExpoLocation.getForegroundPermissionsAsync();
-                    if (status === 'granted') {
-                        setLocationGranted(true);
-                        setShowLocationModal(false);
-                        requestLocationAndFetch();
-                    } else {
-                        setLocationGranted(false);
-                        fetchProducts();
-                    }
-                }
-            }
-            appState.current = nextState;
-        });
-        return () => subscription.remove();
-    }, []);
-
-    // Reverse-geocode coords into the "Deliver to" label + Pune service-area flag.
-    const applyLocationLabel = async (lat?: number, lng?: number) => {
-        if (lat == null || lng == null) return;
-        try {
-            const [place] = await ExpoLocation.reverseGeocodeAsync({ latitude: lat, longitude: lng });
-            if (place) {
-                const label = place.district || place.subregion || place.city || place.region || 'Your Area';
-                setLocationLabel(label);
-                setInServiceArea(isPuneLocation(place));
-            }
-        } catch (e) {
-            console.warn('reverseGeocode failed:', e);
-        }
-    };
-
-    const requestLocationAndFetch = async () => {
-        let lat: number | undefined;
-        let lng: number | undefined;
-        try {
-            const { status: currentStatus } = await ExpoLocation.getForegroundPermissionsAsync();
-            if (currentStatus === 'denied') {
-                setLocationGranted(false);
-                awaitingSettingsReturn.current = true;
-                await Linking.openSettings();
-                return;
-            }
-            const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
-            setLocationGranted(status === 'granted');
-            if (status === 'granted') {
-                ({ lat, lng } = await getCoords());
-                await applyLocationLabel(lat, lng);
-            }
-        } catch (e) {
-            console.warn('requestLocationAndFetch failed:', e);
-        }
-        await fetchProducts(lat, lng);
-    };
-
-    const fetchProducts = async (lat?: number, lng?: number) => {
+    const fetchProducts = async () => {
         if (isLoadingProducts) return;
         setIsLoadingProducts(true);
         setError(null);
-        lastCoordsRef.current = { lat, lng };
         try {
             const [freshCats, recProducts, nearbyData] = await Promise.allSettled([
                 productService.getFreshCategories(),
                 productService.getRecommended(recentSearches, 8),
-                productService.getNearbyCategories(lat, lng),
+                productService.getNearbyCategories(zone.coords?.lat, zone.coords?.lng),
             ]);
 
             if (freshCats.status === 'fulfilled' && freshCats.value.length > 0) {
@@ -362,10 +272,7 @@ export default function HomeScreen() {
                 hasMountedRef.current = true;
                 return;
             }
-            if (Date.now() - lastFetchRef.current > STALE_MS) {
-                const { lat, lng } = lastCoordsRef.current;
-                fetchProducts(lat, lng);
-            }
+            if (Date.now() - lastFetchRef.current > STALE_MS) fetchProducts();
         }, [])
     );
 
@@ -521,35 +428,6 @@ export default function HomeScreen() {
     return (
         <SafeAreaView style={styles.container} edges={['top']}>
             <ActionModal
-                visible={showLocationModal}
-                icon="map-pin"
-                title="Enable Location"
-                message="ZPIN uses your location to show nearby product availability in your area."
-                primaryButtonText="Allow Location"
-                onPrimaryPress={async () => {
-                    setShowLocationModal(false);
-                    const { status } = await ExpoLocation.getForegroundPermissionsAsync();
-                    if (status === 'denied') {
-                        awaitingSettingsReturn.current = true;
-                        await Linking.openSettings();
-                    } else {
-                        requestLocationAndFetch();
-                    }
-                }}
-                secondaryButtonText="Skip"
-                onSecondaryPress={() => { setShowLocationModal(false); setLocationGranted(false); fetchProducts(); }}
-                onClose={() => { setShowLocationModal(false); setLocationGranted(false); fetchProducts(); }}
-            />
-            <ActionModal
-                visible={showAreaModal}
-                icon="map-pin"
-                title="Outside delivery area"
-                message={`ZPIN currently delivers only in ${DELIVERY_CITY}. We're expanding soon — stay tuned!`}
-                primaryButtonText="Got it"
-                onPrimaryPress={() => setShowAreaModal(false)}
-                onClose={() => setShowAreaModal(false)}
-            />
-            <ActionModal
                 visible={comingSoonModal.visible}
                 icon="clock"
                 title="Coming Soon"
@@ -584,22 +462,11 @@ export default function HomeScreen() {
                         </Pressable>
                     </View>
                 </View>
-                <Pressable
-                    style={styles.addressRow}
-                    onPress={() => {
-                        if (locationGranted && inServiceArea === false) setShowAreaModal(true);
-                        else if (locationGranted) requestLocationAndFetch();
-                        else setShowLocationModal(true);
-                    }}
-                >
-                    <MapPin size={14} color={locationGranted && inServiceArea === false ? palette.red500 : palette.yellow600} />
+                <Pressable style={styles.addressRow} onPress={() => router.push('/profile/addresses')}>
+                    <MapPin size={14} color={palette.yellow600} />
                     <Text style={styles.addressText}>Deliver to </Text>
-                    {locationGranted && inServiceArea === false ? (
-                        <Text style={[styles.addressPlace, { color: palette.red500 }]}>{DELIVERY_CITY} only</Text>
-                    ) : (
-                        <Text style={styles.addressPlace}>{locationGranted ? locationLabel : 'set location'}</Text>
-                    )}
-                    {!locationGranted && <ChevronDown size={14} color={colors.textMuted} />}
+                    <Text style={styles.addressPlace}>{locationLabel}</Text>
+                    <ChevronDown size={14} color={colors.textMuted} />
                 </Pressable>
             </View>
 
@@ -774,12 +641,11 @@ export default function HomeScreen() {
 
                 {/* Nearby */}
                 <SectionHeader
-                    eyebrow={locationGranted ? locationLabel : 'Trending near you'}
+                    eyebrow={locationLabel}
                     title="Nearby availabilities"
                     style={styles.section}
                 />
-                {locationGranted ? (
-                    <View style={styles.nearbyGrid}>
+                <View style={styles.nearbyGrid}>
                         {nearby.map((item) => {
                             const soon = item.count != null && item.count <= 0;
                             return (
@@ -798,15 +664,7 @@ export default function HomeScreen() {
                                 </Pressable>
                             );
                         })}
-                    </View>
-                ) : (
-                    <Pressable style={styles.locCard} onPress={() => setShowLocationModal(true)}>
-                        <View style={styles.locIcon}><MapPin size={26} color={palette.yellow600} /></View>
-                        <ZText variant="lg" style={{ marginBottom: 4 }}>Location access required</ZText>
-                        <ZText variant="muted" style={styles.locText}>Allow location to discover products available near you.</ZText>
-                        <View style={styles.locBtn}><Text style={styles.locBtnText}>Enable location</Text></View>
-                    </Pressable>
-                )}
+                </View>
 
                 <ExploreCategories />
 
@@ -825,7 +683,7 @@ export default function HomeScreen() {
                     ))}
                 </ScrollView>
 
-                <DiscoverSection deals={flashDeals} areaLabel={locationGranted ? locationLabel : 'your area'} />
+                <DiscoverSection deals={flashDeals} areaLabel={locationLabel} />
 
                 {/* For you — personalized infinite grid */}
                 <SectionHeader
@@ -965,12 +823,6 @@ const styles = createStyles({
     soonText: { fontFamily: fonts.bodyBold, fontSize: 14, color: '#fff' },
     nearbyName: { fontFamily: fonts.bodySemiBold, fontSize: 15, color: colors.textStrong },
     nearbyCount: { fontFamily: fonts.bodyRegular, fontSize: 12, color: colors.textMuted, marginTop: 1 },
-
-    locCard: { marginHorizontal: 20, backgroundColor: colors.surfaceBrandTint, borderRadius: radius.lg, padding: 24, alignItems: 'center', borderWidth: 1, borderColor: palette.yellow200 },
-    locIcon: { width: 56, height: 56, borderRadius: 28, backgroundColor: colors.surfaceCard, alignItems: 'center', justifyContent: 'center', marginBottom: 12, ...shadow.sm },
-    locText: { textAlign: 'center', marginBottom: 16 },
-    locBtn: { backgroundColor: palette.yellow500, borderRadius: radius.md, paddingVertical: 12, paddingHorizontal: 24 },
-    locBtnText: { fontFamily: fonts.bodyBlack, fontSize: 14, color: colors.textOnYellow },
 
     discountCard: { width: 240 },
     discountImage: { width: '100%', height: 140, borderRadius: radius.lg, backgroundColor: colors.surfaceSunken },
