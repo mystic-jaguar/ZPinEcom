@@ -83,6 +83,14 @@ describe('GET /users/:id', () => {
     expect(res.status).toBe(403);
   });
 
+  it('returns 403 ACCOUNT_SUSPENDED for a live token once an admin suspends the account', async () => {
+    getDbMock().mockResolvedValueOnce({ rows: [{ is_active: false, revoked_at: null }] });
+    const res = await request(app).get(`${BASE}/USR0001`).set(bearerHeader(token));
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe('ACCOUNT_SUSPENDED');
+    expect(getDbMock()).toHaveBeenCalledTimes(1); // the route never ran
+  });
+
   it('returns 404 when user is not found', async () => {
     getDbMock().mockResolvedValueOnce({ rows: [] });
     const res = await request(app)
