@@ -24,7 +24,8 @@ describe('delivery zones', () => {
   });
 
   test('catalogue filter', () => {
-    expect(catalogZone(undefined)).toEqual({ sql: '', key: '' });
+    expect(catalogZone(undefined)).toEqual({ sql: ' AND false', key: ':znone' });
+    expect(catalogZone('')).toEqual({ sql: ' AND false', key: ':znone' });
     expect(catalogZone('560001')).toEqual({ sql: ' AND false', key: ':znone' });
     expect(catalogZone('842002').sql).toContain("IN ('842001','842002','842003','842004')");
     expect(catalogZone('411001').sql).toMatch(/^ AND NOT EXISTS/);

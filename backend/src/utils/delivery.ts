@@ -71,11 +71,9 @@ export function sellerInZoneSql(zone: Zone, userCol = 'p.user_id'): string {
 }
 
 // Catalogue filter from a `?pincode=` query param, plus a cache-key suffix.
-// No pincode → no filter (clients that don't send a location yet see everything);
-// a pincode outside every zone → nothing is listed.
-// ponytail: fail-open when absent; make it required once every client sends it.
+// Required since 2026-09-15 (every client build sends it): no pincode or one
+// outside every zone → nothing is listed.
 export function catalogZone(pincode: unknown): { sql: string; key: string } {
-  if (typeof pincode !== 'string' || pincode.trim() === '') return { sql: '', key: '' };
-  const zone = zoneForPincode(pincode);
+  const zone = typeof pincode === 'string' ? zoneForPincode(pincode) : null;
   return zone ? { sql: ` AND ${sellerInZoneSql(zone)}`, key: `:z${zone}` } : { sql: ' AND false', key: ':znone' };
 }
