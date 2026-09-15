@@ -463,7 +463,7 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
        FROM ${CART} ci
        JOIN products p ON p.id = ci.product_id
        LEFT JOIN users u ON u.id = p.user_id
-       WHERE ci.user_id = $1 AND p.is_approved = true`,
+       WHERE ci.user_id = $1 AND p.is_approved = true AND EXISTS (SELECT 1 FROM users su WHERE su.id = p.user_id AND su.is_active IS NOT FALSE AND su.deleted_at IS NULL)`,
       [req.userId]
     );
 
@@ -503,7 +503,7 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
 
       for (const item of wantedLines) {
         const product = await client.query(
-          'SELECT price, in_stock, product_name, user_id FROM products WHERE id = $1::uuid AND is_approved = true',
+          'SELECT price, in_stock, product_name, user_id FROM products WHERE id = $1::uuid AND is_approved = true AND EXISTS (SELECT 1 FROM users su WHERE su.id = user_id AND su.is_active IS NOT FALSE AND su.deleted_at IS NULL)',
           [item.productId]
         );
         if (product.rows.length === 0 || !product.rows[0].in_stock) continue;
@@ -535,7 +535,7 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
          FROM ${CART} ci
          JOIN products p ON p.id = ci.product_id
          LEFT JOIN users u ON u.id = p.user_id
-         WHERE ci.user_id = $1 AND p.is_approved = true`,
+         WHERE ci.user_id = $1 AND p.is_approved = true AND EXISTS (SELECT 1 FROM users su WHERE su.id = p.user_id AND su.is_active IS NOT FALSE AND su.deleted_at IS NULL)`,
         [req.userId]
       );
     }

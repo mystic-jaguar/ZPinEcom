@@ -48,7 +48,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response): Promise<v
        FROM ${T} w
        JOIN products p ON p.id = w.product_id
        LEFT JOIN product_images pi ON pi.product_id = p.id
-       WHERE w.user_id = $1 AND p.is_approved = true
+       WHERE w.user_id = $1 AND p.is_approved = true AND EXISTS (SELECT 1 FROM users su WHERE su.id = p.user_id AND su.is_active IS NOT FALSE AND su.deleted_at IS NULL)
        GROUP BY w.product_id, p.product_name, p.price, p.in_stock
        ORDER BY MAX(w.created_at) DESC
        LIMIT $2 OFFSET $3`,
@@ -89,7 +89,7 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response): Promise<
 
   try {
     const product = await pool.query(
-      'SELECT id FROM products WHERE id = $1::uuid AND is_approved = true', [productId]
+      'SELECT id FROM products WHERE id = $1::uuid AND is_approved = true AND EXISTS (SELECT 1 FROM users su WHERE su.id = user_id AND su.is_active IS NOT FALSE AND su.deleted_at IS NULL)', [productId]
     );
     if (product.rows.length === 0) {
       res.status(404).json({ success: false, message: 'Product not found' });

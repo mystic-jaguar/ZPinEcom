@@ -35,7 +35,7 @@ const TTL_NEARBY = 3600;        // 1h — nearby categories
 const VARIANT_PRIMARY = `(p.variant_group_id IS NULL OR p.id = (
         SELECT s.id FROM products s
         WHERE s.variant_group_id = p.variant_group_id
-          AND s.in_stock = true AND s.is_approved = true
+          AND s.in_stock = true AND s.is_approved = true AND EXISTS (SELECT 1 FROM users su WHERE su.id = s.user_id AND su.is_active IS NOT FALSE AND su.deleted_at IS NULL)
         ORDER BY s.created_at ASC, s.id ASC LIMIT 1))`;
 
 const router = Router();
@@ -292,7 +292,7 @@ router.get('/recommended', authenticate, async (req: AuthRequest, res: Response)
     if (searchTerms.length > 0) {
       const termResult = await pool.query(
         `SELECT DISTINCT deepest_category_name FROM products
-         WHERE in_stock = true AND is_approved = true
+         WHERE in_stock = true AND is_approved = true AND EXISTS (SELECT 1 FROM users su WHERE su.id = user_id AND su.is_active IS NOT FALSE AND su.deleted_at IS NULL)
            AND deepest_category_name IS NOT NULL
            AND LOWER(deepest_category_name) = ANY($1)`,
         [searchTerms.map(t => t.toLowerCase())]
@@ -312,7 +312,7 @@ router.get('/recommended', authenticate, async (req: AuthRequest, res: Response)
          FROM products p
          LEFT JOIN product_images pi ON pi.product_id = p.id
          LEFT JOIN product_reviews pr ON pr.product_id = p.id
-         WHERE p.in_stock = true AND p.is_approved = true AND ${VARIANT_PRIMARY}
+         WHERE p.in_stock = true AND p.is_approved = true AND EXISTS (SELECT 1 FROM users su WHERE su.id = p.user_id AND su.is_active IS NOT FALSE AND su.deleted_at IS NULL) AND ${VARIANT_PRIMARY}
          GROUP BY p.id
          ORDER BY p.created_at DESC
          LIMIT $1`,
@@ -336,7 +336,7 @@ router.get('/recommended', authenticate, async (req: AuthRequest, res: Response)
        FROM products p
        LEFT JOIN product_images pi ON pi.product_id = p.id
        LEFT JOIN product_reviews pr ON pr.product_id = p.id
-       WHERE p.in_stock = true AND p.is_approved = true AND ${VARIANT_PRIMARY}
+       WHERE p.in_stock = true AND p.is_approved = true AND EXISTS (SELECT 1 FROM users su WHERE su.id = p.user_id AND su.is_active IS NOT FALSE AND su.deleted_at IS NULL) AND ${VARIANT_PRIMARY}
          AND p.deepest_category_name = ANY($1)
          AND p.id != ALL($2)
        GROUP BY p.id
@@ -445,7 +445,7 @@ router.get('/search', productListLimiter, async (req: Request, res: Response): P
        FROM products p
        LEFT JOIN product_images pi ON pi.product_id = p.id
        LEFT JOIN product_reviews pr ON pr.product_id = p.id
-       WHERE p.in_stock = true AND p.is_approved = true AND ${VARIANT_PRIMARY}
+       WHERE p.in_stock = true AND p.is_approved = true AND EXISTS (SELECT 1 FROM users su WHERE su.id = p.user_id AND su.is_active IS NOT FALSE AND su.deleted_at IS NULL) AND ${VARIANT_PRIMARY}
          AND (
            LOWER(REPLACE(p.product_name, ' ', '')) LIKE $1
            OR LOWER(p.product_name) LIKE $2
@@ -483,7 +483,7 @@ router.get('/search', productListLimiter, async (req: Request, res: Response): P
          ) ms
          LEFT JOIN product_images pi ON pi.product_id = p.id
          LEFT JOIN product_reviews pr ON pr.product_id = p.id
-         WHERE p.in_stock = true AND p.is_approved = true AND ${VARIANT_PRIMARY}
+         WHERE p.in_stock = true AND p.is_approved = true AND EXISTS (SELECT 1 FROM users su WHERE su.id = p.user_id AND su.is_active IS NOT FALSE AND su.deleted_at IS NULL) AND ${VARIANT_PRIMARY}
            AND ms.score > $2
          GROUP BY p.id, ms.score
          ORDER BY ms.score DESC, p.created_at DESC
@@ -510,7 +510,7 @@ router.get('/search', productListLimiter, async (req: Request, res: Response): P
          FROM products p
          LEFT JOIN product_images pi ON pi.product_id = p.id
          LEFT JOIN product_reviews pr ON pr.product_id = p.id
-         WHERE p.in_stock = true AND p.is_approved = true AND ${VARIANT_PRIMARY}
+         WHERE p.in_stock = true AND p.is_approved = true AND EXISTS (SELECT 1 FROM users su WHERE su.id = p.user_id AND su.is_active IS NOT FALSE AND su.deleted_at IS NULL) AND ${VARIANT_PRIMARY}
            AND p.deepest_category_name = ANY($1)
            AND p.id != ALL($2)
          GROUP BY p.id
@@ -555,7 +555,7 @@ router.get('/nearby', async (req: Request, res: Response): Promise<void> => {
         const params = cat.keywords.map(k => `%${k}%`);
 
         const countResult = await pool.query(
-          `SELECT COUNT(*) FROM products p WHERE p.in_stock = true AND p.is_approved = true AND ${VARIANT_PRIMARY} AND (${likeConditions})`,
+          `SELECT COUNT(*) FROM products p WHERE p.in_stock = true AND p.is_approved = true AND EXISTS (SELECT 1 FROM users su WHERE su.id = p.user_id AND su.is_active IS NOT FALSE AND su.deleted_at IS NULL) AND ${VARIANT_PRIMARY} AND (${likeConditions})`,
           params
         );
 
@@ -563,7 +563,7 @@ router.get('/nearby', async (req: Request, res: Response): Promise<void> => {
         const imgResult = await pool.query(
           `SELECT pi.image_url FROM products p
            JOIN product_images pi ON pi.product_id = p.id
-           WHERE p.in_stock = true AND p.is_approved = true AND ${VARIANT_PRIMARY} AND (${likeConditions})
+           WHERE p.in_stock = true AND p.is_approved = true AND EXISTS (SELECT 1 FROM users su WHERE su.id = p.user_id AND su.is_active IS NOT FALSE AND su.deleted_at IS NULL) AND ${VARIANT_PRIMARY} AND (${likeConditions})
            LIMIT 1`,
           params
         );
@@ -601,7 +601,7 @@ router.get('/fresh-categories', async (req: Request, res: Response): Promise<voi
         MAX(created_at) OVER (PARTITION BY deepest_category_name) AS latest_at,
         (SELECT image_url FROM product_images WHERE product_id = p.id LIMIT 1) AS image_url
       FROM products p
-      WHERE p.in_stock = true AND p.is_approved = true AND ${VARIANT_PRIMARY}
+      WHERE p.in_stock = true AND p.is_approved = true AND EXISTS (SELECT 1 FROM users su WHERE su.id = p.user_id AND su.is_active IS NOT FALSE AND su.deleted_at IS NULL) AND ${VARIANT_PRIMARY}
         AND deepest_category_name IS NOT NULL
         AND deepest_category_name != ''
       ORDER BY deepest_category_name, created_at DESC
@@ -687,7 +687,7 @@ router.get('/category/:categoryName', productListLimiter, async (req: Request, r
   try {
     // $1 is always the category name. Subsequent filter params are appended dynamically.
     const params: any[] = [categoryName];
-    let where = `p.in_stock = true AND p.is_approved = true AND ${VARIANT_PRIMARY}
+    let where = `p.in_stock = true AND p.is_approved = true AND EXISTS (SELECT 1 FROM users su WHERE su.id = p.user_id AND su.is_active IS NOT FALSE AND su.deleted_at IS NULL) AND ${VARIANT_PRIMARY}
       AND (
         LOWER(p.deepest_category_name) = LOWER($1)
         OR EXISTS (
@@ -742,7 +742,7 @@ router.get('/category/:categoryName', productListLimiter, async (req: Request, r
     const brandsResult = await pool.query(
       `SELECT DISTINCT p.deepest_category_name AS name
        FROM products p
-       WHERE p.in_stock = true AND p.is_approved = true AND ${VARIANT_PRIMARY}
+       WHERE p.in_stock = true AND p.is_approved = true AND EXISTS (SELECT 1 FROM users su WHERE su.id = p.user_id AND su.is_active IS NOT FALSE AND su.deleted_at IS NULL) AND ${VARIANT_PRIMARY}
          AND p.deepest_category_name IS NOT NULL
          AND p.deepest_category_name <> ''
          AND (
@@ -809,7 +809,7 @@ router.get('/', productListLimiter, async (req: Request, res: Response): Promise
   if (cached) { res.json(cached); return; }
 
   try {
-    const countResult = await pool.query(`SELECT COUNT(*) FROM products p WHERE p.in_stock = true AND p.is_approved = true AND ${VARIANT_PRIMARY}`);
+    const countResult = await pool.query(`SELECT COUNT(*) FROM products p WHERE p.in_stock = true AND p.is_approved = true AND EXISTS (SELECT 1 FROM users su WHERE su.id = p.user_id AND su.is_active IS NOT FALSE AND su.deleted_at IS NULL) AND ${VARIANT_PRIMARY}`);
     const total = Number(countResult.rows[0].count);
 
     const result = await pool.query(
@@ -819,7 +819,7 @@ router.get('/', productListLimiter, async (req: Request, res: Response): Promise
        FROM products p
        LEFT JOIN product_images pi ON pi.product_id = p.id
        LEFT JOIN product_reviews pr ON pr.product_id = p.id
-       WHERE p.in_stock = true AND p.is_approved = true AND ${VARIANT_PRIMARY}
+       WHERE p.in_stock = true AND p.is_approved = true AND EXISTS (SELECT 1 FROM users su WHERE su.id = p.user_id AND su.is_active IS NOT FALSE AND su.deleted_at IS NULL) AND ${VARIANT_PRIMARY}
        GROUP BY p.id
        ORDER BY p.created_at DESC, p.id ASC
        LIMIT $1 OFFSET $2`,
@@ -898,9 +898,9 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
     const stampRow = await pool.query(
       `SELECT p.updated_at,
               (SELECT MAX(s.updated_at) FROM products s
-                WHERE s.variant_group_id = p.variant_group_id AND s.is_approved = true) AS group_updated_at,
+                WHERE s.variant_group_id = p.variant_group_id AND s.is_approved = true AND EXISTS (SELECT 1 FROM users su WHERE su.id = s.user_id AND su.is_active IS NOT FALSE AND su.deleted_at IS NULL)) AS group_updated_at,
               (SELECT COUNT(*) FROM products s
-                WHERE s.variant_group_id = p.variant_group_id AND s.is_approved = true) AS group_size
+                WHERE s.variant_group_id = p.variant_group_id AND s.is_approved = true AND EXISTS (SELECT 1 FROM users su WHERE su.id = s.user_id AND su.is_active IS NOT FALSE AND su.deleted_at IS NULL)) AS group_size
          FROM products p WHERE p.id = $1::uuid`,
       [id]
     );
@@ -931,7 +931,7 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
        LEFT JOIN product_reviews pr ON pr.product_id = p.id
        LEFT JOIN users u ON u.id = p.user_id
        LEFT JOIN seller_profiles sp ON sp.user_id = p.user_id
-       WHERE p.id = $1::uuid AND p.is_approved = true
+       WHERE p.id = $1::uuid AND p.is_approved = true AND EXISTS (SELECT 1 FROM users su WHERE su.id = p.user_id AND su.is_active IS NOT FALSE AND su.deleted_at IS NULL)
        GROUP BY p.id, u.name, u.is_live, sp.personal_address`,
       [id]
     );
@@ -951,7 +951,7 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
                 (SELECT pi.image_url FROM product_images pi
                  WHERE pi.product_id = p.id ORDER BY pi.display_order, pi.created_at LIMIT 1) AS thumbnail
          FROM products p
-         WHERE p.variant_group_id = $1 AND p.is_approved = true
+         WHERE p.variant_group_id = $1 AND p.is_approved = true AND EXISTS (SELECT 1 FROM users su WHERE su.id = p.user_id AND su.is_active IS NOT FALSE AND su.deleted_at IS NULL)
          ORDER BY p.created_at`,
         [variantGroupId]
       );

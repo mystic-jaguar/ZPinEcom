@@ -21,7 +21,7 @@ router.get('/', async (_req: Request, res: Response) => {
        JOIN products p ON p.id = fd.product_id
        LEFT JOIN product_images pi ON pi.product_id = p.id
        LEFT JOIN product_reviews pr ON pr.product_id = p.id AND pr.is_hidden = false
-       WHERE ${LIVE_DEAL_PREDICATE} AND p.in_stock = true AND p.is_approved = true
+       WHERE ${LIVE_DEAL_PREDICATE} AND p.in_stock = true AND p.is_approved = true AND EXISTS (SELECT 1 FROM users su WHERE su.id = p.user_id AND su.is_active IS NOT FALSE AND su.deleted_at IS NULL)
          -- Same display filter the customer website applies: a deal whose product
          -- has no usable image renders as a blank card. The row is untouched.
          AND EXISTS (
