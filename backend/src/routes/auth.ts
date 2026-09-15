@@ -53,7 +53,11 @@ const rejectBlockedAccount = (req: Request, res: Response, row: any, method: str
   }
   if (row.is_active === false) {
     logger.authFailure(req.ip || '', method, 'account_deactivated', row.id);
-    res.status(403).json({ success: false, message: 'Account is deactivated', code: 'ACCOUNT_DEACTIVATED' });
+    res.status(403).json({
+      success: false,
+      message: 'Your account has been suspended. Please contact support at support@zpinshop.com.',
+      code: 'ACCOUNT_SUSPENDED',
+    });
     return true;
   }
   return false;

@@ -300,7 +300,7 @@ describe('POST /auth/refresh-token', () => {
       .post(`${BASE}/refresh-token`)
       .send({ refreshToken: token });
     expect(res.status).toBe(403);
-    expect(res.body.code).toBe('ACCOUNT_DEACTIVATED');
+    expect(res.body.code).toBe('ACCOUNT_SUSPENDED');
     expect(res.body.accessToken).toBeUndefined();
     // Only the two SELECTs ran — no DELETE/INSERT of refresh tokens.
     expect(getDbMock()).toHaveBeenCalledTimes(2);
