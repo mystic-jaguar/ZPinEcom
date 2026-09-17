@@ -1,4 +1,5 @@
 import { Image } from 'expo-image';
+import { cldImage } from '../../constants/cloudinary';
 import { useRouter } from 'expo-router';
 import { ArrowRight, Check, ChevronDown, Minus, Plus, ShoppingCart, X, Zap } from 'lucide-react-native';
 import { useFocusEffect } from '@react-navigation/native';
@@ -93,7 +94,7 @@ function CartItem({ item, selected, onToggleSelect, onRemove, onUpdateQuantity, 
                 </View>
             </Pressable>
             <Pressable onPress={() => router.push(`/product/${item.productId || item.product?.productId || item.id}`)}>
-                <Image source={img} style={styles.itemImage} contentFit="cover" />
+                <Image source={cldImage(img, 84)} style={styles.itemImage} contentFit="cover" />
             </Pressable>
             <View style={styles.itemBody}>
                 <View>

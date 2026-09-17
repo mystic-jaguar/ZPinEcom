@@ -1,4 +1,5 @@
 import React from 'react';
+import { cldImage } from '../../constants/cloudinary';
 import { Image, TouchableOpacity, View } from 'react-native';
 import { Text } from '../ui/ScaledText';
 import { createStyles } from '../../constants/theme';
@@ -52,7 +53,7 @@ export default function OrderCard({ order, onPress, onTrack, onBuyAgain }: Order
                 <View style={styles.imageContainer}>
                     {firstItem?.image ? (
                         <Image
-                            source={typeof firstItem.image === 'string' ? { uri: firstItem.image } : firstItem.image}
+                            source={typeof firstItem.image === 'string' ? { uri: cldImage(firstItem.image, 96) } : firstItem.image}
                             style={styles.image}
                             resizeMode="cover"
                         />

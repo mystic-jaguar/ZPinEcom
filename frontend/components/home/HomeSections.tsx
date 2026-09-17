@@ -1,4 +1,5 @@
 import { Image } from 'expo-image';
+import { cldImage } from '../../constants/cloudinary';
 import { useRouter } from 'expo-router';
 import { ArrowRight, Briefcase, Clock, Footprints, Glasses, Lamp, Shirt, ShoppingBag, Watch } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
@@ -97,7 +98,7 @@ function MiniCard({ item, onPress, width }: { item: Item; onPress: () => void; w
     return (
         <Pressable style={[styles.mini, { width }]} onPress={onPress}>
             <View style={styles.miniImageWrap}>
-                {!!item.image && <Image source={{ uri: item.image }} style={styles.miniImage} contentFit="cover" transition={150} />}
+                {!!item.image && <Image source={{ uri: cldImage(item.image, 180) }} style={styles.miniImage} contentFit="cover" transition={150} />}
             </View>
             <Text style={styles.miniName} numberOfLines={1}>{item.name}</Text>
             <Text style={styles.miniPrice}>{fmt(item.price)}</Text>
@@ -158,7 +159,7 @@ export function ExploreCategories() {
             <View style={styles.tileGrid}>
                 {SMALL_TILES.map(t => (
                     <Pressable key={t.label} style={styles.tile} onPress={() => go(t.nav)}>
-                        <Image source={{ uri: t.img }} style={styles.tileImage} contentFit="cover" />
+                        <Image source={{ uri: cldImage(t.img, 200) }} style={styles.tileImage} contentFit="cover" />
                         <View style={styles.tileBody}>
                             <Text style={styles.tileTag}>{t.tag}</Text>
                             <Text style={styles.tileTitle} numberOfLines={1}>{t.label}</Text>
@@ -193,7 +194,7 @@ export function ExploreCategories() {
             {/* Wide tiles */}
             {WIDE_TILES.map(t => (
                 <Pressable key={t.label} style={styles.wideTile} onPress={() => go(t.nav)}>
-                    <Image source={{ uri: t.img }} style={styles.wideTileImage} contentFit="cover" />
+                    <Image source={{ uri: cldImage(t.img, 200) }} style={styles.wideTileImage} contentFit="cover" />
                     <View style={styles.wideTileBody}>
                         <Text style={styles.tileTag}>{t.tag}</Text>
                         <Text style={styles.tileTitle}>{t.label}</Text>
@@ -241,7 +242,7 @@ export function ExploreCategories() {
                     { title: 'The Detail Room', sub: 'Discover pieces that make life better.', img: 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=600&auto=format&fit=crop', nav: { categoryName: 'Accessories' } as NavTarget },
                 ].map(e => (
                     <Pressable key={e.title} style={styles.editorialCard} onPress={() => go(e.nav)}>
-                        <Image source={{ uri: e.img }} style={styles.editorialImage} contentFit="cover" />
+                        <Image source={{ uri: cldImage(e.img, 260) }} style={styles.editorialImage} contentFit="cover" />
                         <View style={styles.editorialBody}>
                             <Text style={styles.editorialTitle}>{e.title}</Text>
                             <Text style={styles.editorialSub} numberOfLines={2}>{e.sub}</Text>
@@ -475,7 +476,7 @@ export function DiscoverSection({ deals, areaLabel }: { deals: FlashDeal[]; area
                 {bargains.map(b => (
                     <Pressable key={b.id} style={styles.bargainCard} onPress={() => go(b.nav)}>
                         <View style={styles.bargainImageWrap}>
-                            {!!b.image && <Image source={{ uri: b.image }} style={styles.miniImage} contentFit="cover" />}
+                            {!!b.image && <Image source={{ uri: cldImage(b.image, 180) }} style={styles.miniImage} contentFit="cover" />}
                             <View style={styles.bargainBadge}><Text style={styles.bargainBadgeText}>{b.discount}</Text></View>
                         </View>
                         <Text style={styles.miniName} numberOfLines={1}>{b.name}</Text>

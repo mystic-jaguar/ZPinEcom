@@ -1,4 +1,5 @@
 import React from 'react';
+import { cldImage } from '../../constants/cloudinary';
 import { Image, View } from 'react-native';
 import { Text } from '../ui/ScaledText';
 import { createStyles } from '../../constants/theme';
@@ -44,7 +45,7 @@ export default function AvatarInitials({
         ]}>
             {profileImage ? (
                 <Image
-                    source={typeof profileImage === 'string' ? { uri: profileImage } : profileImage}
+                    source={typeof profileImage === 'string' ? { uri: cldImage(profileImage, size) } : profileImage}
                     style={{ width: '100%', height: '100%', resizeMode: 'cover' }}
                 />
             ) : (

@@ -1,4 +1,5 @@
 import { Feather, Ionicons } from '@expo/vector-icons';
+import { cldImage } from '../../constants/cloudinary';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { PackageX, RotateCcw, Shirt, ShoppingCart, Zap } from 'lucide-react-native';
 import { EmptyState } from '../../components/ui';
@@ -546,7 +547,7 @@ export default function ProductDetails() {
                                     >
                                         <View style={[styles.variantSwatchImage, v.id === product.productId && { borderColor: palette.yellow600 }]}>
                                             {v.thumbnail ? (
-                                                <Image source={{ uri: v.thumbnail }} style={{ width: '100%', height: '100%', borderRadius: 8 }} resizeMode="cover" />
+                                                <Image source={{ uri: cldImage(v.thumbnail, 64) }} style={{ width: '100%', height: '100%', borderRadius: 8 }} resizeMode="cover" />
                                             ) : (
                                                 <Feather name="image" size={18} color="#ccc" />
                                             )}
@@ -691,7 +692,7 @@ export default function ProductDetails() {
                                 <View style={styles.reviewPhotoRow}>
                                     {reviewImages.map((uri, i) => (
                                         <View key={uri} style={styles.reviewPhotoWrap}>
-                                            <Image source={{ uri }} style={styles.reviewPhoto} />
+                                            <Image source={{ uri: cldImage(uri, 64) }} style={styles.reviewPhoto} />
                                             <TouchableOpacity
                                                 style={styles.reviewPhotoRemove}
                                                 accessibilityLabel={`Remove photo ${i + 1}`}
@@ -773,7 +774,7 @@ export default function ProductDetails() {
                                         {!!r.images?.length && (
                                             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.reviewPhotoStrip}>
                                                 {r.images.map(uri => (
-                                                    <Image key={uri} source={{ uri }} style={styles.reviewPhoto} />
+                                                    <Image key={uri} source={{ uri: cldImage(uri, 64) }} style={styles.reviewPhoto} />
                                                 ))}
                                             </ScrollView>
                                         )}
@@ -815,7 +816,7 @@ export default function ProductDetails() {
                                 <View style={styles.recImagePlaceholder}>
                                     {p.images?.[0] ? (
                                         <Image
-                                            source={{ uri: p.images[0] as string }}
+                                            source={{ uri: cldImage(p.images[0] as string, 180) }}
                                             style={{ width: '100%', height: '100%', borderRadius: 12 }}
                                             resizeMode="cover"
                                         />

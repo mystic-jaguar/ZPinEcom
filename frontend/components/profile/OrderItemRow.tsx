@@ -1,4 +1,5 @@
 import React from 'react';
+import { cldImage } from '../../constants/cloudinary';
 import { Image, View } from 'react-native';
 import { Text } from '../ui/ScaledText';
 import { createStyles } from '../../constants/theme';
@@ -23,7 +24,7 @@ export default function OrderItemRow({
             <View style={styles.imageContainer}>
                 {image ? (
                     <Image
-                        source={typeof image === 'string' ? { uri: image } : image}
+                        source={typeof image === 'string' ? { uri: cldImage(image, 96) } : image}
                         style={styles.image}
                         resizeMode="contain"
                     />

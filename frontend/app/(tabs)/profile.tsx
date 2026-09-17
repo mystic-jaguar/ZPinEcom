@@ -1,4 +1,5 @@
 import ActionModal from '@/components/common/ActionModal';
+import { cldImage } from '../../constants/cloudinary';
 import LegalDocModal, { LegalDocType } from '@/components/common/LegalDocModal';
 import { useCart } from '@/context/CartContext';
 import { useOrder } from '@/context/OrderContext';
@@ -130,7 +131,7 @@ export default function ProfileScreen() {
                     <View style={styles.heroTop}>
                         <View style={styles.avatar}>
                             {user.profileImage ? (
-                                <Image source={{ uri: user.profileImage }} style={styles.avatarImg} contentFit="cover" />
+                                <Image source={{ uri: cldImage(user.profileImage, 64) }} style={styles.avatarImg} contentFit="cover" />
                             ) : (
                                 <Text style={styles.avatarText}>{initialsOf(user.name)}</Text>
                             )}

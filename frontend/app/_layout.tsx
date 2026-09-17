@@ -17,7 +17,6 @@ import { UserProvider, useUser } from "../context/UserContext";
 import { NetworkProvider } from "../context/NetworkContext";
 import { WishlistProvider } from "../context/WishlistContext";
 import { ZoneProvider, useZone } from "../context/ZoneContext";
-import { startKeepAlive } from "../services/keepAlive";
 import { useNotificationTaps } from "../services/push";
 import { installRejectionHandler } from "../utils/rejectionHandler";
 
@@ -57,11 +56,6 @@ function RootLayoutNav() {
   // Tapping an order push opens that order. Held back until the session is
   // resolved so the auth redirect below doesn't replace() the tap away.
   useNotificationTaps(isAuthenticated && !isLoading);
-
-  useEffect(() => {
-    // Start keep-alive only once the user is authenticated
-    if (isAuthenticated) startKeepAlive();
-  }, [isAuthenticated]);
 
   useEffect(() => {
     if (isLoading) return;
