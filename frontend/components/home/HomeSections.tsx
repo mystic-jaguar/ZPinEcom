@@ -36,12 +36,12 @@ const useNav = () => {
 const fmt = (n: number) => `₹${(Number(n) || 0).toLocaleString('en-IN')}`;
 
 /**
- * Live products for one category, falling back to the supplied editorial set when
- * the category is thin — same rule as the website (fall back below `min` items),
- * so a half-stocked catalogue never renders a section with two lonely cards.
+ * Live products for one category. No hardcoded fallback: invented cards stayed
+ * visible after every seller was suspended and led nowhere. A row with no live
+ * products hides itself.
  */
-function useCategoryItems(category: string, limit: number, fallback: Item[], min: number): Item[] {
-    const [items, setItems] = useState<Item[]>(fallback);
+function useCategoryItems(category: string, limit: number): Item[] {
+    const [items, setItems] = useState<Item[]>([]);
 
     useEffect(() => {
         let cancelled = false;
@@ -49,7 +49,6 @@ function useCategoryItems(category: string, limit: number, fallback: Item[], min
             .then(res => {
                 if (cancelled) return;
                 const live = (res.products || []).slice(0, limit);
-                if (live.length < min) return; // keep the fallback
                 setItems(live.map((p: any) => ({
                     id: String(p.productId),
                     name: p.productName,
@@ -58,9 +57,9 @@ function useCategoryItems(category: string, limit: number, fallback: Item[], min
                     nav: { productId: String(p.productId) },
                 })));
             })
-            .catch(() => { /* keep the fallback set */ });
+            .catch(() => setItems([]));
         return () => { cancelled = true; };
-    }, [category, limit, min, fallback]);
+    }, [category, limit]);
 
     return items;
 }
@@ -108,22 +107,6 @@ function MiniCard({ item, onPress, width }: { item: Item; onPress: () => void; w
 
 /* ── Explore Categories ──────────────────────────────────────────────────── */
 
-const ETHNIC_FALLBACK: Item[] = [
-    { id: 'e1', name: 'Chikankari Kurta Set', price: 1499, image: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=400&auto=format&fit=crop', nav: { categoryName: 'Fashion', subCategoryName: 'Ethnic' } },
-    { id: 'e2', name: 'Banarasi Silk Saree', price: 2542, image: 'https://images.unsplash.com/photo-1610189844202-5c9d1b4cdbcc?w=400&auto=format&fit=crop', nav: { categoryName: 'Fashion', subCategoryName: 'Ethnic' } },
-    { id: 'e3', name: 'Nehru Jacket', price: 1299, image: 'https://images.unsplash.com/photo-1622470953794-aa9c70b0fb9d?w=400&auto=format&fit=crop', nav: { categoryName: 'Fashion', subCategoryName: 'Ethnic' } },
-    { id: 'e4', name: 'Anarkali Gown', price: 1989, image: 'https://images.unsplash.com/photo-1583391733956-6c78276477e2?w=400&auto=format&fit=crop', nav: { categoryName: 'Fashion', subCategoryName: 'Ethnic' } },
-    { id: 'e5', name: 'Printed Short Kurta', price: 899, image: 'https://images.unsplash.com/photo-1564859228273-274232fdb516?w=400&auto=format&fit=crop', nav: { categoryName: 'Fashion', subCategoryName: 'Ethnic' } },
-    { id: 'e6', name: 'Festive Lehenga', price: 3699, image: 'https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=400&auto=format&fit=crop', nav: { categoryName: 'Fashion', subCategoryName: 'Ethnic' } },
-];
-
-const TECH_FALLBACK: Item[] = [
-    { id: 't1', name: 'Smart Watch Series X', price: 1690, image: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&auto=format&fit=crop', nav: { categoryName: 'Accessories', subCategoryName: 'Watches' } },
-    { id: 't2', name: 'Analog Classic', price: 1290, image: 'https://images.unsplash.com/photo-1524805444758-089113d48a6d?w=400&auto=format&fit=crop', nav: { categoryName: 'Accessories', subCategoryName: 'Watches' } },
-    { id: 't3', name: 'Sports Chronograph', price: 1699, image: 'https://images.unsplash.com/photo-1547996160-81dfa63595aa?w=400&auto=format&fit=crop', nav: { categoryName: 'Accessories', subCategoryName: 'Watches' } },
-    { id: 't4', name: 'Digital Fitness Band', price: 795, image: 'https://images.unsplash.com/photo-1575311373937-040b8e1fd5b6?w=400&auto=format&fit=crop', nav: { categoryName: 'Accessories', subCategoryName: 'Watches' } },
-];
-
 const SMALL_TILES: { tag: string; label: string; sub: string; img: string; nav: NavTarget }[] = [
     { tag: 'TOP PICKS', label: 'Footwear', sub: 'Sneakers, shoes & more', img: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400&auto=format&fit=crop', nav: { categoryName: 'Footwear' } },
     { tag: 'LATEST', label: 'Accessories', sub: 'Bags, watches & eyewear', img: 'https://images.unsplash.com/photo-1549298916-b41d501d3772?w=400&auto=format&fit=crop', nav: { categoryName: 'Accessories' } },
@@ -138,8 +121,8 @@ const WIDE_TILES: { tag: string; label: string; sub: string; img: string; nav: N
 
 export function ExploreCategories() {
     const go = useNav();
-    const ethnic = useCategoryItems('Ethnic', 6, ETHNIC_FALLBACK, 4);
-    const tech = useCategoryItems('Watches', 4, TECH_FALLBACK, 2);
+    const ethnic = useCategoryItems('Ethnic', 6);
+    const tech = useCategoryItems('Watches', 4);
     const dropWidth = s(150);
 
     return (
@@ -237,6 +220,7 @@ export function ExploreCategories() {
             </Pressable>
 
             {/* Ethnic Drops */}
+            {ethnic.length > 0 && <>
             <View style={styles.rowBlock}>
                 <RowHeader
                     kicker="HANDPICKED STYLES FOR YOU"
@@ -248,6 +232,7 @@ export function ExploreCategories() {
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hList}>
                 {ethnic.map(item => <MiniCard key={item.id} item={item} width={dropWidth} onPress={() => go(item.nav)} />)}
             </ScrollView>
+            </>}
 
             {/* Editorial duo */}
             <View style={styles.editorialRow}>
@@ -297,6 +282,7 @@ export function ExploreCategories() {
 
             {/* Tech Drops (the website's "Audio Tech" slot — ZPIN has no audio
                 category, so this reads the Watches & smart-wearables catalogue) */}
+            {tech.length > 0 && <>
             <View style={styles.rowBlock}>
                 <RowHeader
                     kicker="TECH THAT MOVES WITH YOU"
@@ -308,27 +294,12 @@ export function ExploreCategories() {
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hList}>
                 {tech.map(item => <MiniCard key={item.id} item={item} width={dropWidth} onPress={() => go(item.nav)} />)}
             </ScrollView>
+            </>}
         </View>
     );
 }
 
 /* ── Essentials grid ─────────────────────────────────────────────────────── */
-
-const APPLIANCE_FALLBACK: Item[] = [
-    { id: 'ap1', name: 'Electric Kettle', price: 1099, image: 'https://images.unsplash.com/photo-1594213114663-d94db9b17125?w=400&auto=format&fit=crop', nav: { categoryName: 'Home & Living' } },
-    { id: 'ap2', name: 'Table Lamp', price: 799, image: 'https://images.unsplash.com/photo-1507473885765-e6ed057f782c?w=400&auto=format&fit=crop', nav: { categoryName: 'Home & Living' } },
-    { id: 'ap3', name: 'Storage Rack', price: 1499, image: 'https://images.unsplash.com/photo-1598300042247-d088f8ab3a91?w=400&auto=format&fit=crop', nav: { categoryName: 'Home & Living' } },
-    { id: 'ap4', name: 'Cookware Set', price: 2199, image: 'https://images.unsplash.com/photo-1584990347449-a40b0d7c97c4?w=400&auto=format&fit=crop', nav: { categoryName: 'Home & Living' } },
-    { id: 'ap5', name: 'Wall Clock', price: 599, image: 'https://images.unsplash.com/photo-1563861826100-9cb868fdbe1c?w=400&auto=format&fit=crop', nav: { categoryName: 'Home & Living' } },
-];
-
-const BEAUTY_FALLBACK: Item[] = [
-    { id: 'bp1', name: 'Vitamin C Serum', price: 649, image: 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=400&auto=format&fit=crop', nav: { categoryName: 'Beauty' } },
-    { id: 'bp2', name: 'Daily Moisturizer', price: 449, image: 'https://images.unsplash.com/photo-1556228720-195a672e8a03?w=400&auto=format&fit=crop', nav: { categoryName: 'Beauty' } },
-    { id: 'bp3', name: 'Matte Lipstick', price: 349, image: 'https://images.unsplash.com/photo-1586495777744-4413f21062fa?w=400&auto=format&fit=crop', nav: { categoryName: 'Beauty' } },
-    { id: 'bp4', name: 'Sunscreen SPF 50', price: 499, image: 'https://images.unsplash.com/photo-1556228578-8c89e6adf883?w=400&auto=format&fit=crop', nav: { categoryName: 'Beauty' } },
-    { id: 'bp5', name: 'Hair Serum', price: 399, image: 'https://images.unsplash.com/photo-1608248543803-ba4f8c70ae0b?w=400&auto=format&fit=crop', nav: { categoryName: 'Beauty' } },
-];
 
 const WATCH_ICONS = [
     { label: 'Smart Watches', Icon: Watch, sub: 'Smart Watches' },
@@ -339,13 +310,13 @@ const WATCH_ICONS = [
 
 export function EssentialsGrid() {
     const go = useNav();
-    const appliances = useCategoryItems('Home Improvement', 5, APPLIANCE_FALLBACK, 3);
-    const beauty = useCategoryItems('Skincare', 5, BEAUTY_FALLBACK, 3);
+    const appliances = useCategoryItems('Home Improvement', 5);
+    const beauty = useCategoryItems('Skincare', 5);
     const cardWidth = s(130);
 
     // A plain render function, not a component: declaring a component inside the
     // body would remount (and scroll-reset) both rows on every state change.
-    const renderRow = ({ kicker, title, sub, items, nav }: { kicker: string; title: string; sub: string; items: Item[]; nav: NavTarget }) => (
+    const renderRow = ({ kicker, title, sub, items, nav }: { kicker: string; title: string; sub: string; items: Item[]; nav: NavTarget }) => items.length > 0 && (
         <View style={styles.essentialCard}>
             <RowHeader kicker={kicker} title={title} sub={sub} actionLabel="View All" onAction={() => go(nav)} inset />
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.essentialRow}>
@@ -412,14 +383,6 @@ export function EssentialsGrid() {
 
 /* ── Discover ────────────────────────────────────────────────────────────── */
 
-const POPULAR_FALLBACK: Item[] = [
-    { id: 'p1', name: 'Everyday Sneakers', price: 1299, image: 'https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?w=400&auto=format&fit=crop', nav: { categoryName: 'Footwear' } },
-    { id: 'p2', name: 'Cotton Shirt', price: 699, image: 'https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?w=400&auto=format&fit=crop', nav: { categoryName: 'Fashion' } },
-    { id: 'p3', name: 'Home Planter', price: 499, image: 'https://images.unsplash.com/photo-1485955900006-10f4d324d411?w=400&auto=format&fit=crop', nav: { categoryName: 'Home & Living' } },
-    { id: 'p4', name: 'Leather Wallet', price: 599, image: 'https://images.unsplash.com/photo-1627123424574-724758594e93?w=400&auto=format&fit=crop', nav: { categoryName: 'Accessories' } },
-    { id: 'p5', name: 'Wall Clock', price: 599, image: 'https://images.unsplash.com/photo-1563861826100-9cb868fdbe1c?w=400&auto=format&fit=crop', nav: { categoryName: 'Home & Living' } },
-];
-
 
 const TRY_BEFORE = [
     { label: 'Clothes', Icon: Shirt, nav: { categoryName: 'Fashion' } as NavTarget },
@@ -436,7 +399,7 @@ const TRY_BEFORE = [
  */
 export function DiscoverSection({ deals, areaLabel }: { deals: FlashDeal[]; areaLabel: string }) {
     const go = useNav();
-    const [popular, setPopular] = useState<Item[]>(POPULAR_FALLBACK);
+    const [popular, setPopular] = useState<Item[]>([]);
 
     useEffect(() => {
         let cancelled = false;
@@ -444,7 +407,6 @@ export function DiscoverSection({ deals, areaLabel }: { deals: FlashDeal[]; area
             .then(res => {
                 if (cancelled) return;
                 const live = (res.products || []).slice(0, 6);
-                if (live.length < 3) return;
                 setPopular(live.map((p: any) => ({
                     id: String(p.productId),
                     name: p.productName,
@@ -453,7 +415,7 @@ export function DiscoverSection({ deals, areaLabel }: { deals: FlashDeal[]; area
                     nav: { productId: String(p.productId) },
                 })));
             })
-            .catch(() => { /* keep the fallback set */ });
+            .catch(() => setPopular([]));
         return () => { cancelled = true; };
     }, []);
 
@@ -472,6 +434,7 @@ export function DiscoverSection({ deals, areaLabel }: { deals: FlashDeal[]; area
 
     return (
         <View style={styles.section}>
+            {popular.length > 0 && <>
             <View style={styles.rowBlock}>
                 <RowHeader
                     kicker={`TRENDING IN ${areaLabel.toUpperCase()}`}
@@ -483,6 +446,7 @@ export function DiscoverSection({ deals, areaLabel }: { deals: FlashDeal[]; area
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hList}>
                 {popular.map(item => <MiniCard key={item.id} item={item} width={s(140)} onPress={() => go(item.nav)} />)}
             </ScrollView>
+            </>}
 
             <Pressable style={styles.localCard} onPress={() => go({})}>
                 <Text style={styles.localTag}>COMMUNITY CHOICE</Text>
