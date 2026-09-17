@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { ChevronLeft, PackageSearch, Search, ShoppingBag, SlidersHorizontal } from 'lucide-react-native';
+import { Award, ChevronLeft, ChevronRight, Clock, PackageSearch, Search, ShoppingBag, SlidersHorizontal, Truck } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Dimensions, FlatList, Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -279,22 +279,49 @@ export default function ProductListing() {
                 initialNumToRender={PAGE_SIZE}
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[palette.yellow500]} tintColor={palette.yellow500} />}
                 ListFooterComponent={loadingMore ? <View style={styles.footerLoader}><ActivityIndicator size="small" color={palette.yellow600} /></View> : null}
-                ListEmptyComponent={
+                ListEmptyComponent={hasActiveFilters ? (
                     <View style={styles.empty}>
                         <View style={styles.emptyIcon}>
-                            <PackageSearch size={34} color={colors.textMuted} strokeWidth={1.75} />
+                            <PackageSearch size={34} color={palette.yellow700} strokeWidth={1.75} />
                         </View>
-                        <ZText variant="h3" style={styles.emptyTitle}>Nothing here yet</ZText>
-                        <ZText variant="muted" style={styles.emptyText}>
-                            {hasActiveFilters
-                                ? "No products match these filters. Try loosening them a little."
-                                : "We haven't stocked this collection yet — check back soon."}
-                        </ZText>
-                        {hasActiveFilters
-                            ? <ZButton label="Clear filters" size="md" fullWidth={false} onPress={clearFilters} style={styles.emptyBtn} />
-                            : <ZButton label="Browse all products" variant="outline" size="md" fullWidth={false} onPress={() => router.replace('/product-listing')} style={styles.emptyBtn} />}
+                        <ZText variant="h3" style={styles.emptyTitle}>No matches</ZText>
+                        <ZText variant="muted" style={styles.emptyText}>No products match these filters. Try loosening them a little.</ZText>
+                        <Pressable style={styles.emptyCta} onPress={clearFilters}>
+                            <Text style={styles.emptyCtaText}>Clear filters</Text>
+                        </Pressable>
                     </View>
-                }
+                ) : (
+                    // Mirrors the website's category "coming soon" state (GenderPage.css .gp-empty).
+                    <View style={styles.emptyCard}>
+                        <Image source={require('../assets/images/no_product.png')} style={styles.emptyArt} contentFit="contain" />
+                        <View style={styles.emptyBadge}>
+                            <Clock size={12} color="#B45309" strokeWidth={2.4} />
+                            <Text style={styles.emptyBadgeText}>COMING SOON</Text>
+                        </View>
+                        <Text style={styles.emptyHeading}>
+                            Great products are{'\n'}<Text style={styles.emptyHeadingAccent}>on their way!</Text>
+                        </Text>
+                        <Text style={styles.emptyBody}>
+                            We're working hard to bring the best {String(subCategoryName || categoryName || '')} products to you. Stay tuned!
+                        </Text>
+                        <View style={styles.emptyFeatures}>
+                            {[
+                                { Icon: ShoppingBag, label: 'Curated' },
+                                { Icon: Award, label: 'Best Quality' },
+                                { Icon: Truck, label: 'Fast Delivery' },
+                            ].map(({ Icon, label }) => (
+                                <View key={label} style={styles.emptyFeature}>
+                                    <Icon size={15} color={palette.yellow700} strokeWidth={1.9} />
+                                    <Text style={styles.emptyFeatureText}>{label}</Text>
+                                </View>
+                            ))}
+                        </View>
+                        <Pressable style={styles.emptyCta} onPress={() => router.push('/(tabs)/categories' as any)}>
+                            <Text style={styles.emptyCtaText}>View All Categories</Text>
+                            <ChevronRight size={16} color={colors.textOnYellow} strokeWidth={2.5} />
+                        </Pressable>
+                    </View>
+                )}
             />
 
             <FilterModal
@@ -334,8 +361,19 @@ const styles = createStyles({
     footerLoader: { paddingVertical: 20, alignItems: 'center' },
     skeletonGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 16 },
     empty: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40, paddingBottom: 40 },
-    emptyIcon: { width: 76, height: 76, borderRadius: 38, backgroundColor: colors.surfaceSunken, alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
+    emptyIcon: { width: 76, height: 76, borderRadius: 38, backgroundColor: '#FFF2CC', alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
     emptyTitle: { marginBottom: 8 },
     emptyText: { textAlign: 'center', lineHeight: 21, marginBottom: 22 },
-    emptyBtn: { paddingHorizontal: 28, alignSelf: 'center' },
+    emptyCard: { marginTop: 12, marginBottom: 20, paddingHorizontal: 22, paddingTop: 20, paddingBottom: 26, borderRadius: 22, borderWidth: 1, borderColor: '#E7E9ED', backgroundColor: colors.surfaceCard, alignItems: 'center' },
+    emptyArt: { width: '100%', aspectRatio: 1.5, maxHeight: 190, marginBottom: 14 },
+    emptyBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 100, backgroundColor: '#FFF2CC', marginBottom: 12 },
+    emptyBadgeText: { fontFamily: fonts.monoBold, fontSize: 10, letterSpacing: 0.8, color: '#B45309' },
+    emptyHeading: { fontFamily: fonts.displayBold, fontSize: 24, lineHeight: 30, letterSpacing: -0.5, color: colors.textStrong, textAlign: 'center', marginBottom: 8 },
+    emptyHeadingAccent: { color: '#C98A00' },
+    emptyBody: { fontFamily: fonts.bodyRegular, fontSize: 14, lineHeight: 21, color: colors.textMuted, textAlign: 'center', marginBottom: 18 },
+    emptyFeatures: { alignSelf: 'stretch', flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 14, paddingVertical: 11, paddingHorizontal: 12, borderRadius: 14, backgroundColor: '#FAFAF7', marginBottom: 20 },
+    emptyFeature: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+    emptyFeatureText: { fontFamily: fonts.bodySemiBold, fontSize: 12, color: colors.textBody },
+    emptyCta: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 46, paddingHorizontal: 24, borderRadius: 100, backgroundColor: palette.yellow500 },
+    emptyCtaText: { fontFamily: fonts.bodyBold, fontSize: 15, color: colors.textOnYellow },
 });
