@@ -3,7 +3,7 @@ import { Zap } from 'lucide-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Dimensions, FlatList, RefreshControl, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { AppHeader, ProductCard, ZText } from '../components/ui';
+import { AppHeader, EmptyState, ProductCard, ZText } from '../components/ui';
 import { createStyles, colors, fonts, palette, radius, productGridCardWidth } from '../constants/theme';
 import { FlashDeal, flashDealService } from '../services/flashDeals';
 import { Text } from '../components/ui/ScaledText';
@@ -110,9 +110,15 @@ export default function FlashDealsScreen() {
                         <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />
                     }
                     ListEmptyComponent={
-                        <View style={styles.center}>
-                            <ZText variant="body" style={styles.empty}>No flash deals running right now.</ZText>
-                        </View>
+                        <EmptyState
+                            badge="NO LIVE DEALS"
+                            BadgeIcon={Zap}
+                            title="Fresh deals are"
+                            accent="dropping soon!"
+                            body="No flash deals are running right now. Check back shortly for limited-time prices."
+                            ctaLabel="Browse Products"
+                            onCta={() => router.push('/product-listing')}
+                        />
                     }
                     renderItem={({ item }) => (
                         <DealCard deal={item} onPress={() => router.push(`/product/${item.productId}`)} />
@@ -128,7 +134,6 @@ const styles = createStyles({
     sub: { paddingHorizontal: 20, paddingBottom: 10, color: colors.textMuted },
     list: { paddingHorizontal: 20, paddingBottom: 32, gap: 18 },
     center: { paddingVertical: 60, alignItems: 'center', justifyContent: 'center' },
-    empty: { color: colors.textMuted },
     meta: { marginTop: 6, gap: 5 },
     timerRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
     labelChip: {

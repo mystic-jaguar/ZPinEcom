@@ -1,6 +1,7 @@
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { RotateCcw, Shirt, ShoppingCart, Zap } from 'lucide-react-native';
+import { PackageX, RotateCcw, Shirt, ShoppingCart, Zap } from 'lucide-react-native';
+import { EmptyState } from '../../components/ui';
 import { useFocusEffect } from '@react-navigation/native';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, RefreshControl, ScrollView, TouchableOpacity, View } from 'react-native';
@@ -384,17 +385,18 @@ export default function ProductDetails() {
 
     if (error || !product) {
         return (
-            <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: 20 }]}>
-                <Feather name="alert-triangle" size={48} color="#FF3B30" />
-                <Text style={{ marginTop: 20, fontSize: 16, color: '#666', textAlign: 'center' }}>
-                    {error || 'Product not found'}
-                </Text>
-                <TouchableOpacity
-                    style={{ marginTop: 20, padding: 10, backgroundColor: '#FBBF24', borderRadius: 8 }}
-                    onPress={() => router.back()}
-                >
-                    <Text style={{ fontWeight: 'bold' }}>Go Back</Text>
-                </TouchableOpacity>
+            <View style={[styles.container, { paddingTop: insets.top }]}>
+                <EmptyState
+                    badge="UNAVAILABLE"
+                    BadgeIcon={PackageX}
+                    title="This product is"
+                    accent="no longer available"
+                    body="It may have been sold out or removed by the seller. Plenty more to discover, though!"
+                    ctaLabel="Continue Shopping"
+                    onCta={() => router.replace('/(tabs)' as any)}
+                    secondaryLabel="Go back"
+                    onSecondary={() => router.back()}
+                />
             </View>
         );
     }

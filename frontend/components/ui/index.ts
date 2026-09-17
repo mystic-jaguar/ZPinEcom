@@ -12,3 +12,4 @@ export { default as ZText } from './ZText';
 export type { ZButtonVariant } from './ZButton';
 export type { ZTextVariant } from './ZText';
 export type { AuthCardProps } from './AuthCard';
+export { default as EmptyState } from './EmptyState';

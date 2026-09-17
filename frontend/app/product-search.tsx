@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { FlatList, Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import SkeletonCard from '../components/product/SkeletonCard';
-import { ProductCard, ZText } from '../components/ui';
+import { EmptyState, ProductCard, ZText } from '../components/ui';
 import { createStyles, colors, fonts, palette, radius, productGridCardWidth } from '../constants/theme';
 import { useSearch } from '../context/SearchContext';
 import apiClient from '../services/api';
@@ -143,10 +143,15 @@ export default function ProductSearchScreen() {
                         }
                     />
                 ) : (
-                    <View style={styles.empty}>
-                        <Search size={44} color={colors.borderStrong} />
-                        <ZText variant="muted" style={styles.emptyText}>No products found for “{searchQuery}”</ZText>
-                    </View>
+                    <EmptyState
+                        badge="NO RESULTS"
+                        BadgeIcon={Search}
+                        title="We couldn't find"
+                        accent={`“${searchQuery}”`}
+                        body="Try a different spelling or a broader word — or browse our categories instead."
+                        ctaLabel="View All Categories"
+                        onCta={() => router.push('/(tabs)/categories' as any)}
+                    />
                 )
             ) : (
                 <ScrollView contentContainerStyle={styles.discover} showsVerticalScrollIndicator={false}>
@@ -199,8 +204,6 @@ const styles = createStyles({
 
     skeletonGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 8 },
 
-    empty: { flex: 1, alignItems: 'center', justifyContent: 'center', marginTop: -40 },
-    emptyText: { marginTop: 14, textAlign: 'center', paddingHorizontal: 40 },
 
     discover: { paddingHorizontal: 20, paddingBottom: 40 },
     rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
