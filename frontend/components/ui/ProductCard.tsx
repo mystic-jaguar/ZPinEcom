@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { Heart, Zap } from 'lucide-react-native';
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Pressable, View } from 'react-native';
 import { createStyles, colors, fonts, palette, radius, productGridCardWidth } from '../../constants/theme';
 import { Text } from './ScaledText';
@@ -30,11 +30,14 @@ export default function ProductCard({
   image, brand, name, detail, price, originalPrice, discount, tryAtDoor,
   wished, width, onPress, onWishlist, style,
 }: ProductCardProps) {
-  const src = typeof image === 'string' ? { uri: cldImage(image, width ?? productGridCardWidth) } : image;
+  // Memoised so a parent re-render (wishlist toggle, countdown tick, list recycling) hands
+  // expo-image the SAME source object; a fresh object made it re-run the fade-in = flicker.
+  const w = width ?? productGridCardWidth;
+  const src = useMemo(() => (typeof image === 'string' ? { uri: cldImage(image, w) } : image), [image, w]);
   return (
     <Pressable onPress={onPress} style={[styles.card, { width: width ?? productGridCardWidth }, style]}>
       <View style={styles.imageWrap}>
-        <Image source={src} style={styles.image} contentFit="cover" transition={150} />
+        <Image source={src} style={styles.image} contentFit="cover" transition={150} cachePolicy="memory-disk" recyclingKey={typeof image === 'string' ? image : undefined} />
         {onWishlist ? (
           <Pressable onPress={onWishlist} hitSlop={8} style={styles.heart}>
             <Heart size={17} color={wished ? palette.red500 : colors.textStrong} fill={wished ? palette.red500 : 'transparent'} />
