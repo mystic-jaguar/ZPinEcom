@@ -4,6 +4,7 @@ import React from 'react';
 import { Pressable, View } from 'react-native';
 import { createStyles, colors, fonts, palette, radius, productGridCardWidth } from '../../constants/theme';
 import { Text } from './ScaledText';
+import { cldImage } from '../../constants/cloudinary';
 
 export interface ProductCardProps {
   image: any; // uri string or require()
@@ -29,7 +30,7 @@ export default function ProductCard({
   image, brand, name, detail, price, originalPrice, discount, tryAtDoor,
   wished, width, onPress, onWishlist, style,
 }: ProductCardProps) {
-  const src = typeof image === 'string' ? { uri: image } : image;
+  const src = typeof image === 'string' ? { uri: cldImage(image, width ?? productGridCardWidth) } : image;
   return (
     <Pressable onPress={onPress} style={[styles.card, { width: width ?? productGridCardWidth }, style]}>
       <View style={styles.imageWrap}>

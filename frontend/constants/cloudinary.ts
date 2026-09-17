@@ -1,3 +1,5 @@
+import { PixelRatio } from 'react-native';
+
 // Category artwork is hosted on Cloudinary and addressed by the CategoryNode id,
 // so no per-node URL table has to be maintained here — upload `<id>.jpg` into the
 // `zpin/categories` folder and the circle picks it up. Anything not uploaded 404s
@@ -19,3 +21,13 @@ export const categoryImageUrl = (id: string, size: number): string | null =>
     CLOUD_NAME
         ? `https://res.cloudinary.com/${CLOUD_NAME}/image/upload/f_auto,q_auto,c_fill,g_auto,w_${size},h_${size}/zpin/categories/${slug(id)}`
         : null;
+
+// Seller/admin uploads are full camera originals (often 1-4MB). Ask Cloudinary for a
+// copy no wider than the box (dp x pixel ratio); c_limit keeps aspect and never upscales,
+// so contentFit="cover" still crops client-side exactly as before. Non-Cloudinary URIs,
+// require() assets and nullish values pass through untouched.
+export const cldImage = <T,>(src: T, dpWidth: number): T => {
+    if (typeof src !== 'string' || !src.includes('res.cloudinary.com/') || !src.includes('/upload/')) return src;
+    const w = Math.min(2000, Math.round(dpWidth * PixelRatio.get()));
+    return src.replace('/upload/', `/upload/f_auto,q_auto,c_limit,w_${w}/`) as T;
+};

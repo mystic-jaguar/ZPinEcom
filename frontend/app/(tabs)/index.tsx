@@ -1,4 +1,5 @@
 import { Image } from 'expo-image';
+import { cldImage } from '../../constants/cloudinary';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { ArrowRight, ChevronDown, Heart, MapPin, Search, ShoppingBag, Star, Tag, Zap } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -410,7 +411,7 @@ function HomeFeed() {
         return (
             <Pressable key={key} style={[styles.fyBanner, v.card]} onPress={() => goToBannerTarget(b.actionUrl)}>
                 {b.imageUrl ? (
-                    <Image source={{ uri: b.imageUrl }} style={styles.fyBannerImage} contentFit="cover" />
+                    <Image source={{ uri: cldImage(b.imageUrl, 44) }} style={styles.fyBannerImage} contentFit="cover" />
                 ) : (
                     <View style={[styles.fyBannerIcon, { backgroundColor: v.iconBg }]}>
                         <Icon size={20} color={v.iconColor} fill={b.icon === 'star' ? v.iconColor : 'transparent'} />
@@ -510,7 +511,7 @@ function HomeFeed() {
                             onPress={() => router.push({ pathname: '/(tabs)/categories', params: { categoryId: cat.id } })}
                         >
                             <View style={styles.chipImageWrap}>
-                                <Image source={typeof cat.image === 'string' ? { uri: cat.image } : cat.image} style={styles.chipImage} contentFit="cover" />
+                                <Image source={typeof cat.image === 'string' ? { uri: cldImage(cat.image, 64) } : cat.image} style={styles.chipImage} contentFit="cover" />
                             </View>
                             <Text style={styles.chipText} numberOfLines={1}>{cat.name}</Text>
                         </Pressable>
@@ -572,7 +573,7 @@ function HomeFeed() {
                                     onPress={() => goToBannerTarget(b.actionUrl)}
                                 >
                                     {b.imageUrl ? (
-                                        <Image source={{ uri: b.imageUrl }} style={styles.promoImage} contentFit="cover" />
+                                        <Image source={{ uri: cldImage(b.imageUrl, SCREEN_W) }} style={styles.promoImage} contentFit="cover" />
                                     ) : (
                                         <View style={styles.promoTextWrap}>
                                             <Text style={styles.promoTitle} numberOfLines={2}>{b.title}</Text>
@@ -630,7 +631,7 @@ function HomeFeed() {
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hList}>
                     {freshArrivals.map((item) => (
                         <Pressable key={item.id} style={styles.freshCard} onPress={() => handleProductNav(item.category, item.subCategory)}>
-                            <Image source={typeof item.image === 'string' ? { uri: item.image } : item.image} style={styles.freshImage} contentFit="cover" />
+                            <Image source={typeof item.image === 'string' ? { uri: cldImage(item.image, 160) } : item.image} style={styles.freshImage} contentFit="cover" />
                             <View style={styles.freshOverlay}>
                                 <Text style={styles.freshName} numberOfLines={1}>{item.name}</Text>
                                 <Text style={styles.freshOffer}>{item.offer}</Text>
@@ -651,7 +652,7 @@ function HomeFeed() {
                             return (
                                 <Pressable key={item.id} style={styles.nearbyItem} onPress={() => handleNearbyNav(item)}>
                                     <View style={styles.nearbyImageWrap}>
-                                        <Image source={typeof item.image === 'string' ? { uri: item.image } : item.image} style={styles.nearbyImage} contentFit="cover" />
+                                        <Image source={typeof item.image === 'string' ? { uri: cldImage(item.image, SCREEN_W / 2) } : item.image} style={styles.nearbyImage} contentFit="cover" />
                                         {item.count != null && item.count > 0 && (
                                             <View style={styles.nearbyBadge}><Text style={styles.nearbyBadgeText}>{item.count}+</Text></View>
                                         )}
@@ -673,7 +674,7 @@ function HomeFeed() {
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hList}>
                     {BIG_DISCOUNTS.map((item) => (
                         <Pressable key={item.id} style={styles.discountCard} onPress={() => handleProductNav(item.category, item.subCategory)}>
-                            <Image source={{ uri: item.image }} style={styles.discountImage} contentFit="cover" />
+                            <Image source={{ uri: cldImage(item.image, 240) }} style={styles.discountImage} contentFit="cover" />
                             <View style={styles.discountBadge}><Text style={styles.discountBadgeText}>FLAT 40% OFF</Text></View>
                             <View style={styles.discountInfo}>
                                 <Text style={styles.discountName}>{item.name}</Text>
