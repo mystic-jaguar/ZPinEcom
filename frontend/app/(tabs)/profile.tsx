@@ -96,15 +96,19 @@ export default function ProfileScreen() {
                         <Text style={styles.heroEmail}>Log in to see your orders, wishlist, coupons and saved addresses.</Text>
                         <ZButton label="Log in" icon={ArrowRight} style={{ marginTop: 16 }} onPress={() => router.push('/auth/login')} />
                     </View>
-                    <Pressable style={{ paddingVertical: 14 }} onPress={() => router.push('/auth/signup')}>
-                        <ZText variant="lg">New to ZPIN? Create account</ZText>
-                    </Pressable>
-                    <Pressable style={{ paddingVertical: 14 }} onPress={() => router.push('/profile/help-center')}>
-                        <ZText variant="lg">Help & support</ZText>
-                    </Pressable>
-                    <Pressable style={{ paddingVertical: 14 }} onPress={() => openLegalDoc('privacy')}>
-                        <ZText variant="lg">Privacy & terms</ZText>
-                    </Pressable>
+                    <View style={[styles.card, { marginTop: 20 }]}>
+                        {[
+                            { icon: User, label: 'New to ZPIN? Create account', onPress: () => router.push('/auth/signup') },
+                            settings[3],
+                            settings[4],
+                        ].map((s, i, arr) => (
+                            <Pressable key={s.label} style={[styles.row, i < arr.length - 1 && styles.rowBorder]} onPress={s.onPress}>
+                                <View style={styles.rowIcon}><s.icon size={18} color={colors.textBody} /></View>
+                                <Text style={styles.rowLabel}>{s.label}</Text>
+                                <ChevronRight size={18} color={colors.borderStrong} />
+                            </Pressable>
+                        ))}
+                    </View>
                 </ScrollView>
                 <LegalDocModal visible={legalModalVisible} docType={legalDocType} onClose={() => setLegalModalVisible(false)} />
             </SafeAreaView>
