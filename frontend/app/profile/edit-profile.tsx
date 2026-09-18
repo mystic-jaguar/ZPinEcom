@@ -10,6 +10,8 @@ import { useUser } from '../../context/UserContext';
 import { userService } from '../../services/user';
 import { Text, TextInput } from '../../components/ui/ScaledText';
 
+const GENDERS = ['Male', 'Female', 'Do not wish to specify'];
+
 function initialsOf(name?: string) {
     if (!name) return 'ZP';
     return name.trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() || '').join('') || 'ZP';
@@ -45,7 +47,8 @@ export default function EditProfileScreen() {
                     setForm({
                         name: raw.name || '',
                         dob: raw.dob ? String(raw.dob).split('T')[0] : '',
-                        gender: raw.gender || '',
+                        // Website stores lowercase ('male') — map onto the picker's option.
+                        gender: GENDERS.find((g) => g.toLowerCase() === String(raw.gender || '').toLowerCase()) || '',
                         preferences: {
                             receivePushNotifications: raw.receivePushNotifications ?? raw.receive_push_notifications ?? true,
                             receiveEmailUpdates: raw.receiveEmailUpdates ?? raw.receive_email_updates ?? false,
@@ -60,6 +63,13 @@ export default function EditProfileScreen() {
 
     const handleSave = async () => {
         if (isSaving) return;
+        const fail = (msg: string) => { setErrorMessage(msg); setShowErrorModal(true); };
+        if (!form.name.trim()) return fail('Please enter your full name.');
+        if (!form.dob) return fail('Please enter your date of birth.');
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(form.dob) || Number.isNaN(Date.parse(form.dob)))
+            return fail('Enter your date of birth as YYYY-MM-DD, e.g. 2000-01-31.');
+        if (Date.parse(form.dob) > Date.now()) return fail('Date of birth cannot be in the future.');
+        if (!form.gender) return fail('Please select your gender.');
         setIsSaving(true);
         try {
             const updates: Record<string, any> = {};
@@ -73,7 +83,7 @@ export default function EditProfileScreen() {
             setShowSuccessModal(true);
         } catch (error) {
             console.error('Failed to update profile:', error);
-            setErrorMessage('Failed to update profile. Please try again.');
+            setErrorMessage(error instanceof Error && error.message ? error.message : 'Failed to update profile. Please try again.');
             setShowErrorModal(true);
         } finally {
             setIsSaving(false);
@@ -157,7 +167,7 @@ export default function EditProfileScreen() {
                         </Pressable>
                         {showGenderPicker && (
                             <View style={styles.dropdown}>
-                                {['Male', 'Female', 'Do not wish to specify'].map((opt) => (
+                                {GENDERS.map((opt) => (
                                     <Pressable key={opt} style={styles.dropdownItem} onPress={() => { setForm({ ...form, gender: opt }); setShowGenderPicker(false); }}>
                                         <Text style={styles.dropdownText}>{opt}</Text>
                                         {form.gender === opt && <Check size={16} color={palette.yellow600} />}

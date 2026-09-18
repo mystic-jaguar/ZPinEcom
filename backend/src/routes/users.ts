@@ -200,7 +200,8 @@ router.put('/profileDetails', authenticate, async (req: AuthRequest, res: Respon
   if (name && (typeof name !== 'string' || name.trim().length < 1 || name.length > 100)) { bad('Name must be 1–100 characters'); return; }
   if (userName && (typeof userName !== 'string' || !/^[A-Za-z0-9_.]{3,30}$/.test(userName))) { bad('Username must be 3–30 letters, digits, dots or underscores'); return; }
   if (dob && (typeof dob !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(dob) || Number.isNaN(Date.parse(dob)) || Date.parse(dob) > Date.now())) { bad('Date of birth must be a past date in YYYY-MM-DD form'); return; }
-  if (gender && !GENDERS.includes(gender)) { bad(`Gender must be one of: ${GENDERS.join(', ')}`); return; }
+  // The website stores lowercase ('male'), so match case-insensitively.
+  if (gender && (typeof gender !== 'string' || !GENDERS.some((g) => g.toLowerCase() === gender.toLowerCase()))) { bad(`Gender must be one of: ${GENDERS.join(', ')}`); return; }
   if (profileImage !== undefined && profileImage !== null && profileImage !== ''
       && (typeof profileImage !== 'string' || profileImage.length > 500 || !/^https:\/\//.test(profileImage))) { bad('Profile image must be an https URL'); return; }
   for (const flag of [receivePushNotifications, receiveEmailUpdates, receiveOrderUpdates]) {
