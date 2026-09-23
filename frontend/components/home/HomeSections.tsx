@@ -312,7 +312,7 @@ const WATCH_ICONS = [
 export function EssentialsGrid() {
     const go = useNav();
     const appliances = useCategoryItems('Home Improvement', 5);
-    const beauty = useCategoryItems('Skincare', 5);
+    const beauty = useCategoryItems('Beauty', 5);
     const cardWidth = s(130);
 
     // A plain render function, not a component: declaring a component inside the

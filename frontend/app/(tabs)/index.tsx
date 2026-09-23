@@ -17,6 +17,7 @@ import { useSearch } from '../../context/SearchContext';
 import { FlashDeal, flashDealService } from '../../services/flashDeals';
 import { PromoBanner, bannerService } from '../../services/banners';
 import { productService } from '../../services/product';
+import { RecentProduct, recentlyViewed } from '../../services/recentlyViewed';
 import { productOneLiner } from '../../utils/productDetail';
 import { Text } from '../../components/ui/ScaledText';
 
@@ -26,14 +27,6 @@ const CATEGORIES = [
     { id: 'accessories', name: 'Accessories', image: 'https://images.unsplash.com/photo-1549298916-b41d501d3772?auto=format&fit=crop&w=200&q=80' },
     { id: 'beauty', name: 'Beauty', image: require('../../assets/images/beauty_icon.jpg') },
     { id: 'home', name: 'Home & Living', image: 'https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=200&q=80' },
-];
-
-const RECOMMENDED = [
-    { id: '1', name: 'Bags', desc: 'From ₹499', image: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&w=400&q=80', category: 'Accessories', subCategory: 'Bags' },
-    { id: '2', name: 'Headphones', desc: 'Up to 60% OFF', image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=400&q=80', category: 'Gadgets', subCategory: 'Audio Devices' },
-    { id: '3', name: 'Watches', desc: 'Min 40% OFF', image: 'https://images.unsplash.com/photo-1524592094714-0f0654e20314?auto=format&fit=crop&w=400&q=80', category: 'Accessories', subCategory: 'Watches' },
-    { id: '4', name: 'Sunglasses', desc: 'Stylish & Cool', image: 'https://images.unsplash.com/photo-1511499767150-a48a237f0083?auto=format&fit=crop&w=400&q=80', category: 'Accessories', subCategory: 'Sunglasses' },
-    { id: '5', name: 'Wallets', desc: 'Premium Leather', image: 'https://images.unsplash.com/photo-1627123424574-724758594e93?auto=format&fit=crop&w=400&q=80', category: 'Accessories', subCategory: 'Wallets' },
 ];
 
 const FRESH_ARRIVALS = [
@@ -68,7 +61,7 @@ const BANNER_AUTO_MS = 5000;
 const FALLBACK_BANNERS: PromoBanner[] = [
     { id: 'fb1', title: 'Style, delivered in hours', subtitle: 'Shop the new season edit', imageUrl: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?w=1200&auto=format&fit=crop', actionUrl: '/product-listing', bgColor: null },
     { id: 'fb2', title: 'Try-at-door', subtitle: 'Wear it before you buy it', imageUrl: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=1200&auto=format&fit=crop', actionUrl: '/product-listing', bgColor: null },
-    { id: 'fb3', title: 'Beauty picks', subtitle: 'Skincare & makeup from ₹249', imageUrl: 'https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=1200&auto=format&fit=crop', actionUrl: '/product-listing', bgColor: null },
+    { id: 'fb3', title: 'Beauty picks', subtitle: 'Skincare & makeup from ₹249', imageUrl: 'https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=1200&auto=format&fit=crop', actionUrl: '/product-listing?categoryName=Beauty', bgColor: null },
 ];
 
 const FORYOU_PAGE_SIZE = 12;
@@ -140,11 +133,12 @@ function HomeFeed() {
      * merchandising banner.
      */
     const goToBannerTarget = useCallback((actionUrl?: string | null) => {
-        try {
-            router.push((actionUrl || '/product-listing') as any);
-        } catch {
-            router.push('/product-listing' as any);
-        }
+        const url = (actionUrl || '').trim();
+        if (/^https?:\/\//i.test(url)) { Linking.openURL(url).catch(() => {}); return; }
+        // Only push paths this app actually routes; an unknown one (a website path)
+        // lands on expo-router's "Unmatched route" error screen — try/catch can't see that.
+        const known = /^\/(product-listing|product-search|flash-deals|product\/[^/?]+|profile(\/|$|\?)|\(tabs\))/.test(url);
+        router.push((known ? url : '/product-listing') as any);
     }, [router]);
     const { recentSearches, isLoading: searchLoading } = useSearch();
     const [freshArrivals, setFreshArrivals] = useState<any[]>(FRESH_ARRIVALS);
@@ -157,7 +151,9 @@ function HomeFeed() {
     const [feedBanners, setFeedBanners] = useState<PromoBanner[]>([]);
     const bannerRef = useRef<ScrollView>(null);
     const [bannerIndex, setBannerIndex] = useState(0);
-    const [recommended, setRecommended] = useState<any[]>(RECOMMENDED);
+    const [recentProducts, setRecentProducts] = useState<RecentProduct[]>([]);
+    // Refresh on every focus — coming back from a product page must show it first.
+    useFocusEffect(useCallback(() => { recentlyViewed.list().then(setRecentProducts); }, []));
     const [nearby, setNearby] = useState<any[]>(NEARBY_FALLBACK);
     const [isLoadingProducts, setIsLoadingProducts] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -212,9 +208,8 @@ function HomeFeed() {
         setIsLoadingProducts(true);
         setError(null);
         try {
-            const [freshCats, recProducts, nearbyData] = await Promise.allSettled([
+            const [freshCats, nearbyData] = await Promise.allSettled([
                 productService.getFreshCategories(),
-                productService.getRecommended(recentSearches, 8),
                 productService.getNearbyCategories(zone.coords?.lat, zone.coords?.lng),
             ]);
 
@@ -233,17 +228,6 @@ function HomeFeed() {
                         subCategory: cat.name,
                     };
                 }));
-            }
-
-            if (recProducts.status === 'fulfilled' && recProducts.value.length > 0) {
-                setRecommended(recProducts.value.map(p => ({
-                    id: p.productId,
-                    name: p.productName,
-                    desc: `₹${p.price}`,
-                    image: p.images?.length > 0 ? p.images[0] : 'https://via.placeholder.com/150',
-                    category: Array.isArray(p.categoryPath) ? (p.categoryPath[0]?.name || 'Fashion') : p.categoryPath,
-                    subCategory: p.deepestCategoryName || '',
-                })));
             }
 
             if (nearbyData.status === 'fulfilled' && nearbyData.value.length > 0) {
@@ -489,8 +473,8 @@ function HomeFeed() {
                     <View style={styles.deliveryZap}>
                         <Zap size={120} color="rgba(255,196,0,0.14)" fill="rgba(255,196,0,0.14)" />
                     </View>
-                    <View>
-                        <Text style={styles.deliveryEyebrow}>Estimated delivery within</Text>
+                    <View style={styles.deliveryLeft}>
+                        <Text style={styles.deliveryEyebrow} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>Estimated delivery within</Text>
                         <View style={styles.deliveryHrsRow}>
                             <Text style={styles.deliveryHrs}>2-12</Text>
                             <Text style={styles.deliveryHrsUnit}>HRS</Text>
@@ -498,7 +482,7 @@ function HomeFeed() {
                     </View>
                     <View style={styles.livePill}>
                         <View style={styles.liveDot} />
-                        <Text style={styles.livePillText}>LIVE IN YOUR AREA</Text>
+                        <Text style={styles.livePillText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>LIVE IN YOUR AREA</Text>
                     </View>
                 </View>
 
@@ -536,10 +520,10 @@ function HomeFeed() {
                     </View>
                 </View>
 
-                {/* Recommended */}
-                <SectionHeader eyebrow="Fresh today" title="Recently viewed" actionLabel="See all" onAction={() => router.push({ pathname: '/product-listing', params: { recommend: '1' } })} style={styles.section} />
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hList}>
-                    {recommended.map((item) => (
+                {/* Recently viewed — real per-device history, hidden until the user opens a product */}
+                {recentProducts.length > 0 && <SectionHeader eyebrow="Pick up where you left off" title="Recently viewed" style={styles.section} />}
+                {recentProducts.length > 0 && <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hList}>
+                    {recentProducts.map((item) => (
                         <ProductCard
                             key={item.id}
                             width={productGridCardWidth}
@@ -547,12 +531,12 @@ function HomeFeed() {
                             image={item.image}
                             brand="ZPIN"
                             name={item.name}
-                            price={item.desc}
+                            price={`₹${item.price}`}
                             tryAtDoor
-                            onPress={() => handleProductNav(item.category, item.subCategory)}
+                            onPress={() => router.push(`/product/${item.id}` as any)}
                         />
                     ))}
-                </ScrollView>
+                </ScrollView>}
 
                 {/* Promo banners — admin-authored (promo_banners), with an editorial
                     fallback set so the slot is never empty. Auto-advances every 5s;
@@ -763,12 +747,13 @@ const styles = createStyles({
     searchPlaceholder: { fontFamily: fonts.bodyRegular, fontSize: 14, color: colors.textFaint },
 
     deliveryBanner: { marginHorizontal: 20, marginTop: 12, backgroundColor: colors.surfaceInverse, borderRadius: 20, paddingVertical: 15, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', overflow: 'hidden' },
+    deliveryLeft: { flex: 1, marginRight: 10 },
     deliveryZap: { position: 'absolute', right: -18, top: -18 },
     deliveryEyebrow: { fontFamily: fonts.monoBold, fontSize: 10, letterSpacing: 1.4, color: palette.yellow400, textTransform: 'uppercase', marginBottom: 6 },
     deliveryHrsRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 6 },
     deliveryHrs: { fontFamily: fonts.displayBold, fontSize: 28, letterSpacing: -0.6, color: colors.textInvert },
     deliveryHrsUnit: { fontFamily: fonts.monoBold, fontSize: 12, color: palette.neutral300, marginBottom: 3 },
-    livePill: { flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: 'rgba(255,255,255,0.1)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 100 },
+    livePill: { flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: 'rgba(255,255,255,0.1)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)', paddingVertical: 8, paddingHorizontal: 10, borderRadius: 100, flexShrink: 1, maxWidth: '55%' },
     liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: palette.yellow500 },
     livePillText: { fontFamily: fonts.monoBold, fontSize: 10, letterSpacing: 1, color: colors.textInvert },
 

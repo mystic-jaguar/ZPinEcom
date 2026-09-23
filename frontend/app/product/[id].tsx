@@ -23,6 +23,7 @@ import { useWishlist } from '../../context/WishlistContext';
 import { useRequireAuth } from '../../context/AuthPromptContext';
 import apiClient, { tokenManager } from '../../services/api';
 import { productService } from '../../services/product';
+import { recentlyViewed } from '../../services/recentlyViewed';
 import * as ImagePicker from 'expo-image-picker';
 import { MAX_REVIEW_IMAGES, reviewService } from '../../services/review';
 import { userService } from '../../services/user';
@@ -148,6 +149,7 @@ export default function ProductDetails() {
                 apiClient.get('coupons').catch(() => ({ data: { data: [] } })),
             ]);
             setProduct(data);
+            recentlyViewed.add({ id: data.productId || productId, name: data.productName, price: Number(data.dealPrice ?? data.price) || 0, image: data.images?.[0] || '' });
             setRelatedProducts(related);
             await loadReviews(productId);
             // Pick the first active coupon to display
