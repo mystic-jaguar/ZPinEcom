@@ -148,7 +148,7 @@ const styles = createStyles({
   brand: { fontFamily: fonts.monoBold, fontSize: 10, letterSpacing: 1.4, color: colors.textFaint, textTransform: 'uppercase', marginBottom: 3 },
   name: { fontFamily: fonts.bodySemiBold, fontSize: 14, color: colors.textStrong, marginBottom: 3 },
   detail: { fontFamily: fonts.bodyRegular, fontSize: 11.5, color: colors.textFaint, marginBottom: 5 },
-  priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 7 },
+  priceRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 7 },
   price: { fontFamily: fonts.displayBold, fontSize: 17, color: colors.textStrong },
   original: { fontFamily: fonts.bodyRegular, fontSize: 12, color: colors.textFaint, textDecorationLine: 'line-through' },
   discount: { fontFamily: fonts.bodyBold, fontSize: 12, color: palette.green500 },
