@@ -17,7 +17,40 @@ export interface ProductListParams {
     priceBands?: string;  // comma-separated "min-max" bands, e.g. "0-500,5000-"
 }
 
+export interface Shop {
+    id: string;
+    name: string;
+    description: string | null;
+    image: string | null;
+    verified: boolean;
+    product_count: number;
+    rating: number | null;
+    review_count: number;
+    categories: string[]; // lowercase root category names
+}
+
 export const productService = {
+    /** Shop directory — every active seller in the customer's zone. */
+    async getShops(): Promise<Shop[]> {
+        try {
+            const response = await apiClient.get('products/shops');
+            return response.data.shops || [];
+        } catch (error) {
+            throw new Error(handleApiError(error));
+        }
+    },
+
+    /** One shop and a page of its products, optionally filtered by name. */
+    async getShop(sellerId: string, params?: { page?: number; limit?: number; q?: string }) {
+        try {
+            const response = await apiClient.get<{ shop: Shop; products: ProductObject[]; pagination: PaginationObject }>(
+                `products/shops/${encodeURIComponent(sellerId)}`, { params });
+            return response.data;
+        } catch (error) {
+            throw new Error(handleApiError(error));
+        }
+    },
+
     /**
      * Get all products with optional location-based filtering
      */

@@ -73,7 +73,7 @@ export function sellerInZoneSql(zone: Zone, userCol = 'p.user_id'): string {
 // Catalogue filter from a `?pincode=` query param, plus a cache-key suffix.
 // Required since 2026-09-15 (every client build sends it): no pincode or one
 // outside every zone → nothing is listed.
-export function catalogZone(pincode: unknown): { sql: string; key: string } {
+export function catalogZone(pincode: unknown, userCol = 'p.user_id'): { sql: string; key: string } {
   const zone = typeof pincode === 'string' ? zoneForPincode(pincode) : null;
-  return zone ? { sql: ` AND ${sellerInZoneSql(zone)}`, key: `:z${zone}` } : { sql: ' AND false', key: ':znone' };
+  return zone ? { sql: ` AND ${sellerInZoneSql(zone, userCol)}`, key: `:z${zone}` } : { sql: ' AND false', key: ':znone' };
 }

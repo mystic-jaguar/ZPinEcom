@@ -3,7 +3,7 @@ export { default as AuthCard } from './AuthCard';
 export { default as BottomBar } from './BottomBar';
 export { default as CheckoutSteps } from './CheckoutSteps';
 export { default as GoogleGlyph } from './GoogleGlyph';
-export { default as ProductCard } from './ProductCard';
+export { default as ProductCard, isNewProduct } from './ProductCard';
 export { default as Screen } from './Screen';
 export { default as SectionHeader } from './SectionHeader';
 export { default as ZButton } from './ZButton';

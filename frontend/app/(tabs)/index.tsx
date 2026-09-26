@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { cldImage } from '../../constants/cloudinary';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { ArrowRight, ChevronDown, Heart, MapPin, Search, ShoppingBag, Star, Tag, Zap } from 'lucide-react-native';
+import { ArrowRight, ChevronDown, Heart, MapPin, Search, ShoppingBag, Star, Store, Tag, Zap } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Dimensions, Linking, NativeScrollEvent, NativeSyntheticEvent, Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -9,7 +9,8 @@ import ActionModal from '../../components/common/ActionModal';
 import LegalDocModal, { LegalDocType } from '../../components/common/LegalDocModal';
 import DealCountdown from '../../components/home/DealCountdown';
 import { DiscoverSection, EssentialsGrid, ExploreCategories } from '../../components/home/HomeSections';
-import { ProductCard, SectionHeader, ZText } from '../../components/ui';
+import { ProductCard, SectionHeader, ZText, isNewProduct } from '../../components/ui';
+import { ProductObject } from '../../types/types';
 import { ComingSoonScreen } from '../../components/common/ZoneScreens';
 import { useZone } from '../../context/ZoneContext';
 import { createStyles, colors, fonts, palette, radius, shadow, productGridCardWidth } from '../../constants/theme';
@@ -534,6 +535,7 @@ function HomeFeed() {
                             price={`₹${item.price}`}
                             tryAtDoor
                             onPress={() => router.push(`/product/${item.id}` as any)}
+                            actionsFor={{ productId: item.id, inStock: true } as ProductObject}
                         />
                     ))}
                 </ScrollView>}
@@ -624,6 +626,20 @@ function HomeFeed() {
                     ))}
                 </ScrollView>
 
+                {/* Shop directory — every local store on ZPIN */}
+                <Pressable style={styles.shopsBanner} onPress={() => router.push('/shops' as any)} accessibilityRole="button" accessibilityLabel="Browse all shops">
+                    <View style={styles.shopsBannerIcon}>
+                        <Store size={22} color={colors.textOnYellow} />
+                    </View>
+                    <View style={styles.shopsBannerBody}>
+                        <Text style={styles.shopsBannerEyebrow}>SHOP LOCAL</Text>
+                        <Text style={styles.shopsBannerTitle} numberOfLines={2}>Explore every shop near you</Text>
+                    </View>
+                    <View style={styles.shopsBannerCta}>
+                        <ArrowRight size={18} color={palette.yellow500} />
+                    </View>
+                </Pressable>
+
                 {/* Nearby */}
                 <SectionHeader
                     eyebrow={locationLabel}
@@ -696,6 +712,9 @@ function HomeFeed() {
                                         discount={(node.data.discount ?? 0) > 0 ? `${node.data.discount}% OFF` : undefined}
                                         tryAtDoor
                                         onPress={() => router.push(`/product/${node.data.productId}`)}
+                                        rating={node.data.rating}
+                                        isNew={isNewProduct(node.data.timeStamp)}
+                                        actionsFor={node.data}
                                     />
                                 )
                         )}
@@ -783,13 +802,23 @@ const styles = createStyles({
     heroCta: { flexDirection: 'row', alignItems: 'center', gap: 7, alignSelf: 'flex-start', backgroundColor: colors.surfaceInverse, borderRadius: 100, paddingVertical: 12, paddingHorizontal: 18 },
     heroCtaText: { fontFamily: fonts.bodyBold, fontSize: 13, color: colors.textInvert },
 
-    chipsRow: { paddingHorizontal: 20, gap: 16, marginTop: 22 },
+    // flexGrow+center: centred when every chip fits, scrolls normally when not.
+    chipsRow: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 20, gap: 16, marginTop: 22 },
     chip: { alignItems: 'center', width: 68 },
     chipImageWrap: { width: 64, height: 64, borderRadius: 32, overflow: 'hidden', backgroundColor: colors.surfaceSunken, marginBottom: 7, borderWidth: 1, borderColor: colors.borderSubtle },
     chipImage: { width: '100%', height: '100%' },
     chipText: { fontFamily: fonts.bodyMedium, fontSize: 12, color: colors.textBody, textAlign: 'center' },
 
     section: { paddingHorizontal: 20, marginTop: 28 },
+    shopsBanner: {
+        flexDirection: 'row', alignItems: 'center', gap: 14, marginHorizontal: 20, marginTop: 28,
+        backgroundColor: colors.surfaceInverse, borderRadius: radius.lg, padding: 16,
+    },
+    shopsBannerIcon: { width: 46, height: 46, borderRadius: 23, backgroundColor: palette.yellow500, alignItems: 'center', justifyContent: 'center' },
+    shopsBannerBody: { flex: 1, minWidth: 0 },
+    shopsBannerEyebrow: { fontFamily: fonts.monoBold, fontSize: 9.5, letterSpacing: 1.3, color: palette.yellow500, marginBottom: 3 },
+    shopsBannerTitle: { fontFamily: fonts.displayBold, fontSize: 17, lineHeight: 21, color: colors.textInvert },
+    shopsBannerCta: { width: 38, height: 38, borderRadius: 19, borderWidth: 1.5, borderColor: 'rgba(255,196,0,0.5)', alignItems: 'center', justifyContent: 'center' },
     hList: { paddingHorizontal: 20, gap: 14 },
     hCard: {},
 

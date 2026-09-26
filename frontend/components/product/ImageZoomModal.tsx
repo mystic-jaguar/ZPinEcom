@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { Dimensions, Modal, Platform, Pressable, View } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createStyles } from '../../constants/theme';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
@@ -59,6 +60,7 @@ export default function ImageZoomModal({
     onClose: () => void;
     onIndexChange?: (index: number) => void;
 }) {
+    const insets = useSafeAreaInsets();
     const [index, setIndex] = useState(initialIndex);
 
     const scale = useSharedValue(1);
@@ -181,7 +183,8 @@ export default function ImageZoomModal({
                     {/* Rendered after the image so it always stays on top, even when the
                         image is scaled up — zIndex alone isn't reliably respected across
                         platforms for transformed siblings. */}
-                    <Pressable style={styles.close} onPress={onClose} hitSlop={12}>
+                    {/* Below the status bar / notch on every phone, not a fixed 48. */}
+                    <Pressable style={[styles.close, { top: Math.max(insets.top + 10, 24) }]} onPress={onClose} hitSlop={12}>
                         <Ionicons name="close" size={26} color="#FFFFFF" />
                     </Pressable>
                     {images.length > 1 && (

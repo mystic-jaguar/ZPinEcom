@@ -1,7 +1,7 @@
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { cldImage } from '../../constants/cloudinary';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { PackageX, RotateCcw, Shirt, ShoppingCart, Zap } from 'lucide-react-native';
+import { PackageX, RotateCcw, Shirt, ShoppingCart, Store, Zap } from 'lucide-react-native';
 import { EmptyState } from '../../components/ui';
 import { useFocusEffect } from '@react-navigation/native';
 import React, { useCallback, useEffect, useState } from 'react';
@@ -11,12 +11,11 @@ import AccordionItem from '../../components/common/AccordionItem';
 import ActionModal from '../../components/common/ActionModal';
 import DeliveryOptionSelector from '../../components/product/DeliveryOptionSelector';
 import ProductImageCarousel from '../../components/product/ProductImageCarousel';
+import ImageZoomModal from '../../components/product/ImageZoomModal';
 import ProductSpecifications from '../../components/product/ProductSpecifications';
 import VariantSelector from '../../components/product/VariantSelector';
 import { useCart } from '../../context/CartContext';
-import { useCheckout } from '../../context/CheckoutContext';
-import { useAddress } from '../../context/AddressContext';
-import { isServiceableAddress } from '../../constants/delivery';
+import { useQuickBuy } from '../../hooks/useQuickBuy';
 import { useOrder } from '../../context/OrderContext';
 import { useUser } from '../../context/UserContext';
 import { useWishlist } from '../../context/WishlistContext';
@@ -38,14 +37,14 @@ export default function ProductDetails() {
     const productId = Array.isArray(id) ? id[0] : id;
     const router = useRouter();
     const insets = useSafeAreaInsets();
-    const { addToCart, remainingStock, selectOnly } = useCart();
-    const { setDeliveryType, selectedAddressId, setSelectedAddressId } = useCheckout();
-    const { addresses } = useAddress();
+    const { addToCart, remainingStock } = useCart();
+    const { checkoutAlone } = useQuickBuy();
     const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
     const { user, isAuthenticated } = useUser();
     const requireAuth = useRequireAuth();
     const { orders, isLoading: isOrdersLoading } = useOrder();
     const [showSuccessModal, setShowSuccessModal] = useState(false);
+    const [reviewPhotos, setReviewPhotos] = useState<{ images: string[]; index: number } | null>(null);
     const [showVariantWarningModal, setShowVariantWarningModal] = useState(false);
     const [unavailableMessage, setUnavailableMessage] = useState<string | null>(null);
     const [showDeleteReviewModal, setShowDeleteReviewModal] = useState(false);
@@ -357,16 +356,7 @@ export default function ProductDetails() {
         // straight to the summary — an address outside the delivery area still
         // needs the address screen, which is where that is explained.
         if (tryAtDoor) {
-            setDeliveryType('Instant');
-            selectOnly({ productId: product.productId, selectedSize });
-            const current = addresses.find(a => a.id === selectedAddressId);
-            const target = current || addresses.find(a => a.isDefault) || addresses[0];
-            if (target && isServiceableAddress(target.city, target.pincode)) {
-                if (target.id !== selectedAddressId) setSelectedAddressId(target.id);
-                router.push('/checkout/summary');
-            } else {
-                router.push('/checkout/address');
-            }
+            checkoutAlone(product.productId, selectedSize);
             return;
         }
         setShowSuccessModal(true);
@@ -448,7 +438,20 @@ export default function ProductDetails() {
 
                     {/* Seller name inline; the address stays behind the accordion below */}
                     {product.sellerName && (
-                        <Text style={styles.sellerLine}>Sold by {product.sellerName}</Text>
+                        <View style={styles.sellerRow}>
+                            <Text style={[styles.sellerLine, styles.sellerLineFlex]} numberOfLines={1}>Sold by {product.sellerName}</Text>
+                            {product.userId ? (
+                                <Pressable
+                                    style={styles.visitShopBtn}
+                                    onPress={() => router.push({ pathname: '/shops/[id]', params: { id: product.userId } } as any)}
+                                    accessibilityRole="button"
+                                    hitSlop={6}
+                                >
+                                    <Store size={13} color={colors.textStrong} />
+                                    <Text style={styles.visitShopText}>Visit Shop</Text>
+                                </Pressable>
+                            ) : null}
+                        </View>
                     )}
 
                     {product.sellerIsLive === false && (
@@ -775,8 +778,10 @@ export default function ProductDetails() {
                                         <Text style={styles.reviewComment}>{r.comment}</Text>
                                         {!!r.images?.length && (
                                             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.reviewPhotoStrip}>
-                                                {r.images.map(uri => (
-                                                    <Image key={uri} source={{ uri: cldImage(uri, 64) }} style={styles.reviewPhoto} />
+                                                {r.images.map((uri, i) => (
+                                                    <Pressable key={uri} onPress={() => setReviewPhotos({ images: r.images!, index: i })} accessibilityRole="imagebutton" accessibilityLabel="View review photo">
+                                                        <Image source={{ uri: cldImage(uri, 64) }} style={styles.reviewPhoto} />
+                                                    </Pressable>
                                                 ))}
                                             </ScrollView>
                                         )}
@@ -852,6 +857,13 @@ export default function ProductDetails() {
                     <Text style={styles.addBtnText}>Add · ₹{effectivePrice.toLocaleString('en-IN')}</Text>
                 </Pressable>
             </View>
+
+            <ImageZoomModal
+                visible={reviewPhotos !== null}
+                images={(reviewPhotos?.images || []).map(uri => ({ uri: cldImage(uri, 1080) }))}
+                initialIndex={reviewPhotos?.index ?? 0}
+                onClose={() => setReviewPhotos(null)}
+            />
 
             <ActionModal
                 visible={showSuccessModal}
@@ -997,6 +1009,14 @@ const styles = createStyles({
         color: '#666',
         marginBottom: 12
     },
+    sellerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
+    sellerLineFlex: { flex: 1, marginBottom: 0 },
+    visitShopBtn: {
+        flexDirection: 'row', alignItems: 'center', gap: 5,
+        paddingHorizontal: 12, minHeight: 32, borderRadius: 16,
+        borderWidth: 1, borderColor: colors.borderInk, backgroundColor: colors.surfaceCard,
+    },
+    visitShopText: { fontFamily: fonts.bodySemiBold, fontSize: 12, color: colors.textStrong },
     sellerOfflineLine: {
         fontSize: 13,
         color: '#b3261e',

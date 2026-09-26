@@ -6,7 +6,7 @@ import { ActivityIndicator, Dimensions, FlatList, Pressable, RefreshControl, Scr
 import { SafeAreaView } from 'react-native-safe-area-context';
 import FilterModal, { FilterState } from '../components/product/FilterModal';
 import SkeletonCard from '../components/product/SkeletonCard';
-import { EmptyState, ProductCard, ZButton, ZText } from '../components/ui';
+import { EmptyState, ProductCard, ZButton, ZText, isNewProduct } from '../components/ui';
 import { CATEGORY_DATA, CategoryNode } from '../constants/categories';
 import { createStyles, colors, fonts, palette, radius, productGridCardWidth } from '../constants/theme';
 import { useSearch } from '../context/SearchContext';
@@ -197,6 +197,9 @@ export default function ProductListing() {
                 if (isInWishlist(item.productId)) removeFromWishlist(item.productId); else addToWishlist(item);
             }}
             onPress={() => router.push(`/product/${item.productId}`)}
+            rating={item.rating}
+            isNew={isNewProduct(item.timeStamp)}
+            actionsFor={item}
         />
     );
 

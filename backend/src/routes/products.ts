@@ -39,6 +39,11 @@ const VARIANT_PRIMARY = `(p.variant_group_id IS NULL OR p.id = (
           AND s.in_stock = true AND s.is_approved = true AND EXISTS (SELECT 1 FROM users su WHERE su.id = s.user_id AND su.is_active IS NOT FALSE AND su.deleted_at IS NULL)
         ORDER BY s.created_at ASC, s.id ASC LIMIT 1))`;
 
+// Reviews belong to the listing, not the colour: every review query matches the
+// whole variant group of product $1 (or just $1 when ungrouped) — same rule as
+// the website's reviewController. One review per shopper per group, too.
+const VARIANT_GROUP_REVIEWS = `pr.product_id IN (SELECT id FROM products WHERE id = $1 OR variant_group_id = (SELECT variant_group_id FROM products WHERE id = $1))`;
+
 const router = Router();
 
 // Review photos: one at a time, 5MB, same ceiling and byte-sniffing the vendor
@@ -804,6 +809,111 @@ router.get('/category/:categoryName', productListLimiter, async (req: Request, r
   }
 });
 
+// Storefront listing rules shared by the shop routes below.
+const LISTED = `p.in_stock = true AND p.is_approved = true AND ${VARIANT_PRIMARY}`;
+
+// Shop card fields. `image` is shop_image_url (public shop photo) — never
+// shop_photo_url, which is a KYC upload. product_categories is read through
+// to_jsonb so this still runs if that website-added column isn't there.
+const SHOP_FIELDS = `
+  u.id::text AS id,
+  COALESCE(NULLIF(btrim(MAX(sbd.business_name)), ''), u.name) AS name,
+  MAX(sbd.business_description) AS description,
+  MAX(sbd.shop_image_url) AS image,
+  COALESCE(bool_or(sbd.is_verified), false) AS verified,
+  COUNT(DISTINCT p.id)::int AS product_count,
+  ROUND(AVG(pr.rating)::numeric, 1) AS rating,
+  COUNT(pr.rating)::int AS review_count,
+  CASE WHEN COUNT(DISTINCT p.id) > 0
+    THEN array_remove(array_agg(DISTINCT lower(cr.root_name)), NULL)
+    ELSE ARRAY(SELECT lower(e) FROM seller_business_details x,
+      jsonb_array_elements_text(CASE WHEN jsonb_typeof(to_jsonb(x)->'product_categories') = 'array'
+           THEN to_jsonb(x)->'product_categories' ELSE '[]'::jsonb END) e
+     WHERE x.user_id::text = u.id::text)
+  END AS categories`;
+
+const SHOP_FROM = `
+  WITH RECURSIVE cat_root AS (
+    SELECT id, name AS root_name FROM categories WHERE parent_id IS NULL
+    UNION ALL
+    SELECT c.id, cr.root_name FROM categories c JOIN cat_root cr ON c.parent_id = cr.id
+  )
+  SELECT ${SHOP_FIELDS}
+    FROM users u
+    LEFT JOIN seller_business_details sbd ON sbd.user_id::text = u.id::text
+    LEFT JOIN products p ON p.user_id = u.id AND ${LISTED}
+    LEFT JOIN cat_root cr ON cr.id = p.category_id
+    LEFT JOIN product_reviews pr ON pr.product_id = p.id AND pr.is_hidden = false
+   WHERE u.user_role = 'seller' AND u.is_active IS NOT FALSE AND u.deleted_at IS NULL`;
+
+const SHOP_GROUP = `GROUP BY u.id, u.name`;
+
+function shopRow(r: any) {
+  return { ...r, rating: r.rating == null ? null : Number(r.rating), categories: r.categories || [] };
+}
+
+// GET /api/v1/products/shops — shop directory (every active seller in the zone,
+// including ones with nothing listed yet). Same set as the website's /shops.
+router.get('/shops', productListLimiter, async (req: Request, res: Response): Promise<void> => {
+  const zone = catalogZone(req.query.pincode, 'u.id');
+  const cacheKey = `products:shops${zone.key}`;
+  const cached = await cacheGet(cacheKey);
+  if (cached) { res.json(cached); return; }
+  try {
+    const { rows } = await pool.query(`${SHOP_FROM}${zone.sql} ${SHOP_GROUP} ORDER BY COUNT(DISTINCT p.id) DESC, 2`);
+    const response = { success: true, shops: rows.map(shopRow) };
+    await cacheSet(cacheKey, response, 300);
+    res.json(response);
+  } catch (err) {
+    logger.error('getshops_error', { error: (err as any)?.message ?? String(err) });
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// GET /api/v1/products/shops/:sellerId — one shop + its listed products (paged,
+// optional ?q= name filter). 404 if the seller isn't an active shop in the zone.
+router.get('/shops/:sellerId', productListLimiter, async (req: Request, res: Response): Promise<void> => {
+  const zone = catalogZone(req.query.pincode, 'u.id');
+  const sellerId = String(req.params.sellerId || '').slice(0, 64);
+  const page = Math.max(Number(req.query.page) || 1, 1);
+  const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 60);
+  const q = String(req.query.q || '').trim().slice(0, 80);
+  try {
+    const shopRes = await pool.query(`${SHOP_FROM} AND u.id::text = $1${zone.sql} ${SHOP_GROUP}`, [sellerId]);
+    if (shopRes.rows.length === 0) { res.status(404).json({ success: false, message: 'Shop not found' }); return; }
+
+    const params: any[] = [sellerId];
+    let where = `p.user_id::text = $1 AND ${LISTED}`;
+    if (q) { params.push(`%${q.replace(/[%_\\]/g, '\\$&')}%`); where += ` AND p.product_name ILIKE $${params.length}`; }
+    const total = Number((await pool.query(`SELECT COUNT(*) FROM products p WHERE ${where}`, params)).rows[0].count);
+    const result = await pool.query(
+      `SELECT p.*,
+        COALESCE(json_agg(DISTINCT pi.image_url) FILTER (WHERE pi.image_url IS NOT NULL), '[]') as images,
+        COALESCE(AVG(pr.rating), 0) as average_rating
+       FROM products p
+       LEFT JOIN product_images pi ON pi.product_id = p.id
+       LEFT JOIN product_reviews pr ON pr.product_id = p.id
+       WHERE ${where}
+       GROUP BY p.id
+       ORDER BY p.created_at DESC, p.id ASC
+       LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+      [...params, limit, (page - 1) * limit]
+    );
+    res.json({
+      success: true,
+      shop: shopRow(shopRes.rows[0]),
+      products: result.rows.map(normalizeProduct),
+      pagination: {
+        currentPage: page, totalPages: Math.ceil(total / limit), totalItems: total,
+        itemsPerPage: limit, hasNextPage: page * limit < total, hasPrevPage: page > 1,
+      },
+    });
+  } catch (err) {
+    logger.error('getshop_error', { error: (err as any)?.message ?? String(err) });
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 // GET /api/v1/products — all products (paginated)
 router.get('/', productListLimiter, async (req: Request, res: Response): Promise<void> => {
   const zone = catalogZone(req.query.pincode);
@@ -1104,13 +1214,13 @@ router.get('/:id/reviews', async (req: Request, res: Response): Promise<void> =>
         ? `SELECT pr.*, u.name as user_name, NULL::text as user_profile_image
            FROM product_reviews pr
            JOIN users u ON u.id = pr.user_id::text
-           WHERE pr.product_id = $1 AND pr.user_id::text = $2
+           WHERE ${VARIANT_GROUP_REVIEWS} AND pr.user_id::text = $2
            ORDER BY pr.created_at DESC
            LIMIT $3 OFFSET $4`
         : `SELECT pr.*, u.name as user_name, NULL::text as user_profile_image
            FROM product_reviews pr
            JOIN users u ON u.id = pr.user_id::text
-           WHERE pr.product_id = $1 AND pr.is_hidden = false${blockedFilter}
+           WHERE ${VARIANT_GROUP_REVIEWS} AND pr.is_hidden = false${blockedFilter}
            ORDER BY pr.created_at DESC
            LIMIT $${requesterId ? 3 : 2} OFFSET $${requesterId ? 4 : 3}`,
       mineOnly
@@ -1122,8 +1232,8 @@ router.get('/:id/reviews', async (req: Request, res: Response): Promise<void> =>
 
     const countResult = await pool.query(
       mineOnly
-        ? 'SELECT COUNT(*) FROM product_reviews WHERE product_id = $1 AND user_id::text = $2'
-        : `SELECT COUNT(*) FROM product_reviews pr WHERE pr.product_id = $1 AND pr.is_hidden = false${blockedFilter}`,
+        ? `SELECT COUNT(*) FROM product_reviews pr WHERE ${VARIANT_GROUP_REVIEWS} AND pr.user_id::text = $2`
+        : `SELECT COUNT(*) FROM product_reviews pr WHERE ${VARIANT_GROUP_REVIEWS} AND pr.is_hidden = false${blockedFilter}`,
       mineOnly
         ? [productUUID, mineUserId]
         : requesterId
@@ -1136,8 +1246,8 @@ router.get('/:id/reviews', async (req: Request, res: Response): Promise<void> =>
     // draws the 5/4/3/2/1 bars from it and the page only ever holds 10 rows.
     const distResult = await pool.query(
       mineOnly
-        ? 'SELECT rating, COUNT(*)::int AS count FROM product_reviews WHERE product_id = $1 AND user_id::text = $2 GROUP BY rating'
-        : `SELECT pr.rating, COUNT(*)::int AS count FROM product_reviews pr WHERE pr.product_id = $1 AND pr.is_hidden = false${blockedFilter} GROUP BY pr.rating`,
+        ? `SELECT pr.rating, COUNT(*)::int AS count FROM product_reviews pr WHERE ${VARIANT_GROUP_REVIEWS} AND pr.user_id::text = $2 GROUP BY pr.rating`
+        : `SELECT pr.rating, COUNT(*)::int AS count FROM product_reviews pr WHERE ${VARIANT_GROUP_REVIEWS} AND pr.is_hidden = false${blockedFilter} GROUP BY pr.rating`,
       mineOnly ? [productUUID, mineUserId] : requesterId ? [productUUID, requesterId] : [productUUID]
     );
     const ratingCounts: Record<string, number> = { '1': 0, '2': 0, '3': 0, '4': 0, '5': 0 };
@@ -1218,7 +1328,7 @@ router.post('/:id/reviews', authenticate, reviewLimiter, async (req: AuthRequest
 
     // Prevent duplicate reviews from the same user
     const existing = await pool.query(
-      'SELECT id FROM product_reviews WHERE product_id = $1 AND user_id::text = $2',
+      `SELECT pr.id FROM product_reviews pr WHERE ${VARIANT_GROUP_REVIEWS} AND pr.user_id::text = $2`,
       [productUUID, req.userId]
     );
     if (existing.rows.length > 0) {
@@ -1234,7 +1344,7 @@ router.post('/:id/reviews', authenticate, reviewLimiter, async (req: AuthRequest
     );
     // Invalidate product cache (rating changed) and all review pages
     await Promise.all([
-      cacheDelPattern(`product:${productUUID}:reviews:*`),
+      cacheDelPattern('product:*:reviews:*'),
       cacheDel(`product:${productUUID}`, `product:${req.params.id}`),
     ]);
     res.status(201).json({ success: true, message: 'Review added' });
@@ -1325,7 +1435,7 @@ router.put('/:id/reviews/:reviewId', authenticate, async (req: AuthRequest, res:
     );
 
     await Promise.all([
-      cacheDelPattern(`product:${productUUID}:reviews:*`),
+      cacheDelPattern('product:*:reviews:*'),
       cacheDel(`product:${productUUID}`, `product:${req.params.id}`),
     ]);
 
@@ -1374,7 +1484,7 @@ router.delete('/:id/reviews/:reviewId', authenticate, async (req: AuthRequest, r
     );
 
     await Promise.all([
-      cacheDelPattern(`product:${productUUID}:reviews:*`),
+      cacheDelPattern('product:*:reviews:*'),
       cacheDel(`product:${productUUID}`, `product:${req.params.id}`),
     ]);
 
@@ -1431,7 +1541,7 @@ router.post('/:id/reviews/:reviewId/report', authenticate, reviewLimiter, async 
         [req.params.reviewId]
       );
       hidden = true;
-      await cacheDelPattern(`product:${review.product_id}:reviews:*`);
+      await cacheDelPattern('product:*:reviews:*');
     }
 
     res.json({
