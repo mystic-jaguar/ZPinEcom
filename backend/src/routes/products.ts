@@ -820,7 +820,7 @@ const SHOP_FIELDS = `
   COALESCE(NULLIF(btrim(MAX(sbd.business_name)), ''), u.name) AS name,
   MAX(sbd.business_description) AS description,
   MAX(sbd.shop_image_url) AS image,
-  COALESCE(bool_or(sbd.is_verified), false) AS verified,
+  COALESCE(bool_or(sbd.is_verified OR sbd.kyc_status = 'approved'), false) AS verified,
   COUNT(DISTINCT p.id)::int AS product_count,
   ROUND(AVG(pr.rating)::numeric, 1) AS rating,
   COUNT(pr.rating)::int AS review_count,
