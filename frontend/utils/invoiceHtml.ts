@@ -141,8 +141,9 @@ export function buildInvoiceHtml(order: InvoiceData, customerEmail?: string): st
     const invoiceDate = new Date();
     const shortId = String(order.orderNumber || '').replace(/^ORD-|^ZP-/i, '').toUpperCase();
     const fy = (() => {
-        const y = invoiceDate.getFullYear() % 100;
-        const start = invoiceDate.getMonth() >= 3 ? y : y - 1;
+        const ist = new Date(invoiceDate.getTime() + 5.5 * 3600000); // IST year/month
+        const y = ist.getUTCFullYear() % 100;
+        const start = ist.getUTCMonth() >= 3 ? y : y - 1;
         return `${String(start).padStart(2, '0')}-${String((start + 1) % 100).padStart(2, '0')}`;
     })();
 
