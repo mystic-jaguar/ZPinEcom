@@ -1,0 +1,21 @@
+# EAS reads .easignore from the git root (ZPinEcom), not from frontend/
+node_modules
+android
+ios
+.expo
+dist
+.git
+.idea
+.vscode
+.claude
+/_archive
+/backend
+/cloudinary-upload
+/docs
+/scripts
+aab_output
+*.apk
+*.aab
+*.tar
+*.tar.gz
+**/*.map
