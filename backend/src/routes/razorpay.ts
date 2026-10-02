@@ -106,7 +106,9 @@ router.post('/verify', authenticate, async (req: AuthRequest, res: Response): Pr
     .update(`${razorpayOrderId}|${razorpayPaymentId}`)
     .digest('hex');
 
-  if (expectedSignature !== razorpaySignature) {
+  const given = Buffer.from(String(razorpaySignature || ''));
+  const expected = Buffer.from(expectedSignature);
+  if (given.length !== expected.length || !crypto.timingSafeEqual(given, expected)) {
     res.status(400).json({ success: false, message: 'Invalid payment signature' });
     return;
   }

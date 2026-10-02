@@ -2,7 +2,7 @@ import appleSignin from 'apple-signin-auth';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { Request, Response, Router } from 'express';
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { OAuth2Client } from 'google-auth-library';
 import jwt from 'jsonwebtoken';
 import { pool } from '../db';
@@ -85,10 +85,17 @@ const otpLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-// 3 OTP verify attempts per 15 minutes per IP — prevents brute-force of 6-digit OTPs
+// 3 OTP verify attempts per 15 minutes per EMAIL — prevents brute-force of 6-digit
+// OTPs. Was per IP: that let an attacker rotate IPs against one inbox's code, and on
+// carrier NAT one customer's typos locked out everyone else verifying on that IP.
+// Neither verify route tracks attempts on the stored code, so this is the only guard.
 const otpVerifyLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: isProd ? 3 : 1000,
+  keyGenerator: (req) => {
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    return email ? `email:${email}` : ipKeyGenerator(req.ip || '');
+  },
   message: { success: false, code: 'RATE_LIMITED', message: 'Too many incorrect codes entered. Please wait 15 minutes, then request a fresh code.' },
   standardHeaders: true,
   legacyHeaders: false,
@@ -105,10 +112,13 @@ const resetPasswordLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-// 10 token refresh attempts per 15 minutes per IP (dev: relaxed)
+// Token refresh: per IP. Was 10/15min — with 15-minute access tokens, eleven
+// customers behind one carrier-NAT IP was enough to 429 the rest, and the app
+// treated that as a logout. A refresh token is a signed 30-day JWT matched against
+// the DB, so this is flood protection, not guess protection; it can be generous.
 const refreshLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: isProd ? 10 : 1000,
+  max: isProd ? 300 : 1000,
   message: { success: false, message: 'Too many token refresh attempts. Please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
