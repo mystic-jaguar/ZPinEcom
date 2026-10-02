@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
-import { tokenManager } from '../services/api';
+import { setSessionEndedHandler, tokenManager } from '../services/api';
 import { registerForPushNotifications, unregisterPushNotifications } from '../services/push';
 import { userService } from '../services/user';
 import { CompleteUserProfile, UserDetailsObject, UserObject } from '../types/types';
@@ -66,6 +66,14 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     // Load User from Storage
     useEffect(() => {
         loadUser();
+        // Server ended the session (suspended / refresh refused) — tokens are already gone.
+        setSessionEndedHandler(() => {
+            setUserState(INITIAL_USER);
+            setUserDetailsState(undefined);
+            setIsAuthenticated(false);
+            void AsyncStorage.multiRemove([USER_STORAGE_KEY, USER_DETAILS_STORAGE_KEY]);
+        });
+        return () => setSessionEndedHandler(null);
     }, []);
 
     const refreshUserFromServer = async (userId: string) => {

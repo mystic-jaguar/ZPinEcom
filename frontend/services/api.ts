@@ -118,6 +118,20 @@ async function refreshAccessToken(): Promise<string> {
     return accessToken;
 }
 
+// UserContext registers this so a server-ended session (suspension, refused
+// refresh) flips the UI to signed-out instead of only wiping storage underneath it.
+let onSessionEnded: (() => void) | null = null;
+export const setSessionEndedHandler = (fn: (() => void) | null) => { onSessionEnded = fn; };
+
+async function endSession(): Promise<void> {
+    await Promise.all([
+        secureRemove(SECURE_KEYS.ACCESS_TOKEN),
+        secureRemove(SECURE_KEYS.REFRESH_TOKEN),
+        AsyncStorage.removeItem(STORAGE_KEYS.USER_DATA),
+    ]);
+    onSessionEnded?.();
+}
+
 // Response interceptor - Handle errors and token refresh
 apiClient.interceptors.response.use(
     (response) => {
@@ -149,16 +163,24 @@ apiClient.interceptors.response.use(
                 originalRequest.headers.set('Authorization', `Bearer ${accessToken}`);
                 originalRequest.headers.set('x-auth-token', accessToken);
                 return apiClient(originalRequest);
-            } catch (refreshError) {
-                // Refresh failed — clear all auth state and force re-login
-                await Promise.all([
-                    secureRemove(SECURE_KEYS.ACCESS_TOKEN),
-                    secureRemove(SECURE_KEYS.REFRESH_TOKEN),
-                    AsyncStorage.removeItem(STORAGE_KEYS.USER_DATA),
-                ]);
-                // Signal to the app that auth is gone — UserContext will redirect to login
+            } catch (refreshError: any) {
+                // Only a definitive refusal (401/403, or no refresh token) ends the session.
+                // A 429, 5xx or dropped connection is transient: wiping tokens on those
+                // logged shoppers out whenever the refresh limiter tripped on carrier NAT.
+                const refreshStatus = refreshError?.response?.status;
+                if (refreshError?.message !== 'SESSION_EXPIRED' && refreshStatus !== 401 && refreshStatus !== 403) {
+                    return Promise.reject(error);
+                }
+                await endSession();
                 return Promise.reject(new Error('SESSION_EXPIRED'));
             }
+        }
+
+        // Admin suspension: the auth middleware answers 403 ACCOUNT_SUSPENDED on any
+        // call. Sign out now instead of leaving a dead session on screen; the error
+        // still reaches the caller so the server's message can be shown.
+        if (error.response?.status === 403 && (error.response.data as any)?.code === 'ACCOUNT_SUSPENDED') {
+            await endSession();
         }
 
         return Promise.reject(error);
