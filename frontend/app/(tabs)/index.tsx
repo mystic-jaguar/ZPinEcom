@@ -7,7 +7,7 @@ import { ActivityIndicator, Dimensions, Linking, NativeScrollEvent, NativeSynthe
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
 import LegalDocModal, { LegalDocType } from '../../components/common/LegalDocModal';
-import DealCountdown from '../../components/home/DealCountdown';
+import FlashDealsPanel from '../../components/home/FlashDealsPanel';
 import { DiscoverSection, EssentialsGrid, ExploreCategories } from '../../components/home/HomeSections';
 import { ProductCard, SectionHeader, ZText, isNewProduct } from '../../components/ui';
 import { ProductObject } from '../../types/types';
@@ -579,36 +579,9 @@ function HomeFeed() {
                     )}
                 </View>
 
-                {/* Flash Deals — admin-managed, hidden when nothing is running */}
-                {flashDeals.length > 0 && (
-                    <>
-                        <SectionHeader
-                            eyebrow="Ends soon"
-                            title="Flash deals"
-                            actionLabel="See all"
-                            onAction={() => router.push('/flash-deals' as any)}
-                            style={styles.section}
-                        />
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hList}>
-                            {flashDeals.slice(0, 8).map((deal) => (
-                                <View key={deal.id} style={{ width: productGridCardWidth }}>
-                                    <ProductCard
-                                        width={productGridCardWidth}
-                                        style={styles.hCard}
-                                        image={deal.images?.[0] || ''}
-                                        brand={deal.label}
-                                        name={deal.productName}
-                                        price={deal.dealPrice}
-                                        originalPrice={deal.originalPrice}
-                                        discount={deal.discountPercent > 0 ? `${deal.discountPercent}%` : undefined}
-                                        onPress={() => router.push(`/product/${deal.productId}`)}
-                                    />
-                                    <DealCountdown endsAt={deal.endsAt} />
-                                </View>
-                            ))}
-                        </ScrollView>
-                    </>
-                )}
+                {/* Flash Deals — admin-managed, hidden when nothing is running.
+                    Port of the website's FlashDealsSection in the app's theme. */}
+                {flashDeals.length > 0 && <FlashDealsPanel deals={flashDeals} />}
 
                 <EssentialsGrid />
 

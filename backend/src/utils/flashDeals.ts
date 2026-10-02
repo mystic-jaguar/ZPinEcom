@@ -68,31 +68,58 @@ export async function liveDealPrices(
   return map;
 }
 
-/** Burn deal stock for a purchased line. Never goes negative. */
+/**
+ * Burn deal stock for a deal-priced line. Returns false when the deal no longer
+ * holds `quantity` units, and the caller must refuse the checkout: the old
+ * GREATEST(..., 0) clamp sold 5 units at the deal price out of 1 remaining.
+ */
 export async function consumeDealStock(
   q: { query: (sql: string, params: any[]) => Promise<any> },
   productId: string,
   quantity: number
-): Promise<void> {
-  await q.query(
-    `UPDATE flash_deals fd
-        SET stock_remaining = GREATEST(fd.stock_remaining - $2, 0)
-      WHERE fd.product_id = $1::uuid AND ${LIVE_DEAL_PREDICATE}`,
+): Promise<boolean> {
+  const { rows } = await q.query(
+    `UPDATE flash_deals
+        SET stock_remaining = stock_remaining - $2
+      WHERE id = (
+        SELECT fd.id FROM flash_deals fd
+         WHERE fd.product_id = $1::uuid AND ${LIVE_DEAL_PREDICATE} AND fd.stock_remaining >= $2
+         ORDER BY fd.deal_price ASC
+         LIMIT 1
+      )
+      RETURNING id`,
     [productId, Math.max(1, Number(quantity) || 1)]
   );
+  return rows.length > 0;
 }
 
-/** Give deal stock back when a checkout is discarded before it was ever paid. */
+/**
+ * Give deal stock back when a deal-priced line is cancelled or its checkout is
+ * discarded unpaid. Only to the still-running deal that SOLD it (same product,
+ * same price as the line was charged) — a full-price line, or a deal that has
+ * since ended, gets nothing. Deliberately ignores `stock_remaining > 0`: the
+ * old LIVE_DEAL_PREDICATE here meant a SOLD-OUT deal could never get a
+ * cancelled unit back, i.e. exactly the deal that needs it most. Capped at
+ * total_stock. Byte-identical SQL: website-customer utils/flashDeals.js.
+ */
 export async function releaseDealStock(
   q: { query: (sql: string, params: any[]) => Promise<any> },
-  productId: string,
-  quantity: number
+  productId: string | null,
+  quantity: number,
+  paidPrice: number | string
 ): Promise<void> {
+  if (!productId) return;
   await q.query(
-    `UPDATE flash_deals fd
-        SET stock_remaining = fd.stock_remaining + $2
-      WHERE fd.product_id = $1::uuid AND ${LIVE_DEAL_PREDICATE}`,
-    [productId, Math.max(1, Number(quantity) || 1)]
+    `UPDATE flash_deals
+        SET stock_remaining = LEAST(stock_remaining + $2, total_stock)
+      WHERE id = (
+        SELECT fd.id FROM flash_deals fd
+         WHERE fd.product_id = $1::uuid AND fd.deal_price = $3::numeric
+           AND fd.is_active = true AND fd.starts_at <= NOW() AND fd.ends_at > NOW()
+         ORDER BY fd.ends_at DESC
+         LIMIT 1
+      )`,
+    [productId, Math.max(1, Number(quantity) || 1), paidPrice]
   );
 }
 

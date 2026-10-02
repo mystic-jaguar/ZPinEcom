@@ -806,8 +806,11 @@ router.post('/', authenticate, orderCreateLimiter, async (req: AuthRequest, res:
           [generateId(), subId, item.product_id, item.product_name, item.quantity, item.price,
            item.image || '', item.variant || null]
         );
-        if (dealPrices.size > 0 && dealPrices.has(String(item.product_id))) {
-          await consumeDealStock(client, item.product_id, item.quantity);
+        if (dealPrices.size > 0 && dealPrices.has(String(item.product_id))
+            && !(await consumeDealStock(client, item.product_id, item.quantity))) {
+          await client.query('ROLLBACK');
+          res.status(409).json({ success: false, message: `Not enough flash deal stock left for ${item.product_name}. Please reduce the quantity.` });
+          return;
         }
         // Decrement inventory atomically. The `quantity >= $1` guard makes the
         // check-and-decrement a single locked operation, so concurrent orders for
@@ -2130,13 +2133,14 @@ router.patch('/:id/cancel', authenticate, async (req: AuthRequest, res: Response
     );
     await recordOrderStatus(client, req.params.id, 'cancelled', `Cancelled by customer: ${reason}`);
 
-    // Restore inventory for each cancelled order item
+    // Restore inventory (and any flash-deal allocation) for each cancelled item
     const cancelledItems = await client.query(
-      `SELECT product_id, quantity, variant FROM ${ORDER_ITEMS} WHERE order_id = $1`,
+      `SELECT product_id, quantity, variant, price FROM ${ORDER_ITEMS} WHERE order_id = $1`,
       [req.params.id]
     );
     for (const item of cancelledItems.rows) {
       await restockLine(client, item.product_id, item.quantity, item.variant);
+      await releaseDealStock(client, item.product_id, item.quantity, item.price);
     }
 
     // Paid orders are always refunded to the original payment method. (The ZPIN
@@ -2226,12 +2230,12 @@ async function reclaimOrders(client: any, rows: any[]): Promise<string[]> {
 
   // Put back everything checkout took: product stock and flash-deal stock.
   const items = await client.query(
-    `SELECT product_id, quantity, variant FROM ${ORDER_ITEMS} WHERE order_id = ANY($1)`,
+    `SELECT product_id, quantity, variant, price FROM ${ORDER_ITEMS} WHERE order_id = ANY($1)`,
     [ids]
   );
   for (const item of items.rows) {
     await restockLine(client, item.product_id, item.quantity, item.variant);
-    await releaseDealStock(client, item.product_id, item.quantity);
+    await releaseDealStock(client, item.product_id, item.quantity, item.price);
   }
 
   // Release the coupon too — it was never actually used.

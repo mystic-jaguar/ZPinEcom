@@ -36,8 +36,9 @@ export function useCountdown(endsAt: string): { label: string; urgent: boolean }
 
 function DealCard({ deal, onPress }: { deal: FlashDeal; onPress: () => void }) {
     const { label: left, urgent } = useCountdown(deal.endsAt);
-    const soldPct = deal.totalStock > 0
-        ? Math.min(100, Math.round(((deal.totalStock - deal.stockRemaining) / deal.totalStock) * 100))
+    // Bar = units LEFT of the deal's allocation, same as the website and home panel.
+    const leftPct = deal.totalStock > 0
+        ? Math.max(4, Math.min(100, Math.round((deal.stockRemaining / deal.totalStock) * 100)))
         : 0;
     const lowStock = deal.stockRemaining > 0 && deal.stockRemaining <= 5;
 
@@ -64,7 +65,7 @@ function DealCard({ deal, onPress }: { deal: FlashDeal; onPress: () => void }) {
                     <Text style={[styles.timer, urgent && styles.timerUrgent]}>{left}</Text>
                 </View>
                 <View style={styles.barTrack}>
-                    <View style={[styles.barFill, lowStock && styles.barFillLow, { width: `${soldPct}%` }]} />
+                    <View style={[styles.barFill, lowStock && styles.barFillLow, { width: `${leftPct}%` }]} />
                 </View>
                 <Text style={[styles.stock, lowStock && styles.stockLow]}>
                     {lowStock ? `Only ${deal.stockRemaining} left!` : `${deal.stockRemaining} left of ${deal.totalStock}`}
