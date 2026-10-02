@@ -180,11 +180,11 @@ const GENDERS = ['Male', 'Female', 'Do not wish to specify'];
 
 router.put('/profileDetails', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
   const {
-    name, userName, dob, gender, profileImage,
+    name, userName, dob, gender, profileImage, mobile,
     receivePushNotifications, receiveEmailUpdates, receiveOrderUpdates,
   } = req.body;
 
-  const hasFields = name || userName || dob || gender || profileImage !== undefined
+  const hasFields = name || userName || dob || gender || mobile || profileImage !== undefined
     || receivePushNotifications !== undefined
     || receiveEmailUpdates !== undefined
     || receiveOrderUpdates !== undefined;
@@ -197,7 +197,11 @@ router.put('/profileDetails', authenticate, async (req: AuthRequest, res: Respon
   // Shape-check every field before it reaches the row — these used to be
   // written verbatim, so a 50 KB name or a javascript: profile image went in.
   const bad = (message: string) => { res.status(400).json({ success: false, message }); };
-  if (name && (typeof name !== 'string' || name.trim().length < 1 || name.length > 100)) { bad('Name must be 1–100 characters'); return; }
+  // Same name and mobile rules as the website profile (authController.js updateProfile),
+  // so a profile saved here can always be re-saved there.
+  if (name && (typeof name !== 'string' || name.trim().length < 2 || name.trim().length > 100
+      || !/^[\p{L}\p{M}][\p{L}\p{M}\s.'’-]*$/u.test(name.trim()))) { bad('Name must be 2–100 letters (spaces, hyphens and apostrophes allowed, no numbers)'); return; }
+  if (mobile && (typeof mobile !== 'string' || !/^[6-9]\d{9}$/.test(mobile))) { bad('Enter a valid 10-digit mobile number'); return; }
   if (userName && (typeof userName !== 'string' || !/^[A-Za-z0-9_.]{3,30}$/.test(userName))) { bad('Username must be 3–30 letters, digits, dots or underscores'); return; }
   if (dob && (typeof dob !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(dob) || Number.isNaN(Date.parse(dob)) || Date.parse(dob) > Date.now())) { bad('Date of birth must be a past date in YYYY-MM-DD form'); return; }
   // The website stores lowercase ('male'), so match case-insensitively.
@@ -209,6 +213,14 @@ router.put('/profileDetails', authenticate, async (req: AuthRequest, res: Respon
   }
 
   try {
+    if (mobile) {
+      const taken = await pool.query(`SELECT id FROM ${USERS} WHERE mobile = $1 AND id <> $2`, [mobile, req.userId]);
+      if (taken.rows.length) {
+        res.status(409).json({ success: false, message: 'Mobile number already registered to another account' });
+        return;
+      }
+    }
+
     const setClauses: string[] = [];
     const values: any[] = [];
 
@@ -220,6 +232,7 @@ router.put('/profileDetails', authenticate, async (req: AuthRequest, res: Respon
 
     if (name)                                  push('name', name.trim());
     if (userName)                              push('user_name', userName);
+    if (mobile)                                push('mobile', mobile);
     if (dob)                                   push('dob', dob);
     if (gender)                                push('gender', gender);
     if (profileImage !== undefined)            push('profile_image', profileImage);
@@ -242,6 +255,10 @@ router.put('/profileDetails', authenticate, async (req: AuthRequest, res: Respon
 
     res.json({ success: true, message: 'Profile updated successfully', data: normalizeUser(updated.rows[0]) });
   } catch (err) {
+    if ((err as any)?.code === '23505' && String((err as any)?.detail || '').includes('mobile')) {
+      res.status(409).json({ success: false, message: 'Mobile number already registered to another account' });
+      return;
+    }
     logger.error('updateprofile_error', { error: (err as any)?.message ?? String(err) });
     res.status(500).json({ success: false, message: 'Server error' });
   }

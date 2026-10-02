@@ -2147,6 +2147,8 @@ router.patch('/:id/cancel', authenticate, async (req: AuthRequest, res: Response
       [generateId(), req.params.id, req.userId, reason]
     );
 
+    await releaseCouponIfCheckoutCancelled(client, req.params.id);
+
     await client.query('COMMIT');
 
     // Refund outside the transaction — a gateway failure must not undo the
@@ -2189,6 +2191,31 @@ router.patch('/:id/cancel', authenticate, async (req: AuthRequest, res: Response
 // is deliberately past every one of those limits: stock is cheap, a charge with
 // no order is not.
 const STALE_CHECKOUT_MINUTES = 30;
+
+// Give a coupon back once EVERY parcel of its checkout is cancelled — the
+// discount is spread over all sub-orders, so one cancelled parcel out of three
+// must not free it. Byte-identical SQL: website-customer utils/releaseCoupon.js.
+async function releaseCouponIfCheckoutCancelled(client: any, orderId: string): Promise<boolean> {
+  const { rows } = await client.query(
+    `WITH g AS (
+       SELECT id, status FROM orders
+        WHERE COALESCE(group_id, id) = (SELECT COALESCE(group_id, id) FROM orders WHERE id = $1)
+     )
+     DELETE FROM coupon_redemptions
+      WHERE order_id IN (SELECT id FROM g)
+        AND NOT EXISTS (SELECT 1 FROM g WHERE status <> 'cancelled')
+     RETURNING coupon_code`,
+    [orderId]
+  );
+  for (const r of rows) {
+    await client.query(
+      `UPDATE coupons SET usage_count = GREATEST(usage_count - 1, 0), updated_at = NOW()
+        WHERE UPPER(code) = UPPER($1)`,
+      [r.coupon_code]
+    );
+  }
+  return rows.length > 0;
+}
 
 // Undo everything a checkout consumed, for orders already SELECT ... FOR UPDATE'd
 // by the caller inside an open transaction. Shared by the customer-initiated

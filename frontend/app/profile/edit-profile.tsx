@@ -23,6 +23,7 @@ export default function EditProfileScreen() {
 
     const [form, setForm] = useState({
         name: user.name || '',
+        mobile: user.mobile || '',
         dob: user.dob || '',
         gender: user.gender || '',
         preferences: {
@@ -46,6 +47,7 @@ export default function EditProfileScreen() {
                     const raw = response.data as any;
                     setForm({
                         name: raw.name || '',
+                        mobile: raw.mobile || '',
                         dob: raw.dob ? String(raw.dob).split('T')[0] : '',
                         // Website stores lowercase ('male' / 'other') — map onto the picker's option.
                         gender: GENDERS.find((g) => g.toLowerCase() === String(raw.gender || '').toLowerCase())
@@ -66,6 +68,7 @@ export default function EditProfileScreen() {
         if (isSaving) return;
         const fail = (msg: string) => { setErrorMessage(msg); setShowErrorModal(true); };
         if (!form.name.trim()) return fail('Please enter your full name.');
+        if (form.mobile && !/^[6-9]\d{9}$/.test(form.mobile)) return fail('Enter a valid 10-digit mobile number.');
         if (!form.dob) return fail('Please enter your date of birth.');
         if (!/^\d{4}-\d{2}-\d{2}$/.test(form.dob) || Number.isNaN(Date.parse(form.dob)))
             return fail('Enter your date of birth as YYYY-MM-DD, e.g. 2000-01-31.');
@@ -75,6 +78,7 @@ export default function EditProfileScreen() {
         try {
             const updates: Record<string, any> = {};
             if (form.name && form.name !== user.name) updates.name = form.name;
+            if (form.mobile && form.mobile !== user.mobile) updates.mobile = form.mobile;
             if (form.dob) updates.dob = form.dob;
             if (form.gender) updates.gender = form.gender;
             updates.receivePushNotifications = form.preferences.receivePushNotifications;
@@ -132,17 +136,21 @@ export default function EditProfileScreen() {
                     </>
                 ) : null}
 
-                {user.mobile ? (
-                    <>
-                        <ZText variant="eyebrow" color={colors.textBody} style={styles.label}>Mobile</ZText>
-                        <View style={styles.readonlyField}>
-                            <Text style={styles.countryCode}>+91</Text>
-                            <View style={styles.divider} />
-                            <Text style={styles.readonlyText} numberOfLines={1}>{user.mobile}</Text>
-                            <BadgeCheck size={18} color={palette.green500} />
-                        </View>
-                    </>
-                ) : null}
+                {/* Editable here too (website parity); same [6-9]XXXXXXXXX rule as the backend. */}
+                <ZText variant="eyebrow" color={colors.textBody} style={styles.label}>Mobile</ZText>
+                <View style={styles.field}>
+                    <Text style={styles.countryCode}>+91</Text>
+                    <View style={styles.divider} />
+                    <TextInput
+                        style={styles.fieldInput}
+                        value={form.mobile}
+                        placeholder="10-digit mobile number"
+                        placeholderTextColor={colors.textFaint}
+                        onChangeText={(t) => setForm({ ...form, mobile: t.replace(/[^0-9]/g, '').slice(0, 10) })}
+                        maxLength={10}
+                        keyboardType="phone-pad"
+                    />
+                </View>
 
                 <View style={styles.row}>
                     <View style={{ flex: 1 }}>

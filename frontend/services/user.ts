@@ -52,7 +52,7 @@ export const userService = {
     /**
      * Update user profile (JSON body)
      */
-    async updateProfileJson(data: { name?: string; userName?: string; dob?: string; gender?: string }) {
+    async updateProfileJson(data: { name?: string; userName?: string; mobile?: string; dob?: string; gender?: string }) {
         try {
             const response = await apiClient.put('users/profileDetails', data);
             return response.data;

@@ -186,7 +186,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
             });
 
             // Only call API if there are actual fields the backend understands
-            const apiFields = ['name', 'userName', 'dob', 'gender', 'receivePushNotifications', 'receiveEmailUpdates', 'receiveOrderUpdates'] as const;
+            const apiFields = ['name', 'userName', 'mobile', 'dob', 'gender', 'receivePushNotifications', 'receiveEmailUpdates', 'receiveOrderUpdates'] as const;
             const hasApiFields = apiFields.some(f => (updates as any)[f] !== undefined);
             if (hasApiFields) {
                 const result = await userService.updateProfileJson(updates as any);

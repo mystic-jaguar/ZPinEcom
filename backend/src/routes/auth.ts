@@ -492,14 +492,13 @@ router.post('/logout', async (req: Request, res: Response): Promise<void> => {
     }
   }
 
-  // Close the stolen-access-token window: tokens minted at or before now are refused.
-  if (userId) {
-    try {
-      await revokeTokensFor(userId);
-    } catch (err: any) {
-      logger.error('auth.logout_revoke_failed', { userId, message: err?.message });
-    }
-  }
+  // Logout ends the APP session only (owner decision 2026-10-02): its refresh
+  // tokens are gone above, so it can't renew. customer_token_revocations is NOT
+  // written here — that row is shared with the customer website, and writing it
+  // signed the shopper out of the website too.
+  // ponytail: the current access token stays valid until it expires (≤15 min);
+  // per-surface revocation would need a column on the shared table (schema change).
+  if (userId) logger.info('auth.logout', { userId });
   res.json({ success: true, message: 'Logged out' });
 });
 
