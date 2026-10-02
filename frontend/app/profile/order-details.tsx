@@ -167,7 +167,9 @@ export default function OrderDetailsScreen() {
         const subtotal = group.orders.reduce((s, o) => s + Number(o.totalAmount || 0), 0);
         const shipping = group.orders.reduce((s, o) => s + Number(o.shippingAmount || 0), 0);
         const tax = group.orders.reduce((s, o) => s + Number(o.taxAmount || 0), 0);
-        const discount = Math.max(0, Number((subtotal + shipping + tax - group.total).toFixed(2)));
+        const instantFees = group.orders.reduce((s, o) => s + Number((o as any).deliveryFee || 0), 0);
+        const groupPrepaid = group.orders.reduce((s, o) => s + Number((o as any).prepaidAmount || 0), 0);
+        const discount = Math.max(0, Number((subtotal + shipping + instantFees + tax - group.total).toFixed(2)));
         const paymentMethod = group.orders[0].paymentMethod;
         // COD money only exists once it is handed over at the door. Labelling an
         // unpaid COD order "Paid" is what made a cancelled order look refundable.
@@ -271,9 +273,10 @@ export default function OrderDetailsScreen() {
                             paymentStatus: group.orders[0].paymentStatus,
                             shippingAddress: addr,
                             items: group.orders.flatMap(o => o.items),
-                            deliveryFee: shipping,
+                            deliveryFee: shipping + instantFees,
                             taxAmount: tax,
                             discount,
+                            prepaidAmount: groupPrepaid,
                             // Each shipment can be a different seller — list every
                             // distinct store name rather than picking just one.
                             fulfilledBy: Array.from(new Set(group.orders.map(o => o.fulfilledBy).filter(Boolean))).join(', ') || undefined,
@@ -292,7 +295,8 @@ export default function OrderDetailsScreen() {
 
     // ----- Single-shipment order (legacy or single-seller): unchanged layout -----
     const order = fetchedOrder ?? getOrderById(singleId);
-    const isInstantDelivery = order?.notes === 'instant_delivery';
+    // Website orders leave notes empty — delivery_type is the column both surfaces write.
+    const isInstantDelivery = String(order?.deliveryType || '').toLowerCase() === 'flash' || order?.notes === 'instant_delivery';
 
     let couponCode: string | undefined;
     let noteCouponDiscount = 0;
@@ -303,7 +307,7 @@ export default function OrderDetailsScreen() {
     const itemsTotal = Number(order?.totalAmount || 0);
     const gstAmount = Number(order?.taxAmount || 0);
     const shippingFee = Number(order?.shippingAmount || 0);
-    const instantTrialFee = isInstantDelivery ? 50 : 0;
+    const instantTrialFee = isInstantDelivery ? (Number(order?.deliveryFee) || 50) : 0;
     const preDiscountTotal = itemsTotal + shippingFee + gstAmount + instantTrialFee;
     const inferredCouponDiscount = Math.max(0, Number((preDiscountTotal - Number(order?.finalAmount || 0)).toFixed(2)));
     const couponDiscount = Math.max(noteCouponDiscount, inferredCouponDiscount);
@@ -487,7 +491,7 @@ export default function OrderDetailsScreen() {
                         paymentStatus: order.paymentStatus,
                         shippingAddress: addr,
                         items: order.items,
-                        deliveryFee: shippingFee,
+                        deliveryFee: shippingFee + instantTrialFee,
                         taxAmount: gstAmount,
                         discount: couponDiscount,
                         prepaidAmount,

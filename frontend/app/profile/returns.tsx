@@ -47,9 +47,13 @@ const REFUND_DISCLAIMER = 'This amount will be refunded once the seller receives
 const MISSING_ID = 'no-id-';
 const keyOf = (item: { orderItemId?: string }, i: number) => String(item.orderItemId || `${MISSING_ID}${i}`);
 
-function isWithinReturnWindow(order: { status: string; updatedAt?: string; createdAt?: string }) {
+// Counted from placement (created_at), Instant orders excluded — the exact rule the
+// backend and website enforce. updatedAt moved on every later write, so the screen
+// offered returns the server then refused.
+function isWithinReturnWindow(order: { status: string; createdAt?: string; deliveryType?: string }) {
     if (order.status !== 'delivered') return false;
-    const ref = order.updatedAt || order.createdAt;
+    if (String(order.deliveryType || '').toLowerCase() === 'flash') return false;
+    const ref = order.createdAt;
     if (!ref) return false;
     const d = new Date(ref);
     if (Number.isNaN(d.getTime())) return false;
@@ -57,8 +61,8 @@ function isWithinReturnWindow(order: { status: string; updatedAt?: string; creat
     return elapsed >= 0 && elapsed <= RETURN_WINDOW_DAYS * 864e5;
 }
 
-function daysLeft(order: { updatedAt?: string; createdAt?: string }) {
-    const ref = order.updatedAt || order.createdAt;
+function daysLeft(order: { createdAt?: string }) {
+    const ref = order.createdAt;
     if (!ref) return 0;
     const elapsed = Date.now() - new Date(ref).getTime();
     return Math.max(0, RETURN_WINDOW_DAYS - Math.floor(elapsed / 864e5));

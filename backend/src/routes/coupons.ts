@@ -12,27 +12,32 @@ const router = Router();
 
 // GET /api/v1/coupons — list all coupons with computed status
 router.get('/', async (req: Request, res: Response): Promise<void> => {
+  // Status is computed per request, not cached: a cached 'active' used to outlive expiry by up to 1h.
+  const withStatus = (rows: any[]) => ({
+    success: true,
+    data: rows
+      .map((c: any) => {
+        const expired = c.expiryDate !== null && new Date(c.expiryDate).getTime() <= Date.now();
+        const usedUp = c.usageLimit !== null && c.usageCount >= c.usageLimit;
+        return { ...c, status: expired ? 'expired' : usedUp ? 'used' : 'active' };
+      })
+      .sort((a: any, b: any) => Number(a.status === 'expired') - Number(b.status === 'expired')),
+  });
+
   const cached = await cacheGet(COUPON_CACHE_KEY);
-  if (cached) { res.json(cached); return; }
+  if (cached) { res.json(withStatus(cached as any[])); return; }
 
   try {
     const result = await pool.query(`
       SELECT id, code, description, discount_type, discount_value,
              min_order_amount, max_discount_amount, valid_until, usage_limit, usage_count,
-             is_active,
-             valid_until > NOW() AS not_expired,
-             (usage_limit IS NULL OR usage_count < usage_limit) AS under_limit
+             is_active
       FROM coupons
       WHERE is_active = true
-      ORDER BY not_expired DESC, created_at DESC
+      ORDER BY created_at DESC
     `);
 
     const coupons = result.rows.map((r: any) => {
-      let status: 'active' | 'expired' | 'used';
-      if (!r.not_expired) status = 'expired';
-      else if (!r.under_limit) status = 'used';
-      else status = 'active';
-
       return {
         id: r.id,
         code: r.code,
@@ -45,13 +50,11 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
         expiryDate: r.valid_until,
         usageLimit: r.usage_limit,
         usageCount: r.usage_count,
-        status,
       };
     });
 
-    const response = { success: true, data: coupons };
-    await cacheSet(COUPON_CACHE_KEY, response, TTL_COUPONS);
-    res.json(response);
+    await cacheSet(COUPON_CACHE_KEY, coupons, TTL_COUPONS);
+    res.json(withStatus(coupons));
   } catch (err) {
     logger.error('getcoupons_error', { error: (err as any)?.message ?? String(err) });
     res.status(500).json({ success: false, message: 'Server error' });
@@ -74,12 +77,22 @@ router.post('/validate', authenticate, couponLimiter, async (req: AuthRequest, r
       FROM coupons
       WHERE UPPER(code) = UPPER($1)
         AND is_active = true
-        AND valid_until > NOW()
+        AND (valid_until IS NULL OR valid_until > NOW())
         AND (usage_limit IS NULL OR usage_count < usage_limit)
     `, [code]);
 
     if (result.rows.length === 0) {
       res.status(404).json({ success: false, message: 'Invalid or expired coupon code' });
+      return;
+    }
+
+    // Single use per user, same as checkout and the website — say so here, not at the last step.
+    const used = await pool.query(
+      'SELECT 1 FROM coupon_redemptions WHERE user_id = $1 AND UPPER(coupon_code) = UPPER($2)',
+      [String(req.userId), code]
+    );
+    if (used.rows.length > 0) {
+      res.status(409).json({ success: false, message: 'You have already used this coupon' });
       return;
     }
 

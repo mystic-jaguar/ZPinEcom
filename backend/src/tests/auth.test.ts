@@ -497,8 +497,8 @@ describe('POST /auth/forgetPassword/resetPassword', () => {
       .send({ resetToken: token, newPassword: 'NewPass123!' });
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
-    // Verify the DB was called 4 times (SELECT token, UPDATE password, UPDATE token, DELETE refresh)
-    expect(getDbMock().mock.calls.length).toBe(4);
+    // SELECT token, UPDATE password, UPDATE token, DELETE refresh, revocation upsert (kills live access tokens)
+    expect(getDbMock().mock.calls.length).toBe(5);
   });
 });
 

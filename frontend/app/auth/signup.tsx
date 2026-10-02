@@ -82,7 +82,7 @@ export default function SignupScreen() {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(email)) { setErrorMessage('Please enter a valid email address'); setShowErrorModal(true); return false; }
         if (!mobile.trim()) { setErrorMessage('Please enter your mobile number'); setShowErrorModal(true); return false; }
-        if (!/^\d{10}$/.test(mobile)) { setErrorMessage('Please enter a valid 10-digit mobile number'); setShowErrorModal(true); return false; }
+        if (!/^[6-9]\d{9}$/.test(mobile)) { setErrorMessage('Please enter a valid 10-digit mobile number'); setShowErrorModal(true); return false; }
         if (!password.trim()) { setErrorMessage('Please enter a password'); setShowErrorModal(true); return false; }
         // Match the backend's strength policy exactly (validation.ts mirrors isStrongPassword).
         const passwordCheck = validatePassword(password);

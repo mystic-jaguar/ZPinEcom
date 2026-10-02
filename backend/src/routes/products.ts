@@ -318,7 +318,7 @@ router.get('/recommended', authenticate, async (req: AuthRequest, res: Response)
           COALESCE(AVG(pr.rating), 0) as average_rating
          FROM products p
          LEFT JOIN product_images pi ON pi.product_id = p.id
-         LEFT JOIN product_reviews pr ON pr.product_id = p.id
+         LEFT JOIN product_reviews pr ON pr.product_id = p.id AND pr.is_hidden = false
          WHERE p.in_stock = true AND p.is_approved = true AND EXISTS (SELECT 1 FROM users su WHERE su.id = p.user_id AND su.is_active IS NOT FALSE AND su.deleted_at IS NULL) AND ${VARIANT_PRIMARY}${zone.sql}
          GROUP BY p.id
          ORDER BY p.created_at DESC
@@ -342,7 +342,7 @@ router.get('/recommended', authenticate, async (req: AuthRequest, res: Response)
         COALESCE(AVG(pr.rating), 0) as average_rating
        FROM products p
        LEFT JOIN product_images pi ON pi.product_id = p.id
-       LEFT JOIN product_reviews pr ON pr.product_id = p.id
+       LEFT JOIN product_reviews pr ON pr.product_id = p.id AND pr.is_hidden = false
        WHERE p.in_stock = true AND p.is_approved = true AND EXISTS (SELECT 1 FROM users su WHERE su.id = p.user_id AND su.is_active IS NOT FALSE AND su.deleted_at IS NULL) AND ${VARIANT_PRIMARY}${zone.sql}
          AND p.deepest_category_name = ANY($1)
          AND p.id != ALL($2)
@@ -452,7 +452,7 @@ router.get('/search', productListLimiter, async (req: Request, res: Response): P
         COALESCE(AVG(pr.rating), 0) as average_rating
        FROM products p
        LEFT JOIN product_images pi ON pi.product_id = p.id
-       LEFT JOIN product_reviews pr ON pr.product_id = p.id
+       LEFT JOIN product_reviews pr ON pr.product_id = p.id AND pr.is_hidden = false
        WHERE p.in_stock = true AND p.is_approved = true AND EXISTS (SELECT 1 FROM users su WHERE su.id = p.user_id AND su.is_active IS NOT FALSE AND su.deleted_at IS NULL) AND ${VARIANT_PRIMARY}${zone.sql}
          AND (
            LOWER(REPLACE(p.product_name, ' ', '')) LIKE $1
@@ -490,7 +490,7 @@ router.get('/search', productListLimiter, async (req: Request, res: Response): P
            FROM unnest($1::text[]) AS t
          ) ms
          LEFT JOIN product_images pi ON pi.product_id = p.id
-         LEFT JOIN product_reviews pr ON pr.product_id = p.id
+         LEFT JOIN product_reviews pr ON pr.product_id = p.id AND pr.is_hidden = false
          WHERE p.in_stock = true AND p.is_approved = true AND EXISTS (SELECT 1 FROM users su WHERE su.id = p.user_id AND su.is_active IS NOT FALSE AND su.deleted_at IS NULL) AND ${VARIANT_PRIMARY}${zone.sql}
            AND ms.score > $2
          GROUP BY p.id, ms.score
@@ -517,7 +517,7 @@ router.get('/search', productListLimiter, async (req: Request, res: Response): P
           COALESCE(AVG(pr.rating), 0) as average_rating
          FROM products p
          LEFT JOIN product_images pi ON pi.product_id = p.id
-         LEFT JOIN product_reviews pr ON pr.product_id = p.id
+         LEFT JOIN product_reviews pr ON pr.product_id = p.id AND pr.is_hidden = false
          WHERE p.in_stock = true AND p.is_approved = true AND EXISTS (SELECT 1 FROM users su WHERE su.id = p.user_id AND su.is_active IS NOT FALSE AND su.deleted_at IS NULL) AND ${VARIANT_PRIMARY}${zone.sql}
            AND p.deepest_category_name = ANY($1)
            AND p.id != ALL($2)
@@ -739,7 +739,7 @@ router.get('/category/:categoryName', productListLimiter, async (req: Request, r
       `SELECT COUNT(*) FROM (
          SELECT p.id
          FROM products p
-         LEFT JOIN product_reviews pr ON pr.product_id = p.id
+         LEFT JOIN product_reviews pr ON pr.product_id = p.id AND pr.is_hidden = false
          WHERE ${where}
          GROUP BY p.id
          ${having}
@@ -779,7 +779,7 @@ router.get('/category/:categoryName', productListLimiter, async (req: Request, r
         COALESCE(AVG(pr.rating), 0) as average_rating
        FROM products p
        LEFT JOIN product_images pi ON pi.product_id = p.id
-       LEFT JOIN product_reviews pr ON pr.product_id = p.id
+       LEFT JOIN product_reviews pr ON pr.product_id = p.id AND pr.is_hidden = false
        WHERE ${where}
        GROUP BY p.id
        ${having}
@@ -892,7 +892,7 @@ router.get('/shops/:sellerId', productListLimiter, async (req: Request, res: Res
         COALESCE(AVG(pr.rating), 0) as average_rating
        FROM products p
        LEFT JOIN product_images pi ON pi.product_id = p.id
-       LEFT JOIN product_reviews pr ON pr.product_id = p.id
+       LEFT JOIN product_reviews pr ON pr.product_id = p.id AND pr.is_hidden = false
        WHERE ${where}
        GROUP BY p.id
        ORDER BY p.created_at DESC, p.id ASC
@@ -935,7 +935,7 @@ router.get('/', productListLimiter, async (req: Request, res: Response): Promise
         COALESCE(AVG(pr.rating), 0) as average_rating
        FROM products p
        LEFT JOIN product_images pi ON pi.product_id = p.id
-       LEFT JOIN product_reviews pr ON pr.product_id = p.id
+       LEFT JOIN product_reviews pr ON pr.product_id = p.id AND pr.is_hidden = false
        WHERE p.in_stock = true AND p.is_approved = true AND EXISTS (SELECT 1 FROM users su WHERE su.id = p.user_id AND su.is_active IS NOT FALSE AND su.deleted_at IS NULL) AND ${VARIANT_PRIMARY}${zone.sql}
        GROUP BY p.id
        ORDER BY p.created_at DESC, p.id ASC
@@ -1045,7 +1045,7 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
         sp.personal_address as seller_address
        FROM products p
        LEFT JOIN product_images pi ON pi.product_id = p.id
-       LEFT JOIN product_reviews pr ON pr.product_id = p.id
+       LEFT JOIN product_reviews pr ON pr.product_id = p.id AND pr.is_hidden = false
        LEFT JOIN users u ON u.id = p.user_id
        LEFT JOIN seller_profiles sp ON sp.user_id = p.user_id
        WHERE p.id = $1::uuid AND p.is_approved = true AND EXISTS (SELECT 1 FROM users su WHERE su.id = p.user_id AND su.is_active IS NOT FALSE AND su.deleted_at IS NULL)

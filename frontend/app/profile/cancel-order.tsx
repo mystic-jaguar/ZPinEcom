@@ -137,7 +137,9 @@ export default function CancelOrderScreen() {
                 // The server sends the exact wording as refundDisclaimer.
                 msg += isReturn
                     ? `\n\nRefund of ₹${response.refundAmount.toFixed(2)}. ${response.refundDisclaimer || 'This amount will be refunded once the seller receives the product.'}`
-                    : `\n\nRefund of ₹${response.refundAmount.toFixed(2)} credited to your original payment method.`;
+                    : (response as any).refundStatus === 'failed'
+                        ? `\n\nRefund of ₹${response.refundAmount.toFixed(2)} could not be started automatically. Our team will process it to your original payment method.`
+                        : `\n\nRefund of ₹${response.refundAmount.toFixed(2)} initiated to your original payment method.`;
             } else if (!isReturn && !isPaidStatus(order.paymentStatus)) {
                 // Nothing was ever collected (COD before hand-over) — do not imply
                 // money is on its way back.

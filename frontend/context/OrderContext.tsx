@@ -78,6 +78,12 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
                     estimatedDelivery: o.estimatedDelivery || '',
                     trackingNumber: o.trackingNumber,
                     notes: o.notes,
+                    // Needed by the return-window and Instant-fee logic; dropped by this allow-list before.
+                    deliveryType: o.deliveryType,
+                    deliveryFee: Number(o.deliveryFee || 0),
+                    prepaidAmount: Number(o.prepaidAmount || 0),
+                    isTrial: Boolean(o.isTrial),
+                    courier: o.courier ?? null,
                     createdAt: o.createdAt,
                     updatedAt: o.updatedAt,
                     date: o.createdAt,

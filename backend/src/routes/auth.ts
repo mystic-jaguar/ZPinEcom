@@ -7,6 +7,7 @@ import { OAuth2Client } from 'google-auth-library';
 import jwt from 'jsonwebtoken';
 import { pool } from '../db';
 import { authenticate, AuthRequest, revokeTokensFor } from '../middleware/auth';
+import { canonicalizeEmail, emailCandidates } from '../utils/canonicalizeEmail';
 import { generateId } from '../utils/id';
 import { logger } from '../utils/logger';
 import { sendOTPEmail } from '../utils/mailer';
@@ -197,7 +198,9 @@ function normalizeUser(row: any) {
 // ─── POST /api/v1/auth/signup ─────────────────────────────────────────────────
 
 router.post('/signup', signupLimiter, async (req: Request, res: Response): Promise<void> => {
-  const { name, email, password, mobile, userName } = req.body;
+  const { name, email: rawEmail, password, mobile, userName } = req.body;
+  // Stored canonical, same as the website's signup, so UNIQUE(email) catches Gmail aliases.
+  const email = rawEmail ? canonicalizeEmail(rawEmail) : rawEmail;
 
   if (!name || !email || !password) {
     res.status(400).json({ success: false, message: 'Name, email and password are required' });
@@ -212,6 +215,18 @@ router.post('/signup', signupLimiter, async (req: Request, res: Response): Promi
     return;
   }
 
+  // Same name/mobile rules as the customer website (authController.js validateName +
+  // profile mobile) — an app account that breaks them can never re-save its web profile.
+  const trimmedName = String(name).trim();
+  if (trimmedName.length < 2 || trimmedName.length > 100 || !/^[\p{L}\p{M}][\p{L}\p{M}\s.'’-]*$/u.test(trimmedName)) {
+    res.status(400).json({ success: false, message: 'Name must be 2–100 letters (spaces, hyphens and apostrophes allowed, no numbers)' });
+    return;
+  }
+  if (mobile && !/^[6-9]\d{9}$/.test(String(mobile))) {
+    res.status(400).json({ success: false, message: 'Enter a valid 10-digit Indian mobile number' });
+    return;
+  }
+
   // Basic email format check
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     res.status(400).json({ success: false, message: 'Invalid email format' });
@@ -220,7 +235,7 @@ router.post('/signup', signupLimiter, async (req: Request, res: Response): Promi
 
   try {
     const existing = await pool.query(
-      `SELECT id, is_verified, google_id, apple_id, password_hash, user_role FROM ${USERS} WHERE email = $1`, [email.toLowerCase()]
+      `SELECT id, is_verified, google_id, apple_id, password_hash, user_role FROM ${USERS} WHERE email = ANY($1::text[])`, [emailCandidates(rawEmail)]
     );
     if (existing.rows.length > 0) {
       if (existing.rows[0].is_verified) {
@@ -333,8 +348,8 @@ router.post('/login', loginLimiter, async (req: Request, res: Response): Promise
 
   try {
     const result = await pool.query(
-      `SELECT * FROM ${USERS} WHERE email = $1 OR user_name = $1`,
-      [email.toLowerCase()]
+      `SELECT * FROM ${USERS} WHERE email = ANY($1::text[]) OR user_name = $2`,
+      [emailCandidates(email), String(email).trim().toLowerCase()]
     );
 
     // Constant-time response to prevent user enumeration
@@ -514,7 +529,7 @@ router.post('/forgetPassword/sendOTP', otpLimiter, async (req: Request, res: Res
 
   try {
     const userResult = await pool.query(
-      `SELECT id, google_id, apple_id, password_hash FROM ${USERS} WHERE email = $1`, [email.toLowerCase()]
+      `SELECT id, google_id, apple_id, password_hash FROM ${USERS} WHERE email = ANY($1::text[])`, [emailCandidates(email)]
     );
 
     // Always return the same response to prevent email enumeration
@@ -554,7 +569,7 @@ router.post('/forgetPassword/sendOTP', otpLimiter, async (req: Request, res: Res
       [generateId(), userId, otpHash]
     );
 
-    await sendOTPEmail(email.toLowerCase(), otp, 'password_reset');
+    await sendOTPEmail(String(email).trim().toLowerCase(), otp, 'password_reset');
 
     // Never return OTP in response
     res.json({ success: true, message: 'If that email exists, an OTP has been sent' });
@@ -579,11 +594,11 @@ router.post('/forgetPassword/verifyOTP', otpVerifyLimiter, async (req: Request, 
     const result = await pool.query(
       `SELECT at.* FROM ${AUTH_TOKENS} at
        JOIN ${USERS} u ON u.id = at.user_id
-       WHERE u.email = $1
+       WHERE u.email = ANY($1::text[])
          AND at.token_type = 'password_reset'
          AND at.expires_at > NOW()
          AND at.is_used = false`,
-      [email.toLowerCase()]
+      [emailCandidates(email)]
     );
 
     if (result.rows.length === 0) {
@@ -664,6 +679,8 @@ router.post('/forgetPassword/resetPassword', resetPasswordLimiter, async (req: R
       [decoded.tokenId]
     );
     await pool.query(`DELETE FROM ${REFRESH_TOKENS} WHERE user_id = $1`, [userId]);
+    // Also kills live access tokens here and on the website (shared revocation row).
+    await revokeTokensFor(userId);
 
     res.json({ success: true, message: 'Password reset successfully. Please log in again.' });
     logger.security('auth.password_reset', { userId, ip: req.ip || '' });
@@ -682,7 +699,7 @@ router.post('/verification/sendOTP', otpLimiter, async (req: Request, res: Respo
     return;
   }
 
-  const normalizedEmail = email.toLowerCase();
+  const normalizedEmail = canonicalizeEmail(email);
   const otp = generateOTP(); // cryptographically secure
   const otpHash = await bcrypt.hash(otp, 10); // hash before storing
 
@@ -738,7 +755,7 @@ router.post('/verification/verifyOTP', otpVerifyLimiter, async (req: Request, re
     // Find the pending signup for this email (OTP is stored hashed).
     const pendingResult = await pool.query(
       `SELECT * FROM ${PENDING_SIGNUPS} WHERE email = $1 AND expires_at > NOW()`,
-      [email.toLowerCase()]
+      [canonicalizeEmail(email)]
     );
 
     if (pendingResult.rows.length === 0) {
@@ -851,7 +868,7 @@ router.post('/google', loginLimiter, async (req: Request, res: Response): Promis
     }
 
     const { email, name, sub: googleId, picture } = payload;
-    const normalizedEmail = email.toLowerCase();
+    const normalizedEmail = canonicalizeEmail(email);
 
     let dob: string | null = null;
     let gender: string | null = null;
@@ -895,8 +912,8 @@ router.post('/google', loginLimiter, async (req: Request, res: Response): Promis
 
     // Check if user already exists
     let userResult = await pool.query(
-      `SELECT * FROM ${USERS} WHERE email = $1`,
-      [normalizedEmail]
+      `SELECT * FROM ${USERS} WHERE email = ANY($1::text[])`,
+      [emailCandidates(email)]
     );
 
     let user = userResult.rows[0];
@@ -1016,7 +1033,7 @@ router.post('/apple', loginLimiter, async (req: Request, res: Response): Promise
     }
 
     const appleId = claims.sub;
-    const email = claims.email ? String(claims.email).toLowerCase() : null;
+    const email = claims.email ? canonicalizeEmail(String(claims.email)) : null;
 
     if (!appleId) {
       res.status(401).json({ success: false, message: 'Invalid Apple token' });
@@ -1029,7 +1046,7 @@ router.post('/apple', loginLimiter, async (req: Request, res: Response): Promise
     let user = userResult.rows[0];
 
     if (!user && email) {
-      userResult = await pool.query(`SELECT * FROM ${USERS} WHERE email = $1`, [email]);
+      userResult = await pool.query(`SELECT * FROM ${USERS} WHERE email = ANY($1::text[])`, [emailCandidates(String(claims.email))]);
       user = userResult.rows[0];
     }
 

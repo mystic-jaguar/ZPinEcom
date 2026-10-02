@@ -47,8 +47,9 @@ export default function EditProfileScreen() {
                     setForm({
                         name: raw.name || '',
                         dob: raw.dob ? String(raw.dob).split('T')[0] : '',
-                        // Website stores lowercase ('male') — map onto the picker's option.
-                        gender: GENDERS.find((g) => g.toLowerCase() === String(raw.gender || '').toLowerCase()) || '',
+                        // Website stores lowercase ('male' / 'other') — map onto the picker's option.
+                        gender: GENDERS.find((g) => g.toLowerCase() === String(raw.gender || '').toLowerCase())
+                            || (String(raw.gender || '').toLowerCase() === 'other' ? 'Do not wish to specify' : ''),
                         preferences: {
                             receivePushNotifications: raw.receivePushNotifications ?? raw.receive_push_notifications ?? true,
                             receiveEmailUpdates: raw.receiveEmailUpdates ?? raw.receive_email_updates ?? false,
