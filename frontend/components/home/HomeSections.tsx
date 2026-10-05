@@ -7,6 +7,7 @@ import { Pressable, ScrollView, View } from 'react-native';
 import { createStyles, colors, fonts, palette, radius, s } from '../../constants/theme';
 import { FlashDeal } from '../../services/flashDeals';
 import { productService } from '../../services/product';
+import HomeArt, { ArtKind } from './HomeArt';
 import { Text } from '../ui/ScaledText';
 
 /**
@@ -108,16 +109,16 @@ function MiniCard({ item, onPress, width }: { item: Item; onPress: () => void; w
 
 /* ── Explore Categories ──────────────────────────────────────────────────── */
 
-const SMALL_TILES: { tag: string; label: string; sub: string; img: string; nav: NavTarget }[] = [
-    { tag: 'TOP PICKS', label: 'Footwear', sub: 'Sneakers, shoes & more', img: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400&auto=format&fit=crop', nav: { categoryName: 'Footwear' } },
-    { tag: 'LATEST', label: 'Accessories', sub: 'Bags, watches & eyewear', img: 'https://images.unsplash.com/photo-1549298916-b41d501d3772?w=400&auto=format&fit=crop', nav: { categoryName: 'Accessories' } },
-    { tag: 'HANDPICKED', label: 'Home & Living', sub: 'Décor, storage & more', img: 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=400&auto=format&fit=crop', nav: { categoryName: 'Home & Living' } },
-    { tag: 'GLOW UP', label: 'Beauty', sub: 'Skincare, makeup & care', img: 'https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=400&auto=format&fit=crop', nav: { categoryName: 'Beauty' } },
+const SMALL_TILES: { tag: string; label: string; sub: string; art: ArtKind; nav: NavTarget }[] = [
+    { tag: 'TOP PICKS', label: 'Footwear', sub: 'Sneakers, shoes & more', art: 'footwear', nav: { categoryName: 'Footwear' } },
+    { tag: 'LATEST', label: 'Accessories', sub: 'Bags, watches & eyewear', art: 'accessories', nav: { categoryName: 'Accessories' } },
+    { tag: 'HANDPICKED', label: 'Home & Living', sub: 'Décor, storage & more', art: 'home', nav: { categoryName: 'Home & Living' } },
+    { tag: 'GLOW UP', label: 'Beauty', sub: 'Skincare, makeup & care', art: 'beauty', nav: { categoryName: 'Beauty' } },
 ];
 
-const WIDE_TILES: { tag: string; label: string; sub: string; img: string; nav: NavTarget }[] = [
-    { tag: 'NEW SEASON', label: 'Casual Wear', sub: 'Fresh fits for everyday ease.', img: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=400&auto=format&fit=crop', nav: { categoryName: 'Fashion', subCategoryName: 'Casual' } },
-    { tag: 'ACTIVE LIFE', label: 'Sportswear', sub: 'Gear that moves with you.', img: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&auto=format&fit=crop', nav: { categoryName: 'Fashion', subCategoryName: 'Sportswear' } },
+const WIDE_TILES: { tag: string; label: string; sub: string; art: ArtKind; nav: NavTarget }[] = [
+    { tag: 'NEW SEASON', label: 'Casual Wear', sub: 'Fresh fits for everyday ease.', art: 'fashion', nav: { categoryName: 'Fashion', subCategoryName: 'Casual' } },
+    { tag: 'ACTIVE LIFE', label: 'Sportswear', sub: 'Gear that moves with you.', art: 'sports', nav: { categoryName: 'Fashion', subCategoryName: 'Sportswear' } },
 ];
 
 export function ExploreCategories() {
@@ -136,12 +137,7 @@ export function ExploreCategories() {
 
             {/* Hero — Ethnic & Fusion Wear */}
             <Pressable style={styles.heroCard} onPress={() => go({ categoryName: 'Fashion', subCategoryName: 'Ethnic' })}>
-                <Image
-                    source={{ uri: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=600&auto=format&fit=crop' }}
-                    style={styles.heroImage}
-                    contentFit="cover"
-                />
-                <View style={styles.heroScrim} />
+                <HomeArt kind="ethnic" dark size={64} align="end" style={styles.heroImage} />
                 <View style={styles.heroBody}>
                     <View style={[styles.heroTag, { backgroundColor: palette.warning500 }]}>
                         <Text style={styles.heroTagText}>CULTURE & STYLE</Text>
@@ -159,7 +155,7 @@ export function ExploreCategories() {
             <View style={styles.tileGrid}>
                 {SMALL_TILES.map(t => (
                     <Pressable key={t.label} style={styles.tile} onPress={() => go(t.nav)}>
-                        <Image source={{ uri: cldImage(t.img, 200) }} style={styles.tileImage} contentFit="cover" />
+                        <HomeArt kind={t.art} size={36} style={styles.tileImage} />
                         <View style={styles.tileBody}>
                             <Text style={styles.tileTag}>{t.tag}</Text>
                             <Text style={styles.tileTitle} numberOfLines={1}>{t.label}</Text>
@@ -172,12 +168,7 @@ export function ExploreCategories() {
 
             {/* Hero — Holistic Wellness */}
             <Pressable style={[styles.heroCard, styles.heroSpaced]} onPress={() => go({ categoryName: 'Beauty', subCategoryName: 'Skincare' })}>
-                <Image
-                    source={{ uri: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=600&auto=format&fit=crop' }}
-                    style={styles.heroImage}
-                    contentFit="cover"
-                />
-                <View style={styles.heroScrim} />
+                <HomeArt kind="skincare" dark size={64} align="end" style={styles.heroImage} />
                 <View style={styles.heroBody}>
                     <View style={[styles.heroTag, { backgroundColor: '#8b5cf6' }]}>
                         <Text style={styles.heroTagText}>WELLNESS</Text>
@@ -194,7 +185,7 @@ export function ExploreCategories() {
             {/* Wide tiles */}
             {WIDE_TILES.map(t => (
                 <Pressable key={t.label} style={styles.wideTile} onPress={() => go(t.nav)}>
-                    <Image source={{ uri: cldImage(t.img, 200) }} style={styles.wideTileImage} contentFit="cover" />
+                    <HomeArt kind={t.art} size={40} style={styles.wideTileImage} />
                     <View style={styles.wideTileBody}>
                         <Text style={styles.tileTag}>{t.tag}</Text>
                         <Text style={styles.tileTitle}>{t.label}</Text>
@@ -206,12 +197,7 @@ export function ExploreCategories() {
 
             {/* New arrivals banner */}
             <Pressable style={styles.arrivals} onPress={() => go({ categoryName: 'Fashion', subCategoryName: 'Western' })}>
-                <Image
-                    source={{ uri: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?w=1200&auto=format&fit=crop' }}
-                    style={styles.arrivalsImage}
-                    contentFit="cover"
-                />
-                <View style={styles.arrivalsScrim} />
+                <HomeArt kind="western" dark size={56} align="end" style={styles.arrivalsImage} />
                 <View style={styles.arrivalsBody}>
                     <Text style={styles.arrivalsTag}>NEW SEASON</Text>
                     <Text style={styles.arrivalsTitle}>The New <Text style={{ color: palette.yellow500 }}>ZPIN</Text> Arrivals</Text>
@@ -238,11 +224,11 @@ export function ExploreCategories() {
             {/* Editorial duo */}
             <View style={styles.editorialRow}>
                 {[
-                    { title: 'Luxe Living', sub: 'Premium comfort for your space and style.', img: 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=600&auto=format&fit=crop', nav: { categoryName: 'Home & Living' } as NavTarget },
-                    { title: 'The Detail Room', sub: 'Discover pieces that make life better.', img: 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=600&auto=format&fit=crop', nav: { categoryName: 'Accessories' } as NavTarget },
+                    { title: 'Luxe Living', sub: 'Premium comfort for your space and style.', art: 'home' as ArtKind, nav: { categoryName: 'Home & Living' } as NavTarget },
+                    { title: 'The Detail Room', sub: 'Discover pieces that make life better.', art: 'jewellery' as ArtKind, nav: { categoryName: 'Accessories' } as NavTarget },
                 ].map(e => (
                     <Pressable key={e.title} style={styles.editorialCard} onPress={() => go(e.nav)}>
-                        <Image source={{ uri: cldImage(e.img, 260) }} style={styles.editorialImage} contentFit="cover" />
+                        <HomeArt kind={e.art} size={44} style={styles.editorialImage} />
                         <View style={styles.editorialBody}>
                             <Text style={styles.editorialTitle}>{e.title}</Text>
                             <Text style={styles.editorialSub} numberOfLines={2}>{e.sub}</Text>
@@ -254,11 +240,7 @@ export function ExploreCategories() {
 
             {/* Mastering the Everyday */}
             <View style={styles.feature}>
-                <Image
-                    source={{ uri: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=700&auto=format&fit=crop' }}
-                    style={styles.featureImage}
-                    contentFit="cover"
-                />
+                <HomeArt kind="fashion" size={60} style={styles.featureImage} />
                 <View style={styles.featureBody}>
                     <Text style={styles.kicker}>EDITORIAL</Text>
                     <Text style={styles.featureTitle}>Mastering the Everyday</Text>
@@ -515,7 +497,6 @@ const styles = createStyles({
     heroSpaced: { marginTop: 18 },
     heroCard: { marginHorizontal: 20, minHeight: 210, borderRadius: radius.xl, overflow: 'hidden', backgroundColor: colors.surfaceSunken, justifyContent: 'flex-end' },
     heroImage: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
-    heroScrim: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(14,13,11,0.42)' },
     heroBody: { padding: 20 },
     heroTag: { alignSelf: 'flex-start', borderRadius: 100, paddingHorizontal: 10, paddingVertical: 5, marginBottom: 10 },
     heroTagText: { fontFamily: fonts.monoBold, fontSize: 9, letterSpacing: 1, color: colors.textInvert },
@@ -542,7 +523,6 @@ const styles = createStyles({
 
     arrivals: { marginHorizontal: 20, marginTop: 20, minHeight: 190, borderRadius: radius.xl, overflow: 'hidden', backgroundColor: colors.surfaceInverse, justifyContent: 'center' },
     arrivalsImage: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
-    arrivalsScrim: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(14,13,11,0.55)' },
     arrivalsBody: { padding: 20 },
     arrivalsTag: { fontFamily: fonts.monoBold, fontSize: 9, letterSpacing: 1.2, color: palette.yellow400, marginBottom: 6 },
     arrivalsTitle: { fontFamily: fonts.displayBold, fontSize: 22, lineHeight: 26, letterSpacing: -0.6, color: colors.textInvert },

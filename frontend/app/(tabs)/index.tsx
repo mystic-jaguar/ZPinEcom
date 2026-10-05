@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import ActionModal from '../../components/common/ActionModal';
 import LegalDocModal, { LegalDocType } from '../../components/common/LegalDocModal';
 import FlashDealsPanel from '../../components/home/FlashDealsPanel';
+import HomeArt, { ArtKind, artFor } from '../../components/home/HomeArt';
 import { DiscoverSection, EssentialsGrid, ExploreCategories } from '../../components/home/HomeSections';
 import { ProductCard, SectionHeader, ZText, isNewProduct } from '../../components/ui';
 import { ProductObject } from '../../types/types';
@@ -22,32 +23,30 @@ import { RecentProduct, recentlyViewed } from '../../services/recentlyViewed';
 import { productOneLiner } from '../../utils/productDetail';
 import { Text } from '../../components/ui/ScaledText';
 
-const CATEGORIES = [
-    { id: 'fashion', name: 'Fashion', image: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=200&q=80' },
-    { id: 'footwear', name: 'Footwear', image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=200&q=80' },
-    { id: 'accessories', name: 'Accessories', image: 'https://images.unsplash.com/photo-1549298916-b41d501d3772?auto=format&fit=crop&w=200&q=80' },
-    { id: 'beauty', name: 'Beauty', image: require('../../assets/images/beauty_icon.jpg') },
-    { id: 'home', name: 'Home & Living', image: 'https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=200&q=80' },
+const CATEGORIES: { id: string; name: string; art: ArtKind }[] = [
+    { id: 'fashion', name: 'Fashion', art: 'fashion' },
+    { id: 'footwear', name: 'Footwear', art: 'footwear' },
+    { id: 'accessories', name: 'Accessories', art: 'accessories' },
+    { id: 'beauty', name: 'Beauty', art: 'beauty' },
+    { id: 'home', name: 'Home & Living', art: 'home' },
 ];
 
 const FRESH_ARRIVALS = [
-    { id: '1', name: 'Ethnic Wear', offer: '30% - 70% OFF', image: require('../../assets/images/ethnic_wear_icon.jpg'), color: '#6A994E', category: 'Fashion', subCategory: 'Ethnic' },
-    { id: '2', name: 'Casual Wear', offer: '20% - 60% OFF', image: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=400&q=80', color: '#E9E3D5', category: 'Fashion', subCategory: 'T-Shirts' },
-    { id: '3', name: 'Western', offer: 'FLAT 50% OFF', image: 'https://images.unsplash.com/photo-1551232864-3f0890e580d9?auto=format&fit=crop&w=400&q=80', color: '#D4A373', category: 'Fashion', subCategory: 'Western' },
+    { id: '1', name: 'Ethnic Wear', offer: '30% - 70% OFF', art: 'ethnic' as ArtKind, category: 'Fashion', subCategory: 'Ethnic' },
+    { id: '2', name: 'Casual Wear', offer: '20% - 60% OFF', art: 'fashion' as ArtKind, category: 'Fashion', subCategory: 'T-Shirts' },
+    { id: '3', name: 'Western', offer: 'FLAT 50% OFF', art: 'western' as ArtKind, category: 'Fashion', subCategory: 'Western' },
 ];
 
 const NEARBY_FALLBACK = [
-    { id: '1', name: 'Men', image: require('../../assets/images/men_icon.jpg'), category: 'Fashion', subCategory: 'Men', count: null as number | null },
-    { id: '2', name: 'Women', image: require('../../assets/images/women_icon.jpg'), category: 'Fashion', subCategory: 'Women', count: null as number | null },
-    { id: '3', name: 'Kids', image: 'https://images.unsplash.com/photo-1519457431-44ccd64a579b?auto=format&fit=crop&w=200&q=80', category: 'Fashion', subCategory: 'Kids', count: 0 as number | null },
-    { id: '4', name: 'Makeup', image: require('../../assets/images/makeup_icon.jpg'), category: 'Beauty', subCategory: 'Makeup', count: null as number | null },
+    { id: '1', name: 'Men', art: 'men' as ArtKind, category: 'Fashion', subCategory: 'Men', count: null as number | null },
+    { id: '2', name: 'Women', art: 'women' as ArtKind, category: 'Fashion', subCategory: 'Women', count: null as number | null },
+    { id: '3', name: 'Kids', art: 'kids' as ArtKind, category: 'Fashion', subCategory: 'Kids', count: 0 as number | null },
+    { id: '4', name: 'Makeup', art: 'makeup' as ArtKind, category: 'Beauty', subCategory: 'Makeup', count: null as number | null },
 ];
 
-const HERO_IMAGE = 'https://images.unsplash.com/photo-1489987707025-afc232f7ea0f?auto=format&fit=crop&w=500&q=80';
-
-const BIG_DISCOUNTS = [
-    { id: '1', name: 'Sneaker Steals', desc: "Grab a pair before it's gone!", image: 'https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?auto=format&fit=crop&w=400&q=80', category: 'Footwear', subCategory: 'Sports Shoes' },
-    { id: '2', name: 'Winter Clearance', desc: 'Up to 80% off jackets', image: 'https://images.unsplash.com/photo-1487222477894-8943e31ef7b2?auto=format&fit=crop&w=400&q=80', category: 'Fashion', subCategory: 'Jackets' },
+const BIG_DISCOUNTS: { id: string; name: string; desc: string; art: ArtKind; category: string; subCategory: string }[] = [
+    { id: '1', name: 'Sneaker Steals', desc: "Grab a pair before it's gone!", art: 'footwear', category: 'Footwear', subCategory: 'Sports Shoes' },
+    { id: '2', name: 'Winter Clearance', desc: 'Up to 80% off jackets', art: 'winter', category: 'Fashion', subCategory: 'Jackets' },
 ];
 
 // "For you" infinite grid: paginate up to a cap, then stop and offer "See all".
@@ -59,10 +58,12 @@ const BANNER_AUTO_MS = 5000;
  * carousel entirely, which left a hole in the page whenever merchandising lapsed.
  * Same fallback set (and same reasoning) as the website homepage.
  */
-const FALLBACK_BANNERS: PromoBanner[] = [
-    { id: 'fb1', title: 'Style, delivered in hours', subtitle: 'Shop the new season edit', imageUrl: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?w=1200&auto=format&fit=crop', actionUrl: '/product-listing', bgColor: null },
-    { id: 'fb2', title: 'Try-at-door', subtitle: 'Wear it before you buy it', imageUrl: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=1200&auto=format&fit=crop', actionUrl: '/product-listing', bgColor: null },
-    { id: 'fb3', title: 'Beauty picks', subtitle: 'Skincare & makeup from ₹249', imageUrl: 'https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=1200&auto=format&fit=crop', actionUrl: '/product-listing?categoryName=Beauty', bgColor: null },
+// Built-in banners carry SVG art instead of a photo; admin banners never set `art`.
+type HomeBanner = PromoBanner & { art?: ArtKind };
+const FALLBACK_BANNERS: HomeBanner[] = [
+    { id: 'fb1', title: 'Style, delivered in hours', subtitle: 'Shop the new season edit', art: 'delivery', actionUrl: '/product-listing', bgColor: null },
+    { id: 'fb2', title: 'Try-at-door', subtitle: 'Wear it before you buy it', art: 'tryAtDoor', actionUrl: '/product-listing', bgColor: null },
+    { id: 'fb3', title: 'Beauty picks', subtitle: 'Skincare & makeup from ₹249', art: 'beauty', actionUrl: '/product-listing?categoryName=Beauty', bgColor: null },
 ];
 
 const FORYOU_PAGE_SIZE = 12;
@@ -223,7 +224,7 @@ function HomeFeed() {
                         id: String(i),
                         name: cat.name,
                         offer: 'New Arrival',
-                        image: cat.imageUrl ? { uri: cat.imageUrl } : require('../../assets/images/icon_backup.png'),
+                        art: artFor(cat.name),
                         color: CARD_COLORS[i % CARD_COLORS.length],
                         category: rootCat,
                         subCategory: cat.name,
@@ -235,9 +236,7 @@ function HomeFeed() {
                 setNearby(nearbyData.value.map((cat, i) => ({
                     id: String(i),
                     name: cat.name,
-                    image: cat.imageUrl
-                        ? { uri: cat.imageUrl }
-                        : NEARBY_FALLBACK.find(n => n.name === cat.name)?.image || require('../../assets/images/icon_backup.png'),
+                    art: artFor(cat.name),
                     category: cat.rootCategory,
                     subCategory: cat.subCategory,
                     count: cat.count,
@@ -333,7 +332,7 @@ function HomeFeed() {
 
     // Near-bottom detection on the page scroll (avoids nesting a FlatList in the ScrollView).
     // Promo banners: admin-authored when any are active, editorial fallback otherwise.
-    const banners = promoBanners.length ? promoBanners : FALLBACK_BANNERS;
+    const banners: HomeBanner[] = promoBanners.length ? promoBanners : FALLBACK_BANNERS;
 
     // Auto-advance the carousel, looping back to the first — the website's 5s timer.
     // Swipe + dots are the mobile equivalent of the website's prev/next arrows.
@@ -495,9 +494,7 @@ function HomeFeed() {
                             style={styles.chip}
                             onPress={() => router.push({ pathname: '/(tabs)/categories', params: { categoryId: cat.id } })}
                         >
-                            <View style={styles.chipImageWrap}>
-                                <Image source={typeof cat.image === 'string' ? { uri: cldImage(cat.image, 64) } : cat.image} style={styles.chipImage} contentFit="cover" />
-                            </View>
+                            <HomeArt kind={cat.art} size={26} style={styles.chipImageWrap} />
                             <Text style={styles.chipText} numberOfLines={1}>{cat.name}</Text>
                         </Pressable>
                     ))}
@@ -506,7 +503,7 @@ function HomeFeed() {
                 {/* Try-at-door hero */}
                 <View style={styles.hero}>
                     <View style={styles.heroImageWrap}>
-                        <Image source={{ uri: HERO_IMAGE }} style={styles.heroImage} contentFit="cover" />
+                        <HomeArt kind="tryAtDoor" size={64} style={styles.heroImage} />
                     </View>
                     <View style={styles.heroContent}>
                         <View style={styles.tryBadge}>
@@ -561,10 +558,13 @@ function HomeFeed() {
                                     {b.imageUrl ? (
                                         <Image source={{ uri: cldImage(b.imageUrl, SCREEN_W) }} style={styles.promoImage} contentFit="cover" />
                                     ) : (
-                                        <View style={styles.promoTextWrap}>
-                                            <Text style={styles.promoTitle} numberOfLines={2}>{b.title}</Text>
-                                            {!!b.subtitle && <Text style={styles.promoSub} numberOfLines={2}>{b.subtitle}</Text>}
-                                        </View>
+                                        <>
+                                            {b.art && <HomeArt kind={b.art} size={52} align="end" style={styles.promoArt} />}
+                                            <View style={[styles.promoTextWrap, b.art && styles.promoTextBeside]}>
+                                                <Text style={styles.promoTitle} numberOfLines={2}>{b.title}</Text>
+                                                {!!b.subtitle && <Text style={styles.promoSub} numberOfLines={2}>{b.subtitle}</Text>}
+                                            </View>
+                                        </>
                                     )}
                                 </Pressable>
                             </View>
@@ -590,7 +590,7 @@ function HomeFeed() {
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hList}>
                     {freshArrivals.map((item) => (
                         <Pressable key={item.id} style={styles.freshCard} onPress={() => handleProductNav(item.category, item.subCategory)}>
-                            <Image source={typeof item.image === 'string' ? { uri: cldImage(item.image, 160) } : item.image} style={styles.freshImage} contentFit="cover" />
+                            <HomeArt kind={item.art} size={60} style={styles.freshImage} />
                             <View style={styles.freshOverlay}>
                                 <Text style={styles.freshName} numberOfLines={1}>{item.name}</Text>
                                 <Text style={styles.freshOffer}>{item.offer}</Text>
@@ -625,7 +625,7 @@ function HomeFeed() {
                             return (
                                 <Pressable key={item.id} style={styles.nearbyItem} onPress={() => handleNearbyNav(item)}>
                                     <View style={styles.nearbyImageWrap}>
-                                        <Image source={typeof item.image === 'string' ? { uri: cldImage(item.image, SCREEN_W / 2) } : item.image} style={styles.nearbyImage} contentFit="cover" />
+                                        <HomeArt kind={item.art} size={40} style={styles.nearbyImage} />
                                         {item.count != null && item.count > 0 && (
                                             <View style={styles.nearbyBadge}><Text style={styles.nearbyBadgeText}>{item.count}+</Text></View>
                                         )}
@@ -647,7 +647,7 @@ function HomeFeed() {
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hList}>
                     {BIG_DISCOUNTS.map((item) => (
                         <Pressable key={item.id} style={styles.discountCard} onPress={() => handleProductNav(item.category, item.subCategory)}>
-                            <Image source={{ uri: cldImage(item.image, 240) }} style={styles.discountImage} contentFit="cover" />
+                            <HomeArt kind={item.art} size={52} style={styles.discountImage} />
                             <View style={styles.discountBadge}><Text style={styles.discountBadgeText}>FLAT 40% OFF</Text></View>
                             <View style={styles.discountInfo}>
                                 <Text style={styles.discountName}>{item.name}</Text>
@@ -764,6 +764,8 @@ const styles = createStyles({
     promoDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.borderStrong },
     promoDotActive: { width: 18, backgroundColor: palette.yellow500 },
     promoImage: { width: '100%', height: '100%' },
+    promoArt: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
+    promoTextBeside: { maxWidth: '64%' },
     promoTextWrap: { padding: 20 },
     promoTitle: { fontFamily: fonts.displayBold, fontSize: 20, color: palette.ink },
     promoSub: { fontFamily: fonts.bodyRegular, fontSize: 13, color: palette.neutral700, marginTop: 6 },
@@ -779,7 +781,6 @@ const styles = createStyles({
     chipsRow: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 20, gap: 16, marginTop: 22 },
     chip: { alignItems: 'center', width: 68 },
     chipImageWrap: { width: 64, height: 64, borderRadius: 32, overflow: 'hidden', backgroundColor: colors.surfaceSunken, marginBottom: 7, borderWidth: 1, borderColor: colors.borderSubtle },
-    chipImage: { width: '100%', height: '100%' },
     chipText: { fontFamily: fonts.bodyMedium, fontSize: 12, color: colors.textBody, textAlign: 'center' },
 
     section: { paddingHorizontal: 20, marginTop: 28 },

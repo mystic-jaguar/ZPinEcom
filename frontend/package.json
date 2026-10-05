@@ -11,7 +11,7 @@
     "postinstall": "patch-package",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
-    "test": "tsx utils/scaleStyles.test.ts && tsx constants/supportMatcher.test.mjs"
+    "test": "tsx utils/scaleStyles.test.ts && tsx utils/artFor.test.ts && tsx constants/supportMatcher.test.mjs"
   },
   "dependencies": {
     "@expo-google-fonts/hanken-grotesk": "^0.4.3",
