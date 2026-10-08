@@ -57,14 +57,16 @@ function isWithinReturnWindow(order: { status: string; createdAt?: string; deliv
     if (!ref) return false;
     const d = new Date(ref);
     if (Number.isNaN(d.getTime())) return false;
-    const elapsed = Date.now() - d.getTime();
-    return elapsed >= 0 && elapsed <= RETURN_WINDOW_DAYS * 864e5;
+    // No lower bound: created_at is IST wall-clock in a naive column, read back as
+    // UTC, so a same-day order looks up to 5.5h in the FUTURE. `elapsed >= 0` hid
+    // every order placed today. Backend only checks the upper bound too.
+    return Date.now() - d.getTime() <= RETURN_WINDOW_DAYS * 864e5;
 }
 
 function daysLeft(order: { createdAt?: string }) {
     const ref = order.createdAt;
     if (!ref) return 0;
-    const elapsed = Date.now() - new Date(ref).getTime();
+    const elapsed = Math.max(0, Date.now() - new Date(ref).getTime());
     return Math.max(0, RETURN_WINDOW_DAYS - Math.floor(elapsed / 864e5));
 }
 
