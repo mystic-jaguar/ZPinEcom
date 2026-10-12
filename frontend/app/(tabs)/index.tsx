@@ -38,10 +38,10 @@ const FRESH_ARRIVALS = [
 ];
 
 const NEARBY_FALLBACK = [
-    { id: '1', name: 'Men', art: 'men' as ArtKind, category: 'Fashion', subCategory: 'Men', count: null as number | null },
-    { id: '2', name: 'Women', art: 'women' as ArtKind, category: 'Fashion', subCategory: 'Women', count: null as number | null },
-    { id: '3', name: 'Kids', art: 'kids' as ArtKind, category: 'Fashion', subCategory: 'Kids', count: 0 as number | null },
-    { id: '4', name: 'Makeup', art: 'makeup' as ArtKind, category: 'Beauty', subCategory: 'Makeup', count: null as number | null },
+    { id: '1', name: 'Men', image: require('../../assets/images/men_icon.jpg'), category: 'Fashion', subCategory: 'Men', count: null as number | null },
+    { id: '2', name: 'Women', image: require('../../assets/images/women_icon.jpg'), category: 'Fashion', subCategory: 'Women', count: null as number | null },
+    { id: '3', name: 'Kids', image: 'https://images.unsplash.com/photo-1519457431-44ccd64a579b?auto=format&fit=crop&w=200&q=80', category: 'Fashion', subCategory: 'Kids', count: 0 as number | null },
+    { id: '4', name: 'Makeup', image: require('../../assets/images/makeup_icon.jpg'), category: 'Beauty', subCategory: 'Makeup', count: null as number | null },
 ];
 
 const BIG_DISCOUNTS: { id: string; name: string; desc: string; art: ArtKind; category: string; subCategory: string }[] = [
@@ -236,7 +236,9 @@ function HomeFeed() {
                 setNearby(nearbyData.value.map((cat, i) => ({
                     id: String(i),
                     name: cat.name,
-                    art: artFor(cat.name),
+                    image: cat.imageUrl
+                        ? { uri: cat.imageUrl }
+                        : NEARBY_FALLBACK.find(n => n.name === cat.name)?.image || require('../../assets/images/icon_backup.png'),
                     category: cat.rootCategory,
                     subCategory: cat.subCategory,
                     count: cat.count,
@@ -625,7 +627,7 @@ function HomeFeed() {
                             return (
                                 <Pressable key={item.id} style={styles.nearbyItem} onPress={() => handleNearbyNav(item)}>
                                     <View style={styles.nearbyImageWrap}>
-                                        <HomeArt kind={item.art} size={40} style={styles.nearbyImage} />
+                                        <Image source={typeof item.image === 'string' ? { uri: cldImage(item.image, SCREEN_W / 2) } : item.image} style={styles.nearbyImage} contentFit="cover" />
                                         {item.count != null && item.count > 0 && (
                                             <View style={styles.nearbyBadge}><Text style={styles.nearbyBadgeText}>{item.count}+</Text></View>
                                         )}

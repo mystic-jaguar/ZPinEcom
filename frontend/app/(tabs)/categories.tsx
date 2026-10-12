@@ -21,16 +21,6 @@ const CATEGORY_META: Record<string, { image: any; unit: string }> = {
     home: { image: { uri: 'https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=500&q=80' }, unit: 'items' },
 };
 
-// Curated quick-access subcategories under Fashion.
-const POPULAR = [
-    { name: 'T-Shirts', root: 'Fashion' },
-    { name: 'Jeans', root: 'Fashion' },
-    { name: 'Kurtas', root: 'Fashion' },
-    { name: 'Dresses', root: 'Fashion' },
-    { name: 'Co-Ords', root: 'Fashion' },
-    { name: 'Jackets', root: 'Fashion' },
-];
-
 // Real count of leaf subcategories under a node — a decorative-but-honest tally.
 const countLeaves = (n: CategoryNode): number =>
     n.children && n.children.length ? n.children.reduce((s, c) => s + countLeaves(c), 0) : 1;
@@ -70,8 +60,8 @@ const gridMetrics = {
 } as const;
 
 // Card-grid landing (matches design doc): a hero feature tile for the first
-// category, an image grid for the rest, and popular quick-access chips.
-const CategoryLanding = ({ onOpen, onPopular }: { onOpen: (cat: CategoryNode) => void; onPopular: (name: string, root: string) => void; }) => {
+// category and an image grid for the rest.
+const CategoryLanding = ({ onOpen }: { onOpen: (cat: CategoryNode) => void }) => {
     const [feature, ...rest] = CATEGORY_DATA;
     const featMeta = CATEGORY_META[feature.id];
     return (
@@ -120,15 +110,6 @@ const CategoryLanding = ({ onOpen, onPopular }: { onOpen: (cat: CategoryNode) =>
                 })}
             </View>
 
-            {/* Popular chips */}
-            <Text style={styles.popularLabel}>Popular in Fashion</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.popularRow}>
-                {POPULAR.map((p) => (
-                    <TouchableOpacity key={p.name} style={styles.popularChip} onPress={() => onPopular(p.name, p.root)}>
-                        <Text style={styles.popularChipText}>{p.name}</Text>
-                    </TouchableOpacity>
-                ))}
-            </ScrollView>
             <View style={{ height: 120 }} />
         </ScrollView>
     );
@@ -355,7 +336,7 @@ export default function CategoriesScreen() {
                     <MainCategoryView key={drilledCategory.id} category={drilledCategory} onLeafPress={handleLeafPress} />
                 </View>
             ) : (
-                <CategoryLanding onOpen={(cat) => setDrilledId(cat.id)} onPopular={handleLeafPress} />
+                <CategoryLanding onOpen={(cat) => setDrilledId(cat.id)} />
             )}
         </SafeAreaView>
     );
@@ -390,11 +371,6 @@ const styles = createStyles({
     landingCardCaption: { position: 'absolute', left: 14, bottom: 13, right: 14 },
     landingCardTitle: { fontFamily: fonts.displayBold, fontSize: 18, color: colors.textInvert },
     landingCardCount: { fontFamily: fonts.monoBold, fontSize: 9, letterSpacing: 0.8, color: palette.neutral200 },
-
-    popularLabel: { fontFamily: fonts.monoBold, fontSize: 10, letterSpacing: 1.6, color: colors.textMuted, textTransform: 'uppercase', marginTop: 26, marginBottom: 14 },
-    popularRow: { gap: 10, paddingRight: 20 },
-    popularChip: { backgroundColor: colors.surfaceCard, borderWidth: 2, borderColor: colors.borderSubtle, paddingVertical: 9, paddingHorizontal: 16, borderRadius: 100 },
-    popularChipText: { fontFamily: fonts.bodyBold, fontSize: 13, color: colors.textBody },
 
     mainContent: { flex: 1, backgroundColor: palette.paperWarm, borderTopWidth: 1, borderTopColor: colors.borderSubtle },
     categoryHeader: { paddingTop: 20, paddingHorizontal: 20, paddingBottom: 10 },
