@@ -286,5 +286,5 @@ const styles = createStyles({
     radioOn: { backgroundColor: palette.yellow500, borderWidth: 0 },
     infoBox: { flexDirection: 'row', gap: 10, alignItems: 'flex-start', backgroundColor: palette.yellow100, borderRadius: radius.md, padding: 14, marginTop: 18 },
     infoText: { flex: 1, fontFamily: fonts.bodyRegular, fontSize: 12, lineHeight: 18, color: palette.yellow800 },
-    bottomBar: { position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', gap: 12, backgroundColor: colors.surfaceCard, borderTopWidth: 1, borderTopColor: colors.surfaceSunken, paddingHorizontal: 20, paddingTop: 16 },
+    bottomBar: { flexDirection: 'row', gap: 12, backgroundColor: colors.surfaceCard, borderTopWidth: 1, borderTopColor: colors.surfaceSunken, paddingHorizontal: 20, paddingTop: 16 },
 });
