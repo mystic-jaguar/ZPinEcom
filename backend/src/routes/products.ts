@@ -364,7 +364,22 @@ router.get('/recommended', authenticate, async (req: AuthRequest, res: Response)
 // escaped: "%" alone matched every product, "_" matched any character.
 const escapeLike = (s: string) => s.replace(/[\\%_]/g, '\\$&');
 
-// GET /api/v1/products/search?q= — full-text product name search with related products
+// Record a committed app search in search_logs for the admin "Top searched"
+// card — same row shape as the website's logSearch (productController.js), with
+// source='app'. The app searches as you type, so only requests the app marks
+// `log=1` (enter, a tapped term, a tapped result) count; logging every debounced
+// keystroke would fill the card with prefixes. Fire-and-forget: a logging
+// failure can never break search.
+function logSearch(req: Request, q: string, resultsCount: number): void {
+  if (req.query.log !== '1' || q.length > 200) return;
+  pool.query(
+    `INSERT INTO search_logs (query, normalized_query, results_count, source)
+     VALUES ($1, $2, $3, 'app')`,
+    [q, q.toLowerCase().replace(/\s+/g, ' '), resultsCount]
+  ).catch(err => logger.warn('search.log_failed', { error: err?.message ?? String(err) }));
+}
+
+// GET /api/v1/products/search?q=&log=1 — full-text product name search with related products
 router.get('/search', productListLimiter, async (req: Request, res: Response): Promise<void> => {
   const zone = catalogZone(req.query.pincode);
   const q = (req.query.q as string || '').trim();
@@ -383,7 +398,7 @@ router.get('/search', productListLimiter, async (req: Request, res: Response): P
   // this Redis, so the window is kept short rather than invalidated.
   const cacheKey = `search:${q.toLowerCase()}:l${limit}${zone.key}`;
   const cached = await cacheGet(cacheKey);
-  if (cached) { res.json(cached); return; }
+  if (cached) { logSearch(req, q, (cached as any).products?.length ?? 0); res.json(cached); return; }
 
   try {
     // Normalize query — treat "keychain" and "key chain" as equivalent
@@ -532,6 +547,7 @@ router.get('/search', productListLimiter, async (req: Request, res: Response): P
 
     const response = { success: true, products, related };
     await cacheSet(cacheKey, response, TTL_SEARCH);
+    logSearch(req, q, products.length);
     res.json(response);
   } catch (err) {
     logger.error('search_error', { error: (err as any)?.message ?? String(err) });

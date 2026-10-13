@@ -24,7 +24,9 @@ export default function ProductSearchScreen() {
     const [refreshing, setRefreshing] = useState(false);
     const searchTimeout = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    const runSearch = async (query: string, silent = false) => {
+    // `log` marks a committed search (enter, tapped term) for the admin's Top
+    // searches card; as-you-type requests are not counted.
+    const runSearch = async (query: string, silent = false, log = false) => {
         if (!query.trim()) {
             setSearchResults([]);
             setRelatedProducts([]);
@@ -32,7 +34,7 @@ export default function ProductSearchScreen() {
         }
         if (!silent) setLoading(true);
         try {
-            const response = await apiClient.get('products/search', { params: { q: query, limit: 50 } });
+            const response = await apiClient.get('products/search', { params: { q: query, limit: 50, ...(log ? { log: 1 } : {}) } });
             setSearchResults(response.data.products || []);
             setRelatedProducts(response.data.related || []);
         } catch {
@@ -62,14 +64,18 @@ export default function ProductSearchScreen() {
     };
 
     const handleProductPress = (item: ProductObject) => {
-        if (searchQuery.trim().length >= 2) addSearch(searchQuery.trim());
+        if (searchQuery.trim().length >= 2) {
+            addSearch(searchQuery.trim());
+            // Tapping a result commits the typed query — count it (cache hit server-side).
+            apiClient.get('products/search', { params: { q: searchQuery.trim(), limit: 50, log: 1 } }).catch(() => {});
+        }
         if (item.deepestCategoryName) addSearch(item.deepestCategoryName);
         router.push(`/product/${item.productId}`);
     };
 
     const applyTerm = (term: string) => {
         setSearchQuery(term);
-        runSearch(term);
+        runSearch(term, false, true);
     };
 
     const allDisplayed = [
@@ -110,6 +116,10 @@ export default function ProductSearchScreen() {
                         onChangeText={handleSearchChange}
                         autoFocus
                         returnKeyType="search"
+                        onSubmitEditing={() => {
+                            if (searchTimeout.current) clearTimeout(searchTimeout.current);
+                            if (searchQuery.trim().length >= 2) runSearch(searchQuery, false, true);
+                        }}
                     />
                     {searchQuery.length > 0 && (
                         <Pressable onPress={() => handleSearchChange('')} hitSlop={8}>
