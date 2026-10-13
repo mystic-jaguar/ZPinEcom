@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useState } from 'react';
 import { Dimensions, Modal, Platform, Pressable, View } from 'react-native';
+import { Text } from '../ui/ScaledText';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -53,12 +54,15 @@ export default function ImageZoomModal({
     initialIndex,
     onClose,
     onIndexChange,
+    caption,
 }: {
     visible: boolean;
     images: any[];
     initialIndex: number;
     onClose: () => void;
     onIndexChange?: (index: number) => void;
+    /** Shown in a panel under the photo — review photos pass the review itself. */
+    caption?: React.ReactNode;
 }) {
     const insets = useSafeAreaInsets();
     const [index, setIndex] = useState(initialIndex);
@@ -188,6 +192,14 @@ export default function ImageZoomModal({
                         <Ionicons name="close" size={26} color="#FFFFFF" />
                     </Pressable>
                     {images.length > 1 && (
+                        <View style={[styles.counter, { top: Math.max(insets.top + 16, 30) }]}>
+                            <Text style={styles.counterText}>{index + 1} / {images.length}</Text>
+                        </View>
+                    )}
+                    {!!caption && (
+                        <View style={[styles.caption, { paddingBottom: 16 + insets.bottom }]}>{caption}</View>
+                    )}
+                    {images.length > 1 && !caption && (
                         <View style={styles.pagination}>
                             {images.map((_, i) => (
                                 <View key={i} style={[styles.dot, i === index ? styles.activeDot : styles.inactiveDot]} />
@@ -216,6 +228,19 @@ const styles = createStyles({
     pagination: {
         position: 'absolute', bottom: 40, alignSelf: 'center',
         flexDirection: 'row', zIndex: 10,
+        ...Platform.select({ android: { elevation: 10 } }),
+    },
+    counter: {
+        position: 'absolute', left: 20, zIndex: 10,
+        paddingHorizontal: 12, paddingVertical: 5, borderRadius: 999,
+        backgroundColor: 'rgba(255,255,255,0.18)',
+        ...Platform.select({ android: { elevation: 10 } }),
+    },
+    counterText: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
+    caption: {
+        position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 10,
+        paddingHorizontal: 20, paddingTop: 16,
+        backgroundColor: 'rgba(0,0,0,0.72)',
         ...Platform.select({ android: { elevation: 10 } }),
     },
     dot: { height: 4, borderRadius: 2, marginHorizontal: 3 },

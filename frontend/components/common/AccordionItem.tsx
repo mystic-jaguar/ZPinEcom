@@ -1,5 +1,5 @@
 import { Feather } from '@expo/vector-icons';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { TouchableOpacity, View } from 'react-native';
 import { Text } from '../ui/ScaledText';
 import { createStyles } from '../../constants/theme';
@@ -8,10 +8,13 @@ interface AccordionItemProps {
     title: string;
     children: React.ReactNode;
     initiallyExpanded?: boolean;
+    /** Bump to open the section from outside (e.g. a "jump to reviews" tap). */
+    openSignal?: number;
 }
 
-export default function AccordionItem({ title, children, initiallyExpanded = false }: AccordionItemProps) {
+export default function AccordionItem({ title, children, initiallyExpanded = false, openSignal }: AccordionItemProps) {
     const [expanded, setExpanded] = useState(initiallyExpanded);
+    useEffect(() => { if (openSignal) setExpanded(true); }, [openSignal]);
 
     return (
         <View style={styles.container}>

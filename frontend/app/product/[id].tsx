@@ -2,7 +2,7 @@ import { Feather, Ionicons } from '@expo/vector-icons';
 import { cldImage } from '../../constants/cloudinary';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { PackageX, RotateCcw, Shirt, ShoppingCart, Store, Zap } from 'lucide-react-native';
-import { EmptyState } from '../../components/ui';
+import { EmptyState, SectionHeader } from '../../components/ui';
 import { useFocusEffect } from '@react-navigation/native';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, RefreshControl, ScrollView, TouchableOpacity, View } from 'react-native';
@@ -22,7 +22,7 @@ import { useWishlist } from '../../context/WishlistContext';
 import { useRequireAuth } from '../../context/AuthPromptContext';
 import apiClient, { tokenManager } from '../../services/api';
 import { productService } from '../../services/product';
-import { recentlyViewed } from '../../services/recentlyViewed';
+import { recentlyViewed, RecentProduct } from '../../services/recentlyViewed';
 import * as ImagePicker from 'expo-image-picker';
 import { MAX_REVIEW_IMAGES, reviewService } from '../../services/review';
 import { userService } from '../../services/user';
@@ -44,7 +44,21 @@ export default function ProductDetails() {
     const requireAuth = useRequireAuth();
     const { orders, isLoading: isOrdersLoading } = useOrder();
     const [showSuccessModal, setShowSuccessModal] = useState(false);
-    const [reviewPhotos, setReviewPhotos] = useState<{ images: string[]; index: number } | null>(null);
+    const [reviewPhotos, setReviewPhotos] = useState<{ review: ReviewObject; index: number } | null>(null);
+    const [recent, setRecent] = useState<RecentProduct[]>([]);
+    // Rating badge → open the Reviews section and scroll to it.
+    const scrollRef = React.useRef<ScrollView>(null);
+    const reviewsRef = React.useRef<View>(null);
+    const [openReviews, setOpenReviews] = useState(0);
+    const goToReviews = () => {
+        setOpenReviews(n => n + 1);
+        // After the section has expanded, so the measured position is final.
+        setTimeout(() => {
+            const inner = (scrollRef.current as any)?.getInnerViewRef?.();
+            if (!inner || !reviewsRef.current) return;
+            reviewsRef.current.measureLayout(inner, (_x, y) => scrollRef.current?.scrollTo({ y: Math.max(y - 12, 0), animated: true }), () => undefined);
+        }, 120);
+    };
     const [showVariantWarningModal, setShowVariantWarningModal] = useState(false);
     const [unavailableMessage, setUnavailableMessage] = useState<string | null>(null);
     const [showDeleteReviewModal, setShowDeleteReviewModal] = useState(false);
@@ -144,10 +158,12 @@ export default function ProductDetails() {
             setError(null);
             const [data, related, couponsRes] = await Promise.all([
                 productService.getProductById(productId),
-                productService.getProducts({ limit: 6 }).then(r => r.products.filter(p => p.productId !== productId).slice(0, 4)).catch(() => []),
+                productService.getProducts({ limit: 9 }).then(r => r.products.filter(p => p.productId !== productId).slice(0, 8)).catch(() => []),
                 apiClient.get('coupons').catch(() => ({ data: { data: [] } })),
             ]);
             setProduct(data);
+            // Read before adding, so this product isn't in its own rail.
+            recentlyViewed.list().then(list => setRecent(list.filter(r => r.id !== (data.productId || productId)))).catch(() => undefined);
             recentlyViewed.add({ id: data.productId || productId, name: data.productName, price: Number(data.dealPrice ?? data.price) || 0, image: data.images?.[0] || '' });
             setRelatedProducts(related);
             await loadReviews(productId);
@@ -400,7 +416,7 @@ export default function ProductDetails() {
 
     return (
         <View style={styles.container}>
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 130 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[palette.yellow500]} tintColor={palette.yellow500} />}>
+            <ScrollView ref={scrollRef} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 130 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[palette.yellow500]} tintColor={palette.yellow500} />}>
                 {/* Images Carousel */}
                 <View style={{ position: 'relative' }}>
                     <ProductImageCarousel
@@ -426,10 +442,16 @@ export default function ProductDetails() {
                     <View style={styles.titleRow}>
                         <Text style={styles.productName}>{product.productName}</Text>
                         {(product.rating ?? 0) > 0 && (
-                            <View style={[styles.ratingBadge, { backgroundColor: (product.rating ?? 0) >= 4 ? '#059669' : (product.rating ?? 0) >= 3 ? '#D97706' : '#EF4444' }]}>
+                            <Pressable
+                                onPress={goToReviews}
+                                hitSlop={8}
+                                accessibilityRole="button"
+                                accessibilityLabel="Go to customer reviews"
+                                style={[styles.ratingBadge, { backgroundColor: (product.rating ?? 0) >= 4 ? '#059669' : (product.rating ?? 0) >= 3 ? '#D97706' : '#EF4444' }]}
+                            >
                                 <Text style={styles.ratingText}>{(product.rating ?? 0).toFixed(1)}</Text>
                                 <Ionicons name="star" size={10} color="#fff" />
-                            </View>
+                            </Pressable>
                         )}
                     </View>
 
@@ -633,7 +655,8 @@ export default function ProductDetails() {
                         </AccordionItem>
                     )}
 
-                    <AccordionItem title={`Reviews${reviewTotal > 0 ? ` (${reviewTotal})` : ''}`}>
+                    <View ref={reviewsRef} collapsable={false}>
+                    <AccordionItem title={`Reviews${reviewTotal > 0 ? ` (${reviewTotal})` : ''}`} openSignal={openReviews}>
                         {/* Star distribution — counts come from the API so they cover
                             every review, not just the first page loaded below. */}
                         {reviewTotal > 0 && (
@@ -779,7 +802,7 @@ export default function ProductDetails() {
                                         {!!r.images?.length && (
                                             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.reviewPhotoStrip}>
                                                 {r.images.map((uri, i) => (
-                                                    <Pressable key={uri} onPress={() => setReviewPhotos({ images: r.images!, index: i })} accessibilityRole="imagebutton" accessibilityLabel="View review photo">
+                                                    <Pressable key={uri} onPress={() => setReviewPhotos({ review: r, index: i })} accessibilityRole="imagebutton" accessibilityLabel="View review photo">
                                                         <Image source={{ uri: cldImage(uri, 64) }} style={styles.reviewPhoto} />
                                                     </Pressable>
                                                 ))}
@@ -802,6 +825,7 @@ export default function ProductDetails() {
                             )}
                         </View>
                     </AccordionItem>
+                    </View>
 
                     <AccordionItem title="Shipping & Returns">
                         <Text style={styles.bodyText}>Standard shipping logic applies.</Text>
@@ -809,37 +833,25 @@ export default function ProductDetails() {
 
                 </View>
 
-                {/* You might also like Section */}
-                {relatedProducts.length > 0 && (
-                <View style={styles.recommendationSection}>
-                    <Text style={styles.sectionTitle}>You might also like</Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20 }}>
-                        {relatedProducts.map((p) => (
-                            <TouchableOpacity
-                                key={p.productId}
-                                style={styles.recCard}
-                                onPress={() => router.push(`/product/${p.productId}`)}
-                            >
-                                <View style={styles.recImagePlaceholder}>
-                                    {p.images?.[0] ? (
-                                        <Image
-                                            source={{ uri: cldImage(p.images[0] as string, 180) }}
-                                            style={{ width: '100%', height: '100%', borderRadius: 12 }}
-                                            resizeMode="cover"
-                                        />
-                                    ) : (
-                                        <View style={{ alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-                                            <Feather name="image" size={24} color="#ccc" />
-                                        </View>
-                                    )}
-                                </View>
-                                <Text style={styles.recTitle} numberOfLines={1}>{p.productName}</Text>
-                                <Text style={styles.recPrice}>₹{p.price}</Text>
-                            </TouchableOpacity>
-                        ))}
-                    </ScrollView>
-                </View>
-                )}
+                {/* New Arrivals — the listing API's default order is newest first */}
+                <ProductRail
+                    title="New Arrivals"
+                    eyebrow="FRESH DROPS"
+                    onViewAll={() => router.push('/product-listing')}
+                    items={relatedProducts.map(p => ({
+                        id: p.productId, name: p.productName, price: Number(p.price) || 0,
+                        image: (p.images?.[0] as string) || '',
+                    }))}
+                    onOpen={(pid) => router.push(`/product/${pid}`)}
+                />
+
+                {/* Recently Viewed — device-local history, minus this product */}
+                <ProductRail
+                    title="Recently Viewed"
+                    eyebrow="PICK UP WHERE YOU LEFT OFF"
+                    items={recent}
+                    onOpen={(pid) => router.push(`/product/${pid}`)}
+                />
 
             </ScrollView>
 
@@ -860,9 +872,33 @@ export default function ProductDetails() {
 
             <ImageZoomModal
                 visible={reviewPhotos !== null}
-                images={(reviewPhotos?.images || []).map(uri => ({ uri: cldImage(uri, 1080) }))}
+                images={(reviewPhotos?.review.images || []).map(uri => ({ uri: cldImage(uri, 1080) }))}
                 initialIndex={reviewPhotos?.index ?? 0}
                 onClose={() => setReviewPhotos(null)}
+                // The photo with the review it belongs to, like the website's viewer.
+                caption={reviewPhotos && (
+                    <View>
+                        <View style={styles.viewerHead}>
+                            <View style={styles.viewerAvatar}>
+                                <Text style={styles.viewerAvatarText}>{(reviewPhotos.review.user?.name || 'U').charAt(0).toUpperCase()}</Text>
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.viewerName} numberOfLines={1}>{reviewPhotos.review.user?.name || 'User'}</Text>
+                                <View style={styles.viewerMeta}>
+                                    {[1, 2, 3, 4, 5].map(n => (
+                                        <Ionicons key={n} name="star" size={11} color={n <= reviewPhotos.review.rating ? '#FBBF24' : 'rgba(255,255,255,0.3)'} />
+                                    ))}
+                                    <Text style={styles.viewerDate}>
+                                        {'  '}{new Date(reviewPhotos.review.createdAt).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', year: 'numeric' })}
+                                    </Text>
+                                </View>
+                            </View>
+                        </View>
+                        {!!reviewPhotos.review.comment && (
+                            <Text style={styles.viewerComment} numberOfLines={4}>{reviewPhotos.review.comment}</Text>
+                        )}
+                    </View>
+                )}
             />
 
             <ActionModal
@@ -946,7 +982,48 @@ export default function ProductDetails() {
     );
 }
 
+/** Horizontal product rail under the page — New Arrivals, Recently Viewed. Hidden when empty. */
+function ProductRail({ title, eyebrow, items, onOpen, onViewAll }: {
+    title: string; eyebrow?: string; items: RecentProduct[];
+    onOpen: (id: string) => void; onViewAll?: () => void;
+}) {
+    if (!items.length) return null;
+    return (
+        <View style={styles.recommendationSection}>
+            <SectionHeader
+                eyebrow={eyebrow}
+                title={title}
+                actionLabel={onViewAll ? 'View all' : undefined}
+                onAction={onViewAll}
+                style={{ paddingHorizontal: 20 }}
+            />
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20 }}>
+                {items.map((p) => (
+                    <TouchableOpacity key={p.id} style={styles.recCard} onPress={() => onOpen(p.id)}>
+                        <View style={styles.recImagePlaceholder}>
+                            {p.image ? (
+                                <Image source={{ uri: cldImage(p.image, 180) }} style={{ width: '100%', height: '100%', borderRadius: 12 }} resizeMode="cover" />
+                            ) : (
+                                <Feather name="image" size={24} color="#ccc" />
+                            )}
+                        </View>
+                        <Text style={styles.recTitle} numberOfLines={1}>{p.name}</Text>
+                        <Text style={styles.recPrice}>₹{Number(p.price).toLocaleString('en-IN')}</Text>
+                    </TouchableOpacity>
+                ))}
+            </ScrollView>
+        </View>
+    );
+}
+
 const styles = createStyles({
+    viewerHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    viewerAvatar: { width: 34, height: 34, borderRadius: 17, backgroundColor: palette.yellow500, alignItems: 'center', justifyContent: 'center' },
+    viewerAvatarText: { fontFamily: fonts.bodyBold, fontSize: 14, color: colors.textOnYellow },
+    viewerName: { fontFamily: fonts.bodyBold, fontSize: 14, color: '#fff' },
+    viewerMeta: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
+    viewerDate: { fontSize: 11, color: 'rgba(255,255,255,0.7)' },
+    viewerComment: { fontSize: 13, lineHeight: 19, color: 'rgba(255,255,255,0.92)', marginTop: 10 },
     container: {
         flex: 1,
         backgroundColor: '#fff'
